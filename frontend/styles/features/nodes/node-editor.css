@@ -973,7 +973,6 @@ dialog.node-wide .node-main-section .country-picker-dropdown .country-option {
 
 /* Node editor: one shell, task tabs, and one scrolling content region. */
 dialog.node-wide { --dialog-width:72rem; }
-dialog.node-wide:has([data-node-editor-tab="network"][aria-selected="true"],[data-node-editor-tab="billing"][aria-selected="true"]) { --dialog-width:48rem; }
 dialog#dlg.node-wide > form.box {
   display:flex;
   flex-direction:column;
@@ -1036,7 +1035,8 @@ dialog.node-wide .node-editor-tabs [role=tab]:hover { color:var(--tx); }
 dialog.node-wide .node-editor-tabs [role=tab]:focus-visible { outline:2px solid var(--a);outline-offset:2px; }
 dialog.node-wide .node-form-layout {
   flex:0 1 auto;
-  display:block;
+  display:grid;
+  grid-template-rows:minmax(0,1fr);
   min-width:0;
   min-height:0;
   padding:.85rem .15rem;
@@ -1044,8 +1044,11 @@ dialog.node-wide .node-form-layout {
   overscroll-behavior:contain;
   scrollbar-gutter:stable;
 }
-dialog.node-wide [data-node-editor-pane][hidden] { display:none; }
-dialog.node-wide .node-connection-pane {
+/* All tasks share one intrinsic frame, keeping header, tabs and actions still. */
+dialog.node-wide [data-node-editor-pane] { grid-area:1/1;min-width:0;align-self:start; }
+dialog.node-wide [data-node-editor-pane][data-active=false] { visibility:hidden;pointer-events:none;max-height:100%;overflow:clip; }
+dialog.node-wide [data-node-editor-pane][data-active=false] :is(.country-dropdown,.user-date-calendar) { display:none; }
+dialog.node-wide :is(.node-connection-pane,.node-task-workspace) {
   display:grid;
   grid-template-columns:minmax(0,1.8fr) minmax(14rem,1fr);
   gap:2rem;
@@ -1141,14 +1144,22 @@ dialog.node-wide .node-tls-readiness[data-mode=on][data-ready=no] { color:var(--
 dialog.node-wide .node-tls-readiness[hidden] { display:none; }
 dialog.node-wide .node-tls-context { margin:.35rem 0 .5rem;color:var(--mu);font-size:.73rem;line-height:1.5; }
 dialog.node-wide .node-tls-stored-flags { display:none; }
-dialog.node-wide :is(.node-ip-section,.node-billing-section) { max-width:43rem; }
 dialog.node-wide .node-billing-fields > :has([name=billingProviderUrl]),
 dialog.node-wide .node-billing-fields > :has([name=billingNote]) { grid-column:1/-1; }
 dialog.node-wide .node-ip-hint { margin:-.45rem 0 1.1rem;color:var(--mu);font-size:.8rem;line-height:1.5; }
-dialog.node-wide .node-rotation-editor-body { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem; padding:0; }
-dialog.node-wide .node-rotation-editor-body > :is(.f:has(textarea),.node-pool-toolbar,output,.node-rotation-probe) { grid-column:1/-1; }
-dialog.node-wide .node-rotation-editor-body > output:empty { display:none; }
-dialog.node-wide .node-rotation-editor-body textarea { height:10rem;min-height:6rem;resize:vertical; }
+dialog.node-wide .node-rotation-editor-body { padding:0; }
+dialog.node-wide .node-pool-editor { display:grid;gap:.8rem;min-width:0;align-content:start; }
+dialog.node-wide .node-pool-editor .node-form-section-title { margin-bottom:0; }
+dialog.node-wide .node-pool-editor .node-ip-hint { margin:0; }
+dialog.node-wide .node-pool-editor > output:empty { display:none; }
+dialog.node-wide .node-rotation-editor-body textarea { height:clamp(12rem,28dvh,17rem);min-height:8rem;resize:vertical; }
+dialog.node-wide .node-task-aside { min-width:0;padding-left:1.5rem;border-left:1px solid var(--nx-separator); }
+dialog.node-wide .node-rotation-settings { display:grid;gap:1rem;align-content:start; }
+dialog.node-wide .node-rotation-settings .node-form-section-title { margin-bottom:0; }
+dialog.node-wide .node-rotation-settings .f:has([name=rotationEnabled]) { display:flex;align-items:center;justify-content:space-between;gap:1rem; }
+dialog.node-wide .node-rotation-settings .node-rotation-probe button { white-space:normal;max-width:100%; }
+dialog.node-wide .node-provider-editor .node-billing-fields { grid-template-columns:minmax(0,1fr); }
+dialog.node-wide .node-provider-editor textarea { min-height:6rem;height:7.5rem;resize:vertical; }
 dialog.node-wide .node-pool-toolbar { display:flex;gap:.5rem;align-items:center;flex-wrap:wrap; }
 dialog.node-wide .node-pool-toolbar span { margin-right:auto;font-size:.75rem;color:var(--mu); }
 dialog.node-wide > form.box > .act {
@@ -1201,8 +1212,8 @@ dialog.node-wide .node-tls-setup-feedback { margin:0;font-size:.75rem;line-heigh
 dialog.node-wide .node-tls-setup-feedback[data-ready=no] { color:var(--er); }
 @media(max-width:760px) {
   dialog#dlg.node-wide > form.box { padding:1rem; }
-  dialog.node-wide .node-connection-pane { grid-template-columns:minmax(0,1fr);gap:1.2rem; }
-  dialog.node-wide .node-network-stack { border-left:0;border-top:1px solid var(--nx-separator);padding:1.1rem 0 0; }
+  dialog.node-wide :is(.node-connection-pane,.node-task-workspace) { grid-template-columns:minmax(0,1fr);gap:1.2rem; }
+  dialog.node-wide :is(.node-network-stack,.node-task-aside) { border-left:0;border-top:1px solid var(--nx-separator);padding:1.1rem 0 0; }
   dialog.node-wide .node-editor-tabs { gap:.1rem; }
   dialog.node-wide .node-editor-tabs [role=tab] { padding:.6rem .65rem;font-size:.8rem; }
 }
