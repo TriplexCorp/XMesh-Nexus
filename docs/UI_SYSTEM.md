@@ -235,6 +235,26 @@ viewport-safe height without the former 54rem cap, pane baselines, and reopening
 Artifacts include `nodes-{width}x{height}.png` and
 `user-details-{width}x{height}.png` at 1920×1080, 2560×1440 and 3440×1440.
 
+#### User Details visual continuity
+
+User Details is an **existing Nexus workspace**, not a separate design product.
+Do not implement generated neon/cyber mockups as a new CSS material or overlay.
+All four tabs must inherit Classic, Glass, Raised, density, radius, borders,
+accent, motion and focus from the global system. Feature CSS may improve layout
+and content hierarchy, but must not add new glow, gradient frames, fake KPI
+charts, decorative empty tiles or double-bordered panels.
+
+Reuse the existing `ic()` SVG set for semantic section labels, dates and
+actions. Keep the Xray usage donut and per-server breakdown tied to actual
+authenticated user-counter data. A calendar may identify the timestamp of the
+latest confirmed sample, but **never imply historical daily values** without a
+time-series API. One user-level draft and Save action, inert inactive tabs,
+one scroll owner, viewer masking and all device controls must be preserved.
+
+Review every user-tab screenshot alongside surrounding Nexus pages in Classic,
+Glass, Raised and both themes; adjust feature spacing, not global palette,
+shadows or action-button anatomy.
+
 ### Tables / Users / Squads / Hosts
 
 Short tables are short surfaces. They do not reserve fleet-scale height. Empty page background below real content is preferable to artificial stretching.
