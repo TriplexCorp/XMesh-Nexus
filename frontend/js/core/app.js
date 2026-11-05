@@ -336,16 +336,8 @@ const ENT={
       // Enrolling a fresh node needs no XRAY STUDIO profile. Configuration is
       // optional until an operator assigns a profile to the enrolled node.
       const nodeProfile=DB.profiles.find(p=>String(p.id)===String(data.profileId));
-      const requiresTLS=nodeProfile&&inbs(nodeProfile).some(ib=>ib.streamSettings?.security==='tls');
-      if(requiresTLS&&data.tlsAutoProvision&&data.tlsManualProvision)
-        return 'Выберите только один способ управления сертификатом.';
-      if(requiresTLS&&data.tlsAutoProvision){
-        const domain=String(data.tlsDomain||data.addr||'').trim().toLowerCase(),email=String(data.tlsAcmeEmail||'').trim();
-        if(!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain))return 'Управляемый TLS: укажите корректный DNS-домен ноды.';
-        // The installer contact is available only to the backend. A blank
-        // node-specific email is valid and inherits PANEL_ACME_EMAIL there.
-        if(email&&!/^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email))return 'Управляемый TLS: укажите контактный email ACME.';
-      }
+      const certificate=nodeTlsReadiness(nodeProfile,data);
+      if(certificate.mode==='on'&&!certificate.ready)return certificate.reason;
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
       if(port&&(!Number.isInteger(port)||port<1||port>65535))return 'Локальный порт Xray должен быть от 1 до 65535.';
       if(port&&port===nodePort)return 'Порт Xray должен отличаться от порта XMesh Node на том же сетевом интерфейсе.';
@@ -2990,27 +2982,65 @@ function nodeEffectiveTlsMode(profile){
   if(modes.includes('tls'))return 'on';
   return modes.every(mode=>mode==='none'||mode==='reality')?'off':'unconfigured';
 }
+// Security, not protocol or old ACME flags, decides whether TLS is needed.
+// A checked profile switch does not prove a certificate exists on the node.
+function nodeTlsReadiness(profile,data={}){
+  const mode=nodeEffectiveTlsMode(profile);
+  if(mode!=='on')return {mode,ready:mode==='off',method:'none',reason:''};
+  const entries=inbs(profile).filter(x=>String(x?.streamSettings?.security||'').toLowerCase()==='tls');
+  const pathsReady=entries.length>0&&entries.every(x=>{
+    const certs=x?.streamSettings?.tlsSettings?.certificates;
+    return Array.isArray(certs)&&certs.length>0&&certs.every(cert=>
+      typeof cert?.certificateFile==='string'&&cert.certificateFile.startsWith('/')&&cert.certificateFile.trim().length>1&&
+      typeof cert?.keyFile==='string'&&cert.keyFile.startsWith('/')&&cert.keyFile.trim().length>1);
+  });
+  const auto=Boolean(data.tlsAutoProvision),manual=Boolean(data.tlsManualProvision);
+  if(auto&&manual)return {mode,ready:false,method:'conflict',reason:'Выберите один способ получения сертификата: Let’s Encrypt или внешний сертификат.'};
+  if(manual||pathsReady&&!auto)return pathsReady
+    ?{mode,ready:true,method:'external',reason:'В профиле заданы пути сертификата. Наличие файлов на ноде будет проверено отдельно.'}
+    :{mode,ready:false,method:'external',reason:'В XRAY STUDIO укажите certificateFile и keyFile для каждого TLS inbound.'};
+  const domain=String(data.tlsDomain||data.addr||'').trim().toLowerCase();
+  const email=String(data.tlsAcmeEmail||'').trim();
+  const validDomain=/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain)&&/[a-z]/.test(domain.split('.').pop()||'');
+  const validEmail=/^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email)&&email.length<=254;
+  if(!validDomain)return {mode,ready:false,method:'acme',field:'tlsDomain',reason:'Для автоматического TLS укажите DNS-домен ноды. IP-адрес для сертификата не подходит.'};
+  if(!validEmail)return {mode,ready:false,method:'acme',field:'tlsAcmeEmail',reason:'Для выпуска Let’s Encrypt укажите контактный email ACME.'};
+  return {mode,ready:true,method:'acme',reason:'Let’s Encrypt настроен. Выпуск сертификата начнётся при применении профиля на ноде.'};
+}
 function syncNodeEffectiveTls(form){
   if(!form||form.dataset.ent!=='nodes')return;
-  const profileId=form.elements.namedItem('profileId')?.value;
-  const profile=DB.profiles.find(p=>String(p.id)===String(profileId));
-  const mode=nodeEffectiveTlsMode(profile);
-  const toggle=form.querySelector('[data-node-tls-effective]');
-  const status=form.querySelector('.node-tls-effective');
-  if(status)status.dataset.state=mode;
-  const label=form.querySelector('[data-node-tls-state]');
-  const indicator=form.querySelector('[data-node-tls-indicator]');
+  const field=k=>form.elements.namedItem(k);
+  const profile=DB.profiles.find(p=>String(p.id)===String(field('profileId')?.value));
+  const state=nodeTlsReadiness(profile,{addr:field('addr')?.value,tlsDomain:field('tlsDomain')?.value,
+    tlsAcmeEmail:field('tlsAcmeEmail')?.value,tlsAutoProvision:field('tlsAutoProvision')?.checked,
+    tlsManualProvision:field('tlsManualProvision')?.checked});
+  const mode=state.mode;
+  const toggle=form.querySelector('[data-node-tls-effective]'),status=form.querySelector('.node-tls-effective');
+  const label=form.querySelector('[data-node-tls-state]'),indicator=form.querySelector('[data-node-tls-indicator]');
   const preferences=form.querySelector('[data-node-tls-preferences]');
-  const hint=form.querySelector('[data-node-tls-note]');
-  const names={on:'ВКЛ — профиль использует TLS',off:'ВЫКЛ — сертификат TLS не используется',unconfigured:'Не настроено — выберите корректный профиль'};
+  const hint=form.querySelector('[data-node-tls-note]'),feedback=form.querySelector('[data-node-tls-readiness]');
+  const names={on:'ВКЛ — профиль использует TLS',off:'ВЫКЛ — сертификат TLS не используется',unconfigured:'Не настроено — выберите профиль'};
+  if(status)status.dataset.state=mode;
   if(toggle){toggle.checked=mode==='on';toggle.setAttribute('aria-label',names[mode]);}
   if(label)label.textContent=names[mode];
   if(indicator)indicator.hidden=mode==='unconfigured';
   if(preferences&&mode!=='on')preferences.open=false;
-  if(hint)hint.textContent=mode==='on'?'Можно выбрать способ получения сертификата.':'Настройки сохранены, но при выбранном Security сертификат TLS не используется.';
+  if(hint)hint.textContent=mode==='on'?'Выберите способ получения сертификата: автоматический выпуск или внешний сертификат из профиля.':'Настройки сохраняются для будущих TLS-профилей.';
+  if(feedback){feedback.dataset.ready=state.ready?'yes':'no';feedback.dataset.mode=mode;
+    feedback.textContent=mode==='on'?state.reason:mode==='off'?'Сертификат не требуется для выбранного Security.':'';}
+  const summary=preferences?.querySelector('summary');
+  if(summary)summary.textContent=mode==='on'&&!state.ready?'Настроить сертификат · требуется':'Параметры сертификата';
 }
+
 document.addEventListener('change',event=>{
   if(event.target.matches?.('form[data-ent="nodes"] [name="profileId"]'))syncNodeEffectiveTls(event.target.closest('form'));
+});
+
+document.addEventListener('input',event=>{
+  if(event.target.matches?.('form[data-ent="nodes"] :is([name="addr"],[name="tlsDomain"],[name="tlsAcmeEmail"])'))syncNodeEffectiveTls(event.target.closest('form'));
+});
+document.addEventListener('change',event=>{
+  if(event.target.matches?.('form[data-ent="nodes"] :is([name="tlsAutoProvision"],[name="tlsManualProvision"])'))syncNodeEffectiveTls(event.target.closest('form'));
 });
 
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
@@ -3036,9 +3066,9 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :f.k==='port'?'':field(f,o[f.k])).join('');
   const tlsField=k=>{const f=nodeCoreFields.find(x=>x.k===k);return f?field(f,o[f.k]):''};
   const nodeTlsFields='<fieldset class="node-tls-settings"><legend>Сертификат ноды</legend>'+
-    '<div class="node-tls-effective"><label class="f"><span>Сертификат TLS по Security</span><span class="sw" data-node-tls-indicator><input type="checkbox" data-node-tls-effective role="switch" disabled aria-label="Не настроено — выберите корректный профиль"><span></span></span></label><small data-node-tls-state role="status">Не настроено — выберите корректный профиль</small></div>'+
-    '<p class="node-tls-help">Состояние профиля не подтверждает выдачу сертификата на ноде.</p>'+
-    '<details data-node-tls-preferences><summary>Ручные настройки получения сертификата</summary><p class="node-tls-help" data-node-tls-note></p><div class="node-tls-modes">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div><div class="node-tls-details">'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div></details></fieldset>';
+    '<div class="node-tls-effective"><label class="f"><span>TLS по Security</span><span class="sw" data-node-tls-indicator><input type="checkbox" data-node-tls-effective role="switch" disabled aria-label="Не настроено — выберите профиль"><span></span></span></label><small data-node-tls-state role="status">Не настроено — выберите профиль</small></div>'+
+    '<p class="node-tls-readiness" data-node-tls-readiness role="status" aria-live="polite"></p>'+
+    '<details data-node-tls-preferences><summary>Параметры сертификата</summary><div class="node-tls-popup"><p class="node-tls-help" data-node-tls-note></p><div class="node-tls-modes">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div><div class="node-tls-details">'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div></div></details></fieldset>';
   const nodeResetAction=id?'<div class="node-reset-action"><div class="node-reset-copy"><strong>Счётчик трафика</strong><span>Обнулить расход ноды. Xray не перезапускается.</span></div><button type="button" class="gh sm node-traffic-reset-button" data-node-reset-traffic="'+esc(String(id))+'" title="">'+ic('redo')+'Обнулить</button><output class="node-traffic-reset-status" data-node-reset-feedback aria-live="polite"></output></div>':'';
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
@@ -3046,7 +3076,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт, страну, название и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e.fs):k==='nodes'
-    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeTlsFields+nodeResetAction+'</section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
+    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section>'+`<div class="node-network-stack"><section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section>${nodeTlsFields}</div><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   const boundedEntityEditor=['tpls','admins'].includes(k);
   const editorFields=boundedEntityEditor?'<div class="entity-editor-body">'+fields+'</div>':fields;
@@ -4587,7 +4617,20 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     }catch(error){er('Не удалось сохранить пользователя: '+(error.message||'ошибка API'))}
     finally{delete f.dataset.saving;if(button?.isConnected)button.disabled=false}
   }
-  else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(key==='nodes'?e2.fs.filter(field=>!field.k.startsWith('geo')):e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
+  else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(key==='nodes'?e2.fs.filter(field=>!field.k.startsWith('geo')):e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m){
+      if(key==='nodes'){
+        const profile=DB.profiles.find(p=>String(p.id)===String(d.profileId));
+        const readiness=nodeTlsReadiness(profile,d);
+        if(readiness.mode==='on'&&!readiness.ready){
+          const preferences=f.querySelector('[data-node-tls-preferences]');
+          if(preferences)preferences.open=true;
+          syncNodeEffectiveTls(f);
+          const target=readiness.field&&f.elements.namedItem(readiness.field);
+          target?.focus?.();
+        }
+      }
+      return er(m);
+    }
     if(key==='admins'){
       if(!id&&d.password.length<16)return er('Для нового администратора требуется пароль минимум 16 символов.');
       if(id&&!d.password)delete d.password;

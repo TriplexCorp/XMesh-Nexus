@@ -1391,7 +1391,7 @@ dialog.node-wide > form.box > .node-form-layout {
   width:100%;
   min-width:0;
   grid-template-columns:minmax(0,1.5fr) minmax(0,.94fr) minmax(0,1.06fr);
-  grid-template-areas:"primary ips billing" "geo geo geo";
+  grid-template-areas:"primary ips billing";
   gap:clamp(14px,.95vw,20px);
   align-items:stretch;
   align-content:start;
@@ -1541,4 +1541,288 @@ dialog.node-wide .node-tls-modes {
 dialog.node-wide .node-tls-details {
   grid-template-columns:minmax(0,1fr);
 }
+}
+
+/* TLS readiness + compact certificate wizard: one row of status, no tall
+ * form expander. The profile remains the authority for Security. */
+dialog.node-wide .node-network-stack {
+  grid-area:ips;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  align-content:start;
+  gap:.55rem;
+  min-width:0;
+}
+dialog.node-wide .node-network-stack > :is(.node-ip-section,.node-tls-settings) {
+  grid-area:auto;
+  box-sizing:border-box;
+  min-width:0;
+  width:100%;
+  align-self:start;
+  margin:0;
+  padding:.68rem .75rem;
+  border:1px solid var(--nx-border);
+  border-radius:var(--ui-radius);
+  background:color-mix(in srgb,var(--s2) 48%,var(--s1));
+  box-shadow:none;
+}
+dialog.node-wide .node-network-stack .node-tls-settings {
+  position:relative;
+  overflow:visible;
+}
+dialog.node-wide .node-network-stack .node-tls-settings legend {
+  padding-inline:.3rem;
+  font-size:.82rem;
+}
+dialog.node-wide .node-network-stack .node-tls-effective {
+  padding:.35rem .45rem;
+  margin:0 0 .38rem;
+  gap:.2rem;
+}
+dialog.node-wide .node-network-stack .node-tls-effective .f {
+  flex:1 1 100%;
+  min-width:0;
+  gap:.38rem;
+}
+dialog.node-wide .node-network-stack .node-tls-effective .f > span:first-child {
+  font-size:.72rem;
+}
+dialog.node-wide .node-network-stack .node-tls-effective [data-node-tls-state] {
+  font-size:.7rem;
+  font-weight:650;
+  line-height:1.25;
+}
+dialog.node-wide .node-tls-readiness {
+  margin:0 0 .35rem;
+  font-size:.73rem;
+  line-height:1.32;
+  overflow-wrap:anywhere;
+  color:var(--mu);
+}
+dialog.node-wide .node-tls-readiness:empty {
+  display:none;
+}
+dialog.node-wide .node-tls-readiness[data-mode="on"][data-ready="no"] {
+  color:var(--er);
+  font-weight:650;
+}
+dialog.node-wide .node-tls-readiness[data-mode="on"][data-ready="yes"] {
+  color:var(--tx);
+}
+dialog.node-wide .node-network-stack [data-node-tls-preferences] summary {
+  display:inline-flex;
+  align-items:center;
+  width:auto;
+  font-size:.74rem;
+  line-height:1.3;
+  margin:0;
+  cursor:pointer;
+  color:var(--a);
+}
+dialog.node-wide .node-network-stack [data-node-tls-preferences] summary:focus-visible {
+  outline:2px solid var(--a);
+  outline-offset:3px;
+  border-radius:var(--ui-control-radius);
+}
+dialog.node-wide .node-network-stack .node-tls-popup {
+  position:absolute;
+  bottom:calc(100% + .35rem);
+  right:0;
+  z-index:50;
+  box-sizing:border-box;
+  width:min(23rem,calc(100vw - 3rem));
+  max-height:min(70dvh,390px);
+  overflow-y:auto;
+  display:grid;
+  gap:.6rem;
+  padding:.85rem;
+  border:1px solid var(--nx-border-strong);
+  border-radius:var(--ui-radius);
+  background:var(--nx-panel-bg);
+  box-shadow:var(--nx-section-shadow);
+}
+dialog.node-wide .node-network-stack .node-tls-popup .node-tls-help {
+  margin:0;
+  font-size:.72rem;
+}
+dialog.node-wide .node-network-stack .node-tls-popup :is(.node-tls-details,.node-tls-modes) {
+  gap:.45rem .6rem;
+  margin:0;
+}
+dialog.node-wide .node-network-stack .node-tls-popup .f > span:first-child {
+  font-size:.74rem;
+}
+dialog.node-wide .node-network-stack .node-tls-popup input:not([type="checkbox"]) {
+  height:2.35rem;
+  min-height:2.35rem;
+  font-size:.78rem;
+}
+dialog.node-wide .node-billing-fields {
+  gap:.5rem .65rem;
+}
+@media (min-width:1151px) {
+  dialog.node-wide > form.box {
+    gap:.6rem;
+    padding:.7rem 1.05rem;
+  }
+  dialog.node-wide > form.box > .node-form-layout {
+    gap:.6rem;
+    align-items:start;
+  }
+  dialog.node-wide .node-form-layout > section {
+    align-self:start;
+    padding:.72rem .8rem;
+  }
+  dialog.node-wide .node-main-section .node-form-grid {
+    gap:.55rem .7rem;
+  }
+  dialog.node-wide .node-form-layout :is(input:not([type="checkbox"]):not([type="hidden"]),select,.country-selected,.user-date-trigger) {
+    height:2.32rem;
+    min-height:2.32rem;
+    font-size:.84rem;
+  }
+  dialog.node-wide .node-main-section .country-trigger {
+    min-height:2.32rem;
+  }
+  dialog.node-wide .node-main-section .node-reset-action {
+    margin-top:.55rem;
+    padding:.5rem .6rem;
+  }
+  /* Rotation's switch and interval share a row; the address pool uses the
+   * full column. Stacking these short controls wasted a complete field row. */
+  dialog.node-wide .node-rotation-editor-body {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:.45rem .6rem;
+  }
+  dialog.node-wide .node-rotation-editor-body > :is(.f:has(textarea),.node-pool-toolbar,output,.node-rotation-probe) {
+    grid-column:1/-1;
+  }
+  dialog.node-wide .node-rotation-editor-body > output:empty {
+    display:none;
+  }
+  dialog.node-wide .node-pool-toolbar {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  dialog.node-wide .node-pool-toolbar > span {
+    grid-column:1/-1;
+    margin:0;
+  }
+  dialog.node-wide .node-ip-section textarea[name="rotationIps"] {
+    height:clamp(110px,15dvh,150px);
+    min-height:110px;
+  }
+  dialog.node-wide :is(.node-section-intro,.node-ip-hint) {
+    margin-bottom:.45rem;
+  }
+  dialog.node-wide > form.box > .act {
+    padding-top:.5rem;
+  }
+}
+@media (min-width:751px) and (max-width:1150px) {
+  dialog.node-wide > form.box > .node-form-layout {
+    grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+    grid-template-areas:"primary billing" "ips ips";
+  }
+}
+@media (max-width:750px) {
+  dialog.node-wide > form.box > .node-form-layout {
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"primary" "ips" "billing";
+  }
+  dialog.node-wide .node-network-stack .node-tls-popup {
+    position:static;
+    width:100%;
+    max-height:none;
+    margin-top:.55rem;
+    overflow:visible;
+    padding:.7rem;
+    box-shadow:none;
+  }
+}
+
+
+/* Never override the browser's closed-<details> behavior with our grid display. */
+dialog.node-wide .node-network-stack [data-node-tls-preferences]:not([open]) > .node-tls-popup {
+  display:none;
+}
+/* A compact but legible one-screen desktop editor at 768px tall.
+ * Reduce intrinsic content height instead of hiding overflow or clipping fields. */
+@media (min-width:1151px) and (max-height:820px) {
+  dialog.node-wide > form.box {
+    padding:.42rem .85rem .5rem;
+    gap:.35rem;
+  }
+  dialog.node-wide > form.box > h2 {
+    margin:0;
+    font-size:1rem;
+    line-height:1.3;
+  }
+  dialog.node-wide > form.box > .node-form-layout {
+    gap:.5rem;
+  }
+  dialog.node-wide .node-form-layout > section,
+  dialog.node-wide .node-network-stack > :is(.node-ip-section,.node-tls-settings) {
+    padding:.5rem .65rem;
+  }
+  dialog.node-wide .node-main-section .node-form-grid {
+    row-gap:.35rem;
+    column-gap:.55rem;
+  }
+  dialog.node-wide .node-form-layout :is(input:not([type="checkbox"]):not([type="hidden"]),select,.country-selected,.user-date-trigger),
+  dialog.node-wide .node-main-section .country-trigger {
+    height:2rem;
+    min-height:2rem;
+    font-size:.8rem;
+  }
+  dialog.node-wide .node-main-section .node-reset-action {
+    margin-top:.35rem;
+    padding:.38rem .5rem;
+  }
+  dialog.node-wide :is(.node-form-section-title,.node-billing-section .node-form-section-title) {
+    font-size:.86rem;
+    line-height:1.2;
+  }
+  dialog.node-wide :is(.node-section-intro,.node-ip-hint) {
+    font-size:.7rem;
+    line-height:1.2;
+    margin:.15rem 0 .3rem;
+  }
+  dialog.node-wide :is(.node-main-section .node-form-grid,.node-billing-fields,.node-rotation-editor-body) .f {
+    gap:.14rem;
+  }
+  dialog.node-wide .node-form-layout .f > span:first-child {
+    font-size:.72rem;
+    line-height:1.15;
+  }
+  dialog.node-wide .node-network-stack {
+    gap:.3rem;
+  }
+  dialog.node-wide .node-network-stack .node-tls-effective {
+    padding:.22rem .35rem;
+    margin:0 0 .18rem;
+  }
+  dialog.node-wide .node-network-stack .node-tls-readiness {
+    margin:0 0 .2rem;
+    font-size:.68rem;
+    line-height:1.2;
+  }
+  dialog.node-wide .node-ip-section textarea[name="rotationIps"] {
+    height:86px;
+    min-height:72px;
+    max-height:140px;
+  }
+  dialog.node-wide .node-rotation-editor-body {
+    gap:.3rem;
+  }
+  dialog.node-wide .node-pool-toolbar {
+    gap:.2rem;
+  }
+  dialog.node-wide .node-billing-fields {
+    row-gap:.32rem;
+    column-gap:.55rem;
+  }
+  dialog.node-wide > form.box > .act {
+    padding-top:.35rem;
+  }
 }

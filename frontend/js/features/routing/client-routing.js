@@ -27,6 +27,8 @@
     const name = parts.filter(Boolean).join(' ');
     const explicit = parts.find(p => typeof p === 'string' && /^(nl|pl|de|ru|se|swe|ee|fi|fr|us|es)$/i.test(p.trim()));
     if (explicit) return explicit.toLowerCase() === 'swe' ? 'se' : explicit.toLowerCase();
+    const emoji=parts.find(p=>typeof p==='string'&&/^[\u{1F1E6}-\u{1F1FF}]{2}$/u.test(p));
+    if(emoji)return Array.from(emoji,c=>String.fromCharCode(c.codePointAt(0)-127397)).join('').toLowerCase();
     return flagPatterns.find(([pattern]) => pattern.test(name))?.[1] || '';
   }
   function flag(code) {
@@ -79,7 +81,7 @@
     const sources = [
       ...nodes.filter(n=>Number.isSafeInteger(Number(n.id))&&Number(n.id)>0).map(n=>({
         key:'node:'+n.id, title:n.name||'Узел #'+n.id, kind:'Вся нода',
-        detail:'Правила для всех её серверов', code:countryCode(n.countryCode,n.country,n.name)
+        detail:'Правила для всех её серверов', code:countryCode(n.countryCode,n.flag,n.country,n.name)
       })),
       ...hosts.filter(h=>Number.isSafeInteger(Number(h.id))&&Number(h.id)>0).map(h=>({
         key:'host:'+h.id, title:h.remark||h.name||h.address||'Хост #'+h.id, kind:'Публичный хост',
@@ -141,17 +143,17 @@
       const rules=p.rules||[],assigned=p.servers||[];
       const rulePreview=rules.map((rule,index)=>{
         const destination=rule.action==='server'?(targets.find(t=>t.key===rule.server)?.label||rule.server||actions.server):(actions[rule.action]||rule.action);
-        return '<button type="button" class="crx-rule-chip" data-cr-rule-open="'+escapeHTML(p.id)+'" data-cr-rule-index="'+index+'"><span class="crx-rule-index">'+String(index+1).padStart(2,'0')+'</span><span class="crx-rule-condition"><small>'+escapeHTML(kinds[rule.match]||rule.match)+'</small><b data-no-translate>'+escapeHTML(rule.value||'—')+'</b><small>'+escapeHTML(rule.network?rule.network.toUpperCase().replace(',', ' + '):'TCP + UDP')+'</small></span><em'+(rule.action==='server'&&rule.server?' data-no-translate':'')+'>→ '+escapeHTML(destination)+'</em></button>';
+        return '<button type="button" class="crx-rule-chip" data-cr-rule-open="'+escapeHTML(p.id)+'" data-cr-rule-index="'+index+'"><span class="crx-rule-index">'+String(index+1).padStart(2,'0')+'</span><span class="crx-rule-condition"><b data-no-translate>'+escapeHTML(rule.value||'—')+'</b><small><span>'+escapeHTML(kinds[rule.match]||rule.match)+'</span><span aria-hidden="true">·</span><span>'+escapeHTML(rule.network?rule.network.toUpperCase().replace(',', ' + '):'TCP + UDP')+'</span></small></span><em class="crx-action-'+escapeHTML(rule.action)+'"'+(rule.action==='server'&&rule.server?' data-no-translate':'')+'><span aria-hidden="true">→</span> <span>'+escapeHTML(destination)+'</span></em></button>';
       });
       const preview=rulePreview.slice(0,4).join('')+(rules.length>4?'<details class="crx-more-rules"><summary>+ '+countLabel(rules.length-4,['правило','правила','правил'],['rule','rules'])+'</summary>'+rulePreview.slice(4).join('')+'</details>':'');
-      return '<article class="crx-card'+(p.enabled===false?' is-disabled':'')+'" data-cr-profile="'+escapeHTML(p.id)+'">'+
-        '<div class="crx-card-identity"><h3 class="crx-card-title"><button type="button" class="crx-overview-toggle" data-cr-expand="'+escapeHTML(p.id)+'" aria-controls="crx-details-'+escapeHTML(p.id)+'" aria-expanded="'+!collapsedTemplates.has(p.id)+'"><span'+(p.name?' data-no-translate':'')+'>'+escapeHTML(p.name||'Без названия')+'</span>'+icon('chevron')+'</button></h3>'+
+      return '<article class="crx-card'+(p.enabled===false?' is-disabled':'')+'" data-ui-surface="panel" data-cr-profile="'+escapeHTML(p.id)+'">'+
+        '<div class="crx-card-identity"><h3 class="crx-card-title"><button type="button" class="crx-overview-toggle" data-cr-expand="'+escapeHTML(p.id)+'" aria-controls="crx-details-'+escapeHTML(p.id)+'" aria-expanded="'+!collapsedTemplates.has(p.id)+'">'+icon('route')+'<span'+(p.name?' data-no-translate':'')+'>'+escapeHTML(p.name||'Без названия')+'</span>'+icon('chevron')+'</button></h3>'+
         '<div class="crx-card-stats"><span class="crx-state'+(p.enabled===false?' is-off':'')+'"><i></i>'+(p.enabled===false?'Выключен':'Активен')+'</span>'+
         '<span>'+countLabel(assigned.length,['назначение','назначения','назначений'],['assignment','assignments'])+'</span><span>'+countLabel(rules.length,['правило','правила','правил'],['rule','rules'])+'</span></div></div>'+
         '<div class="crx-card-details" id="crx-details-'+escapeHTML(p.id)+'" data-cr-details="'+escapeHTML(p.id)+'"'+(collapsedTemplates.has(p.id)?' hidden':'')+'><div class="crx-card-flags"><h4 class="crx-group-label">Назначения</h4>'+(sourceSummary(p)||'<span class="crx-card-no-rules">Нет назначений</span>')+'</div>'+
         '<div class="crx-card-rules"><h4 class="crx-group-label">Правила · по порядку</h4>'+(preview||'<span class="crx-card-no-rules">Дополнительных правил пока нет</span>')+'</div></div>'+
         '<div class="crx-card-footer"><button type="button" class="crx-btn crx-btn-outline" data-cr-open="'+escapeHTML(p.id)+'">'+
-          'Настроить '+icon('chevron')+'</button>'+
+          icon('settings')+'Настроить '+icon('chevron')+'</button>'+
         '<button type="button" class="crx-icon-btn" data-cr-duplicate="'+escapeHTML(p.id)+'" title="Копировать шаблон" aria-label="Копировать шаблон">'+icon('copy')+'</button></div>'+
       '</article>';
     }
