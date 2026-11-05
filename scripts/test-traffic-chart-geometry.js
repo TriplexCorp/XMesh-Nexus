@@ -15,6 +15,7 @@ const helpers={
  esc:v=>String(v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),
  fmt:(n,d=2)=>Number(n).toFixed(d),
  panelIsEnglish:()=>false,
+ window:{XMeshI18n:{getLocale:()=> 'ru-RU'}},
  trafficMbit:n=>Number(n)*8/1000000,
  DB:{nodes:[{id:1}]},
  ic:()=>'<svg></svg>'

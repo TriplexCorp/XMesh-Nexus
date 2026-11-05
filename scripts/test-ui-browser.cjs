@@ -378,6 +378,20 @@ async function main() {
           assert((await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').innerText()).includes('ads.example.invalid'),'The third rule must not be silently omitted');
           await screenshot(page,'routing-list-'+width);
         }
+        await page.locator('[data-cr-source-open="ui-route-main"]').click();
+        assert(await page.locator('[data-cr-source="node:'+node.id+'"]').isChecked(),'Assignment click must open the assigned source');
+        await page.keyboard.press('Escape');
+        const toggle=page.locator('[data-cr-expand="ui-route-main"]');
+        await toggle.focus();await page.keyboard.press('Enter');
+        assert.equal(await toggle.getAttribute('aria-expanded'),'false');
+        assert(await page.locator('[data-cr-details="ui-route-main"]').isHidden(),'Collapsing must hide details');
+        assert(await page.locator('[data-cr-bottom]').isHidden(),'Disclosure must not change the draft');
+        await page.keyboard.press('Space');
+        assert.equal(await toggle.getAttribute('aria-expanded'),'true');
+        await page.locator('[data-cr-rule-open="ui-route-main"][data-cr-rule-index="2"]').click();
+        assert.equal(await page.locator('[data-cr-rule="2"] input[data-cr-field="value"]').inputValue(),'ads.example.invalid');
+        assert(await page.locator('[data-cr-rule="2"] input[data-cr-field="value"]').evaluate(el=>el===document.activeElement),'Rule click must focus the selected rule');
+        await page.keyboard.press('Escape');
         const more=page.locator('[data-cr-profile="ui-route-long"] .crx-more-rules');
         assert(await more.isVisible(),'Rules after the fourth must remain accessible');
         await more.locator('summary').click();

@@ -392,3 +392,4 @@ More: [CLI update](docs/CLI_UPDATE.md) · [Panel Update & Telemetry](docs/PANEL_
 - Root on the Nexus host remains a high-trust role; this is not an HSM boundary.
 
 XMesh is built around **explicit state, verifiable operations and fail-closed behavior**.
+[English localization requirements and dedicated checks](docs/ENGLISH_LOCALIZATION.md).

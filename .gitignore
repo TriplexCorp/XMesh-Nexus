@@ -10,3 +10,6 @@ target/
 
 # Host-only writable dashboard path mirror; never commit deployment state.
 /deploy/runtime/
+
+# Pinned browser and localization audit dependencies.
+/scripts/browser/node_modules/

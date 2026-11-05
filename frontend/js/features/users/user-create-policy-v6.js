@@ -24,9 +24,9 @@ const daysForDate=value=>{
   const target=parseYmd(value); if(!target)return 0;
   return Math.max(1,Math.round(serial(target)-serial(today())));
 };
-const dateLabel=d=>new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(d);
+const dateLabel=d=>new Intl.DateTimeFormat(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(d);
 const monthLabel=d=>{
-  const text=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(d);
+  const text=new Intl.DateTimeFormat(window.XMeshI18n?.getLocale?.()||'ru-RU',{month:'long',year:'numeric'}).format(d);
   return text.charAt(0).toUpperCase()+text.slice(1);
 };
 

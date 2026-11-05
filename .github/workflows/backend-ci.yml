@@ -76,6 +76,10 @@ jobs:
         run: node scripts/check-client-routing.js
       - name: Validate RU/EN panel and portal localization
         run: node scripts/check-i18n.js
+      - name: Install pinned English audit parser
+        run: npm ci --prefix scripts/browser --ignore-scripts
+      - name: Enforce complete English across panel UI and API error copy
+        run: node scripts/check-english-complete.cjs
       - name: Audit English translation coverage across panel modules
         run: node scripts/check-english-coverage.js
       - name: Check subscription studio and independent deployment blueprint
@@ -255,6 +259,11 @@ jobs:
         run: |
           npm ci --prefix scripts/browser
           scripts/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Enforce English on every rendered panel route, dialogs and authentication
+        env:
+          XMESH_BROWSER_OUTPUT: browser-results
+          XMESH_UI_DISPOSABLE: "1"
+        run: node scripts/test-english-browser.cjs
       - name: Verify rendered layouts and dialog interactions in Chromium
         env:
           XMESH_BROWSER_OUTPUT: browser-results

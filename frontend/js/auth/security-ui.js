@@ -27,7 +27,7 @@ async function mount(root){
    left.append(title,actor);
    const date=document.createElement('time');
    const when=new Date(e.createdAtMs);
-   date.dateTime=Number.isNaN(when.getTime())?'':when.toISOString();date.textContent=Number.isNaN(when.getTime())?'Дата неизвестна':when.toLocaleString();
+   date.dateTime=Number.isNaN(when.getTime())?'':when.toISOString();date.textContent=Number.isNaN(when.getTime())?'Дата неизвестна':when.toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU');
    item.append(left,date);list.append(item);
   }
  };
@@ -77,7 +77,7 @@ async function mount(root){
   (readonly?'<p class="note">Редактирование доступно только владельцу (owner).</p>':'<div class="security-policy-actions"><button type="submit" class="btn">Сохранить политику</button><button type="button" class="gh" data-security-reset>Вернуть значения по умолчанию</button></div>')+'</form>'+
   '<div class="security-policy-footnote">Адрес снижает обнаруживаемость страницы входа, но не является паролем. API должен оставаться защищённым независимо от URL. Используйте длинный непредсказуемый путь и HTTPS.</div>';
   const sessionsBody=root.querySelector('#security-sessions-body');
-  if(sessionsBody)sessionsBody.innerHTML='<div class="security-sessions">'+(sessionRes.sessions||[]).map(s=>'<div class="security-session"><span><b>'+(s.current?'Текущая сессия':'Сессия №'+esc(s.id))+'</b><small>Последняя активность: '+esc(new Date(s.lastActivity).toLocaleString())+' · Истекает: '+esc(new Date(s.expiresAt).toLocaleString())+'</small></span><button type="button" class="gh sm" data-security-revoke="'+esc(s.id)+'">'+(s.current?'Завершить':'Отозвать')+'</button></div>').join('')+
+  if(sessionsBody)sessionsBody.innerHTML='<div class="security-sessions">'+(sessionRes.sessions||[]).map(s=>'<div class="security-session"><span><b>'+(s.current?'Текущая сессия':'Сессия №'+esc(s.id))+'</b><small>Последняя активность: '+esc(new Date(s.lastActivity).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU'))+' · Истекает: '+esc(new Date(s.expiresAt).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU'))+'</small></span><button type="button" class="gh sm" data-security-revoke="'+esc(s.id)+'">'+(s.current?'Завершить':'Отозвать')+'</button></div>').join('')+
     '<div class="security-policy-actions"><button type="button" class="gh" data-security-revoke-others>Завершить все другие сессии</button></div></div>';
  };
  try{await load()}catch(e){fail(e);body.innerHTML='<button class="gh" type="button" data-security-retry>Повторить загрузку</button>'}

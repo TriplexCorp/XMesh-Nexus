@@ -1156,7 +1156,7 @@ const statsXrayHistoryChart=points=>{
  const w=960,h=260,l=74,r=20,t=20,b=45,max=Math.max(1,...[...byTime.values()].flatMap(v=>[v.up,v.down]));
  const x=i=>l+(buckets.length===1?.5:i/(buckets.length-1))*(w-l-r);
  const y=v=>t+(h-t-b)*(1-v/max);
- const series=(key,cls)=>'<polyline class="stats-xray-line '+cls+'" points="'+buckets.map((time,i)=>x(i).toFixed(1)+','+y(byTime.get(time)[key]).toFixed(1)).join(' ')+'" fill="none"/>'+buckets.map((time,i)=>'<circle class="stats-xray-dot '+cls+'" cx="'+x(i).toFixed(1)+'" cy="'+y(byTime.get(time)[key]).toFixed(1)+'" r="4"><title>'+esc(new Date(time).toLocaleString()+' · '+key+' · '+statsBytes(byTime.get(time)[key]))+'</title></circle>').join('');
+ const series=(key,cls)=>'<polyline class="stats-xray-line '+cls+'" points="'+buckets.map((time,i)=>x(i).toFixed(1)+','+y(byTime.get(time)[key]).toFixed(1)).join(' ')+'" fill="none"/>'+buckets.map((time,i)=>'<circle class="stats-xray-dot '+cls+'" cx="'+x(i).toFixed(1)+'" cy="'+y(byTime.get(time)[key]).toFixed(1)+'" r="4"><title>'+esc(new Date(time).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU')+' · '+key+' · '+statsBytes(byTime.get(time)[key]))+'</title></circle>').join('');
  const grid=[0,.5,1].map(f=>'<line class="stats-detail-grid" x1="'+l+'" x2="'+(w-r)+'" y1="'+y(max*f)+'" y2="'+y(max*f)+'"/><text class="stats-detail-label" x="'+(l-8)+'" y="'+(y(max*f)+4)+'" text-anchor="end">'+esc(statsBytes(max*f))+'</text>').join('');
  const ticks=[0,Math.floor((buckets.length-1)/2),buckets.length-1].filter((v,i,a)=>a.indexOf(v)===i).map(i=>'<text class="stats-detail-label" x="'+x(i)+'" y="'+(h-12)+'" text-anchor="'+(i===0?'start':i===buckets.length-1?'end':'middle')+'">'+esc(new Date(buckets[i]).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</text>').join('');
  return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Подтверждённые дельты Upload и Download по интервалам; промежуточные значения отсутствуют">'+grid+series('up','rx')+series('down','tx')+ticks+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> Upload</span><span><i class="tx"></i> Download</span><small>Каждая точка — сумма подтверждённых дельт в интервале; пропущенные интервалы не означают нулевой трафик. Линии лишь соединяют наблюдаемые точки.</small></div>';
@@ -1551,7 +1551,7 @@ function systemPanel(s,error=''){
   const ramDetail=s.ram?.totalBytes?`${sysBytes(s.ram.usedBytes)} из ${sysBytes(s.ram.totalBytes)}`:'Нет данных о памяти';
   const cpuDetail=cpu===null?'Недостаточно данных для расчёта':`Средняя нагрузка: ${s.loadAverage?.one==null?'—':fmt(s.loadAverage.one,2)}`;
   const dbOnline=s.database==='online';
-  const sampled=s.sampledAt?new Date(s.sampledAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
+  const sampled=s.sampledAt?new Date(s.sampledAt).toLocaleTimeString(window.XMeshI18n?.getLocale?.()||'ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
   return `<section class="card system-card"><div class="hd"><div><p class="note">МОНИТОРИНГ · LIVE</p><h3>Состояние системы</h3><p>Ресурсы и доступность сервисов панели в реальном времени.</p></div><span class="sys-live"><i></i> Обновляется</span></div><div class="sys-grid">
   ${donut('CPU','Процессор',cpu,cpuDetail,'--a')}
   ${donut('RAM','Оперативная память',ram,ramDetail,'--b')}
@@ -1574,7 +1574,7 @@ const trafficRateLabel=value=>{
 function trafficSummaryMarkup(payload){
   const points=Array.isArray(payload?.points)?payload.points:[];
   const latest=points[points.length-1];
-  const when=latest?.bucketMs?new Date(latest.bucketMs).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'—';
+  const when=latest?.bucketMs?new Date(latest.bucketMs).toLocaleTimeString(window.XMeshI18n?.getLocale?.()||'ru-RU',{hour:'2-digit',minute:'2-digit'}):'—';
   const rx=latest?trafficRateLabel(latest.rxBytesPerSec):'—';
   const tx=latest?trafficRateLabel(latest.txBytesPerSec):'—';
   const detail=latest?('Последний бакет · '+when):'Ожидание телеметрии';
@@ -1598,7 +1598,7 @@ function trafficChartMarkup(payload,range,chartWidth=960){
   }).join('');
   const axisLabels=[0,Math.floor((points.length-1)/2),points.length-1].filter((idx,i,arr)=>arr.indexOf(idx)===i).map(idx=>{
     const d=new Date(points[idx].bucketMs);
-    const label=range==='24h'?d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    const label=range==='24h'?d.toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):d.toLocaleTimeString(window.XMeshI18n?.getLocale?.()||'ru-RU',{hour:'2-digit',minute:'2-digit'});
     return `<text class="traffic-axis-label" x="${x(idx)}" y="${height-13}" text-anchor="${idx===0?'start':idx===points.length-1?'end':'middle'}">${label}</text>`;
   }).join('');
   const latest=points[points.length-1];
@@ -1805,7 +1805,7 @@ const userDateFromYmd=value=>{
 };
 const userDateLabel=value=>{
   const d=userDateFromYmd(value);
-  return d?new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(d):'Бессрочно';
+  return d?new Intl.DateTimeFormat(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(d):'Бессрочно';
 };
 function userCalendarMarkup(year,month,selected){
   const offset=(new Date(year,month,1).getDay()+6)%7;
@@ -1817,10 +1817,10 @@ function userCalendarMarkup(year,month,selected){
     const day=idx+1,value=userYmd(new Date(year,month,day));
     const chosen=value===selected;
     const date=new Date(year,month,day);
-    const label=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(date);
+    const label=new Intl.DateTimeFormat(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(date);
     return '<button type="button" class="user-cal-day'+(chosen?' selected':'')+(value===today?' is-today':'')+'" data-user-date-day="'+value+'" aria-label="'+esc(label)+'" aria-pressed="'+(chosen?'true':'false')+'">'+day+'</button>';
   }).join('');
-  const monthLabel=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(new Date(year,month,1));
+  const monthLabel=new Intl.DateTimeFormat(window.XMeshI18n?.getLocale?.()||'ru-RU',{month:'long',year:'numeric'}).format(new Date(year,month,1));
   return '<div class="user-cal-header"><strong>'+esc(monthLabel)+'</strong><div class="user-cal-nav"><button type="button" data-user-date-nav="-1" aria-label="Предыдущий месяц">'+ic('chevronLeft')+'</button><button type="button" data-user-date-nav="1" aria-label="Следующий месяц">'+ic('chevronRight')+'</button></div></div><div class="user-cal-grid">'+weekdays+blanks+days+'</div><div class="user-cal-footer"><button type="button" data-user-date-today>Сегодня</button><button type="button" data-user-date-clear>Бессрочно</button></div><div class="user-cal-renew"><input type="number" id="user-renew-days" min="1" max="36500" step="1" inputmode="numeric" aria-label="Продлить на количество дней" placeholder="Добавить дней"><button class="gh" type="button" data-user-renew-apply>Добавить</button></div><p class="er user-renew-error" role="status" hidden></p>';
 }
 function userExtendExpiryYmd(expireAt,days){
@@ -2001,7 +2001,7 @@ function userTrafficDonutsMarkup(payload){
     const amount=Number(r.uplinkBytes)+Number(r.downlinkBytes);
     const share=total?Math.min(100,Math.max(0,amount/total*100)):0;
     const percent=total?fmt(share,share<1?1:0):'0';
-    const seen=Number.isFinite(+r.updatedAtMs)?new Date(+r.updatedAtMs).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    const seen=Number.isFinite(+r.updatedAtMs)?new Date(+r.updatedAtMs).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
     return '<article class="user-server-item"><div class="user-server-donut" style="--traffic-share:'+share.toFixed(3)+'%;--server-color:'+userServerColor(r.nodeId)+'" role="img" aria-label="'+esc(String(r.name||'Узел #'+r.nodeId))+': '+percent+'% пользовательского трафика"><span>'+percent+'%</span></div><div class="user-server-details"><b title="'+esc(r.name||'Узел #'+r.nodeId)+'">'+esc(r.name||'Узел #'+r.nodeId)+'</b><strong>'+userTrafficBytes(amount)+'</strong><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small><span class="user-server-updated">Срез '+esc(seen)+'</span></div></article>';
   }).join('');
   const downloadShare=total?down/total*100:0;
@@ -2147,7 +2147,7 @@ function userDrawer(id,tab){
         ${u.hwid>0&&u.devices.length>u.hwid?`<p class="er">Количество устройств превышает лимит (${u.hwid}).</p>`:''}
       </section>
     </div>
-    <footer class="user-canvas-foot"><span>Создан ${new Date(u.created).toLocaleDateString('ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
+    <footer class="user-canvas-foot"><span>Создан ${new Date(u.created).toLocaleDateString(window.XMeshI18n?.getLocale?.()||'ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
   </div>`,'user-modal');
   // Native dialog/select focus must not leave a reused workspace scrolled.
   const workspace=dlg.querySelector('.user-canvas-grid');
@@ -3230,7 +3230,7 @@ function nodeTlsHealth(runtime){
   if(!t||typeof t!=='object')return {label:'TLS · ожидается агент',detail:'Обновите агент для получения состояния сертификата',kind:'unknown'};
   const days=Number(t.daysRemaining);
   const date=typeof t.notAfter==='string'&&!Number.isNaN(Date.parse(t.notAfter))
-    ?new Date(t.notAfter).toLocaleDateString('ru-RU'):'—';
+    ?new Date(t.notAfter).toLocaleDateString(window.XMeshI18n?.getLocale?.()||'ru-RU'):'—';
   const label={valid:'действует',expiring:'скоро истекает',expired:'истёк',missing:'не найден',error:'ошибка',not_configured:'не используется',multiple:'несколько сертификатов',unknown:'неизвестно'}[t.state]||'неизвестно';
   const remaining=Number.isFinite(days)?' · '+days+' дн.':'';
   const detail=['Домен: '+(t.domain||'—'),'Удостоверяющий центр: '+(t.issuer||'—'),
@@ -4676,7 +4676,7 @@ const notificationKey='xmesh-notifications-v1';
 const notificationState=(()=>{try{return JSON.parse(localStorage.getItem(notificationKey)||'{}')}catch{return {}}})();
 const saveNotifications=()=>{try{localStorage.setItem(notificationKey,JSON.stringify(notificationState))}catch{}};
 const notificationId=item=>[item.group,item.node?.id??item.title??'',item.group==='Аренда серверов'?'rent':item.group==='Лимиты трафика'?'quota':item.message?.split(' · ')[0]].join('|');
-const notificationDate=ms=>new Date(ms).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+const notificationDate=ms=>new Date(ms).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 $('#bell').onclick=()=>{
  const button=$('#bell');
  modal('<div class="box notification-workspace">'+
@@ -4719,7 +4719,7 @@ $('#bell').onclick=()=>{
    if(!Number.isFinite(due))return [];
    const days=Math.max(0,Math.ceil((due-today)/DAY));
    if(due>today&&days>remind)return [];
-   const date=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(due));
+   const date=new Intl.DateTimeFormat(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(due));
    return [{group:'Аренда серверов',severity:due<today?'critical':'warning',node:n,
     message:(due<today?'Аренда просрочена':'До окончания аренды '+days+' дн.')+' · '+date+' · '+(Number(n.billingPrice)||0)+' '+(n.billingCurrency||'EUR')}];
   });
@@ -4731,7 +4731,7 @@ $('#bell').onclick=()=>{
    return [{group:'Лимиты трафика',severity:'critical',node:n,
     message:'Лимит '+(limit?fmt(limit,2)+' ГБ':'исчерпан')+
       (confirmed?' · Xray остановлен':' · ОСТАНОВКА XRAY НЕ ПОДТВЕРЖДЕНА')+
-      (n.trafficLimitReachedAt?' · '+new Date(n.trafficLimitReachedAt.replace(' ','T')).toLocaleString('ru-RU'):'')+
+      (n.trafficLimitReachedAt?' · '+new Date(n.trafficLimitReachedAt.replace(' ','T')).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU'):'')+
       '. Нода заблокирована до увеличения лимита и ручного включения.'}];
   });
   const infrastructure=nodes.flatMap(n=>{
@@ -4740,7 +4740,7 @@ $('#bell').onclick=()=>{
    if(status?.error||!status)return [{group:'Состояние инфраструктуры',severity:'neutral',node:n,message:'Не удалось получить состояние агента. Проверьте соединение с API.'}];
    const observed=status.data;
    if(!observed?.connected){
-    if(observed?.lastSeenAt)return [{group:'Состояние инфраструктуры',severity:'critical',node:n,message:'Агент не отвечает · последнее соединение '+new Date(observed.lastSeenAt).toLocaleString('ru-RU')}];
+    if(observed?.lastSeenAt)return [{group:'Состояние инфраструктуры',severity:'critical',node:n,message:'Агент не отвечает · последнее соединение '+new Date(observed.lastSeenAt).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU')}];
     return [{group:'Состояние инфраструктуры',severity:'neutral',node:n,message:'Агент ещё не подключён · состояние Xray неизвестно'}];
    }
    if(observed.xrayRunning===false)return [{group:'Состояние инфраструктуры',severity:'critical',node:n,message:'Агент онлайн, но Xray остановлен'}];

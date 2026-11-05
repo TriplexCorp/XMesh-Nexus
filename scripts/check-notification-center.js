@@ -26,6 +26,7 @@ function fixture({nodes=[],users=[],getStatus=async()=>({connected:true,xrayRunn
  const context={
   $:selector=>selector==='#bell'?button:null,
   dlg,DB:{nodes,users},DAY:864e5,Date,Intl,Number,String,Math,Promise,
+  window:{XMeshI18n:{getLocale:()=> 'ru-RU'}},
   encodeURIComponent,
   modal:html=>calls.push(html),ic:()=>'<svg></svg>',
   flagView:(_,cls)=>'<img class="'+cls+'" src="/flags/nl.svg">',

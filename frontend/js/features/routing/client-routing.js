@@ -102,6 +102,7 @@
     const sourceByKey=new Map(sources.map(s=>[s.key,s]));
     let draft=clone(Array.isArray(db.set?.clientRoutingProfiles)?db.set.clientRoutingProfiles:[]);
     let saved=JSON.stringify(draft);
+    const collapsedTemplates=new Set();
     let activeId=null, activeTab='sources', search='', jsonValue='', jsonError='', saveBusy=false, confirmDelete='';
     const makeRule=()=>({match:'geosite',value:'',action:'proxy'});
 
@@ -116,6 +117,7 @@
       '<div data-cr-modal-host></div></section>';
 
     const countLabel=(n,ru,en)=>n+' '+(window.XMeshI18n?.getLanguage?.()==='en'?en[n===1?0:1]:ru[({one:0,few:1,many:2,other:2})[new Intl.PluralRules('ru').select(n)]]);
+    const newTemplateName=()=>window.XMeshI18n?.getLanguage?.()==='en'?'New template':'Новый шаблон';
     function current(){return draft.find(p=>p.id===activeId);}
     function dirty(){return JSON.stringify(draft)!==saved;}
     function countInfo(){return draft.reduce((n,p)=>n+(p.servers||[]).length,0);}
@@ -132,22 +134,22 @@
     function sourceSummary(p){
       return (p.servers||[]).map(key=>{
         const item=sourceByKey.get(key);
-        return '<span class="crx-assigned-source">'+flag(item?.code)+'<span><b>'+escapeHTML(item?.title||key)+'</b><small>'+escapeHTML(item?item.kind+' · '+item.detail:'Недоступный сервер')+'</small></span></span>';
+        return '<button type="button" class="crx-assigned-source" data-cr-source-open="'+escapeHTML(p.id)+'" data-cr-source-key="'+escapeHTML(key)+'">'+flag(item?.code)+'<span><b data-no-translate>'+escapeHTML(item?.title||key)+'</b><small>'+escapeHTML(item?item.kind+' · '+item.detail:'Недоступный сервер')+'</small></span></button>';
       }).join('');
     }
     function card(p) {
       const rules=p.rules||[],assigned=p.servers||[];
       const rulePreview=rules.map((rule,index)=>{
         const destination=rule.action==='server'?(targets.find(t=>t.key===rule.server)?.label||rule.server||actions.server):(actions[rule.action]||rule.action);
-        return '<div class="crx-rule-chip"><span class="crx-rule-index">'+String(index+1).padStart(2,'0')+'</span><span class="crx-rule-condition"><small>'+escapeHTML(kinds[rule.match]||rule.match)+'</small><b>'+escapeHTML(rule.value||'—')+'</b><small>'+escapeHTML(rule.network?rule.network.toUpperCase().replace(',', ' + '):'TCP + UDP')+'</small></span><em>→ '+escapeHTML(destination)+'</em></div>';
+        return '<button type="button" class="crx-rule-chip" data-cr-rule-open="'+escapeHTML(p.id)+'" data-cr-rule-index="'+index+'"><span class="crx-rule-index">'+String(index+1).padStart(2,'0')+'</span><span class="crx-rule-condition"><small>'+escapeHTML(kinds[rule.match]||rule.match)+'</small><b data-no-translate>'+escapeHTML(rule.value||'—')+'</b><small>'+escapeHTML(rule.network?rule.network.toUpperCase().replace(',', ' + '):'TCP + UDP')+'</small></span><em'+(rule.action==='server'&&rule.server?' data-no-translate':'')+'>→ '+escapeHTML(destination)+'</em></button>';
       });
       const preview=rulePreview.slice(0,4).join('')+(rules.length>4?'<details class="crx-more-rules"><summary>+ '+countLabel(rules.length-4,['правило','правила','правил'],['rule','rules'])+'</summary>'+rulePreview.slice(4).join('')+'</details>':'');
       return '<article class="crx-card'+(p.enabled===false?' is-disabled':'')+'" data-cr-profile="'+escapeHTML(p.id)+'">'+
-        '<div class="crx-card-identity"><h3 class="crx-card-title">'+escapeHTML(p.name||'Без названия')+'</h3>'+
+        '<div class="crx-card-identity"><h3 class="crx-card-title"><button type="button" class="crx-overview-toggle" data-cr-expand="'+escapeHTML(p.id)+'" aria-controls="crx-details-'+escapeHTML(p.id)+'" aria-expanded="'+!collapsedTemplates.has(p.id)+'"><span'+(p.name?' data-no-translate':'')+'>'+escapeHTML(p.name||'Без названия')+'</span>'+icon('chevron')+'</button></h3>'+
         '<div class="crx-card-stats"><span class="crx-state'+(p.enabled===false?' is-off':'')+'"><i></i>'+(p.enabled===false?'Выключен':'Активен')+'</span>'+
         '<span>'+countLabel(assigned.length,['назначение','назначения','назначений'],['assignment','assignments'])+'</span><span>'+countLabel(rules.length,['правило','правила','правил'],['rule','rules'])+'</span></div></div>'+
-        '<div class="crx-card-flags"><h4 class="crx-group-label">Назначения</h4>'+(sourceSummary(p)||'<span class="crx-card-no-rules">Нет назначений</span>')+'</div>'+
-        '<div class="crx-card-rules"><h4 class="crx-group-label">Правила · по порядку</h4>'+(preview||'<span class="crx-card-no-rules">Дополнительных правил пока нет</span>')+'</div>'+
+        '<div class="crx-card-details" id="crx-details-'+escapeHTML(p.id)+'" data-cr-details="'+escapeHTML(p.id)+'"'+(collapsedTemplates.has(p.id)?' hidden':'')+'><div class="crx-card-flags"><h4 class="crx-group-label">Назначения</h4>'+(sourceSummary(p)||'<span class="crx-card-no-rules">Нет назначений</span>')+'</div>'+
+        '<div class="crx-card-rules"><h4 class="crx-group-label">Правила · по порядку</h4>'+(preview||'<span class="crx-card-no-rules">Дополнительных правил пока нет</span>')+'</div></div>'+
         '<div class="crx-card-footer"><button type="button" class="crx-btn crx-btn-outline" data-cr-open="'+escapeHTML(p.id)+'">'+
           'Настроить '+icon('chevron')+'</button>'+
         '<button type="button" class="crx-icon-btn" data-cr-duplicate="'+escapeHTML(p.id)+'" title="Копировать шаблон" aria-label="Копировать шаблон">'+icon('copy')+'</button></div>'+
@@ -159,7 +161,7 @@
       const checked=(p.servers||[]).includes(key);
       return '<label class="crx-source'+(checked?' is-selected':'')+'" data-cr-source-card="'+escapeHTML(key)+'">'+
         '<span class="crx-source-flag">'+flag(s.code)+'</span>'+
-        '<span class="crx-source-info"><strong>'+escapeHTML(s.title)+'</strong><small>'+escapeHTML(s.kind)+' · '+escapeHTML(s.detail)+'</small></span>'+
+        '<span class="crx-source-info"><strong data-no-translate>'+escapeHTML(s.title)+'</strong><small>'+escapeHTML(s.kind)+' · '+escapeHTML(s.detail)+'</small></span>'+
         '<input type="checkbox" data-cr-source="'+escapeHTML(key)+'"'+(checked?' checked':'')+' aria-label="Назначить '+escapeHTML(s.title)+'">'+
       '</label>';
     }
@@ -194,7 +196,7 @@
       const reuse=Boolean(live?.open&&live.dataset.crProfileId===p.id);
       const markup='<dialog class="crx-overlay" data-cr-overlay aria-labelledby="crx-dialog-title"><div class="crx-dialog">'+
         '<header class="crx-dialog-header"><div class="crx-dialog-identity"><div class="crx-dialog-mark">'+icon('route')+'</div>'+
-        '<div><h2 id="crx-dialog-title">'+escapeHTML(p.name||'Новый шаблон')+'</h2></div></div>'+
+        '<div><h2 id="crx-dialog-title" data-no-translate>'+escapeHTML(p.name||newTemplateName())+'</h2></div></div>'+
         '<button type="button" class="crx-icon-btn crx-close" data-cr-close title="Закрыть" aria-label="Закрыть">'+icon('close')+'</button></header>'+
         '<nav class="crx-tabs" role="tablist" aria-label="Разделы маршрутизации">'+
           [['sources','Назначения','server'],['rules','Правила','settings'],['json','JSON','code']].map(([id,label,symbol])=>
@@ -246,7 +248,7 @@
           const nextCount=nextTab.querySelector('.crx-tab-count');
           if(count&&nextCount)count.textContent=nextCount.textContent;
         }
-        live.querySelector('#crx-dialog-title').textContent=p.name||'Новый шаблон';
+        live.querySelector('#crx-dialog-title').textContent=p.name||newTemplateName();
         live.querySelector('.crx-dialog-summary').innerHTML=next.querySelector('.crx-dialog-summary').innerHTML;
         const saveButton=live.querySelector('.crx-dialog-footer-actions [data-cr-save]');
         saveButton.disabled=saveBusy;
@@ -330,8 +332,8 @@
       }catch(e){notify('Ошибка сохранения: '+(e?.message||'API'));}
       finally{saveBusy=false;render();}
     }
-    function open(id){
-      activeId=id;activeTab='sources';search='';jsonError='';confirmDelete='';
+    function open(id,tab='sources'){
+      activeId=id;activeTab=tab;search='';jsonError='';confirmDelete='';
       jsonValue=JSON.stringify(current(),null,2);render();
       document.querySelector('#client-route-root .crx-close')?.focus();
     }
@@ -371,10 +373,27 @@
       render();
       root.addEventListener('click',async event=>{
         const el=event.target.closest('button');if(!el||!root.contains(el))return;
+        if(el.hasAttribute('data-cr-expand')){
+          const id=el.dataset.crExpand,panel=document.getElementById('crx-details-'+id);
+          if(!panel)return;
+          panel.hidden=!panel.hidden;el.setAttribute('aria-expanded',String(!panel.hidden));
+          if(panel.hidden)collapsedTemplates.add(id);else collapsedTemplates.delete(id);
+          return;
+        }
+        if(el.hasAttribute('data-cr-source-open')){
+          if(checkPending())return;
+          const key=el.dataset.crSourceKey;open(el.dataset.crSourceOpen,'sources');
+          [...root.querySelectorAll('[data-cr-source]')].find(input=>input.dataset.crSource===key)?.focus();return;
+        }
+        if(el.hasAttribute('data-cr-rule-open')){
+          if(checkPending())return;
+          const index=Number(el.dataset.crRuleIndex);open(el.dataset.crRuleOpen,'rules');
+          document.querySelector('[data-cr-rule="'+index+'"] input[data-cr-field="value"]')?.focus();return;
+        }
         if(el.hasAttribute('data-cr-add')){
           if(checkPending())return;
           const id='route_'+Array.from(crypto.getRandomValues(new Uint8Array(6)),n=>n.toString(16).padStart(2,'0')).join('');
-          draft.push({id,name:'Новый шаблон',enabled:true,servers:[],rules:[]});open(id);return;
+          draft.push({id,name:newTemplateName(),enabled:true,servers:[],rules:[]});open(id);return;
         }
         if(el.hasAttribute('data-cr-save')){await save();return;}
         if(el.hasAttribute('data-cr-reset')){
@@ -449,7 +468,7 @@
         if(t.hasAttribute('data-cr-json-text')){jsonValue=t.value;return;}
         if(!p)return;
         if(t.hasAttribute('data-cr-name')){
-          p.name=t.value;root.querySelector('#crx-dialog-title').textContent=t.value||'Новый шаблон';status();return;
+          p.name=t.value;root.querySelector('#crx-dialog-title').textContent=t.value||newTemplateName();status();return;
         }
         if(t.hasAttribute('data-cr-field')&&t.dataset.crField==='value'){
           const row=t.closest('[data-cr-rule]');

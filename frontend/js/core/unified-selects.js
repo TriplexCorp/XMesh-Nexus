@@ -62,7 +62,10 @@
   wrapper.classList.toggle('is-disabled',select.disabled);
   trigger.setAttribute('aria-required',String(select.required));
   trigger.setAttribute('aria-invalid',select.getAttribute('aria-invalid')||'false');
-  const title=select.getAttribute('aria-label')||select.labels?.[0]?.textContent?.trim()||select.getAttribute('title')||'Выбор';
+  const label=select.labels?.[0];
+  const caption=label?.querySelector(':scope > span,:scope > b,:scope > strong');
+  const labelText=caption?.textContent?.trim()||[...(label?.childNodes||[])].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join(' ').trim();
+  const title=select.getAttribute('aria-label')||labelText||select.getAttribute('title')||'Выбор';
   trigger.setAttribute('aria-label',title+': '+textFor(select.selectedOptions[0]));
   if(active===instance){buildOptions(instance);place(instance)}
  }
