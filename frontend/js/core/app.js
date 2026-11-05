@@ -3018,11 +3018,11 @@ function syncNodeEffectiveTls(form){
   const status=form.querySelector('[data-node-tls-effective]');
   const label=form.querySelector('[data-node-tls-state]');
   const feedback=form.querySelector('[data-node-tls-readiness]'),hint=form.querySelector('[data-node-tls-note]');
-  const names={on:'TLS включён',off:'Без TLS',unconfigured:'Профиль не выбран'};
+  const names={on:'TLS включён',off:'Без TLS',unconfigured:profile?'Режим Security не задан':'Профиль не выбран'};
   if(status)status.dataset.state=mode;
   if(label)label.textContent=names[mode];
   if(feedback){feedback.dataset.ready=state.ready?'yes':'no';feedback.dataset.mode=mode;
-    feedback.textContent=mode==='on'?(state.ready?(state.method==='external'?'Внешний сертификат из профиля':String(field('tlsDomain')?.value||field('addr')?.value||'')):state.reason):mode==='off'?'Сертификат не требуется':'Выберите профиль Xray в параметрах подключения';}
+    feedback.textContent=mode==='on'?(state.ready?(state.method==='external'?'Внешний сертификат из профиля':String(field('tlsDomain')?.value||field('addr')?.value||'')):state.reason):mode==='off'?'Сертификат не требуется':profile?'Укажите Security в профиле Xray':'Выберите профиль Xray в параметрах подключения';}
   const method=state.method==='external'||field('tlsManualProvision')?.checked?'external':'acme';
   for(const radio of form.querySelectorAll('[name="nodeTlsMethod"]'))radio.checked=radio.value===method;
   const acme=form.querySelector('[data-node-tls-acme]'),external=form.querySelector('[data-node-tls-external]');
