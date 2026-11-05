@@ -38,6 +38,30 @@ assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{security:'tls'}}
 assert.equal(mode(null),'unconfigured');
 assert.equal(mode({inbounds:[] }),'unconfigured');
 assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{}}]}),'unconfigured');
+// Certificate badges follow effective profile security, not manual ACME flags.
+const visible=new Function('inbs',ui.slice(modeStart,modeEnd)+'return nodeShowsTlsStatus;')(p=>p.inbounds);
+for(const protocol of ['vless','trojan','vmess','shadowsocks','hysteria','masque']){
+ assert.equal(visible(config(protocol,'tls'),{}),true,protocol+' TLS badge must appear without old switches');
+ assert.equal(visible(config(protocol,'reality'),{tlsAutoProvision:true}),false,protocol+' REALITY must not show a TLS badge');
+ assert.equal(visible(config(protocol,'none'),{tlsManualProvision:true}),false,protocol+' none must not show a TLS badge');
+}
+assert.equal(visible(null,{tlsAutoProvision:true}),true,'Unknown legacy profile can retain its TLS status');
+assert.equal(visible(null,{}),false,'Node without TLS must not gain a misleading badge');
+assert.match(ui,/nodeShowsTlsStatus\(p,n\)\?/, 'Node cards must render TLS badge from profile security');
+const statusStart=ui.indexOf('function nodeTlsHealth(runtime){');
+const statusEnd=ui.indexOf('const updateNodeRuntimeBadges=',statusStart);
+assert(statusStart>=0&&statusEnd>statusStart,'Node certificate formatter is missing');
+const health=new Function('panelIsEnglish','window',ui.slice(statusStart,statusEnd)+'return nodeTlsHealth;')(
+ ()=>false,{XMeshI18n:{getLocale:()=> 'ru-RU'}});
+assert.match(health({connected:true,tlsStatus:{state:'valid',daysRemaining:89}}).label,/89 дн\./);
+assert.doesNotMatch(health({connected:true,tlsStatus:{state:'valid',daysRemaining:null}}).label,/0 дн\./,'Missing days cannot become zero');
+assert.match(health({connected:true,tlsStatus:{state:'valid',notAfter:'2035-01-25T00:00:00Z'}}).label,/дн\./,'Signed certificate expiry date can provide remaining days');
+assert.doesNotMatch(health({connected:true,tlsStatus:{state:'multiple',daysRemaining:12}}).label,/12 дн\./,'Multiple certificates must not imply one expiry date');
+assert.equal(health({connected:false}).kind,'unknown');
+const healthEn=new Function('panelIsEnglish','window',ui.slice(statusStart,statusEnd)+'return nodeTlsHealth;')(
+ ()=>true,{XMeshI18n:{getLocale:()=> 'en-US'}});
+assert.match(healthEn({connected:true,tlsStatus:{state:'valid',daysRemaining:89}}).label,/89 days/);
+
 for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-inline','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
  assert(ui.includes(contract),'Node TLS UI contract missing: '+contract);
 

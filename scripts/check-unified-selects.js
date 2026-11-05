@@ -23,7 +23,7 @@ assert.match(ui,/instance\.observer\.disconnect\(\)/,'observers cleaned on navig
 assert.match(ui,/if\(active&&active!==instance\)dismiss\(active\)/,'only one popover at a time');
 assert.match(ui,/select\.disabled/,'disabled state preserved');
 assert.match(ui,/popup\.getBoundingClientRect\(\)/,'unified selector menus correct modal offsets');
-assert.match(app,/menu\.getBoundingClientRect\(\)/,'statistics selector menus correct modal offsets');
+assert.match(app,/menu\.style\.position=dialogRect/,'statistics selector menus use locally anchored PR #345 position');
 assert.match(app,/panelIsEnglish\(\)\?\[' Gbps',' Mbps',' Kbps',' bps'\]/,'speed units localize');
 const presentation=fs.readFileSync('frontend/styles/system/nexus-ui-v3.css','utf8');
 const components=fs.readFileSync('frontend/styles/system/nexus-v3-components.css','utf8');
