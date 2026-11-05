@@ -656,6 +656,75 @@ dialog#dlg.squad-wide .squad-preview-host-nodes{
 }
 
 
+
+/* Compact impact summary: counts stay visible; entity names are disclosed
+ * on demand. Uses shared Nexus borders, control radius and surface colors. */
+dialog#dlg.squad-wide .squad-preview-details{
+  min-width:0;
+  margin:0;
+  border:1px solid var(--nx-border);
+  border-radius:var(--ui-control-radius);
+  background:var(--nx-section-bg);
+}
+dialog#dlg.squad-wide .squad-preview-details>summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.6rem;
+  min-height:2.35rem;
+  padding:.52rem .75rem;
+  cursor:pointer;
+  list-style:none;
+  color:var(--tx);
+  font-size:.77rem;
+  line-height:1.3;
+  font-weight:680;
+}
+dialog#dlg.squad-wide .squad-preview-details>summary::-webkit-details-marker{display:none}
+dialog#dlg.squad-wide .squad-preview-details>summary>span:first-child{
+  display:inline-flex;
+  align-items:center;
+  gap:.45rem;
+  min-width:0;
+}
+dialog#dlg.squad-wide .squad-preview-details>summary .ic{
+  width:.92rem;height:.92rem;flex:none;color:var(--mu);
+}
+dialog#dlg.squad-wide .squad-preview-details>summary:focus-visible{
+  outline:2px solid var(--nx-focus);
+  outline-offset:2px;
+  border-radius:var(--ui-control-radius);
+}
+dialog#dlg.squad-wide .squad-preview-toggle-indicator{
+  display:block;
+  width:.44rem;
+  height:.44rem;
+  flex:none;
+  margin-right:.2rem;
+  border-right:1.6px solid currentColor;
+  border-bottom:1.6px solid currentColor;
+  transform:rotate(45deg);
+  transition:transform .16s ease;
+  color:var(--mu);
+}
+dialog#dlg.squad-wide .squad-preview-details[open] .squad-preview-toggle-indicator{
+  transform:rotate(225deg);
+}
+dialog#dlg.squad-wide .squad-preview-details-body{
+  display:grid;
+  gap:.65rem;
+  min-width:0;
+  max-height:min(21rem,42vh);
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:0 .75rem .75rem;
+  scrollbar-width:thin;
+}
+dialog#dlg.squad-wide .squad-preview-details-body .squad-preview-section{
+  padding-top:.65rem;
+}
+
 @media(min-width:1800px){
   dialog#dlg.squad-wide{
     width:min(1460px,80vw);
