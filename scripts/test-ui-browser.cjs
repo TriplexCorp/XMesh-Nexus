@@ -363,7 +363,8 @@ async function main() {
     await checked('Routing workspace: compact populated rows and contextual saving',async()=>{
       const original=await page.evaluate(()=>structuredClone(DB.set.clientRoutingProfiles||[]));
       try{
-        await page.evaluate(id=>{DB.set.clientRoutingProfiles=[{id:'ui-route-main',name:'RU DIRECT',enabled:true,servers:['node:'+id],rules:[{match:'geosite',value:'category-ru',action:'direct'},{match:'geoip',value:'ru',action:'direct'}]},{id:'ui-route-empty',name:'Draft routing',enabled:false,servers:[],rules:[]},{id:'ui-route-long',name:'Long values',enabled:true,servers:[],rules:[{match:'domain',value:'long-subdomain-'.repeat(12)+'.example.invalid',action:'proxy'}]}]},node.id);
+        await page.evaluate(id=>{DB.set.clientRoutingProfiles=[{id:'ui-route-main',name:'RU DIRECT',enabled:true,servers:['node:'+id],rules:[{match:'geosite',value:'category-ru',action:'direct'},{match:'geoip',value:'ru',action:'direct'},{match:'domain',value:'ads.example.invalid',action:'block',network:'udp'}]},{id:'ui-route-empty',name:'Draft routing',enabled:false,servers:[],rules:[]},{id:'ui-route-long',name:'Long values',enabled:true,servers:[],rules:[{match:'domain',value:'long-subdomain-'.repeat(12)+'.example.invalid',action:'proxy'}]}]},node.id);
+        await page.evaluate(()=>DB.set.clientRoutingProfiles[2].rules.push(...[80,443,8080,8443].map(port=>({match:'port',value:String(port),action:'direct'}))));
         await navigate('clientrouting');
         for(const [width,height] of [[1920,1080],[1366,768],[768,1024],[390,844]]){
           await page.setViewportSize({width,height});
@@ -372,12 +373,18 @@ async function main() {
           const g=await geometry(page);assert(g.scrollWidth<=width+1,'Populated routing rows must not overflow');
           assert.equal(g.outside.length,0,'Routing controls must stay inside the viewport');
           assert((await page.locator('.crx-assigned-source').innerText()).includes(node.name),'Assigned node name must be readable');
-          if(width>=1366)assert((await page.locator('[data-cr-profile="ui-route-main"]').boundingBox()).height<240,'A small routing template should remain a compact row');
+          if(width>=1920)assert((await page.locator('[data-cr-profile="ui-route-main"]').boundingBox()).height<480,'Template overview must expose three rules without excessive height');
+          assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-rule-chip').count(),3,'All three rules must be visible in the overview');
+          assert((await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').innerText()).includes('ads.example.invalid'),'The third rule must not be silently omitted');
           await screenshot(page,'routing-list-'+width);
         }
+        const more=page.locator('[data-cr-profile="ui-route-long"] .crx-more-rules');
+        assert(await more.isVisible(),'Rules after the fourth must remain accessible');
+        await more.locator('summary').click();
+        assert((await more.innerText()).includes('8443'),'Expanding must reveal the final rule');
         await page.locator('[data-cr-open="ui-route-main"]').click();
         await page.locator('[data-cr-tab="rules"]').click();
-        assert.equal(await page.locator('.crx-rule').count(),2,'Configure must retain existing rules');
+        assert.equal(await page.locator('.crx-rule').count(),3,'Configure must retain existing rules');
         await page.keyboard.press('Escape');
         await page.locator('[data-cr-duplicate="ui-route-main"]').click();
         await page.keyboard.press('Escape');

@@ -130,23 +130,24 @@
       el.querySelector('[data-cr-bottom]').hidden=!dirty()&&!saveBusy;
     }
     function sourceSummary(p){
-      const assigned=p.servers||[];
-      const flags=assigned.slice(0,2).map(key=>{
+      return (p.servers||[]).map(key=>{
         const item=sourceByKey.get(key);
-        return '<span class="crx-assigned-source" title="'+escapeHTML(item?.title||key)+'">'+flag(item?.code)+'<span>'+escapeHTML(item?.title||key)+'</span></span>';
+        return '<span class="crx-assigned-source">'+flag(item?.code)+'<span><b>'+escapeHTML(item?.title||key)+'</b><small>'+escapeHTML(item?item.kind+' · '+item.detail:'Недоступный сервер')+'</small></span></span>';
       }).join('');
-      return flags+(assigned.length>2?'<span class="crx-flags-count">+'+(assigned.length-2)+'</span>':'');
     }
     function card(p) {
-      const rulePreview=(p.rules||[]).slice(0,2).map(rule=>
-        '<span class="crx-rule-chip"><span>'+escapeHTML(kinds[rule.match]||rule.match)+'</span><b>'+escapeHTML(rule.value||'—')+
-        '</b><em>→ '+escapeHTML(actions[rule.action]||rule.action)+'</em></span>').join('');
+      const rules=p.rules||[],assigned=p.servers||[];
+      const rulePreview=rules.map((rule,index)=>{
+        const destination=rule.action==='server'?(targets.find(t=>t.key===rule.server)?.label||rule.server||actions.server):(actions[rule.action]||rule.action);
+        return '<div class="crx-rule-chip"><span class="crx-rule-index">'+String(index+1).padStart(2,'0')+'</span><span class="crx-rule-condition"><small>'+escapeHTML(kinds[rule.match]||rule.match)+'</small><b>'+escapeHTML(rule.value||'—')+'</b><small>'+escapeHTML(rule.network?rule.network.toUpperCase().replace(',', ' + '):'TCP + UDP')+'</small></span><em>→ '+escapeHTML(destination)+'</em></div>';
+      });
+      const preview=rulePreview.slice(0,4).join('')+(rules.length>4?'<details class="crx-more-rules"><summary>'+countLabel(rules.length-4,['ещё правило','ещё правила','ещё правил'],['more rule','more rules'])+'</summary>'+rulePreview.slice(4).join('')+'</details>':'');
       return '<article class="crx-card'+(p.enabled===false?' is-disabled':'')+'" data-cr-profile="'+escapeHTML(p.id)+'">'+
         '<div class="crx-card-identity"><h3 class="crx-card-title">'+escapeHTML(p.name||'Без названия')+'</h3>'+
         '<div class="crx-card-stats"><span class="crx-state'+(p.enabled===false?' is-off':'')+'"><i></i>'+(p.enabled===false?'Выключен':'Активен')+'</span>'+
-        '<span>'+countLabel((p.rules||[]).length,['правило','правила','правил'],['rule','rules'])+'</span></div></div>'+
-        '<div class="crx-card-flags">'+(sourceSummary(p)||'<span class="crx-card-no-rules">Нет назначений</span>')+'</div>'+
-        '<div class="crx-card-rules">'+(rulePreview||'<span class="crx-card-no-rules">Дополнительных правил пока нет</span>')+'</div>'+
+        '<span>'+countLabel(assigned.length,['назначение','назначения','назначений'],['assignment','assignments'])+'</span><span>'+countLabel(rules.length,['правило','правила','правил'],['rule','rules'])+'</span></div></div>'+
+        '<div class="crx-card-flags"><h4 class="crx-group-label">Назначения</h4>'+(sourceSummary(p)||'<span class="crx-card-no-rules">Нет назначений</span>')+'</div>'+
+        '<div class="crx-card-rules"><h4 class="crx-group-label">Правила · по порядку</h4>'+(preview||'<span class="crx-card-no-rules">Дополнительных правил пока нет</span>')+'</div>'+
         '<div class="crx-card-footer"><button type="button" class="crx-btn crx-btn-outline" data-cr-open="'+escapeHTML(p.id)+'">'+
           'Настроить '+icon('chevron')+'</button>'+
         '<button type="button" class="crx-icon-btn" data-cr-duplicate="'+escapeHTML(p.id)+'" title="Копировать шаблон" aria-label="Копировать шаблон">'+icon('copy')+'</button></div>'+
