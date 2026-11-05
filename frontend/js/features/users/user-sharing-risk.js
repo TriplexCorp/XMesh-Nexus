@@ -232,9 +232,10 @@
       const remove=dialog.querySelector('[data-device-remove]');
       if(remove)remove.onclick=async()=>{
         if(busy)return;
+        const deviceId=selected;
         busy=true;let confirmed=false;
         try{confirmed=await panelConfirm(t('Привязка будет удалена и освободит место. Это не блокирует устройство: при следующем обновлении подписки клиент сможет зарегистрироваться снова.','Removing this binding frees a slot. It does not block the device: the client can register again on its next subscription refresh.'),{title:t('Удалить привязку устройства?','Remove device binding?'),confirmLabel:t('Удалить привязку','Remove binding'),danger:true})}finally{busy=false}
-        if(confirmed&&dialog.open&&request===detailRequest)await update(null,selected);
+        if(confirmed&&dialog.open&&request===detailRequest)await update(null,deviceId);
       };
     }
     paint();dialog.dataset.focus=focus;dialog.querySelector('.xm-sharing-close').focus({preventScroll:true});
@@ -252,7 +253,7 @@
   document.addEventListener('click',event=>{
     const button=event.target.closest?.('[data-sharing-detail]');if(!button)return;
     event.preventDefault();event.stopImmediatePropagation();
-    const user=userById(button.dataset.sharingDetail);if(user)void openDetail(user,button.dataset.sharingFocus);
+    const user=userById(button.dataset.sharingDetail);if(user)void openDetail(user,button.dataset.sharingFocus,button.dataset.sharingDevice??null);
   },true);
 
   let scheduled=false;

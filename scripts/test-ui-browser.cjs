@@ -322,9 +322,15 @@ async function main() {
       assert.equal(before.length,2,'Two real SQL-backed device slots must be registered');
       const removed=before.find(d=>d.model==='Real device A'),retained=before.find(d=>d.model==='Real device B');
       await navigate('users');await page.reload({waitUntil:'domcontentloaded'});
-      await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus=devices]`).click();
+      // Open the older device directly from its preview. The device workspace
+      // must preserve that identity rather than silently selecting the newest.
+      await page.locator(`#ut tr[data-id="${user.id}"]`).click();
+      const previews=page.locator('#dlg .user-device-preview');
+      assert.equal(await previews.count(),2);
+      await previews.last().click();
       const dialog=page.locator('#xm-sharing-dialog');
-      await dialog.locator(`[data-device-select="${removed.id}"]`).click();
+      await dialog.locator('.xm-device-capacity').waitFor();
+      assert.equal(await dialog.locator('[data-device-select][aria-pressed="true"]').getAttribute('data-device-select'),String(removed.id),'Clicking a device preview must select that exact device, not the most recent one');
       // Register another device after the UI snapshot. Removing A must not
       // overwrite B or this newly registered C with a stale devices array.
       await register('Real device C');
@@ -334,7 +340,13 @@ async function main() {
       await dialog.locator(`[data-device-select="${removed.id}"]`).waitFor({state:'detached'});
       const after=(await api('GET',`/users/${user.id}/subscription`)).deviceLimit.devices;
       assert.deepEqual(after.map(d=>d.id).sort(),[retained.id,third.id].sort(),'Real API must delete only the selected SQL row, retaining concurrent registrations');
-      await page.keyboard.press('Escape');await page.reload({waitUntil:'domcontentloaded'});
+      await page.keyboard.press('Escape');
+      await page.locator(`#dlg [data-sharing-device="${removed.id}"]`).waitFor({state:'detached'});
+      await page.locator('#dlg .user-device-preview').first().waitFor();
+      await page.locator('#dlg .user-device-preview').first().click();
+      await dialog.locator('.xm-device-capacity').waitFor();
+      assert.equal(await dialog.locator(`[data-device-select="${removed.id}"]`).count(),0,'Deleted device must not return when reopening from the parent drawer');
+      await page.keyboard.press('Escape');await page.keyboard.press('Escape');await page.reload({waitUntil:'domcontentloaded'});
       await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus=devices]`).click();
       await dialog.locator(`[data-device-select="${retained.id}"]`).waitFor();
       assert.equal(await dialog.locator('.xm-sharing-device').count(),2,'Deletion must survive a full page reload');
