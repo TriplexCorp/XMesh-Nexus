@@ -362,16 +362,24 @@ html[data-surface=glass]{
   --nx-floating-bg:color-mix(in srgb,var(--s1) 76%,transparent);
   --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 27%,transparent);
   --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 58%,transparent);
-  --nx-border:color-mix(in srgb,var(--tx) 11%,transparent);
-  --nx-border-strong:color-mix(in srgb,var(--tx) 16%,transparent);
   --nx-separator:color-mix(in srgb,var(--tx) 5%,transparent);
-  --nx-panel-shadow:0 22px 64px -42px rgba(0,0,0,.82),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
-  --nx-dialog-shadow:0 34px 96px -34px rgba(0,0,0,.86),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
-  --nx-section-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
-  --nx-item-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
-  --nx-control-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
-  --nx-floating-shadow:0 28px 70px -34px rgba(0,0,0,.84),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
+  --nx-panel-shadow:0 22px 64px -42px rgba(0,0,0,.82);
+  --nx-dialog-shadow:0 34px 96px -34px rgba(0,0,0,.86);
+  --nx-section-shadow:none;
+  --nx-item-shadow:none;
+  --nx-control-shadow:none;
+  --nx-floating-shadow:0 28px 70px -34px rgba(0,0,0,.84);
   --nx-backdrop:blur(18px) saturate(132%);
+}
+
+/* Glass keeps border strength independent from the material. Light surfaces
+ * need daylight shadows rather than the dark theme's near-black elevation. */
+html[data-theme=light][data-surface=glass]{
+  --nx-panel-bg:color-mix(in srgb,var(--s1) 48%,transparent);
+  --nx-dialog-bg:color-mix(in srgb,var(--s1) 68%,transparent);
+  --nx-panel-shadow:0 10px 32px -18px rgba(36,48,68,.18);
+  --nx-dialog-shadow:0 24px 64px -24px rgba(36,48,68,.28);
+  --nx-floating-shadow:0 16px 40px -18px rgba(36,48,68,.24);
 }
 
 /* Raised — neutral depth hierarchy, not accent-coloured slabs. */

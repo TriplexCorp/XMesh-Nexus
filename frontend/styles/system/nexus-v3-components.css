@@ -14,6 +14,9 @@ button svg{flex:none}
 .card .card{padding-inline:0;border:0;border-top:1px solid var(--nx-separator);border-radius:0;background:transparent;box-shadow:none}
 .btn,.gh,.dg,.ib,.ia{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;min-width:0;min-height:var(--nx-control-h);padding:.55rem .85rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);box-shadow:var(--nx-control-shadow);color:var(--tx);font-size:.82rem;font-weight:650;text-decoration:none;white-space:nowrap}
 .btn{background:var(--a);border-color:var(--a);color:var(--btn-text);font-weight:750}
+/* Keep keyboard focus inside filled actions instead of drawing a second
+ * detached outline around their existing border. */
+.btn:focus-visible{outline:2px solid var(--btn-text);outline-offset:-4px;box-shadow:none}
 .btn:not(:disabled):hover{background:color-mix(in srgb,var(--a) 88%,var(--tx))}
 .dg{color:var(--er)}
 .dg:not(:disabled):hover{background:color-mix(in srgb,var(--er) 9%,var(--nx-control-bg));border-color:color-mix(in srgb,var(--er) 35%,var(--nx-border))}
