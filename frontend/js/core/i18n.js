@@ -11,6 +11,11 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Архив":"Archived",
+    "архив":"archived",
+    "Исторический трафик; нода больше не зарегистрирована":"Historical traffic; node is no longer registered",
+    "Архивные ноды — это исторические источники трафика, а не действующие серверы.":"Archived nodes are historical traffic sources, not active servers.",
+
     // Country picker search aliases are internal data; display labels still need full EN coverage.
     "UK United Kingdom Англия England Великобритания Great Britain Britain Британия Соединённое Королевство":"UK United Kingdom England Great Britain Britain",
     "Kosovo Косово Kosova Republic of Kosovo":"Kosovo Kosova Republic of Kosovo",
