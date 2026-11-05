@@ -12,6 +12,9 @@
 .squad-card-name{display:block;max-width:100%;padding:0;border:0;background:transparent;color:var(--tx);font:inherit;font-size:1.06rem;font-weight:760;text-align:left;cursor:pointer;overflow-wrap:anywhere}
 .squad-card-name:hover{color:var(--a)}
 .squad-card-identity p{margin:.2rem 0 0;color:var(--mu);font-size:.78rem;line-height:1.4;overflow-wrap:anywhere}
+.squad-card-head-actions{display:flex;align-items:center;gap:.4rem;min-width:0;justify-self:end}
+.squad-card-head-actions>.squad-card-edit{display:inline-flex;align-items:center;justify-content:center;gap:.42rem;white-space:nowrap;flex:none}
+.squad-card-edit .ic{width:.9rem;height:.9rem;flex:none}
 .squad-card-actions{position:relative;z-index:2}
 .squad-card-actions summary{display:grid;place-items:center;width:2rem;height:2rem;cursor:pointer;list-style:none;border:1px solid transparent;border-radius:var(--ui-control-radius);color:var(--mu)}
 .squad-card-actions summary::-webkit-details-marker{display:none}
@@ -53,3 +56,4 @@
 .squad-directory-note>.ic{flex:none;width:.85rem;height:.85rem;margin-top:.12rem}
 @media(max-width:1450px){.squad-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:860px){.squad-card-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.squad-card-head{grid-template-columns:2.7rem minmax(0,1fr)}.squad-card-head-actions{grid-column:2;justify-self:start;gap:.5rem}}

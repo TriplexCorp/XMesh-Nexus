@@ -191,8 +191,14 @@ async function main() {
         assert(g.left>=0&&g.right<=g.viewport+1,'Cards must fit horizontally');
         assert.equal(g.columns,width<860?1:width<1450?2:3,'Squad grid breakpoint must be deterministic');
         await screenshot(page,`squad-cards-${width}x${height}`);
-        await card.locator('.squad-card-name').click();
-        assert(await page.locator('form[data-ent="squads"]').isVisible(),'Squad card must open existing CRUD editor');
+        const edit=card.locator('.squad-card-edit');
+        assert(await edit.isVisible(),'Edit must be directly visible, not hidden in an actions menu');
+        assert.equal(await card.locator('.squad-card-menu [data-ne]').count(),0,'Actions menu must not duplicate the primary edit action');
+        assert.equal(await card.locator('.squad-card-menu [data-del]').count(),1,'Delete must remain behind the actions menu');
+        const editBounds=await edit.boundingBox(),cardBounds=await card.boundingBox();
+        assert(editBounds&&cardBounds&&editBounds.x>=cardBounds.x-1&&editBounds.x+editBounds.width<=cardBounds.x+cardBounds.width+1,'Direct edit must stay inside the card');
+        await edit.click();
+        assert(await page.locator('form[data-ent="squads"]').isVisible(),'One click on Edit must open the existing Squad editor');
         await page.keyboard.press('Escape');
         await page.waitForSelector('dialog[open]',{state:'detached'});
       }
