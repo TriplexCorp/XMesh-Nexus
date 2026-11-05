@@ -1989,23 +1989,25 @@ function userTrafficDonutsMarkup(payload){
   const up=servers.reduce((sum,r)=>sum+Number(r.uplinkBytes),0);
   const down=servers.reduce((sum,r)=>sum+Number(r.downlinkBytes),0);
   const total=up+down;
+  const latestSample=servers.reduce((last,r)=>Number.isFinite(+r.updatedAtMs)&&+r.updatedAtMs>last?+r.updatedAtMs:last,0);
+  const sampleCaption=latestSample?new Date(latestSample).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
   const cards=servers.map(r=>{
     const amount=Number(r.uplinkBytes)+Number(r.downlinkBytes);
     const share=total?Math.min(100,Math.max(0,amount/total*100)):0;
     const percent=total?fmt(share,share<1?1:0):'0';
     const seen=Number.isFinite(+r.updatedAtMs)?new Date(+r.updatedAtMs).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
-    return '<article class="user-server-item"><div class="user-server-donut" style="--traffic-share:'+share.toFixed(3)+'%;--server-color:'+userServerColor(r.nodeId)+'" role="img" aria-label="'+esc(String(r.name||'Узел #'+r.nodeId))+': '+percent+'% пользовательского трафика"><span>'+percent+'%</span></div><div class="user-server-details"><b title="'+esc(r.name||'Узел #'+r.nodeId)+'">'+esc(r.name||'Узел #'+r.nodeId)+'</b><strong>'+userTrafficBytes(amount)+'</strong><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small><span class="user-server-updated">Срез '+esc(seen)+'</span></div></article>';
+    return '<article class="user-server-item"><div class="user-server-donut" style="--traffic-share:'+share.toFixed(3)+'%;--server-color:'+userServerColor(r.nodeId)+'" role="img" aria-label="'+esc(String(r.name||'Узел #'+r.nodeId))+': '+percent+'% пользовательского трафика"><span>'+percent+'%</span></div><div class="user-server-details"><b title="'+esc(r.name||'Узел #'+r.nodeId)+'">'+esc(r.name||'Узел #'+r.nodeId)+'</b><strong>'+userTrafficBytes(amount)+'</strong><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small><span class="user-server-share" style="--traffic-share:'+share.toFixed(3)+'%;--server-color:'+userServerColor(r.nodeId)+'" role="meter" aria-label="Доля трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+share.toFixed(1)+'"><i></i></span><span class="user-server-updated">'+ic('calendar')+' Срез '+esc(seen)+'</span></div></article>';
   }).join('');
   const downloadShare=total?down/total*100:0;
-  const nodeLegend=servers.map(r=>'<div><span class="user-legend-dot" style="background:'+userServerColor(r.nodeId)+'"></span><span>'+esc(r.name||'Нода #'+r.nodeId)+'</span><b>'+userTrafficBytes(Number(r.uplinkBytes)+Number(r.downlinkBytes))+'</b></div>').join('');
-  const chart='<div class="user-traffic-visual"><div class="user-traffic-main-donut" style="--server-gradient:'+userServerSegments(servers)+'" role="img" aria-label="Распределение трафика по нодам"><div><small>Всего</small><strong>'+userTrafficBytes(total)+'</strong></div></div><div class="user-traffic-legend">'+nodeLegend+'<small>Скачано: '+userTrafficBytes(down)+' · Отправлено: '+userTrafficBytes(up)+'</small></div></div>';
+  const nodeLegend=servers.map(r=>{const amount=Number(r.uplinkBytes)+Number(r.downlinkBytes);const share=total?amount/total*100:0;return '<div><span class="user-legend-dot" style="background:'+userServerColor(r.nodeId)+'"></span><span>'+esc(r.name||'Нода #'+r.nodeId)+'</span><b>'+userTrafficBytes(amount)+'</b><small class="user-legend-share">'+fmt(share,share<1?1:0)+'%</small></div>';}).join('');
+  const chart='<div class="user-traffic-sample">'+ic('calendar')+' <span>Последний подтверждённый срез: <strong>'+esc(sampleCaption)+'</strong></span></div><div class="user-traffic-visual"><div class="user-traffic-main-donut" style="--server-gradient:'+userServerSegments(servers)+'" role="img" aria-label="Распределение трафика по нодам"><div><small>Всего</small><strong>'+userTrafficBytes(total)+'</strong></div></div><div class="user-traffic-legend">'+nodeLegend+'<small>Скачано: '+userTrafficBytes(down)+' · Отправлено: '+userTrafficBytes(up)+'</small></div></div>';
   return chart+(total===0?'<p class="user-server-pending">Счётчики подключены, но трафик пока не зарегистрирован.</p>':'')+'<div class="user-server-grid">'+cards+'</div><small class="user-server-source">Данные только из персональных счётчиков Xray. Общий трафик VPS не используется.</small>';
 }
 function userInboundTrafficMarkup(payload){
  const rows=Array.isArray(payload?.inbounds)?payload.inbounds.filter(r=>r&&typeof r.inboundTag==='string'&&Number.isFinite(+r.uplinkBytes)&&Number.isFinite(+r.downlinkBytes)): [];
- if(!rows.length)return '<section class="user-inbound-stats"><h4>Трафик по inbound</h4><p class="note">Пока нет персональных счётчиков по inbound. Обычный Xray StatsService отдаёт пользователя и inbound отдельно; эти общие значения нельзя перемножать или распределять искусственно. Требуется агент, передающий реальные счётчики userInboundTraffic.</p></section>';
+ if(!rows.length)return '<section class="user-inbound-stats"><h4>'+ic('layers')+' Трафик по inbound</h4><p class="note">Пока нет персональных счётчиков по inbound. Обычный Xray StatsService отдаёт пользователя и inbound отдельно; эти общие значения нельзя перемножать или распределять искусственно. Требуется агент, передающий реальные счётчики userInboundTraffic.</p></section>';
  const cards=rows.map(r=>'<div class="user-inbound-item"><div><b>'+esc(r.inboundTag)+'</b><small>'+esc(r.nodeName||'Узел #'+r.nodeId)+'</small></div><div><b>'+userTrafficBytes(+r.uplinkBytes + +r.downlinkBytes)+'</b><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small></div></div>').join('');
- return '<section class="user-inbound-stats"><h4>Трафик по inbound</h4><div class="user-inbound-grid">'+cards+'</div><small class="user-server-source">Только фактические подписанные измерения узлов; не прибавляются повторно к общему трафику пользователя.</small></section>';
+ return '<section class="user-inbound-stats"><h4>'+ic('layers')+' Трафик по inbound</h4><div class="user-inbound-grid">'+cards+'</div><small class="user-server-source">Только фактические подписанные измерения узлов; не прибавляются повторно к общему трафику пользователя.</small></section>';
 }
 let userTrafficAutoGeneration=0;
 function startUserTrafficAutoRefresh(userId){
@@ -2092,9 +2094,9 @@ function userDrawer(id,tab){
       <div class="user-head-actions"><button type="button" class="gh sm" data-open-user-traffic="${u.id}" data-traffic-username="${esc(u.username)}">${ic("activity")} Подробная статистика</button><button type="button" class="gh sm" data-a="tog" data-u="${u.id}">${ic(u.disabled?'play':'pause')}${u.disabled?'Включить':'Отключить'}</button><button type="button" class="ia user-remove" data-a="del" data-u="${u.id}" aria-label="Удалить пользователя" title="Удалить пользователя">${ic('trash')}</button><button type="button" class="ia" data-x aria-label="Закрыть">${ic('x')}</button></div>
     </header>
     <div class="user-overview-band">
-      <div class="user-usage-line"><span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Сбросить трафик пользователя">${ic('redo')} Сбросить трафик</button><span class="user-expiry-summary" data-user-expiry-summary >${ic('calendar')} <span>Осталось</span> <strong>${userRemainingLabel(u.expireAt)}</strong></span></div>
+      <div class="user-usage-line">${ic("activity")}<span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Сбросить трафик пользователя">${ic('redo')} Сбросить трафик</button><span class="user-expiry-summary" data-user-expiry-summary >${ic('calendar')} <span>Осталось</span> <strong>${userRemainingLabel(u.expireAt)}</strong></span></div>
       ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,usageRatio*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,usageRatio*100)))}"><i></i></div>`:''}
-      <div class="user-identity-row"><span>Xray ID</span>${viewerMode() ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
+      <div class="user-identity-row">${ic("key")}<span>Xray ID</span>${viewerMode() ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
     </div>
     <nav class="user-editor-tabs" role="tablist" aria-label="Настройки пользователя">${[['ov','Настройки','sliders'],['acc','Доступ и подписка','globe'],['traffic','Трафик','activity'],['dev','Устройства','monitor']].map(([key,title,icon],index)=>`<button type="button" role="tab" id="user-tab-${key}" aria-controls="user-panel-${key}" aria-selected="${index===0}" tabindex="${index===0?0:-1}" data-user-editor-tab="${key}">${ic(icon)}<span>${title}</span></button>`).join('')}</nav>
     <div class="user-canvas-grid">
@@ -2120,7 +2122,7 @@ function userDrawer(id,tab){
         </form>
       </section>
       <section class="user-pane user-pane-access" data-user-editor-pane="acc" data-active="false" role="tabpanel" id="user-panel-acc" aria-labelledby="user-tab-acc" tabindex="0" inert aria-hidden="true">
-        <div class="user-access-column"><div class="user-pane-heading"><h3>Доступ</h3></div>
+        <div class="user-access-column"><div class="user-pane-heading"><div class="user-heading-with-icon">${ic("shield")}<div><h3>Доступ</h3><p>Назначенные ресурсы и ограничения</p></div></div></div>
         <div class="user-section-label">Сквады</div>
         <div class="user-squad-options">${squadMarkup}</div>
         <div class="user-section-label">Inbound</div>
@@ -2129,13 +2131,13 @@ function userDrawer(id,tab){
         <div class="user-host-list">${hostMarkup}</div>
         <div class="user-dev-limit"><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}" aria-label="Лимит устройств"></label></div>
         </div><div class="user-subscription-column">
-        <div class="user-pane-heading user-sub-heading"><div><h3>Подписка</h3></div></div>
+        <div class="user-pane-heading user-sub-heading"><div class="user-heading-with-icon">${ic("link")}<div><h3>Подписка</h3><p>Ссылка и управление доступом</p></div></div></div>
         <p class="user-sub-note">Постоянная ссылка на подписку. Домен, путь, оформление и приложения управляются в SUBSCRIPTION STUDIO.</p>
         <div class="user-subscription-state" data-user-sub-state="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем ссылку…</span></div>
         <a class="user-inline-link" href="#subscription" data-x>${ic('globe')} SUBSCRIPTION STUDIO</a></div>
       </section>
       <section class="user-pane user-pane-insights" data-user-editor-pane="traffic" data-active="false" role="tabpanel" id="user-panel-traffic" aria-labelledby="user-tab-traffic" tabindex="0" inert aria-hidden="true">
-        <div class="user-pane-heading"><div><h3>По серверам</h3><p>Персональный трафик Xray</p></div><button type="button" class="ia user-stats-refresh" data-user-traffic-refresh="${u.id}" title="Обновить статистику" aria-label="Обновить статистику">${ic('redo')}</button></div>
+        <div class="user-pane-heading"><div class="user-heading-with-icon">${ic("server")}<div><h3>По серверам</h3><p>Персональный трафик Xray</p></div></div><button type="button" class="ia user-stats-refresh" data-user-traffic-refresh="${u.id}" title="Обновить статистику" aria-label="Обновить статистику">${ic('redo')}</button></div>
         <div class="user-traffic-stats" data-user-traffic-id="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем данные…</span></div>
       </section>
       <section class="user-pane user-pane-devices" data-user-editor-pane="dev" data-active="false" role="tabpanel" id="user-panel-dev" aria-labelledby="user-tab-dev" tabindex="0" inert aria-hidden="true">
@@ -2144,7 +2146,7 @@ function userDrawer(id,tab){
     </div>
     <p class="er user-editor-feedback" id="fe" role="status"></p>
     <div class="user-editor-actions"><span class="user-edit-dirty" data-user-edit-dirty role="status" aria-live="polite"></span><button type="submit" form="user-edit-form" class="btn user-save-button">${ic('check')} Сохранить изменения</button></div>
-    <footer class="user-canvas-foot"><span>Создан ${new Date(u.created).toLocaleDateString(window.XMeshI18n?.getLocale?.()||'ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
+    <footer class="user-canvas-foot"><span>${ic("calendar")} Создан ${new Date(u.created).toLocaleDateString(window.XMeshI18n?.getLocale?.()||'ru-RU')}</span><span>${ic("users")} Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
   </div>`,'user-modal');
   window.XMeshUserDevices.mount(dlg.querySelector('[data-user-inline-devices]'),u.id);
   window.XMeshUserTabs.select(dlg.querySelector('.user-canvas'),tab==='sub'?'acc':tab||'ov');

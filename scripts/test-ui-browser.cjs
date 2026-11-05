@@ -611,6 +611,9 @@ async function main() {
         const bounds=await page.locator('#dlg').boundingBox();
         assert(Math.abs(bounds.height-g.dialog.height)<=1&&Math.abs(bounds.y-g.dialog.y)<=1,'User task switching must not shift the dialog');
         assert.equal(await page.locator('[data-user-editor-pane][inert]').count(),3);
+        if(key==='acc') assert.equal(await page.locator('.user-pane-access .user-heading-with-icon > svg.ic').count(),2,'Access and subscription must keep semantic Nexus icons');
+        if(key==='traffic') assert.equal(await page.locator('.user-pane-insights .user-heading-with-icon > svg.ic').count(),1,'Traffic heading must use the shared SVG icon');
+        if(key==='ov') assert.equal(await page.locator('.user-pane-settings .user-card-title > svg.ic').count(),3,'Settings cards must retain their semantic icons');
         await screenshot(page,`user-task-${key}-${width}`);
       }
       await screenshot(page,`user-details-${width}x${height}`);

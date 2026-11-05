@@ -1429,21 +1429,21 @@ dialog.user-modal .user-pane {
 
 /* User workspace: one visual hierarchy across every task. */
 #dlg.user-modal .user-head{padding-block:.5rem 1rem}
-#dlg.user-modal .user-head .av{width:3.7rem;height:3.7rem;box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 40%,transparent)}
+#dlg.user-modal .user-head .av{width:3.7rem;height:3.7rem;box-shadow:0 0 0 1px var(--nx-border)}
 #dlg.user-modal .user-head h2{font-size:clamp(1.15rem,1.5vw,1.65rem);letter-spacing:-.025em}
 #dlg.user-modal .user-overview-band{
   padding:1rem 1.2rem;gap:1rem;
-  border:1px solid color-mix(in srgb,var(--a) 24%,var(--nx-border));
+  border:1px solid var(--nx-border);
   border-radius:var(--ui-radius);
-  background:linear-gradient(115deg,color-mix(in srgb,var(--a) 9%,transparent),transparent 55%,color-mix(in srgb,var(--a) 6%,transparent)),var(--nx-section-bg);
+  background:var(--nx-section-bg);
 }
 #dlg.user-modal .user-editor-tabs{gap:.6rem;padding-block:.35rem .65rem}
 #dlg.user-modal .user-editor-tabs [role=tab]{padding:.65rem 1rem}
 #dlg.user-modal .user-editor-tabs [aria-selected=true]{
-  background:linear-gradient(180deg,color-mix(in srgb,var(--a) 20%,transparent),color-mix(in srgb,var(--a) 8%,transparent));
-  border-color:color-mix(in srgb,var(--a) 60%,var(--nx-border));
+  background:color-mix(in srgb,var(--a) 9%,var(--nx-section-bg));
+  border-color:color-mix(in srgb,var(--a) 40%,var(--nx-border));
 }
-#dlg.user-modal .user-pane-settings .user-settings-cards{gap:.85rem;align-items:stretch}
+#dlg.user-modal .user-pane-settings .user-settings-cards{gap:.85rem;align-items:start}
 #dlg.user-modal :is(.user-detail-card,.user-access-column,.user-subscription-column,.user-pane-insights,.user-inline-devices .xm-device-picker,.user-inline-devices .xm-device-inspector,#user-inline-xm-assessment-panel){
   box-sizing:border-box;min-width:0;padding:1.1rem 1.2rem;
   border:1px solid var(--nx-border);border-radius:var(--ui-radius);
@@ -1456,8 +1456,8 @@ dialog.user-modal .user-pane {
 #dlg.user-modal .user-card-title p{margin:.2rem 0 0;font-size:.75rem;color:var(--mu);line-height:1.45}
 #dlg.user-modal .user-note-card{grid-column:1/-1}
 #dlg.user-modal .user-note-card textarea{min-height:5rem}
-#dlg.user-modal .user-pane-access{gap:.85rem;align-items:stretch}
-#dlg.user-modal .user-subscription-column{border-inline-start:1px solid var(--nx-border)}
+#dlg.user-modal .user-pane-access{gap:.85rem;align-items:start}
+#dlg.user-modal .user-subscription-column{border:1px solid var(--nx-border);padding-inline-start:1.2rem}
 #dlg.user-modal .user-pane-insights{gap:1rem}
 #dlg.user-modal .user-inline-devices .xm-device-workbench{gap:.85rem}
 #dlg.user-modal .user-inline-devices .xm-device-inspector{border-inline-start:1px solid var(--nx-border)}
@@ -1474,9 +1474,81 @@ dialog.user-modal .user-pane {
 #dlg.user-modal .user-note-card .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 #dlg.user-modal .user-head .who .av{inline-size:3.7rem;block-size:3.7rem;min-inline-size:3.7rem;max-inline-size:3.7rem;flex:0 0 3.7rem;aspect-ratio:1}
 #dlg.user-modal .user-canvas .user-overview-band{padding:.8rem 1rem}
-#dlg.user-modal .user-detail-card{padding:.9rem 1rem;gap:.55rem;background:linear-gradient(145deg,color-mix(in srgb,var(--a) 3%,transparent),transparent 65%),var(--nx-section-bg)}
+#dlg.user-modal .user-detail-card{padding:.9rem 1rem;gap:.55rem;background:var(--nx-section-bg)}
 #dlg.user-modal .user-detail-card :is(input:not([type=checkbox]):not([type=radio]),select,.xm-select-trigger){min-height:2.25rem;padding:.4rem .65rem}
 #dlg.user-modal .user-detail-card .user-card-title{margin-bottom:.2rem}
 #dlg.user-modal .user-detail-card .user-card-title h3{line-height:1.25}
 #dlg.user-modal .user-detail-card .user-card-title p{line-height:1.35}
 #dlg.user-modal :is(.user-access-column,.user-subscription-column,.user-pane-insights)>.user-pane-heading{padding-bottom:.75rem;border-bottom:1px solid var(--nx-border)}
+
+/* User Details polish: keep the panel's current material system, not a new
+ * card variant. Icons clarify sections; data bars describe actual samples. */
+#dlg.user-modal :is(.user-usage-line,.user-identity-row)>.ic{
+  width:1rem;height:1rem;flex:none;color:var(--mu);
+}
+#dlg.user-modal .user-heading-with-icon{
+  display:flex;align-items:center;gap:.65rem;min-width:0;
+}
+#dlg.user-modal .user-heading-with-icon>.ic{
+  width:1.25rem;height:1.25rem;flex:none;color:var(--a);
+}
+#dlg.user-modal .user-heading-with-icon>div{min-width:0}
+#dlg.user-modal .user-heading-with-icon h3,
+#dlg.user-modal .user-heading-with-icon p{margin-inline:0}
+#dlg.user-modal .user-traffic-sample{
+  display:inline-flex;align-items:center;gap:.45rem;
+  justify-self:start;max-width:100%;padding:.28rem .55rem;
+  color:var(--mu);background:var(--nx-section-bg);
+  border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);
+  font-size:.78rem;line-height:1.35;
+}
+#dlg.user-modal .user-traffic-sample>.ic{
+  width:.9rem;height:.9rem;flex:none;color:var(--a);
+}
+#dlg.user-modal .user-traffic-sample strong{color:var(--tx);font-weight:660}
+#dlg.user-modal .user-traffic-legend>div{
+  grid-template-columns:.6rem minmax(0,1fr) auto auto;
+  gap:.28rem .48rem;
+}
+#dlg.user-modal .user-traffic-legend>div>b{
+  grid-column:auto;font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+#dlg.user-modal .user-traffic-legend .user-legend-share{
+  min-width:3rem;text-align:right;color:var(--mu);font-variant-numeric:tabular-nums;
+  font-size:.76rem;
+}
+#dlg.user-modal .user-server-item{align-items:flex-start}
+#dlg.user-modal .user-server-details{flex:1;min-width:0;gap:.22rem}
+#dlg.user-modal .user-server-share{
+  display:block;width:100%;height:.3rem;margin:.16rem 0;
+  overflow:hidden;border-radius:999px;background:var(--nx-border);
+}
+#dlg.user-modal .user-server-share>i{
+  display:block;width:var(--traffic-share);height:100%;
+  border-radius:inherit;background:var(--server-color,var(--a));
+}
+#dlg.user-modal .user-server-updated{
+  display:inline-flex;align-items:center;gap:.24rem;flex-wrap:wrap;
+}
+#dlg.user-modal .user-server-updated .ic{
+  width:.78rem;height:.78rem;flex:none;color:var(--mu);
+}
+#dlg.user-modal .user-inbound-stats>h4{
+  display:flex;align-items:center;gap:.48rem;
+}
+#dlg.user-modal .user-inbound-stats>h4>.ic{
+  width:1rem;height:1rem;flex:none;color:var(--a);
+}
+#dlg.user-modal .user-canvas-foot span{
+  display:inline-flex;align-items:center;gap:.33rem;
+}
+#dlg.user-modal .user-canvas-foot .ic{
+  width:.83rem;height:.83rem;flex:none;color:var(--mu);
+}
+@media(max-width:760px){
+  #dlg.user-modal .user-traffic-legend>div{
+    grid-template-columns:.6rem minmax(0,1fr) auto;
+  }
+  #dlg.user-modal .user-traffic-legend .user-legend-share{grid-column:2/-1;text-align:left}
+  #dlg.user-modal .user-subscription-column{padding-inline-start:.85rem}
+}
