@@ -11,6 +11,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Ротация":"Rotation",
+    "Провайдер":"Provider",
     "Режим Security не задан":"Security not configured",
     "Укажите Security в профиле Xray":"Set Security in the Xray profile",
     "Выпуск начнётся при применении профиля":"Issuance starts when the profile is applied",

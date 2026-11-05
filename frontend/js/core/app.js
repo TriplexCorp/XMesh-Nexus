@@ -3051,7 +3051,11 @@ function selectNodeEditorTab(form,key,focus=false){
     tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;
     if(selected&&focus)tab.focus();
   }
-  for(const pane of form.querySelectorAll('[data-node-editor-pane]'))pane.hidden=pane.dataset.nodeEditorPane!==key;
+  for(const pane of form.querySelectorAll('[data-node-editor-pane]')){
+    const active=pane.dataset.nodeEditorPane===key;
+    pane.dataset.active=String(active);pane.inert=!active;pane.setAttribute('aria-hidden',String(!active));
+  }
+  window.XMeshSelects?.refresh(form.querySelector('[data-node-editor-pane][data-active="true"]'));
 }
 document.addEventListener('click',event=>{
   const tab=event.target.closest?.('[data-node-editor-tab]');
@@ -3099,13 +3103,16 @@ document.addEventListener('change',event=>{
 
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
-  const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k)).map(f=>field(f,f.k==='rotationIntervalHours'?(o[f.k]??24):o[f.k])).join('');
-  const billingFields=e.fs.filter(f=>f.k.startsWith('billing')).map(f=>f.k==='billingDueDate'
+  const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIntervalHours'].includes(f.k)).map(f=>field(f,f.k==='rotationIntervalHours'?(o[f.k]??24):o[f.k])).join('');
+  const poolField=e.fs.filter(f=>f.k==='rotationIps').map(f=>field(f,o[f.k])).join('');
+  const billingField=f=>f.k==='billingDueDate'
     ?'<div class="f node-date-field"><span>Оплачено до</span><button type="button" class="user-date-trigger" data-node-date-open aria-expanded="false">'+ic('calendar')+'<span data-node-date-label>'+esc(o.billingDueDate?userDateLabel(o.billingDueDate):'Выберите дату')+'</span>'+ic('chevronRight')+'</button><input type="hidden" name="billingDueDate" value="'+esc(o.billingDueDate||'')+'"><div class="user-date-calendar" data-node-date-calendar hidden></div></div>'
-    :field(f,o[f.k])).join('');
+    :field(f.k==='billingNote'?{...f,t:'area',rows:4}:f,o[f.k]);
+  const billingFields=e.fs.filter(f=>f.k.startsWith('billing')&&!['billingProviderUrl','billingNote'].includes(f.k)).map(billingField).join('');
+  const providerFields=e.fs.filter(f=>['billingProviderUrl','billingNote'].includes(f.k)).map(billingField).join('');
   const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!f.k.startsWith('geo')&&!['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k));
   // GeoData belongs to its own node service dialog, never the general editor.
-  // Keep tab / screen-reader order in sync with the wide four-column layout.
+  // Keep the connection fields in a deliberate keyboard and reading order.
   // New fields remain supported and follow the explicitly grouped core fields.
   const nodeCoreOrder=['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay'];
   const arrangedNodeCoreFields=k==='nodes'
@@ -3113,7 +3120,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
       const ia=nodeCoreOrder.indexOf(a.k),ib=nodeCoreOrder.indexOf(b.k);
       return (ia<0?nodeCoreOrder.length:ia)-(ib<0?nodeCoreOrder.length:ib);
     }):nodeCoreFields;
-  // Preserve the original editor layout; group only the new TLS options.
+  // Certificate provisioning fields belong to the dedicated TLS sidebar.
   const tlsKeys=new Set(['tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail']);
   const nodeMainFields=arrangedNodeCoreFields.filter(f=>!tlsKeys.has(f.k)).map(f=>f.k==='addr'
     ?'<div class="node-address-port">'+field(f,o[f.k])+field(nodeCoreFields.find(x=>x.k==='port'),o.port)+'</div>'
@@ -3143,8 +3150,8 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт, страну, название и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e.fs):k==='nodes'
     ?'<nav class="node-editor-tabs" role="tablist" aria-label="Настройки узла">'+[['connection','Подключение','server'],['network','IP-пул','globe'],['billing','Оплата','calendar']].map(([tab,label,icon],index)=>'<button type="button" role="tab" id="node-tab-'+tab+'" aria-controls="node-panel-'+tab+'" aria-selected="'+(index===0)+'" tabindex="'+(index===0?'0':'-1')+'" data-node-editor-tab="'+tab+'">'+ic(icon)+'<span>'+label+'</span></button>').join('')+'</nav><div class="node-form-layout">'+
-      '<div class="node-connection-pane" id="node-panel-connection" role="tabpanel" aria-labelledby="node-tab-connection" data-node-editor-pane="connection"><section class="node-main-section" aria-label="Параметры подключения"><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section><aside class="node-network-stack">'+nodeTlsFields+'</aside></div>'+
-      `<section class="node-ip-section" id="node-panel-network" role="tabpanel" aria-labelledby="node-tab-network" data-node-editor-pane="network" hidden><h3 class="node-form-section-title">IP-пул и ротация</h3><p class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</p><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section" id="node-panel-billing" role="tabpanel" aria-labelledby="node-tab-billing" data-node-editor-pane="billing" hidden><h3 class="node-form-section-title">Оплата сервера</h3><div class="node-billing-fields">${billingFields}</div></section></div>`
+      '<div class="node-connection-pane" id="node-panel-connection" role="tabpanel" aria-labelledby="node-tab-connection" data-node-editor-pane="connection" data-active="true" aria-hidden="false"><section class="node-main-section" aria-label="Параметры подключения"><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section><aside class="node-network-stack">'+nodeTlsFields+'</aside></div>'+
+      `<section class="node-ip-section" id="node-panel-network" role="tabpanel" aria-labelledby="node-tab-network" data-node-editor-pane="network" data-active="false" aria-hidden="true" inert><div class="node-rotation-editor-body node-task-workspace"><section class="node-pool-editor"><h3 class="node-form-section-title">IP-пул и ротация</h3><p class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</p>${poolField}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output></section><aside class="node-task-aside node-rotation-settings"><h3 class="node-form-section-title">Ротация</h3>${rotationFields}${rotationProbe}</aside></div></section><section class="node-billing-section" id="node-panel-billing" role="tabpanel" aria-labelledby="node-tab-billing" data-node-editor-pane="billing" data-active="false" aria-hidden="true" inert><div class="node-task-workspace"><section class="node-rent-editor"><h3 class="node-form-section-title">Оплата сервера</h3><div class="node-billing-fields">${billingFields}</div></section><aside class="node-task-aside node-provider-editor"><h3 class="node-form-section-title">Провайдер</h3><div class="node-billing-fields">${providerFields}</div></aside></div></section></div>`
     :standardFields;
   const boundedEntityEditor=['tpls','admins'].includes(k);
   const editorFields=boundedEntityEditor?'<div class="entity-editor-body">'+fields+'</div>':fields;

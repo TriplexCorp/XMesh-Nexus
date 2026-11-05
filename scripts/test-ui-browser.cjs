@@ -865,15 +865,42 @@ async function main() {
       await page.locator(`[data-ne="nodes:${node.id}"]`).first().click();
       const form=page.locator('#dlg form[data-ent="nodes"]');
       try{
+        const frame=()=>form.evaluate(f=>['#dlg','.node-editor-heading','.node-editor-tabs','.act'].map(selector=>{
+          const r=(selector==='#dlg'?f.closest(selector):f.querySelector(selector)).getBoundingClientRect();
+          return{selector,x:r.x,y:r.y,width:r.width,height:r.height};
+        }));
+        const originalFrame=await frame();
         await form.locator('[name="hosting"]').fill('Unsaved hosting');
         for(const key of ['network','billing','connection']){
           await form.locator(`[data-node-editor-tab="${key}"]`).click();
+          const currentFrame=await frame();
+          for(let i=0;i<originalFrame.length;i++)for(const axis of ['x','y','width','height'])assert(Math.abs(currentFrame[i][axis]-originalFrame[i][axis])<=.1,'Task switch must not resize or move '+originalFrame[i].selector+' '+axis+': '+JSON.stringify({originalFrame,currentFrame}));
+          const scrolling=await form.evaluate(f=>{
+            const body=f.querySelector('.node-form-layout'),active=f.querySelector('[data-node-editor-pane][data-active="true"]'),style=getComputedStyle(body);
+            return{height:body.clientHeight,scroll:body.scrollHeight,content:active.getBoundingClientRect().height+parseFloat(style.paddingTop)+parseFloat(style.paddingBottom)};
+          });
+          assert(scrolling.scroll<=Math.max(scrolling.height,scrolling.content)+2,'Inactive tasks must not leave an empty scroll tail: '+JSON.stringify(scrolling));
+          const inactive=form.locator('[data-node-editor-pane][data-active="false"]');
+          assert.equal(await inactive.count(),2);
+          assert(await inactive.evaluateAll(panes=>panes.every(p=>p.inert&&p.getAttribute('aria-hidden')==='true')),'Inactive tasks must not expose controls to focus/accessibility');
+          if(width>=1366&&key!=='connection'){
+            const workspace=await form.locator(`[data-node-editor-pane="${key}"] .node-task-workspace`).evaluate(el=>{
+              const a=el.firstElementChild.getBoundingClientRect(),b=el.lastElementChild.getBoundingClientRect();
+              return{left:a.left,right:a.right,aside:b.left,width:b.width};
+            });
+            assert(workspace.right<workspace.aside&&workspace.width>=200,'Desktop tasks must use two readable columns');
+          }
           if(key==='network'){
             await form.locator('[name="rotationIps"]').fill('192.0.2.10\n192.0.2.10\n192.0.2.11');
             await form.locator('[data-node-pool-normalize]').click();
             assert.equal((await form.locator('[name="rotationIps"]').inputValue()).trim(),'192.0.2.10\n192.0.2.11');
           }
           if(key==='billing'){
+            const currency=form.locator('.xm-select-shell:has([name="billingCurrency"])');
+            assert.equal(await currency.count(),1,'Billing currency must use the shared themed selector after activation');
+            await currency.locator('.xm-select-trigger').click();
+            await page.locator('.xm-select-popover:visible [role="option"]').filter({hasText:'USD'}).click();
+            assert.equal(await form.locator('[name="billingCurrency"]').inputValue(),'USD','The themed currency selector must update the saved form value');
             await form.locator('[data-node-date-open]').click();
             await form.locator('[data-node-date-calendar] [data-user-date-today]').click();
             assert((await form.locator('[name="billingDueDate"]').inputValue()).length>0,'Billing calendar must remain usable in its tab');
