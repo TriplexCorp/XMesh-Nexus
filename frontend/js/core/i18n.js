@@ -3440,10 +3440,10 @@ window.XMeshI18n=(()=>{
   ])dict.set(ru,en);
   const dynamic=[
     // Runtime version labels and system uptime are not fixed dictionary keys.
-    [/^Версия\\s+(v?\\d[\\w.+-]*)$/i,(_,version)=>'Version '+version],
-    [/^(\\d+)\\s+мин$/i,(_,minutes)=>minutes+' min'],
-    [/^(\\d+)\\s+ч\\s+(\\d+)\\s+мин$/i,(_,hours,minutes)=>hours+' h '+minutes+' min'],
-    [/^(\\d+)\\s+д\\s+(\\d+)\\s+ч$/i,(_,days,hours)=>days+' d '+hours+' h'],
+    [/^Версия\s+(v?\d[\w.+-]*)$/i,(_,version)=>'Version '+version],
+    [/^(\d+)\s+мин$/i,(_,minutes)=>minutes+' min'],
+    [/^(\d+)\s+ч\s+(\d+)\s+мин$/i,(_,hours,minutes)=>hours+' h '+minutes+' min'],
+    [/^(\d+)\s+д\s+(\d+)\s+ч$/i,(_,days,hours)=>days+' d '+hours+' h'],
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],
     [/^Активно:\s*(\d+)\s+из\s+(\d+)$/i,(_,a,b)=>'Enabled: '+a+' of '+b],
