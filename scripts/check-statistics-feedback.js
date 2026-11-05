@@ -192,6 +192,44 @@ matches(agent,/cpu_steal/);
 matches(agent,/cpu_steal >= last_cpu_steal/);
 matches(agent,/cpu_steal_percent/);
 
+// Signed usage from removed nodes must retain its history, not fabricate live nodes.
+const historyMigration=fs.readFileSync('backend/migrations/0112_node_traffic_name_history.sql','utf8');
+matches(historyMigration,/CREATE TABLE IF NOT EXISTS node_traffic_name_history/);
+rejects(historyMigration,/REFERENCES panel_records/,'Archived names must survive deletion');
+const deleteNodeSource=backend.slice(backend.indexOf('async fn delete_record('),backend.indexOf('fn valid_public_hostname('));
+matches(deleteNodeSource,/INSERT INTO node_traffic_name_history/);
+matches(deleteNodeSource,/ON CONFLICT \(node_id\) DO UPDATE/);
+rejects(deleteNodeSource,/DELETE FROM user_node_traffic_totals/,'Deleting a node must retain signed user totals');
+rejects(deleteNodeSource,/DELETE FROM user_inbound_traffic_totals/,'Deleting a node must retain inbound totals');
+const historicalApi=backend.slice(backend.indexOf('async fn get_user_traffic('),backend.indexOf('fn aggregate_traffic_metric_rows('));
+matches(historicalApi,/LEFT JOIN node_traffic_name_history history/);
+matches(historicalApi,/LEFT JOIN node_traffic_name_history h/);
+matches(historicalApi,/Архивная нода #/);
+assert.equal((historicalApi.match(/"nodeArchived":/g)||[]).length,2,
+ 'Per-node and per-inbound responses must both identify archived nodes');
+matches(app,/archivedCount=servers.filter\(r=>r.nodeArchived\).length/);
+matches(app,/user-server-archive-note/);
+// Render the real donut markup with a deleted node: bytes and share are not lost.
+const trafficMarkupStart=app.indexOf('function userTrafficDonutsMarkup(payload){');
+const trafficMarkupEnd=app.indexOf('function userInboundTrafficMarkup(',trafficMarkupStart);
+assert(trafficMarkupStart>=0&&trafficMarkupEnd>trafficMarkupStart);
+const renderTraffic=new Function('registerUserNodeColors','userServerColor','userServerSegments',
+  'userTrafficBytes','fmt','ic','esc','panelIsEnglish','window',
+  app.slice(trafficMarkupStart,trafficMarkupEnd)+'return userTrafficDonutsMarkup;')(
+    ()=>{},()=> '#aabbcc',()=> 'conic-gradient(red 0% 100%)',
+    x=>x+' B',(n,d=0)=>Number(n).toFixed(d),()=>'<i></i>',x=>String(x),
+    ()=>false,{XMeshI18n:{getLocale:()=> 'ru-RU'}});
+const marked=renderTraffic({servers:[
+ {nodeId:111,name:'Архивная нода #111',nodeArchived:true,uplinkBytes:10,downlinkBytes:20,updatedAtMs:0},
+ {nodeId:5,name:'Активная нода',nodeArchived:false,uplinkBytes:5,downlinkBytes:15,updatedAtMs:0}
+]});
+matches(marked,/Архивная нода #111/);
+matches(marked,/Активная нода/);
+matches(marked,/user-server-archive-note/);
+matches(marked,/Всего/);
+matches(marked,/50 B/,'Archived signed bytes must remain in lifetime total');
+assert.equal((marked.match(/class="user-server-item"/g)||[]).length,2,'Both current and archived rows appear');
+
 // Presence requires fresh authenticated counter deltas and one handler per path.
 matches(backend,/const USER_ONLINE_WINDOW_MS:\s*i64\s*=\s*45_000/);
 matches(backend,/async fn get_user_presence\(/);
