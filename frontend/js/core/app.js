@@ -383,11 +383,96 @@ const COUNTRY_ALIASES={
  XK:'Kosovo Косово Kosova Republic of Kosovo',
  KP:'Северная Корея КНДР North Korea DPRK'
 };
+// ISO-3 aliases in COUNTRY_CODES order; Kosovo XKX is a user-assigned identifier.
+const COUNTRY_ISO3='AND ARE AFG ATG AIA ALB ARM AGO ATA ARG ASM AUT AUS ABW ALA AZE BIH BRB BGD BEL BFA BGR BHR BDI BEN BLM BMU BRN BOL BES BRA BHS BTN BVT BWA BLR BLZ CAN CCK COD CAF COG CHE CIV COK CHL CMR CHN COL CRI CUB CPV CUW CXR CYP CZE DEU DJI DNK DMA DOM DZA ECU EST EGY ESH ERI ESP ETH FIN FJI FLK FSM FRO FRA GAB GBR GRD GEO GUF GGY GHA GIB GRL GMB GIN GLP GNQ GRC SGS GTM GUM GNB GUY HKG HMD HND HRV HTI HUN IDN IRL ISR IMN IND IOT IRQ IRN ISL ITA JEY JAM JOR JPN KEN KGZ KHM KIR COM KNA PRK KOR KWT CYM KAZ LAO LBN LCA LIE LKA LBR LSO LTU LUX LVA LBY MAR MCO MDA MNE MAF MDG MHL MKD MLI MMR MNG MAC MNP MTQ MRT MSR MLT MUS MDV MWI MEX MYS MOZ NAM NCL NER NFK NGA NIC NLD NOR NPL NRU NIU NZL OMN PAN PER PYF PNG PHL PAK POL SPM PCN PRI PSE PRT PLW PRY QAT REU ROU SRB RUS RWA SAU SLB SYC SDN SWE SGP SHN SVN SJM SVK SLE SMR SEN SOM SUR SSD STP SLV SXM SYR SWZ TCA TCD ATF TGO THA TJK TKL TLS TKM TUN TON TUR TTO TUV TWN TZA UKR UGA UMI USA URY UZB VAT VCT VEN VGB VIR VNM VUT WLF WSM XKX YEM MYT ZAF ZMB ZWE'.split(' ');
+// Common alternative names. The universal index also covers every country's ISO
+// codes, official RU/EN forms, CLDR short forms, other languages and romanization.
+const COUNTRY_EXTRA_ALIASES={
+ "AE": "UAE|Emirates",
+ "AF": "Afghan",
+ "AG": "Antigua & Barbuda",
+ "BA": "Bosnia|Bosnia Herzegovina",
+ "BN": "Brunei Darussalam",
+ "BO": "Plurinational State of Bolivia",
+ "BR": "Brasil",
+ "BY": "Belorussia|Byelorussia",
+ "CD": "DRC|DR Congo|Congo Kinshasa|Zaire|Democratic Republic of the Congo",
+ "CG": "Congo Brazzaville|Republic of the Congo",
+ "CI": "Ivory Coast|Cote d Ivoire",
+ "CN": "PRC|People's Republic of China",
+ "CV": "Cabo Verde",
+ "CZ": "Czech Republic|Czechia",
+ "DE": "Deutschland|Federal Republic of Germany",
+ "EG": "Arab Republic of Egypt",
+ "ES": "Espana|España",
+ "FM": "Federated States of Micronesia",
+ "GE": "Sakartvelo",
+ "GR": "Hellas|Hellenic Republic",
+ "IN": "Bharat|Republic of India",
+ "IR": "Persia|Islamic Republic of Iran",
+ "IT": "Italia",
+ "JP": "Nippon|Nihon",
+ "KR": "ROK|Republic of Korea|South Korea",
+ "LA": "Laos|Lao PDR",
+ "MD": "Moldova|Republic of Moldova",
+ "MK": "Macedonia|FYROM",
+ "MM": "Burma",
+ "NL": "Holland|The Netherlands",
+ "NZ": "Aotearoa",
+ "PS": "Palestine|State of Palestine",
+ "RU": "Russian Federation|Rossiya|RF",
+ "SA": "KSA|Kingdom of Saudi Arabia",
+ "SD": "Republic of the Sudan",
+ "SY": "Syrian Arab Republic",
+ "SZ": "Swaziland",
+ "TH": "Siam",
+ "TL": "East Timor|Timor Leste",
+ "TR": "Turkey|Turkiye",
+ "TW": "ROC|Republic of China",
+ "TZ": "United Republic of Tanzania",
+ "UA": "Ukraina",
+ "US": "USA|America|United States of America",
+ "VA": "Holy See|Vatican City State",
+ "VN": "Viet Nam",
+ "XK": "Republic of Kosovo|Kosova",
+ "ZA": "RSA|Republic of South Africa"
+};
+const COUNTRY_REGION_NAMES=[
+ ...['ru','en'].flatMap(locale=>['long','short'].map(style=>new Intl.DisplayNames([locale],{type:'region',style}))),
+ ...['uk','de','fr','es','it','pt','pl','tr','ja','zh','ar'].map(locale=>new Intl.DisplayNames([locale],{type:'region'}))
+];
+const normalizeCountrySearch=value=>String(value||'').normalize('NFKD')
+ .replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('ru').replace(/ё/g,'е')
+ .replace(/ß/g,'ss').replace(/æ/g,'ae').replace(/œ/g,'oe').replace(/ł/g,'l')
+ .replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
+const COUNTRY_CYRILLIC_ROMAN={а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'kh',ц:'ts',ч:'ch',ш:'sh',щ:'shch',ы:'y',э:'e',ю:'yu',я:'ya',ь:'',ъ:'',і:'i',ї:'yi',є:'ye',ґ:'g'};
+const countryRomanize=value=>[...normalizeCountrySearch(value)].map(ch=>COUNTRY_CYRILLIC_ROMAN[ch]??ch).join('');
+const countrySearchForms=variants=>[...new Set(variants.flatMap(value=>{
+ const form=normalizeCountrySearch(value);
+ return form?[form,countryRomanize(form)]:[];
+}))];
+const countrySearchMatches=query=>{
+ const q=normalizeCountrySearch(query);
+ if(!q)return COUNTRIES;
+ return COUNTRIES.map(country=>{
+  const terms=country.searchTerms;
+  const rank=country.code.toLowerCase()===q||country.iso3.toLowerCase()===q?0:
+   terms.some(term=>term===q)?1:terms.some(term=>term.startsWith(q))?2:
+   terms.some(term=>term.includes(q))?3:Infinity;
+  return {country,rank};
+ }).filter(row=>Number.isFinite(row.rank)).sort((a,b)=>a.rank-b.rank).map(row=>row.country);
+};
 const countryFlag=code=>String.fromCodePoint(...code.toUpperCase().split('').map(c=>127397+c.charCodeAt(0)));
-const COUNTRIES=COUNTRY_CODES.map(code=>{
+const COUNTRIES=COUNTRY_CODES.map((code,index)=>{
  const name=code==='GB'?'Великобритания (UK)':code==='XK'?'Косово':COUNTRY_NAMES.of(code);
  const enName=code==='GB'?'United Kingdom (UK)':code==='XK'?'Kosovo':COUNTRY_NAMES_EN.of(code);
- return {code,flag:countryFlag(code),name,enName,search:(code+' '+name+' '+enName+' '+(COUNTRY_ALIASES[code]||'')).toLocaleLowerCase('ru')};
+ const iso3=COUNTRY_ISO3[index];
+ const terms=countrySearchForms([
+  code,iso3,name,enName,...COUNTRY_REGION_NAMES.map(display=>display.of(code)),
+  ...(COUNTRY_EXTRA_ALIASES[code]||'').split('|'),COUNTRY_ALIASES[code]||'',
+  ...(code==='GB'?['UK']:[])
+ ]);
+ return {code,iso3,flag:countryFlag(code),name,enName,searchTerms:terms};
 }).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
 const countryLabel=country=>panelIsEnglish()?country.enName:country.name;
 // Country flags are bundled in the Docker image. No external CDN at runtime.
@@ -4782,8 +4867,8 @@ the old node will lose access. Cancel and create a new Node ID if both must work
 function renderCountryOptions(picker, query=''){
  const input=picker.querySelector('[data-country-search]'),select=picker.querySelector('input.country-value[name=flag]'),options=picker.querySelector('.country-options');
  if(!input||!select||!options)return;
- const q=String(query||'').trim().toLocaleLowerCase('ru');
- const matches=COUNTRIES.filter(c=>c.search.includes(q));
+ const q=normalizeCountrySearch(query);
+ const matches=countrySearchMatches(q);
  const selected=select.value;
  const custom=selected&&!COUNTRIES.some(c=>c.flag===selected)?selected:'';
  const rows=[];
