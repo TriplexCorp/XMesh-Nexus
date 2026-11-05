@@ -11,6 +11,14 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    'Сертификат TLS по Security':'Certificate TLS (profile Security)',
+    'ВКЛ — профиль использует TLS':'ON — profile uses TLS',
+    'ВЫКЛ — сертификат TLS не используется':'OFF — certificate TLS is not used',
+    'Не настроено — выберите корректный профиль':'Not configured — select a valid profile',
+    'Можно выбрать способ получения сертификата.':'You can choose how to provision the certificate.',
+    'Настройки сохранены, но при выбранном Security сертификат TLS не используется.':'Settings are retained, but the selected Security does not use certificate TLS.',
+    'Состояние профиля не подтверждает выдачу сертификата на ноде.':'Profile settings do not prove a certificate was issued on the node.',
+    'Ручные настройки получения сертификата':'Certificate provisioning preferences',
     "Проверьте транспорт MASQUE и ALPN":"Check MASQUE transport and ALPN",
     "Некорректный tlsSettings в профиле":"Invalid tlsSettings in the profile",
     "Некорректные настройки управляемого TLS":"Invalid managed TLS settings",
