@@ -3038,6 +3038,40 @@ document.addEventListener('click',event=>{
   squadEditorRefresh(form);
 });
 
+// Certificate TLS is a consequence of the profile's explicit Security field,
+// never its protocol, VLESS Encryption settings, or persisted ACME preferences.
+function nodeEffectiveTlsMode(profile){
+  if(!profile)return 'unconfigured';
+  let entries;
+  try{entries=inbs(profile)}catch{return 'unconfigured'}
+  if(!Array.isArray(entries)||!entries.length)return 'unconfigured';
+  const modes=entries.map(ib=>String(ib?.streamSettings?.security||'').trim().toLowerCase());
+  if(modes.includes('tls'))return 'on';
+  return modes.every(mode=>mode==='none'||mode==='reality')?'off':'unconfigured';
+}
+function syncNodeEffectiveTls(form){
+  if(!form||form.dataset.ent!=='nodes')return;
+  const profileId=form.elements.namedItem('profileId')?.value;
+  const profile=DB.profiles.find(p=>String(p.id)===String(profileId));
+  const mode=nodeEffectiveTlsMode(profile);
+  const toggle=form.querySelector('[data-node-tls-effective]');
+  const status=form.querySelector('.node-tls-effective');
+  if(status)status.dataset.state=mode;
+  const label=form.querySelector('[data-node-tls-state]');
+  const indicator=form.querySelector('[data-node-tls-indicator]');
+  const preferences=form.querySelector('[data-node-tls-preferences]');
+  const hint=form.querySelector('[data-node-tls-note]');
+  const names={on:'ВКЛ — профиль использует TLS',off:'ВЫКЛ — сертификат TLS не используется',unconfigured:'Не настроено — выберите корректный профиль'};
+  if(toggle){toggle.checked=mode==='on';toggle.setAttribute('aria-label',names[mode]);}
+  if(label)label.textContent=names[mode];
+  if(indicator)indicator.hidden=mode==='unconfigured';
+  if(preferences&&mode!=='on')preferences.open=false;
+  if(hint)hint.textContent=mode==='on'?'Можно выбрать способ получения сертификата.':'Настройки сохранены, но при выбранном Security сертификат TLS не используется.';
+}
+document.addEventListener('change',event=>{
+  if(event.target.matches?.('form[data-ent="nodes"] [name="profileId"]'))syncNodeEffectiveTls(event.target.closest('form'));
+});
+
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
   const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k)).map(f=>field(f,f.k==='rotationIntervalHours'?(o[f.k]??24):o[f.k])).join('');
@@ -3060,7 +3094,10 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     ?'<div class="node-address-port">'+field(f,o[f.k])+field(nodeCoreFields.find(x=>x.k==='port'),o.port)+'</div>'
     :f.k==='port'?'':field(f,o[f.k])).join('');
   const tlsField=k=>{const f=nodeCoreFields.find(x=>x.k===k);return f?field(f,o[f.k]):''};
-  const nodeTlsFields='<fieldset class="node-tls-settings"><legend>Сертификат ноды</legend><p class="node-tls-help">Режим определяется автоматически по security профиля: TLS — сертификат, REALITY/none — без него. Переключатели ниже необязательны.</p><div class="node-tls-modes">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div><div class="node-tls-details">'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div></fieldset>';
+  const nodeTlsFields='<fieldset class="node-tls-settings"><legend>Сертификат ноды</legend>'+
+    '<div class="node-tls-effective"><label class="f"><span>Сертификат TLS по Security</span><span class="sw" data-node-tls-indicator><input type="checkbox" data-node-tls-effective role="switch" disabled aria-label="Не настроено — выберите корректный профиль"><span></span></span></label><small data-node-tls-state role="status">Не настроено — выберите корректный профиль</small></div>'+
+    '<p class="node-tls-help">Состояние профиля не подтверждает выдачу сертификата на ноде.</p>'+
+    '<details data-node-tls-preferences><summary>Ручные настройки получения сертификата</summary><p class="node-tls-help" data-node-tls-note></p><div class="node-tls-modes">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div><div class="node-tls-details">'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div></details></fieldset>';
   const nodeResetAction=id?'<div class="node-reset-action"><div class="node-reset-copy"><strong>Счётчик трафика</strong><span>Обнулить расход ноды. Xray не перезапускается.</span></div><button type="button" class="gh sm node-traffic-reset-button" data-node-reset-traffic="'+esc(String(id))+'" title="">'+ic('redo')+'Обнулить</button><output class="node-traffic-reset-status" data-node-reset-feedback aria-live="polite"></output></div>':'';
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
@@ -3073,6 +3110,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const boundedEntityEditor=['tpls','admins'].includes(k);
   const editorFields=boundedEntityEditor?'<div class="entity-editor-body">'+fields+'</div>':fields;
   modal(`<form class="box${boundedEntityEditor?' entity-editor':''}" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${editorFields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
+  if(k==='nodes')syncNodeEffectiveTls(dlg.querySelector('form[data-ent="nodes"]'));
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
   if(k==='hosts'){
     const form=dlg.querySelector('form[data-ent="hosts"]');
