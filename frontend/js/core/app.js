@@ -4727,7 +4727,14 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
   else if(t.dataset.hk){const old=DB.set.hooks[t.dataset.hk];DB.set.hooks[t.dataset.hk]=t.checked?1:0;try{await api.saveSettings({hooks:{...DB.set.hooks}});toast(t.checked?'Событие включено':'Событие отключено')}catch(err){DB.set.hooks[t.dataset.hk]=old;t.checked=!!old;toast(err.message)}}
-  else if(t.dataset.psz){UQ.size=+t.value;UQ.page=1;drawUsers()}
+  else if(t.matches('select[data-psz]')){
+    // data-psz is a value-less HTML attribute: its dataset value is an empty string.
+    const size=Number(t.value);
+    if(![15,30,60].includes(size))return;
+    UQ.size=size;
+    UQ.page=1;
+    void drawUsers();
+  }
   else if(t.id==='rail-tips'){C.railTips=t.checked?1:0;apply()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});

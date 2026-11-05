@@ -166,6 +166,50 @@ async function main() {
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
+    await checked('Users pagination: 15 / 30 / 60 with enhanced select',async()=>{
+      await navigate('users');
+      await page.evaluate(async userId=>{
+        const source=DB.users.find(item=>item.id===userId);
+        if(!source)throw Error('Pagination test source user missing');
+        window.__paginationFixtureIds=[];
+        for(let i=0;i<62;i++){
+          const id=900000000000+i;
+          DB.users.push({...source,id,username:'ui-pagination-fixture-'+i,squads:[...source.squads]});
+          window.__paginationFixtureIds.push(id);
+        }
+        UQ.q='';UQ.st='all';UQ.sq='';UQ.inbound='';UQ.tag='';UQ.fp='';
+        UQ.node='';UQ.expiry='';UQ.size=15;UQ.page=1;
+        await drawUsers();
+      },user.id);
+      const choose=async size=>{
+        await page.locator('#ut .pg .xm-select-trigger').click();
+        await page.locator('.xm-select-popover:visible .xm-select-option')
+          .filter({hasText:new RegExp('^'+size+'$')}).click();
+        await page.waitForFunction(size=>{
+          const select=document.querySelector('#ut select[data-psz]');
+          return UQ.size===size&&UQ.page===1&&select?.value===String(size)&&
+            document.querySelectorAll('#ut tbody tr').length===size;
+        },size);
+        assert.equal(await page.locator('#ut tbody tr').count(),size);
+      };
+      try{
+        await choose(30);
+        await choose(60);
+        await choose(15);
+        await page.locator('#ut [data-pg="1"]').click();
+        await page.waitForFunction(()=>UQ.page===2);
+        await choose(30);
+      }finally{
+        await page.evaluate(async()=>{
+          const ids=new Set(window.__paginationFixtureIds||[]);
+          DB.users=DB.users.filter(item=>!ids.has(item.id));
+          delete window.__paginationFixtureIds;
+          UQ.size=15;UQ.page=1;
+          await drawUsers();
+        });
+      }
+    });
+
     await checked('Squad cards: real access mapping, traffic source and responsive grid',async()=>{
       const metrics=await api('GET','/squads/traffic/24h');
       assert.equal(metrics.source,'verified_traffic_deltas');

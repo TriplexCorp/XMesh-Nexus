@@ -70,4 +70,14 @@ for(const file of ['frontend/styles/features/settings/settings.css','frontend/st
 }
 assert.match(layout+'\n'+components,/100dvh/,'Dialog geometry must be viewport-bounded');
 assert.match(layout+'\n'+components,/overflow\s*:\s*auto/,'Dialogs need an internal scroll container');
+// data-psz is a presence-only attribute, so dataset.psz is an empty string.
+assert.match(app,/t\.matches\('select\[data-psz\]'\)/,
+ 'User pagination must recognize a value-less data-psz attribute');
+assert.doesNotMatch(app,/else if\(t\.dataset\.psz\)/,
+ 'Empty data attributes must not break change events');
+assert.match(app,/\[15,30,60\]\.includes\(size\)/,
+ 'Only supported pagination sizes are accepted');
+assert.match(app,/UQ\.size=size;\s*UQ\.page=1;\s*void drawUsers\(\)/,
+ 'Page-size changes reset page 1 and rerender');
+
 console.log(`UI architecture: one content-addressed panel graph, three system owners, ${panelFeatureFiles.length} scoped panel features, explicit layout, and dialog safety: PASS`);
