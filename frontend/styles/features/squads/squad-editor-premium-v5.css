@@ -656,6 +656,44 @@ dialog#dlg.squad-wide .squad-preview-host-nodes{
 }
 
 
+/* The impact preview is a summary, not an entity dump. Details reuse
+ * native disclosure semantics and shared Nexus surfaces. */
+dialog#dlg.squad-wide .squad-impact-details{
+  grid-column:1/-1;
+  min-width:0;
+  border-top:1px solid var(--nx-border);
+}
+dialog#dlg.squad-wide .squad-impact-details>summary{
+  display:flex;align-items:center;gap:.48rem;
+  min-height:2.2rem;list-style:none;cursor:pointer;
+  color:var(--mu);font-size:.76rem;font-weight:680;
+  border-radius:var(--ui-control-radius);
+}
+dialog#dlg.squad-wide .squad-impact-details>summary::-webkit-details-marker{display:none}
+dialog#dlg.squad-wide .squad-impact-details>summary:hover{color:var(--tx)}
+dialog#dlg.squad-wide .squad-impact-details>summary:focus-visible{
+  outline:2px solid var(--nx-focus);outline-offset:2px;
+}
+dialog#dlg.squad-wide .squad-impact-details>summary .ic{
+  width:.94rem;height:.94rem;flex:none;color:var(--mu);
+}
+dialog#dlg.squad-wide .squad-impact-details>summary .ic:last-child{
+  margin-inline-start:auto;transition:transform var(--nx-motion-fast) ease;
+}
+dialog#dlg.squad-wide .squad-impact-details[open]>summary .ic:last-child{
+  transform:rotate(180deg);
+}
+dialog#dlg.squad-wide .squad-impact-details-body{
+  display:grid;gap:.55rem;padding:.22rem 0 .65rem;
+  min-width:0;
+}
+dialog#dlg.squad-wide .squad-impact-details-body .squad-preview-section:first-child{
+  padding-top:0;border-top:0;
+}
+dialog#dlg.squad-wide .squad-impact-details-body .squad-preview-list{
+  grid-template-columns:minmax(0,1fr);
+}
+
 @media(min-width:1800px){
   dialog#dlg.squad-wide{
     width:min(1460px,80vw);
