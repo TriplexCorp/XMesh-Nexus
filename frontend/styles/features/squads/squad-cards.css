@@ -1,0 +1,55 @@
+/* Squad list anatomy only; appearance materials come from the shared system. */
+.squad-directory{display:grid;gap:var(--nx-page-gap);min-width:0}
+.squad-directory-toolbar{display:flex;align-items:center;justify-content:space-between;gap:.7rem 1rem;flex-wrap:wrap}
+.squad-directory-toolbar p{margin:0;color:var(--mu);font-size:.87rem}
+.squad-directory-toolbar>.btn{flex:none}
+.squad-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:var(--nx-page-gap);min-width:0}
+.squad-card{position:relative;display:grid;align-content:start;gap:.8rem;min-width:0;padding:var(--nx-card-pad);border:1px solid var(--nx-border-strong);border-radius:var(--nx-card-radius);background:var(--nx-panel-bg);box-shadow:var(--nx-panel-shadow)}
+.squad-card-head{display:grid;grid-template-columns:2.7rem minmax(0,1fr) auto;gap:.7rem;align-items:start;min-width:0}
+.squad-card-emblem{display:grid;place-items:center;width:2.7rem;height:2.7rem;border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);color:var(--a);background:var(--nx-section-bg)}
+.squad-card-emblem .ic{width:1.3rem;height:1.3rem}
+.squad-card-identity{min-width:0;align-self:center}
+.squad-card-name{display:block;max-width:100%;padding:0;border:0;background:transparent;color:var(--tx);font:inherit;font-size:1.06rem;font-weight:760;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.squad-card-name:hover{color:var(--a)}
+.squad-card-identity p{margin:.2rem 0 0;color:var(--mu);font-size:.78rem;line-height:1.4;overflow-wrap:anywhere}
+.squad-card-actions{position:relative;z-index:2}
+.squad-card-actions summary{display:grid;place-items:center;width:2rem;height:2rem;cursor:pointer;list-style:none;border:1px solid transparent;border-radius:var(--ui-control-radius);color:var(--mu)}
+.squad-card-actions summary::-webkit-details-marker{display:none}
+.squad-card-actions summary>.ic{width:1rem;height:1rem}
+.squad-card-actions summary:hover,.squad-card-actions[open] summary{border-color:var(--nx-border);background:var(--nx-section-bg);color:var(--tx)}
+.squad-card-menu{position:absolute;z-index:5;right:0;top:calc(100% + .25rem);display:grid;gap:.2rem;width:10rem;padding:.35rem;border:1px solid var(--nx-border-strong);border-radius:var(--ui-radius);background:var(--nx-dialog-bg);box-shadow:var(--nx-dialog-shadow)}
+.squad-card-menu button{display:flex;align-items:center;gap:.55rem;width:100%;min-height:2rem;padding:.4rem .5rem;border:0;border-radius:var(--ui-control-radius);color:var(--tx);background:transparent;font:inherit;font-size:.8rem;text-align:left;cursor:pointer}
+.squad-card-menu button:hover{background:var(--nx-section-bg)}
+.squad-card-menu button.is-danger{color:var(--er)}
+.squad-card-menu .ic{width:.88rem;height:.88rem;flex:none}
+.squad-card-name:focus-visible,.squad-card-actions summary:focus-visible,.squad-card-menu button:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
+.squad-card-tags{display:flex;flex-wrap:wrap;align-items:flex-start;align-content:start;gap:.35rem;min-height:1.7rem;min-width:0}
+.squad-card-tags .chip{max-width:100%;overflow-wrap:anywhere}
+.squad-card-no-tags{color:var(--mu);font-size:.8rem}
+.squad-card-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;padding:.75rem 0;border-top:1px solid var(--nx-border);border-bottom:1px solid var(--nx-border)}
+.squad-card-metrics>div{display:grid;grid-template-columns:1.1rem minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:.1rem .5rem;min-width:0}
+.squad-card-metrics>div+div{border-left:1px solid var(--nx-border);padding-left:.7rem}
+.squad-card-metrics .ic{grid-row:1/3;width:1.05rem;height:1.05rem;color:var(--mu)}
+.squad-card-metrics strong{color:var(--tx);font-size:1.16rem;font-weight:760;line-height:1.1;font-variant-numeric:tabular-nums}
+.squad-card-metrics small{color:var(--mu);font-size:.74rem}
+.squad-card-relations{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1rem;min-width:0}
+.squad-card-relations>span{display:inline-flex;align-items:center;gap:.4rem;color:var(--mu);font-size:.76rem}
+.squad-card-relations .ic{width:.85rem;height:.85rem;color:var(--mu)}
+.squad-card-relations b{color:var(--tx);font-weight:720;font-variant-numeric:tabular-nums}
+.squad-card-relations .squad-card-missing{color:var(--wr)}
+.squad-card-traffic{display:grid;grid-template-columns:minmax(0,1fr) minmax(5rem,.52fr);align-items:center;gap:.4rem .65rem;min-height:5.5rem;padding:.75rem .8rem;border:1px solid var(--nx-border);border-radius:var(--ui-radius);background:var(--nx-section-bg)}
+.squad-card-traffic-value{display:grid;align-content:center;gap:.16rem;min-width:0}
+.squad-card-traffic-value strong{font-size:1.03rem;font-weight:765;color:var(--tx);font-variant-numeric:tabular-nums}
+.squad-card-traffic-value small{font-size:.72rem;color:var(--mu);line-height:1.35}
+.squad-card-spark{width:100%;height:2.35rem;overflow:visible;align-self:center}
+.squad-card-spark path{fill:none;stroke:var(--a);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.squad-card-no-spark{color:var(--mu);text-align:center;font-size:1rem}
+.squad-card-traffic-last{grid-column:1/-1;display:flex;gap:.4rem;align-items:center;padding-top:.5rem;border-top:1px solid var(--nx-border);color:var(--mu);font-size:.72rem;line-height:1.35}
+.squad-card-traffic-last>.ic{width:.85rem;height:.85rem;flex:none}
+.squad-card-traffic-last b{color:var(--tx);font-weight:680}
+.squad-card-traffic-loading,.squad-card-traffic-failed{grid-column:1/-1;display:inline-flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--mu)}
+.squad-card-traffic-loading>.ic,.squad-card-traffic-failed>.ic{width:.96rem;height:.96rem}
+.squad-directory-note{display:flex;align-items:flex-start;gap:.45rem;max-width:78rem;margin:0;color:var(--mu);font-size:.73rem;line-height:1.5}
+.squad-directory-note>.ic{flex:none;width:.85rem;height:.85rem;margin-top:.12rem}
+@media(max-width:1450px){.squad-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:860px){.squad-card-grid{grid-template-columns:minmax(0,1fr)}}
