@@ -964,7 +964,7 @@ const balancersP=async()=>{
   });
  }];
 };
-const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',async()=>{
+const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',squadsP],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',async()=>{
     // Do not assume the editor asset was loaded by an older cached index.html.
     // A failed optional script must not crash the whole workspace.
     if(typeof window.XMeshClientRouting?.create!=='function'){
@@ -2691,6 +2691,91 @@ async function crudCard(k,showTitle=true){
   const emptyLabel={nodes:'Узлов пока нет',profiles:'Профилей в XRAY STUDIO пока нет',squads:'Сквадов пока нет',hosts:'Хостов пока нет',tpls:'Шаблонов пока нет',subs:'Шаблонов подписки пока нет',admins:'Администраторов пока нет',tokens:'API-токенов пока нет'}[k]||'Пока пусто';
   const emptyHint={nodes:'Добавьте первый сервер и назначьте ему профиль.',profiles:'Добавьте собственную конфигурацию Xray с inbound.',squads:'Создайте группу доступа на основе inbound.',hosts:'Добавьте адреса подключения, которые должны видеть клиенты.',tpls:'Сохраните тарифные параметры для повторного использования.',subs:'Настройте формат выдачи подписки после подключения API.',admins:'Список заполнится после добавления администраторов.',tokens:'Создайте токен для внешней интеграции.'}[k]||'Добавьте первую запись.';
   return `<div class="card"><div class="hd"><div>${showTitle?`<h3>${e.t}</h3>`:''}<p>${e.n||''}</p></div><button class="btn sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>${items.length?`<div class="tw" data-ui-layout="table"><table class="tb"><thead><tr>${e.cols.map(c=>`<th>${c[0]}</th>`).join('')}${e.mv?'<th></th>':''}</tr></thead><tbody>${items.map((r,i)=>`<tr data-e="${k}:${r.id}">${e.cols.map(c=>`<td data-l="${c[0]}">${c[1](r)}</td>`).join('')}${e.mv?`<td data-l="Порядок"><button class="ia" data-mv="${k}:${r.id}:-1" ${i?'':'disabled'} aria-label="Выше">${ic('up')}</button><button class="ia" data-mv="${k}:${r.id}:1" ${i<items.length-1?'':'disabled'} aria-label="Ниже">${ic('down')}</button></td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>${emptyLabel}</b><span>${emptyHint}</span><button class="gh sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>`}</div>`
+}
+/* Squad cards use only persisted access relationships and verified user-counter
+ * deltas. Never infer squad traffic from node-wide RX/TX or draw invented points. */
+function squadCardSparkline(points){
+  const valid=points.filter(p=>Number.isFinite(+p.bucketMs)&&+p.bucketMs>0&&Number.isFinite(+p.bytes)&&+p.bytes>=0)
+    .sort((a,b)=>a.bucketMs-b.bucketMs);
+  if(valid.length<2)return '<span class="squad-card-no-spark">—</span>';
+  const minX=Date.now()-86400000,maxX=Date.now(),peak=Math.max(1,...valid.map(p=>p.bytes));
+  let path='',previous=-Infinity;
+  for(const point of valid){
+    const x=Math.max(1,Math.min(119,1+(point.bucketMs-minX)/86400000*118));
+    const y=(30-3-point.bytes/peak*24);
+    path+=(point.bucketMs-previous>3900000||!path?'M':'L')+x.toFixed(2)+' '+y.toFixed(2)+' ';
+    previous=point.bucketMs;
+  }
+  return '<svg class="squad-card-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><path d="'+path.trim()+'"/></svg>';
+}
+function squadCardTrafficMarkup(rows){
+  if(!rows.length)return '<div class="squad-card-traffic-value"><strong>—</strong><small>Нет подтверждённых измерений</small></div><span class="squad-card-no-spark" aria-hidden="true">—</span><div class="squad-card-traffic-last">'+ic('calendar')+'<span>Последняя активность <b>—</b></span></div>';
+  const points=rows.map(r=>({
+    bucketMs:Number(r.bucketMs),bytes:Number(r.uplinkBytes)+Number(r.downlinkBytes)
+  })).filter(r=>Number.isFinite(r.bucketMs)&&r.bucketMs>0&&Number.isFinite(r.bytes)&&r.bytes>=0);
+  const total=points.reduce((sum,r)=>sum+r.bytes,0);
+  const latest=Math.max(...rows.map(r=>Number(r.latestSampleMs)||0));
+  const seen=latest>0?new Date(latest).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU',
+    {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+  return '<div class="squad-card-traffic-value"><strong>'+userTrafficBytes(total)+'</strong><small>Подтверждённый трафик · 24 часа</small></div>'+
+    squadCardSparkline(points)+
+    '<div class="squad-card-traffic-last">'+ic('calendar')+'<span>Последний срез <b>'+esc(seen)+'</b></span></div>';
+}
+async function loadSquadCardTraffic(root){
+  if(!root?.isConnected||!backendReady)return;
+  try{
+    const result=await backendRequest('/api/v1/squads/traffic/24h');
+    if(!root.isConnected||cur!=='squads'||result?.source!=='verified_traffic_deltas'||result?.sourceType!=='user'
+      ||result?.range!=='24h'||!Array.isArray(result.items))return;
+    const bySquad=new Map();
+    for(const row of result.items){
+      const key=String(row.squadId);
+      if(!bySquad.has(key))bySquad.set(key,[]);
+      bySquad.get(key).push(row);
+    }
+    for(const el of root.querySelectorAll('[data-squad-traffic]')){
+      el.innerHTML=squadCardTrafficMarkup(bySquad.get(el.dataset.squadTraffic)||[]);
+    }
+  }catch(error){
+    if(root.isConnected)for(const el of root.querySelectorAll('[data-squad-traffic]')){
+      el.innerHTML='<span class="squad-card-traffic-failed">'+ic('activity')+' Статистика недоступна</span>';
+    }
+  }
+}
+async function squadsP(){
+  const {items}=await api.list('squads',{sort:'id'});
+  const knownTags=new Set(DB.profiles.flatMap(p=>inbs(p).map(i=>String(i.tag||''))));
+  const cards=items.map(s=>{
+    const tags=[...new Set((Array.isArray(s.inb)?s.inb:[]).map(String))];
+    const users=DB.users.filter(u=>Array.isArray(u.squads)&&u.squads.some(id=>String(id)===String(s.id)));
+    const hosts=DB.hosts.filter(h=>!h.disabled&&tags.includes(String(h.tag)));
+    const nodeIds=new Set(hosts.flatMap(h=>Array.isArray(h.nodes)?h.nodes:[]).map(String));
+    const missing=tags.filter(tag=>!knownTags.has(tag));
+    const display=String(s.name||'Сквад');
+    const icon=/(?:tls|secure|защит)/i.test(display)?'shield':/(?:vless|reality)/i.test(display)?'activity':/(?:hysteria)/i.test(display)?'activity':/(?:masque)/i.test(display)?'layers':/(?:trojan)/i.test(display)?'key':'layers';
+    return '<article class="squad-card" data-squad-card="'+esc(s.id)+'">'+
+      '<header class="squad-card-head"><div class="squad-card-emblem">'+ic(icon)+'</div>'+
+      '<div class="squad-card-identity"><button type="button" class="squad-card-name" data-ne="squads:'+esc(s.id)+'">'+esc(display)+'</button>'+
+      '<p>'+esc(s.desc||'Группа доступа к подключениям Xray')+'</p></div>'+
+      '<details class="squad-card-actions"><summary aria-label="Действия со сквадом '+esc(display)+'" title="Действия">'+ic('more')+'</summary>'+
+      '<div class="squad-card-menu"><button type="button" data-ne="squads:'+esc(s.id)+'">'+ic('pen')+' Настроить</button>'+
+      '<button type="button" class="is-danger" data-del="squads:'+esc(s.id)+'">'+ic('trash')+' Удалить</button></div></details></header>'+
+      '<div class="squad-card-tags" aria-label="Назначенные inbound">'+(tags.length?tags.map(tag=>chip(esc(tag),tcol(tag))).join(''):'<span class="squad-card-no-tags">Нет inbound</span>')+'</div>'+
+      '<div class="squad-card-metrics">'+
+      '<div>'+ic('users')+'<strong>'+users.length+'</strong><small>Пользователей</small></div>'+
+      '<div>'+ic('layers')+'<strong>'+tags.length+'</strong><small>Inbound</small></div></div>'+
+      '<div class="squad-card-relations"><span>'+ic('globe')+' Хосты <b>'+hosts.length+'</b></span><span>'+ic('server')+' Ноды <b>'+nodeIds.size+'</b></span>'+
+      (missing.length?'<span class="squad-card-missing">'+ic('shield')+' Нет профиля для '+missing.length+' inbound</span>':'')+'</div>'+
+      '<div class="squad-card-traffic" data-squad-traffic="'+esc(s.id)+'" aria-live="polite"><span class="squad-card-traffic-loading">'+ic('activity')+' Загрузка статистики…</span></div>'+
+      '</article>';
+  }).join('');
+  const html='<section class="squad-directory"><div class="squad-directory-toolbar"><p>Доступ пользователей к подключениям Xray.</p>'+
+    '<button type="button" class="btn sm" data-ne="squads">'+ic('plus')+' Сквад</button></div>'+
+    (items.length?'<div class="squad-card-grid" data-ui-layout="cards">'+cards+'</div>'+
+    '<p class="squad-directory-note">'+ic('shield')+' Трафик берётся только из подтверждённых персональных счётчиков Xray за 24 часа. Пользователь в нескольких сквадах учитывается в каждом из них.</p>':
+    '<div class="card empty"><b>Сквадов пока нет</b><span>Создайте группу доступа на основе inbound.</span><button class="gh sm" data-ne="squads">'+ic('plus')+' Сквад</button></div>')+
+    '</section>';
+  return [html,()=>{const root=$('.squad-directory');if(items.length)void loadSquadCardTraffic(root)}];
 }
 async function simple(ks){const h=await Promise.all(ks.map(k=>crudCard(k,ks.length>1)));return [h.join('')]}
 /* Host = client-facing endpoint, not a second Xray server configuration.
