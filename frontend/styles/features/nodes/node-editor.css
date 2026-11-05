@@ -1391,7 +1391,7 @@ dialog.node-wide > form.box > .node-form-layout {
   width:100%;
   min-width:0;
   grid-template-columns:minmax(0,1.5fr) minmax(0,.94fr) minmax(0,1.06fr);
-  grid-template-areas:"primary ips billing" "geo geo geo";
+  grid-template-areas:"primary ips billing";
   gap:clamp(14px,.95vw,20px);
   align-items:stretch;
   align-content:start;
@@ -1688,8 +1688,28 @@ dialog.node-wide .node-billing-fields {
     margin-top:.55rem;
     padding:.5rem .6rem;
   }
+  /* Rotation's switch and interval share a row; the address pool uses the
+   * full column. Stacking these short controls wasted a complete field row. */
+  dialog.node-wide .node-rotation-editor-body {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:.45rem .6rem;
+  }
+  dialog.node-wide .node-rotation-editor-body > :is(.f:has(textarea),.node-pool-toolbar,output,.node-rotation-probe) {
+    grid-column:1/-1;
+  }
+  dialog.node-wide .node-rotation-editor-body > output:empty {
+    display:none;
+  }
+  dialog.node-wide .node-pool-toolbar {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  dialog.node-wide .node-pool-toolbar > span {
+    grid-column:1/-1;
+    margin:0;
+  }
   dialog.node-wide .node-ip-section textarea[name="rotationIps"] {
-    height:clamp(115px,17dvh,160px);
+    height:clamp(110px,15dvh,150px);
     min-height:110px;
   }
   dialog.node-wide :is(.node-section-intro,.node-ip-hint) {

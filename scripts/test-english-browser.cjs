@@ -36,6 +36,23 @@ async function main(){const browser=await chromium.launch({headless:true,executa
   for(const route of routes)await check('English route: '+route,async()=>{await navigate(route);await scan(page,route)});
   const dialogs=[['nodes','[data-ne="nodes"]'],['nodes',`[data-ne="nodes:${node.id}"]`],['hosts','[data-ne="hosts"]'],['squads','[data-ne="squads"]'],['users','[data-nu]'],['users',`tr[data-id="${user.id}"]`],['templates','[data-ne="tpls"]'],['admins','[data-ne="admins"]'],['balancers','#balancer-add'],['clientrouting','[data-cr-add]']];
   for(const [route,selector]of dialogs)await check('English dialog: '+selector,async()=>{await navigate(route);await page.locator(selector).first().click();if(route!=='balancers')await page.locator('dialog[open]').waitFor();await scan(page,selector);if(route==='clientrouting')for(const tab of ['rules','json']){await page.locator('[data-cr-tab="'+tab+'"]').click();await scan(page,'routing '+tab)}await page.keyboard.press('Escape')});
+  await check('English Node certificate setup and validation',async()=>{
+   const tlsProfile=await create('profiles',{name:prefix+' TLS setup',config:JSON.stringify({inbounds:[{tag:prefix+'-tls',listen:'127.0.0.1',port:28443,protocol:'trojan',settings:{clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+   await navigate('nodes');await page.locator(`[data-ne="nodes:${node.id}"]`).click();
+   try{
+    const form=page.locator('#dlg form[data-ent="nodes"]'),status=form.locator('[data-node-tls-readiness]');
+    await form.locator('[name="profileId"]').selectOption(String(tlsProfile.id));
+    await form.locator('.act .btn').click();
+    await scan(page,'missing TLS domain');assert.match(await status.innerText(),/DNS domain/i);
+    assert(await form.locator('[data-node-tls-preferences]').evaluate(el=>el.open),'Validation must reveal certificate setup');
+    await form.locator('[name="tlsDomain"]').fill('node.example.invalid');
+    await scan(page,'missing ACME email');assert.match(await status.innerText(),/email/i);
+    await form.locator('[name="tlsAcmeEmail"]').fill('ops@example.com');
+    await scan(page,'ACME configured');assert.match(await status.innerText(),/Let.s Encrypt/i);
+    await form.locator('[name="tlsManualProvision"]').check();
+    await scan(page,'external certificate missing paths');assert.match(await status.innerText(),/certificateFile/);
+   }finally{await page.keyboard.press('Escape')}
+  });
   await check('English XRAY STUDIO composer',async()=>{await navigate('profiles');await page.locator('[data-action="templates"]').click();await page.locator('dialog[open]').waitFor();await scan(page,'composer');await page.keyboard.press('Escape')});
   for(const [tool,protocol,network,security]of [['reality','vless','raw','none'],['tls','vless','raw','tls'],['inbound','vless','raw','none'],['finalmask','vless','raw','none'],['xhttp','vless','xhttp','none'],['protocol-config','shadowsocks','raw','none'],['transport-config','vless','ws','tls'],['hysteria-config','hysteria','hysteria','tls']])await check('English Xray tool: '+tool,async()=>{
    await navigate('profiles');await page.locator('#xm-studio-v4 [data-v="source"]').evaluate((el,{protocol,network,security})=>{el.value=JSON.stringify({inbounds:[{tag:'english-test',listen:'127.0.0.1',port:443,protocol,settings:{users:[],decryption:'none'},streamSettings:{network,security}}],outbounds:[{tag:'direct',protocol:'freedom'}]});el.dispatchEvent(new Event('input',{bubbles:true}))},{protocol,network,security});

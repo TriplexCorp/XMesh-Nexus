@@ -153,8 +153,6 @@ async function main() {
     const inboundTag = prefix.replace(/-/g,'_');
     const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{serverName:'ui.example.invalid',certificates:[{certificateFile:'/etc/xmesh/external/fullchain.pem',keyFile:'/etc/xmesh/external/privkey.pem'}]}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',flag:'🇵🇱',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,hosting:'Datagio',tlsManualProvision:true,geoEnabled:true});
-    const noTlsProfile=await create('profiles',{name:`${prefix} · Без TLS`,config:JSON.stringify({inbounds:[{tag:inboundTag+'-plain',listen:'127.0.0.1',port:28353,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/tls-indicator'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
-    const missingTlsProfile=await create('profiles',{name:prefix+' · TLS без сертификата',config:JSON.stringify({inbounds:[{tag:inboundTag+'-missing',listen:'127.0.0.1',port:28354,protocol:'trojan',settings:{clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
     await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
     const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
@@ -362,7 +360,7 @@ async function main() {
       await page.reload({waitUntil:'domcontentloaded'});
     });
 
-    await checked('Routing workspace: compact populated rows and contextual saving',async()=>{
+    await checked('Routing workspace: readable interactive gallery and contextual saving',async()=>{
       const original=await page.evaluate(()=>structuredClone(DB.set.clientRoutingProfiles||[]));
       try{
         await page.evaluate(id=>{DB.set.clientRoutingProfiles=[{id:'ui-route-main',name:'RU DIRECT',enabled:true,servers:['node:'+id],rules:[{match:'geosite',value:'category-ru',action:'direct'},{match:'geoip',value:'ru',action:'direct'},{match:'domain',value:'ads.example.invalid',action:'block',network:'udp'}]},{id:'ui-route-empty',name:'Draft routing',enabled:false,servers:[],rules:[]},{id:'ui-route-long',name:'Long values',enabled:true,servers:[],rules:[{match:'domain',value:'long-subdomain-'.repeat(12)+'.example.invalid',action:'proxy'}]}]},node.id);
@@ -375,10 +373,31 @@ async function main() {
           const g=await geometry(page);assert(g.scrollWidth<=width+1,'Populated routing rows must not overflow');
           assert.equal(g.outside.length,0,'Routing controls must stay inside the viewport');
           assert((await page.locator('.crx-assigned-source').innerText()).includes(node.name),'Assigned node name must be readable');
-          if(width>=1920)assert((await page.locator('[data-cr-profile="ui-route-main"]').boundingBox()).height<480,'Template overview must expose three rules without excessive height');
+          assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-assigned-source svg rect[fill="#dc143c"]').count(),1,'Explicit Polish flag must override the Moscow fixture name');
+          if(width>=1920){const card=await page.locator('[data-cr-profile="ui-route-main"]').boundingBox();assert(card.width<900,'Routing cards must keep a readable width');assert(card.height<650,'Three rules and an assignment must remain compact');const scope=await page.locator('[data-cr-profile="ui-route-main"] .crx-card-flags').boundingBox();const rules=await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').boundingBox();assert(rules.y>=scope.y+scope.height,'Assignments must precede ordered rules inside each card');}
           assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-rule-chip').count(),3,'All three rules must be visible in the overview');
           assert((await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').innerText()).includes('ads.example.invalid'),'The third rule must not be silently omitted');
           await screenshot(page,'routing-list-'+width);
+        }
+        const galleryAppearance=await page.evaluate(()=>({surface:C.surface,theme:C.theme,language:XMeshI18n.getLanguage()}));
+        try{
+          for(const theme of ['dark','light'])for(const surface of ['solid','glass','raised']){
+            await page.setViewportSize({width:1920,height:1080});
+            await page.evaluate(({theme,surface})=>{C.theme=theme;C.surface=surface;apply()}, {theme,surface});
+            const material=await page.locator('[data-cr-profile="ui-route-main"]').evaluate(el=>({backdrop:getComputedStyle(el).backdropFilter,shadow:getComputedStyle(el).boxShadow,radius:getComputedStyle(el).borderRadius}));
+            if(surface==='glass')assert.notEqual(material.backdrop,'none','Routing Glass must inherit the shared backdrop material');
+            assert.notEqual(material.radius,'0px','Routing cards must inherit global rounding');
+            await screenshot(page,'routing-gallery-'+theme+'-'+surface);
+          }
+          await page.evaluate(async()=>{XMeshI18n.setLanguage('en');syncTopLanguage();await render(1)});
+          await page.locator('[data-cr-profile="ui-route-main"]').waitFor();
+          await page.waitForTimeout(150);
+          const englishRules=await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').innerText();assert(!/[А-Яа-яЁё]/u.test(englishRules),'Populated routing rules must be fully English: '+JSON.stringify(englishRules));
+          assert((await page.locator('[data-cr-profile="ui-route-main"] .crx-card-stats').innerText()).includes('3 rules'),'Populated counters must use English plurals');
+          await screenshot(page,'routing-gallery-english');
+        }finally{
+          await page.evaluate(initial=>{C.theme=initial.theme;C.surface=initial.surface;apply();XMeshI18n.setLanguage(initial.language);syncTopLanguage();render(1)},galleryAppearance);
+          await page.locator('[data-cr-profile="ui-route-main"]').waitFor();
         }
         await page.locator('[data-cr-source-open="ui-route-main"]').click();
         assert(await page.locator('[data-cr-source="node:'+node.id+'"]').isChecked(),'Assignment click must open the assigned source');
@@ -409,6 +428,16 @@ async function main() {
         await page.locator('[data-cr-reset]').click();
         assert.equal(await page.locator('[data-cr-profile]').count(),3,'Reset must restore saved templates');
         assert(await page.locator('[data-cr-bottom]').isHidden());
+        const demo=await page.evaluate(id=>{const target=DB.nodes.find(n=>n.id===id);const previous={name:target.name,profiles:structuredClone(DB.set.clientRoutingProfiles)};target.name='Польша';DB.set.clientRoutingProfiles=[{...DB.set.clientRoutingProfiles[0],rules:DB.set.clientRoutingProfiles[0].rules.slice(0,2)}];return previous},node.id);
+        try{
+          await page.setViewportSize({width:1920,height:1080});await page.evaluate(()=>render(1));
+          await page.locator('[data-cr-profile="ui-route-main"]').waitFor();
+          const single=await page.locator('[data-cr-profile="ui-route-main"]').boundingBox();
+          assert(single.width<900,'A single template must keep its readable card width');
+          assert.equal(await page.locator('[data-cr-profile]').count(),1);
+          assert.equal(await page.locator('.crx-assigned-source svg rect[fill="#dc143c"]').count(),1,'Polish assignment must retain its flag');
+          await screenshot(page,'routing-single-template');
+        }finally{await page.evaluate(({id,demo})=>{DB.nodes.find(n=>n.id===id).name=demo.name;DB.set.clientRoutingProfiles=demo.profiles},{id:node.id,demo})}
       }finally{
         if(await page.locator('dialog.crx-overlay[open]').count())await page.keyboard.press('Escape');
         await page.evaluate(value=>{DB.set.clientRoutingProfiles=value},original);
@@ -797,8 +826,8 @@ async function main() {
           await page.waitForSelector('#dlg.node-wide[open]');
           try{
             const g=await page.locator('#dlg').evaluate(d=>{
-              const f=d.querySelector('form.box'),r=d.getBoundingClientRect(),b=f.getBoundingClientRect(),s=getComputedStyle(f);
-              return {dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height,scrollHeight:f.scrollHeight,clientHeight:f.clientHeight},tlsInSide:!!f.querySelector('.node-network-stack > .node-tls-settings'),background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
+              const f=d.querySelector('form.box'),r=d.getBoundingClientRect(),b=f.getBoundingClientRect(),s=getComputedStyle(f),layout=f.querySelector('.node-form-layout').getBoundingClientRect(),footer=f.querySelector('.act').getBoundingClientRect();
+              return {layoutBottom:layout.bottom,footerTop:footer.top,dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height,scrollHeight:f.scrollHeight,clientHeight:f.clientHeight},tlsInSide:!!f.querySelector('.node-network-stack > .node-tls-settings'),background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
             });
             assert(Math.abs(g.dialog.bottom-g.form.bottom)<=2,'Node dialog must end with the form, without an empty material tail');
             assert(Math.abs(g.form.top-g.dialog.top)<=2,'Node dialog must not reserve an empty surface above the form');
@@ -810,6 +839,7 @@ async function main() {
             assert(g.tlsInSide,'TLS settings must live alongside billing, not below main fields');
             if(width>=1366&&height>=768&&scale===1){
               assert(g.form.scrollHeight<=g.form.clientHeight+2,'Desktop Node editor must have no scrollbar: '+JSON.stringify(g));
+              assert(g.layoutBottom<=g.footerTop+1,'Footer must not cover the final Node fields: '+JSON.stringify(g));
               const details=page.locator('#dlg [data-node-tls-preferences]');
               await details.evaluate(el=>{el.open=true});
               const expanded=await page.locator('#dlg').evaluate(d=>{
@@ -1063,42 +1093,53 @@ async function main() {
       return{refresh,dialogMotion,reduced};
     });
 
-    await checked('Node certificate switch follows Security, not saved TLS overrides',async()=>{
-      await navigate('nodes');
-      await page.locator(`[data-ne="nodes:${node.id}"]`).first().click();
-      const form=page.locator('dialog form[data-ent="nodes"]');
-      const toggle=form.locator('[data-node-tls-effective]');
-      const preferences=form.locator('[data-node-tls-preferences]');
-      assert.equal(await toggle.isChecked(),true,'TLS profile must render certificate toggle ON');
-      assert.equal(await toggle.isDisabled(),true,'Derived switch cannot silently rewrite Security');
-      await form.locator('[name="profileId"]').selectOption(String(noTlsProfile.id));
-      assert.equal(await toggle.isChecked(),false,'Security none must render OFF despite stored external override');
-      assert.match(await form.locator('[data-node-tls-state]').innerText(),/ВЫКЛ/);
-      assert.equal(await preferences.evaluate(el=>el.open),false,'Inactive override settings must stay collapsed');
-      assert.equal(await form.locator('[name="tlsManualProvision"]').isChecked(),true,'Saved override preference must not be erased');
-      await form.locator('[name="profileId"]').selectOption(String(profile.id));
-      assert.equal(await toggle.isChecked(),true,'Switch must return ON after restoring TLS profile');
+    // Certificate-only profiles must not inflate the later squad inventory.
+    const tlsFixtureStart=fixtures.length;
+    try{
+      const noTlsProfile=await create('profiles',{name:`${prefix} · Без TLS`,config:JSON.stringify({inbounds:[{tag:inboundTag+'-plain',listen:'127.0.0.1',port:28353,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/tls-indicator'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+      const missingTlsProfile=await create('profiles',{name:prefix+' · TLS без сертификата',config:JSON.stringify({inbounds:[{tag:inboundTag+'-missing',listen:'127.0.0.1',port:28354,protocol:'trojan',settings:{clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+      await checked('Node certificate switch follows Security, not saved TLS overrides',async()=>{
+        try{
+          await navigate('nodes');
+          await page.locator(`[data-ne="nodes:${node.id}"]`).first().click();
+          const form=page.locator('dialog form[data-ent="nodes"]');
+          const toggle=form.locator('[data-node-tls-effective]');
+          const preferences=form.locator('[data-node-tls-preferences]');
+          assert.equal(await toggle.isChecked(),true,'TLS profile must render certificate toggle ON');
+          assert.equal(await toggle.isDisabled(),true,'Derived switch cannot silently rewrite Security');
+          await form.locator('[name="profileId"]').selectOption(String(noTlsProfile.id));
+          assert.equal(await toggle.isChecked(),false,'Security none must render OFF despite stored external override');
+          assert.match(await form.locator('[data-node-tls-state]').innerText(),/ВЫКЛ/);
+          assert.equal(await preferences.evaluate(el=>el.open),false,'Inactive override settings must stay collapsed');
+          assert.equal(await form.locator('[name="tlsManualProvision"]').isChecked(),true,'Saved override preference must not be erased');
+          await form.locator('[name="profileId"]').selectOption(String(profile.id));
+          assert.equal(await toggle.isChecked(),true,'Switch must return ON after restoring TLS profile');
+        }finally{await page.keyboard.press('Escape')}
+      });
+      await checked('TLS certificate setup is required before saving a TLS Node profile',async()=>{
+        try{
+          await navigate('nodes');
+          await page.locator('[data-ne="nodes:'+node.id+'"]').first().click();
+          const form=page.locator('dialog form[data-ent="nodes"]');
+          await form.locator('[name="profileId"]').selectOption(String(missingTlsProfile.id));
+          const status=form.locator('[data-node-tls-readiness]');
+          await form.locator('[data-node-tls-preferences] summary').click();
+          await form.locator('[name="tlsManualProvision"]').uncheck();
+          assert.match(await status.innerText(),/DNS-домен/,'Missing ACME domain must show a direct explanation');
+          await form.locator('.act .btn').click();
+          assert(await page.locator('#dlg.node-wide[open]').count(),'Unready TLS must not close the Node editor');
+          assert.match(await page.locator('#fe').innerText(),/DNS-домен/,'TLS save must be rejected before the API call');
+          assert.equal(await form.locator('[data-node-tls-preferences]').evaluate(el=>el.open),true,'Blocked save must open certificate setup');
+          await form.locator('[name="tlsDomain"]').fill('test-node.example.invalid');
+          assert.match(await status.innerText(),/email ACME/,'Missing ACME email must be explained');
+          await form.locator('[name="tlsAcmeEmail"]').fill('tls@example.com');
+          assert.match(await status.innerText(),/Let’s Encrypt настроен/,'Ready ACME settings must be communicated without claiming certificate issuance');
+        }finally{await page.keyboard.press('Escape')}
+      });
+    }finally{
       await page.keyboard.press('Escape');
-    });
-    await checked('TLS certificate setup is required before saving a TLS Node profile',async()=>{
-      await navigate('nodes');
-      await page.locator('[data-ne="nodes:'+node.id+'"]').first().click();
-      const form=page.locator('dialog form[data-ent="nodes"]');
-      await form.locator('[name="profileId"]').selectOption(String(missingTlsProfile.id));
-      const status=form.locator('[data-node-tls-readiness]');
-      await form.locator('[data-node-tls-preferences] summary').click();
-      await form.locator('[name="tlsManualProvision"]').uncheck();
-      assert.match(await status.innerText(),/DNS-домен/,'Missing ACME domain must show a direct explanation');
-      await form.locator('.act .btn').click();
-      assert(await page.locator('#dlg.node-wide[open]').count(),'Unready TLS must not close the Node editor');
-      assert.match(await page.locator('#fe').innerText(),/DNS-домен/,'TLS save must be rejected before the API call');
-      assert.equal(await form.locator('[data-node-tls-preferences]').evaluate(el=>el.open),true,'Blocked save must open certificate setup');
-      await form.locator('[name="tlsDomain"]').fill('test-node.example.invalid');
-      assert.match(await status.innerText(),/email ACME/,'Missing ACME email must be explained');
-      await form.locator('[name="tlsAcmeEmail"]').fill('tls@example.com');
-      assert.match(await status.innerText(),/Let’s Encrypt настроен/,'Ready ACME settings must be communicated without claiming certificate issuance');
-      await page.keyboard.press('Escape');
-    });
+      for(const fixture of fixtures.splice(tlsFixtureStart))await api('DELETE','/collections/'+fixture.collection+'/'+fixture.id);
+    }
     await checked('Редактирование узла сохраняется через API',async()=>{
       await navigate('nodes');
       await page.locator(`[data-ne="nodes:${node.id}"]`).click();
