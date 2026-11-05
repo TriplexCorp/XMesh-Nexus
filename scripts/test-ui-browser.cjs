@@ -360,6 +360,38 @@ async function main() {
       await page.reload({waitUntil:'domcontentloaded'});
     });
 
+    await checked('Routing workspace: compact populated rows and contextual saving',async()=>{
+      const original=await page.evaluate(()=>structuredClone(DB.set.clientRoutingProfiles||[]));
+      try{
+        await page.evaluate(id=>{DB.set.clientRoutingProfiles=[{id:'ui-route-main',name:'RU DIRECT',enabled:true,servers:['node:'+id],rules:[{match:'geosite',value:'category-ru',action:'direct'},{match:'geoip',value:'ru',action:'direct'}]},{id:'ui-route-empty',name:'Draft routing',enabled:false,servers:[],rules:[]},{id:'ui-route-long',name:'Long values',enabled:true,servers:[],rules:[{match:'domain',value:'long-subdomain-'.repeat(12)+'.example.invalid',action:'proxy'}]}]},node.id);
+        await navigate('clientrouting');
+        for(const [width,height] of [[1920,1080],[1366,768],[768,1024],[390,844]]){
+          await page.setViewportSize({width,height});
+          await page.locator('[data-cr-profile="ui-route-main"]').waitFor();
+          assert(await page.locator('[data-cr-bottom]').isHidden(),'Clean routing list must not show a disabled save bar');
+          const g=await geometry(page);assert(g.scrollWidth<=width+1,'Populated routing rows must not overflow');
+          assert.equal(g.outside.length,0,'Routing controls must stay inside the viewport');
+          assert((await page.locator('.crx-assigned-source').innerText()).includes(node.name),'Assigned node name must be readable');
+          if(width>=1366)assert((await page.locator('[data-cr-profile="ui-route-main"]').boundingBox()).height<240,'A small routing template should remain a compact row');
+          await screenshot(page,'routing-list-'+width);
+        }
+        await page.locator('[data-cr-open="ui-route-main"]').click();
+        await page.locator('[data-cr-tab="rules"]').click();
+        assert.equal(await page.locator('.crx-rule').count(),2,'Configure must retain existing rules');
+        await page.keyboard.press('Escape');
+        await page.locator('[data-cr-duplicate="ui-route-main"]').click();
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('[data-cr-profile]').count(),4,'Duplicate must still create a draft');
+        assert(await page.locator('[data-cr-bottom]').isVisible(),'Unsaved changes must reveal save actions');
+        await page.locator('[data-cr-reset]').click();
+        assert.equal(await page.locator('[data-cr-profile]').count(),3,'Reset must restore saved templates');
+        assert(await page.locator('[data-cr-bottom]').isHidden());
+      }finally{
+        if(await page.locator('dialog.crx-overlay[open]').count())await page.keyboard.press('Escape');
+        await page.evaluate(value=>{DB.set.clientRoutingProfiles=value},original);
+      }
+    });
+
     await checked('Node operation spinners actually rotate and respect motion preferences',async()=>{
       await page.setViewportSize({width:1920,height:1080});
       await page.emulateMedia({reducedMotion:'no-preference'});

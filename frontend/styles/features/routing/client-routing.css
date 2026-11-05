@@ -1,6 +1,6 @@
 /* XMesh Nexus — Client Routing. Single stylesheet, one definition per component.
    All dimensions are rem-based and inherit the panel's global scale. */
-#client-route-root.crx{--crx-bg:var(--nx-panel-bg);--crx-panel:var(--nx-section-bg);--crx-border:var(--nx-border);--crx-text:var(--tx,#ebf2f5);--crx-muted:var(--mu,#9ca9b8);--crx-accent:var(--a,#73e4bb);color:var(--crx-text);width:100%;min-width:0;display:grid;gap:1.25rem;padding:.375rem 0 2.5rem;font-size:.875rem}
+#client-route-root.crx{--crx-bg:var(--nx-panel-bg);--crx-panel:var(--nx-section-bg);--crx-border:var(--nx-border);--crx-text:var(--tx,#ebf2f5);--crx-muted:var(--mu,#9ca9b8);--crx-accent:var(--a,#73e4bb);container:client-routing / inline-size;color:var(--crx-text);width:100%;min-width:0;display:grid;gap:1.25rem;padding:.375rem 0 2.5rem;font-size:.875rem}
 #client-route-root.crx *,
 #client-route-root.crx *::before,
 #client-route-root.crx *::after{box-sizing:border-box}
@@ -18,7 +18,7 @@
 #client-route-root.crx .crx-icon-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:2.625rem;padding:.625rem 1rem;border:1px solid var(--crx-border);border-radius:var(--nx-control-radius);background:var(--crx-panel);color:var(--crx-text);font-weight:700;text-decoration:none;transition:background .16s,border-color .16s,color .16s}
 #client-route-root.crx .crx-btn:hover,
 #client-route-root.crx .crx-icon-btn:hover{border-color:var(--crx-accent)}
-#client-route-root.crx .crx-btn-primary{background:var(--crx-accent);border-color:var(--crx-accent);color:#08251b}
+#client-route-root.crx .crx-btn-primary{background:var(--crx-accent);border-color:var(--crx-accent);color:var(--btn-text)}
 #client-route-root.crx .crx-btn-primary:hover{filter:brightness(1.06)}
 #client-route-root.crx .crx-btn-ghost{background:transparent}
 #client-route-root.crx .crx-btn-outline{background:transparent;border-color:color-mix(in srgb,var(--crx-accent) 35%,var(--crx-border))}
@@ -36,34 +36,34 @@
 #client-route-root.crx .crx-section-head p{color:var(--crx-muted);font-size:.8125rem}
 #client-route-root.crx .crx-page-actions{display:flex;align-items:center;gap:.75rem}
 #client-route-root.crx .crx-total{color:var(--crx-muted);font-size:.75rem}
-#client-route-root.crx .crx-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(27rem,100%),1fr));gap:1rem}
-#client-route-root.crx .crx-card{display:flex;flex-direction:column;min-width:0;padding:1.6875rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-panel)}
+#client-route-root.crx .crx-list{display:grid;grid-template-columns:minmax(0,1fr);gap:.75rem}
+#client-route-root.crx .crx-card{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(10rem,.8fr) minmax(14rem,1.3fr) auto;grid-template-areas:"identity assignments rules actions";align-items:center;gap:1.5rem;min-width:0;padding:1.25rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-bg);background-image:var(--nx-panel-image);box-shadow:var(--nx-panel-shadow)}
 #client-route-root.crx .crx-card.is-disabled{opacity:.65}
 #client-route-root.crx .crx-card-top,
 #client-route-root.crx .crx-card-footer{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
 #client-route-root.crx .crx-card-symbol,
 #client-route-root.crx .crx-dialog-mark{display:grid;place-items:center;width:3.5rem;height:3.5rem;border:1px solid color-mix(in srgb,var(--crx-accent) 25%,var(--crx-border));border-radius:var(--nx-card-radius);background:color-mix(in srgb,var(--crx-accent) 11%,var(--crx-panel));color:var(--crx-accent)}
 #client-route-root.crx .crx-card-symbol .crx-icon{width:1.5rem;height:1.5rem;max-width:1.5rem;max-height:1.5rem}
-#client-route-root.crx .crx-state{display:inline-flex;align-items:center;gap:.375rem;border-radius:2rem;padding:.375rem .625rem;background:color-mix(in srgb,var(--crx-accent) 10%,var(--crx-panel));color:var(--crx-accent);font-size:.6875rem;font-weight:800}
+#client-route-root.crx .crx-state{display:inline-flex;align-items:center;gap:.375rem;border-radius:0;padding:0;background:transparent;color:var(--crx-accent);font-size:.6875rem;font-weight:800}
 #client-route-root.crx .crx-state i{width:.375rem;height:.375rem;border-radius:50%;background:currentColor}
 #client-route-root.crx .crx-state.is-off{color:var(--crx-muted)}
-#client-route-root.crx .crx-card-title{margin-top:1rem;font-size:1.25rem;font-weight:800}
+#client-route-root.crx .crx-card-title{margin:0;font-size:1rem;font-weight:750;overflow-wrap:anywhere}
 #client-route-root.crx .crx-card-desc{margin-top:.25rem;color:var(--crx-muted);font-size:.8125rem}
 #client-route-root.crx .crx-card-divider{height:1px;background:var(--crx-border);margin:1rem 0}
 #client-route-root.crx .crx-card-stats,
 #client-route-root.crx .crx-card-flags{display:flex;align-items:center;gap:.875rem;flex-wrap:wrap;color:var(--crx-muted);font-size:.8125rem}
 #client-route-root.crx .crx-card-stats span{display:inline-flex;align-items:center;gap:.375rem}
 #client-route-root.crx .crx-card-stats .crx-icon{width:.875rem;height:.875rem}
-#client-route-root.crx .crx-card-flags{margin-top:1rem;gap:.5rem}
+#client-route-root.crx .crx-card-flags{margin:0;gap:.6rem;grid-area:assignments;min-width:0}
 #client-route-root.crx .crx-flags-count{font-size:.75rem}
-#client-route-root.crx .crx-card-rules{display:flex;align-content:start;flex-wrap:wrap;gap:.5rem;margin:1rem 0 1.5rem}
-#client-route-root.crx .crx-rule-chip{max-width:100%;padding:.375rem .5rem;border:1px solid var(--crx-border);border-radius:var(--nx-control-radius);color:var(--crx-muted);font-size:.75rem;overflow-wrap:anywhere}
-#client-route-root.crx .crx-rule-chip b{color:var(--crx-accent)}
+#client-route-root.crx .crx-card-rules{display:grid;gap:.5rem;margin:0;min-width:0;grid-area:rules}
+#client-route-root.crx .crx-rule-chip{display:flex;align-items:baseline;flex-wrap:wrap;gap:.35rem;max-width:100%;padding:0;border:0;color:var(--crx-muted);font-size:.75rem;overflow-wrap:anywhere}
+#client-route-root.crx .crx-rule-chip b{color:var(--crx-text);font-weight:600}
 #client-route-root.crx .crx-rule-chip em{font-style:normal}
 #client-route-root.crx .crx-card-no-rules{color:var(--crx-muted);font-size:.75rem}
-#client-route-root.crx .crx-card-footer{margin-top:auto}
+#client-route-root.crx .crx-card-footer{margin:0;grid-area:actions}
 #client-route-root.crx .crx-card-footer .crx-btn{flex:1}
-#client-route-root.crx .crx-bottom{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1rem;border:1px solid var(--crx-border);border-radius:var(--nx-control-radius);background:var(--crx-panel)}
+#client-route-root.crx .crx-bottom{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1rem 0;border:0;border-top:1px solid var(--crx-border);border-radius:0;background:transparent}
 #client-route-root.crx .crx-bottom>div:first-child{display:grid;gap:.25rem}
 #client-route-root.crx .crx-bottom span,
 #client-route-root.crx .crx-dialog-summary small{color:var(--crx-muted);font-size:.75rem}
@@ -180,3 +180,17 @@ html[data-motion=on] #client-route-root.crx .crx-dialog{animation:crx-modal-ente
 #client-route-root.crx .crx-dialog-body[aria-labelledby="crx-tab-json"] .crx-section-head{flex:0 0 auto}
 #client-route-root.crx .crx-dialog-body[aria-labelledby="crx-tab-json"] .crx-json{box-sizing:border-box;min-height:0;flex:1 1 0;overflow:auto}
 @media(max-width:40rem){#client-route-root.crx .crx-dialog{width:100%;height:100%;max-height:100%}}
+
+/* Routing templates read as compact rows with four stable information groups. */
+#client-route-root.crx [data-cr-bottom][hidden]{display:none}
+#client-route-root.crx .crx-card-identity{grid-area:identity;min-width:0;display:grid;gap:.6rem}
+#client-route-root.crx .crx-assigned-source{display:flex;align-items:center;gap:.5rem;min-width:0;max-width:100%}
+#client-route-root.crx .crx-assigned-source>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#client-route-root.crx .crx-assigned-source .crx-flag{flex:none;width:1.5rem;height:1.1rem}
+@container client-routing (max-width:64rem){
+ #client-route-root.crx .crx-card{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"identity actions" "assignments assignments" "rules rules";gap:1rem}
+}
+@container client-routing (max-width:36rem){
+ #client-route-root.crx .crx-card{grid-template-columns:minmax(0,1fr);grid-template-areas:"identity" "assignments" "rules" "actions"}
+ #client-route-root.crx .crx-card-footer{justify-content:flex-end}
+}
