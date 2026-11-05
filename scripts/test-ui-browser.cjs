@@ -153,6 +153,24 @@ async function main() {
     const inboundTag = prefix.replace(/-/g,'_');
     const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{serverName:'ui.example.invalid'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',flag:'🇵🇱',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,hosting:'Datagio',tlsManualProvision:true,geoEnabled:true});
+    const noTlsProfile=await create('profiles',{name:`${prefix} · Без TLS`,config:JSON.stringify({inbounds:[{tag:inboundTag+'-plain',listen:'127.0.0.1',port:28353,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/tls-indicator'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+    await checked('Node certificate switch follows Security, not saved TLS overrides',async()=>{
+      await navigate('nodes');
+      await page.locator(`[data-ne="nodes:${node.id}"]`).click();
+      const form=page.locator('dialog form[data-ent="nodes"]');
+      const toggle=form.locator('[data-node-tls-effective]');
+      const preferences=form.locator('[data-node-tls-preferences]');
+      assert.equal(await toggle.isChecked(),true,'TLS profile must render certificate toggle ON');
+      assert.equal(await toggle.isDisabled(),true,'Derived switch cannot silently rewrite Security');
+      await form.locator('[name="profileId"]').selectOption(String(noTlsProfile.id));
+      assert.equal(await toggle.isChecked(),false,'Security none must render OFF despite stored external override');
+      assert.match(await form.locator('[data-node-tls-state]').innerText(),/ВЫКЛ/);
+      assert.equal(await preferences.evaluate(el=>el.open),false,'Inactive override settings must stay collapsed');
+      assert.equal(await form.locator('[name="tlsManualProvision"]').isChecked(),true,'Saved override preference must not be erased');
+      await form.locator('[name="profileId"]').selectOption(String(profile.id));
+      assert.equal(await toggle.isChecked(),true,'Switch must return ON after restoring TLS profile');
+      await page.keyboard.press('Escape');
+    });
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
     await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
     const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
