@@ -1542,3 +1542,135 @@ dialog.node-wide .node-tls-details {
   grid-template-columns:minmax(0,1fr);
 }
 }
+
+
+/* Node editor: preserve three balanced desktop columns after introducing
+ * effective TLS. Certificate provisioning is a separate section beside
+ * billing, not extra height forced into the primary fields column. */
+dialog.node-wide .node-side-stack {
+  grid-area:billing;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  align-content:start;
+  gap:.65rem;
+  min-width:0;
+}
+dialog.node-wide .node-side-stack > :is(.node-billing-section,.node-tls-settings) {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  align-self:start;
+  margin:0;
+  padding:.75rem .85rem;
+  border:1px solid var(--nx-border);
+  border-radius:var(--ui-radius);
+  background:color-mix(in srgb,var(--s2) 48%,var(--s1));
+  box-shadow:none;
+}
+dialog.node-wide .node-side-stack > .node-tls-settings legend {
+  padding:0 .3rem;
+  font-size:.84rem;
+}
+dialog.node-wide .node-side-stack .node-tls-effective {
+  flex-wrap:wrap;
+  gap:.3rem .5rem;
+  margin:0 0 .4rem;
+  padding:.4rem .5rem;
+}
+dialog.node-wide .node-side-stack .node-tls-effective .f {
+  flex:1 1 100%;
+  gap:.4rem;
+}
+dialog.node-wide .node-side-stack .node-tls-effective .f > span:first-child {
+  font-size:.72rem;
+}
+dialog.node-wide .node-side-stack .node-tls-effective [data-node-tls-state] {
+  font-size:.72rem;
+  line-height:1.3;
+}
+dialog.node-wide .node-side-stack [data-node-tls-preferences] summary {
+  margin:0;
+  font-size:.77rem;
+  line-height:1.35;
+}
+dialog.node-wide .node-side-stack [data-node-tls-preferences][open] > .node-tls-help {
+  margin:.3rem 0 .45rem;
+  font-size:.7rem;
+  line-height:1.3;
+}
+dialog.node-wide .node-side-stack :is(.node-tls-details,.node-tls-modes) {
+  gap:.4rem .55rem;
+}
+dialog.node-wide .node-side-stack .node-tls-modes {
+  margin-bottom:.5rem;
+}
+dialog.node-wide .node-side-stack .node-tls-settings .f > span:first-child {
+  font-size:.72rem;
+  line-height:1.25;
+}
+dialog.node-wide .node-side-stack .node-tls-settings input:not([type="checkbox"]) {
+  height:2.25rem;
+  min-height:2.25rem;
+  font-size:.78rem;
+}
+dialog.node-wide .node-side-stack .node-billing-fields {
+  gap:.56rem .7rem;
+}
+/* Content-sized surfaces do not stretch into large artificial empty cards. */
+@media (min-width:1151px) {
+  dialog.node-wide > form.box {
+    gap:.65rem;
+    padding:1rem 1.1rem .8rem;
+  }
+  dialog.node-wide > form.box > .node-form-layout {
+    gap:.7rem;
+    align-items:start;
+  }
+  dialog.node-wide .node-form-layout > section {
+    align-self:start;
+    padding:.85rem .95rem;
+  }
+  dialog.node-wide .node-main-section .node-form-grid {
+    gap:.65rem .8rem;
+  }
+  dialog.node-wide .node-form-layout :is(input:not([type="checkbox"]):not([type="hidden"]),select,.country-selected,.user-date-trigger) {
+    height:2.5rem;
+    min-height:2.5rem;
+    font-size:.86rem;
+  }
+  dialog.node-wide .node-main-section .country-trigger {
+    min-height:2.5rem;
+  }
+  dialog.node-wide .node-main-section .node-reset-action {
+    margin-top:.7rem;
+    padding:.55rem .65rem;
+  }
+  dialog.node-wide .node-ip-section textarea[name="rotationIps"] {
+    height:clamp(120px,19dvh,180px);
+    min-height:110px;
+  }
+  dialog.node-wide :is(.node-section-intro,.node-ip-hint) {
+    margin-bottom:.58rem;
+  }
+  dialog.node-wide .node-side-stack > :is(.node-billing-section,.node-tls-settings) {
+    padding:.75rem .85rem;
+  }
+  dialog.node-wide > form.box > .act {
+    padding-top:.6rem;
+  }
+}
+@media (min-width:751px) and (max-width:1150px) {
+  dialog.node-wide > form.box > .node-form-layout {
+    grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+    grid-template-areas:"primary billing" "ips ips";
+  }
+}
+@media (max-width:750px) {
+  dialog.node-wide > form.box > .node-form-layout {
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"primary" "ips" "billing";
+  }
+  dialog.node-wide .node-side-stack {
+    gap:.75rem;
+  }
+}
