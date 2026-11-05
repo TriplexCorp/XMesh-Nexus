@@ -7,7 +7,7 @@ button svg{flex:none}
 .ic{width:1.1rem;height:1.1rem;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .mu{color:var(--mu)}.er{color:var(--er)}
 .note,.hd p{color:var(--nx-muted);font-size:.8rem;line-height:1.55}
-.card,[data-ui-surface=panel]{min-width:0;align-self:start;padding:var(--nx-card-pad);background:var(--nx-panel-bg);border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);box-shadow:var(--nx-panel-shadow);backdrop-filter:var(--nx-backdrop);-webkit-backdrop-filter:var(--nx-backdrop)}
+.card,[data-ui-surface=panel]{min-width:0;align-self:start;padding:var(--nx-card-pad);background:var(--nx-panel-bg);background-image:var(--nx-panel-image);border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);box-shadow:var(--nx-panel-shadow);backdrop-filter:var(--nx-backdrop);-webkit-backdrop-filter:var(--nx-backdrop)}
 [data-ui-surface=section]{min-width:0;padding:var(--nx-section-pad);background:var(--nx-section-bg);border:1px solid var(--nx-border);border-radius:var(--nx-section-radius);box-shadow:var(--nx-section-shadow)}
 [data-ui-surface=item],[data-ui-surface=metric]{min-width:0;background:var(--nx-item-bg);border:1px solid var(--nx-border);border-radius:var(--nx-item-radius);box-shadow:var(--nx-item-shadow)}
 [data-ui-surface=floating]{background:var(--nx-floating-bg);border:1px solid var(--nx-border-strong);border-radius:var(--nx-section-radius);box-shadow:var(--nx-floating-shadow);backdrop-filter:var(--nx-backdrop)}
