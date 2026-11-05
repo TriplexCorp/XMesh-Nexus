@@ -22,6 +22,24 @@ assert.match(ui,/data-node-pool-normalize/);
 assert.match(ui,/data-node-pool-clear/);
 assert.match(ui,/data-node-date-open/);
 assert.match(ui,/data-node-reset-traffic/);
+// Security, not protocol, VLESS Encryption or saved overrides, determines TLS.
+const modeStart=ui.indexOf('function nodeEffectiveTlsMode(profile){');
+const modeEnd=ui.indexOf('function syncNodeEffectiveTls(',modeStart);
+assert(modeStart>=0&&modeEnd>modeStart,'Missing derived TLS mode helper');
+const mode=new Function('inbs',ui.slice(modeStart,modeEnd)+'return nodeEffectiveTlsMode;')(profile=>profile.inbounds);
+const config=(protocol,security)=>({inbounds:[{protocol,streamSettings:{security}}]});
+for(const protocol of ['vless','trojan','vmess','shadowsocks','hysteria','masque','custom']){
+ assert.equal(mode(config(protocol,'tls')),'on',protocol+' TLS must display ON');
+ assert.equal(mode(config(protocol,'none')),'off',protocol+' none must display OFF');
+ assert.equal(mode(config(protocol,'reality')),'off',protocol+' REALITY must display OFF');
+}
+assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{security:'tls'}},{protocol:'vless',streamSettings:{security:'none'}}]}),'on');
+assert.equal(mode(null),'unconfigured');
+assert.equal(mode({inbounds:[] }),'unconfigured');
+assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{}}]}),'unconfigured');
+for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-preferences','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
+ assert(ui.includes(contract),'Node TLS UI contract missing: '+contract);
+
 // Shared dialog safety is independent of a node-specific placement patch.
 assert.match(css,/node-form-layout/,'Node editor must retain its form sections');
 assert.match(css,/node-address-port/,'Address and port remain one field group');
