@@ -44,8 +44,12 @@ assert.match(css,/\.user-create-duration-calendar\{/,
  'Duration picker must render as a dedicated calendar popover');
 assert.match(css,/\.user-create-cal-day\.is-selected/,
  'Selected calendar date must have an explicit state');
-assert.match(css,/\.user-create-extra-grid\{[\s\S]*grid-template-areas:"squads tag hold desc"/,
- 'Metadata controls must retain their authored desktop composition');
+assert.match(css,/\.user-create-section-extra\{container-type:inline-size;container-name:nx-user-extra\}/,
+ 'Metadata section must own container-responsive layout');
+assert.match(css,/@container nx-user-extra \(min-width:44rem\)/,
+ 'Metadata must reflow into two columns at medium widths');
+assert.match(css,/grid-template-areas:"squads squads" "tag hold" "desc desc"/,
+ 'Long squad lists and notes should receive full-row width on medium layouts');
 assert.match(css,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
  'On-hold switch must stay a real compact switch instead of a stretched legacy surface');
 assert.match(css,/\.user-create-desc textarea\{[^}]*min-height:3\.9rem;[^}]*resize:vertical/,
