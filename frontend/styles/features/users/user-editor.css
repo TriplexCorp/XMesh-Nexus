@@ -173,7 +173,7 @@
   align-items:start;
   min-width:0;
 }
-.user-create-squads{grid-area:squads}.user-create-tag{grid-area:tag}.user-create-desc{grid-area:desc}
+.user-create-squads{grid-area:squads}.user-create-tag{grid-area:tag}.user-create-hold{grid-area:hold}.user-create-desc{grid-area:desc}
 .user-create-squads .ms{min-height:3rem;padding:.36rem;gap:.3rem;align-content:center;border-radius:var(--nx-control-radius);background:color-mix(in srgb,var(--nx-section-bg) 82%,var(--nx-panel-bg))}
 .user-create-squads .ck{min-height:1.78rem;padding:.28rem .48rem;display:inline-flex;align-items:center;gap:.3rem;border-radius:var(--nx-control-radius)}
 
