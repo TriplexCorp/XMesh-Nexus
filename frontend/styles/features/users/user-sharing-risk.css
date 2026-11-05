@@ -119,3 +119,12 @@ dialog#xm-sharing-dialog.xm-sharing-dialog{width:min(64rem,calc(100vw - 2rem));h
 .xm-risk-pill.is-normal{min-width:2rem;justify-content:center}
 
 .xm-device-picker .xm-sharing-device[aria-pressed=true]>.ic:first-child{color:var(--a)}
+
+/* Embedded management shares the user dialog's scroll owner and draft. */
+.user-inline-devices{min-width:0}
+.user-inline-devices .xm-sharing-shell{max-height:none;overflow:visible}
+.user-inline-devices .xm-sharing-shell>header{display:none}
+.user-inline-devices .xm-device-toolbar{padding:0 0 .5rem}
+.user-inline-devices .xm-sharing-body{overflow:visible;padding:1rem 0 0;scrollbar-gutter:auto}
+.user-inline-devices .xm-device-workbench{grid-template-columns:minmax(14rem,1fr) minmax(0,2fr)}
+@media(max-width:760px){.user-inline-devices .xm-device-workbench{grid-template-columns:minmax(0,1fr)}}

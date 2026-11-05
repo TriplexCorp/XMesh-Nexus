@@ -191,19 +191,28 @@
   }
 
   let detailRequest=0;
-  async function openDetail(user,focus='devices',selectedId=null){
-    const request=++detailRequest,dialog=ensureDialog();
+  async function openDetail(user,focus='devices',selectedId=null,inline=null){
+    const request=++detailRequest,dialog=inline||ensureDialog();
+    dialog.dataset.deviceRequest=String(request);
+    const isOpen=()=>inline?dialog.isConnected&&Boolean(dialog.closest('dialog')?.open):dialog.open;
+    const scopeIds=()=>{
+      if(!inline)return;
+      for(const node of dialog.querySelectorAll('[id]'))node.id='user-inline-'+node.id;
+      for(const node of dialog.querySelectorAll('[aria-controls],[aria-labelledby]'))for(const attr of ['aria-controls','aria-labelledby'])if(node.hasAttribute(attr))node.setAttribute(attr,'user-inline-'+node.getAttribute(attr));
+    };
+    const isCurrent=()=>dialog.dataset.deviceRequest===String(request);
     const writable=typeof viewerMode==='function'&&!viewerMode();
     let tab=focus==='risk'?'risk':'devices',selected=selectedId,busy=false;
-    if(!dialog.open)dialog.dataset.deviceChanged='0';
+    if(!isOpen())dialog.dataset.deviceChanged='0';
     const relative=ms=>!Number(ms)?'—':Date.now()-Number(ms)<60000?t('сейчас','now'):`${ago(ms)} ${t('назад','ago')}`;
     const stamp=ms=>Number(ms)?new Date(Number(ms)).toLocaleString(en()?'en-US':'ru-RU'):'—';
     const head=()=>`<header><div><h2 id="xm-sharing-title">${t('Устройства и доступ','Devices & access')}</h2><p>${esc(user.username)}</p></div><button type="button" class="xm-sharing-close" aria-label="${t('Закрыть','Close')}">${ic('x')}</button></header>`;
     dialog.innerHTML=`<div class="xm-sharing-shell">${head()}<div class="xm-sharing-loading" role="status">${t('Загрузка устройств…','Loading devices…')}</div></div>`;
+    scopeIds();
     dialog.querySelector('.xm-sharing-close').onclick=()=>dialog.close();
-    if(!dialog.open)dialog.showModal();
+    if(!isOpen())dialog.showModal();
     const result=await riskFor(user).catch(()=>null);
-    if(request!==detailRequest||!dialog.open)return;
+    if(!isCurrent()||!isOpen())return;
     if(!result){dialog.querySelector('.xm-sharing-loading').textContent=t('Не удалось загрузить данные. Откройте окно ещё раз.','Could not load data. Reopen this window to retry.');return;}
     function paint(){
       const devices=(user.devices||[]).slice().sort((a,b)=>(Number(b.last)||0)-(Number(a.last)||0));
@@ -213,7 +222,8 @@
       const identity=device?deviceIdentity(device):null;
       const reasons=result.factors.length?result.factors.map(f=>`<li><b>+${f.points}</b><span>${esc(f.text)}</span></li>`).join(''):`<li class="is-clean">${ic('check')}<span>${t('Признаков совместного использования не обнаружено','No sharing signals detected')}</span></li>`;
       dialog.innerHTML=`<div class="xm-sharing-shell">${head()}<div class="xm-device-toolbar"><div class="xm-device-tabs" role="tablist" aria-label="${t('Раздел устройства','Device sections')}"><button type="button" role="tab" id="xm-devices-tab" aria-controls="xm-devices-panel" aria-selected="${tab==='devices'}" data-device-tab="devices">${t('Устройства','Devices')} <span>${count}</span></button><button type="button" role="tab" id="xm-assessment-tab" aria-controls="xm-assessment-panel" aria-selected="${tab==='risk'}" data-device-tab="risk">${t('Проверка доступа','Access assessment')}</button></div><button type="button" class="xm-device-limit" data-device-limit-open ${writable?'':'disabled'}>${limit?t(`Лимит: ${limit}`,`Limit: ${limit}`):t('Без лимита','Unlimited')}${writable?ic('pen'):''}</button></div><div class="xm-sharing-body"><div id="xm-devices-panel" role="tabpanel" aria-labelledby="xm-devices-tab" ${tab==='devices'?'':'hidden'}>${count?`<div class="xm-device-workbench"><nav class="xm-device-picker" aria-label="${t('Выбрать устройство','Select a device')}">${devices.map(d=>{const i=deviceIdentity(d);return `<button type="button" class="xm-sharing-device" data-device-select="${esc(d.id)}" aria-pressed="${String(d.id)===String(selected)}">${ic(i.icon)}<span><b>${esc(i.label)}</b><small>${esc(i.system)}${d.app?' · '+esc(d.app):''}</small></span>${ic('chevronRight')}</button>`}).join('')}</nav><section class="xm-device-inspector" aria-label="${t('Сведения об устройстве','Device information')}"><div class="xm-device-identity"><span class="xm-device-glyph">${ic(identity.icon)}</span><div><h3>${esc(identity.label)}</h3><p>${esc(identity.system)}${device.app?' · '+esc(device.app):''}</p></div></div><dl class="xm-device-facts"><div><dt>${t('Подписка обновлена','Subscription refreshed')}</dt><dd title="${esc(stamp(device.last))}">${esc(relative(device.last))}</dd></div><div><dt>${t('Добавлено','Added')}</dt><dd>${esc(Number(device.first)?new Date(Number(device.first)).toLocaleDateString(en()?'en-US':'ru-RU', {year:'numeric',month:'short',day:'numeric'}):'—')}</dd></div></dl><details class="xm-sharing-device-details"><summary>${t('Идентификатор и диагностика','Identifier & diagnostics')}</summary><dl><div><dt>HWID</dt><dd>${esc(device.fingerprint||'—')}</dd></div><div><dt>${t('Обновлений подписки','Subscription refreshes')}</dt><dd>${esc(device.refreshes??0)}</dd></div><div><dt>${t('Имя устройства','Device hostname')}</dt><dd>${esc(device.model||'—')}</dd></div><div><dt>${t('Система и сборка','System & build')}</dt><dd>${esc([device.os||device.plat,device.osVersion].filter(Boolean).join(' · ')||'—')}</dd></div></dl><p class="xm-device-context">${t('Время обновления подписки в приложении. Оно не показывает, подключён ли сейчас VPN.','The last subscription refresh in the app. This does not indicate a live VPN connection.')}</p></details>${writable?`<div class="xm-device-actions"><button type="button" class="gh" data-device-remove>${ic('trash')}${t('Удалить устройство','Remove device')}</button></div>`:''}</section></div>`:`<div class="xm-sharing-empty">${ic('monitor')}<h3>${t('Пока ни одного устройства','No devices yet')}</h3><p>${t('Передайте пользователю ссылку подписки. Привязка появится, когда приложение впервые её обновит.','Give the user their subscription link. A binding appears when their app first refreshes it.')}</p></div>`}<p class="xm-device-capacity" role="status">${limit?(count>limit?t(`Лимит превышен: ${count} из ${limit}`,`Over limit: ${count} of ${limit}`):count===limit?t('Все места заняты','All slots are used'):t(`Свободных мест: ${limit-count}`,`Available slots: ${limit-count}`)):t('Количество устройств не ограничено','Device count is unlimited')}</p></div><section id="xm-assessment-panel" role="tabpanel" aria-labelledby="xm-assessment-tab" ${tab==='risk'?'':'hidden'}><div class="xm-assessment-heading"><h3>${result.tier.key==='normal'?t('Поводов для проверки нет','No review needed'):t('Стоит проверить доступ','Access is worth reviewing')}</h3><span class="xm-sharing-score is-${result.tier.key}">${result.score}<small>/100</small></span></div><p class="xm-sharing-period">${t('Сигналы за последние 7 дней. Заполненный лимит сам по себе не считается подозрительным.','Signals from the last 7 days. Filling the device limit is not suspicious on its own.')}</p><ul class="xm-sharing-reasons">${reasons}</ul><div class="xm-sharing-metrics"><div><span>${t('Трафик за 24 часа','Traffic in 24 hours')}</span><b>${result.trafficAvailable?fmtBytes(result.traffic.recent24h):t('Нет данных','Unavailable')}</b></div><div><span>${t('Серверов за 6 часов','Servers in 6 hours')}</span><b>${result.trafficAvailable?result.traffic.nodes6h:'—'}</b></div><div><span>${t('Новых устройств за сутки','New devices in 24 hours')}</span><b>${result.devices.new24h}</b></div></div><p class="xm-sharing-footnote">${t('Высокий объём трафика сам по себе не считается sharing. Проверка не блокирует устройства автоматически.','High traffic volume alone is not treated as sharing. The assessment does not automatically block devices.')}${result.trafficAvailable?'':t(' История трафика недоступна; учтены только устройства.',' Traffic history is unavailable; only device signals are included.')}</p></section><form class="xm-device-limit-form" hidden><label>${t('Лимит устройств','Device limit')}<input type="number" name="limit" min="0" step="1" required value="${limit}"></label><p>${t('0 — без ограничений. Изменение лимита не удаляет уже зарегистрированные устройства.','0 means unlimited. Changing this limit does not remove existing devices.')}</p><div><button type="button" class="gh" data-device-limit-cancel>${t('Отмена','Cancel')}</button><button class="btn">${t('Сохранить лимит','Save limit')}</button></div></form><p class="xm-device-feedback" role="status" aria-live="polite"></p></div></div>`;
-      dialog.querySelector('.xm-sharing-close').onclick=()=>dialog.close();
+      scopeIds();
+    dialog.querySelector('.xm-sharing-close').onclick=()=>dialog.close();
       for(const button of dialog.querySelectorAll('[data-device-tab]'))button.onclick=()=>{tab=button.dataset.deviceTab;paint();dialog.querySelector(`[data-device-tab="${tab}"]`).focus()};
       const tabs=[...dialog.querySelectorAll('[role=tab]')];
       tabs.forEach((button,index)=>button.onkeydown=e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();tabs[e.key==='Home'?0:e.key==='End'?tabs.length-1:(index+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length].click()}});
@@ -224,7 +234,9 @@
       async function update(patch,deviceId=null){
         if(busy||!writable)return;busy=true;
         dialog.querySelectorAll('[data-device-remove],.xm-device-limit-form button').forEach(b=>b.disabled=true);
-        try{if(deviceId!==null)await removeUserDevice(user.id,deviceId);else await api.update('users',user.id,patch);cache.delete(user.id);dialog.dataset.deviceChanged='1';if(dialog.open&&request===detailRequest)await openDetail(userById(user.id)||user,tab,selected);else refreshViews()}
+        const draftLimit=inline?.closest('.user-canvas')?.querySelector('[data-hw]');
+        const syncLimit=draftLimit&&Number(draftLimit.value)===Number(user.hwid);
+        try{if(deviceId!==null)await removeUserDevice(user.id,deviceId);else await api.update('users',user.id,patch);if(syncLimit&&patch?.hwid!==undefined)draftLimit.value=String(patch.hwid);cache.delete(user.id);dialog.dataset.deviceChanged='1';if(isOpen()&&isCurrent())await openDetail(userById(user.id)||user,tab,selected,inline);else refreshViews()}
         catch(error){feedback.textContent=t('Не удалось сохранить: ','Could not save: ')+(error.message||t('Ошибка API','API error'));dialog.querySelectorAll('[data-device-remove],.xm-device-limit-form button').forEach(b=>b.disabled=false)}
         finally{busy=false}
       }
@@ -235,10 +247,10 @@
         const deviceId=selected;
         busy=true;let confirmed=false;
         try{confirmed=await panelConfirm(t('Привязка будет удалена и освободит место. Это не блокирует устройство: при следующем обновлении подписки клиент сможет зарегистрироваться снова.','Removing this binding frees a slot. It does not block the device: the client can register again on its next subscription refresh.'),{title:t('Удалить привязку устройства?','Remove device binding?'),confirmLabel:t('Удалить привязку','Remove binding'),danger:true})}finally{busy=false}
-        if(confirmed&&dialog.open&&request===detailRequest)await update(null,deviceId);
+        if(confirmed&&isOpen()&&isCurrent())await update(null,deviceId);
       };
     }
-    paint();dialog.dataset.focus=focus;dialog.querySelector('.xm-sharing-close').focus({preventScroll:true});
+    paint();dialog.dataset.focus=focus;if(!inline)dialog.querySelector('.xm-sharing-close').focus({preventScroll:true});
     function refreshViews(){
       if(dialog.dataset.deviceChanged!=='1')return;
       dialog.dataset.deviceChanged='0';
@@ -247,8 +259,14 @@
       else if(location.hash==='#users')render(1);
       else if(location.hash==='#tools')drawTools();
     }
-    dialog.onclose=refreshViews;
+    if(!inline)dialog.onclose=refreshViews;
   }
+
+  window.XMeshUserDevices=Object.freeze({mount:(root,id)=>{
+    const user=userById(id);if(!user||!root)return;
+    root.closest('dialog')?.addEventListener('close',()=>{if(root.dataset.deviceChanged==='1'&&location.hash==='#users')render(1)},{once:true});
+    void openDetail(user,'devices',null,root);
+  }});
 
   document.addEventListener('click',event=>{
     const button=event.target.closest?.('[data-sharing-detail]');if(!button)return;
