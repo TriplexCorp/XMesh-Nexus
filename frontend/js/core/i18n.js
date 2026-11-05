@@ -11,6 +11,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Базовая информация о пользователе":"Basic user information",
+    "Ограничения и поведение трафика":"Traffic limits and behavior",
+    "Параметры подключения":"Connection settings",
+    "Основные данные":"Basic details",
     "Ротация":"Rotation",
     "Провайдер":"Provider",
     "Режим Security не задан":"Security not configured",

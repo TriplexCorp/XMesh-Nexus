@@ -2086,9 +2086,6 @@ function userDrawer(id,tab){
   const hostMarkup=hosts.length
     ?hosts.map(host=>`<div class="user-host-line"><span>${esc(host.remark||host.tag)}</span><small title="${esc(host.address||'')}">${esc(host.address||'')}:${esc(host.port||'')}</small></div>`).join('')
     :'<span class="user-canvas-muted">Подходящие серверы не назначены</span>';
-  const devices=u.devices.length
-    ?u.devices.slice().sort((a,b)=>(Number(b.last)||0)-(Number(a.last)||0)).map(d=>`<button type="button" class="user-device-preview" data-sharing-detail="${u.id}" data-sharing-focus="devices" data-sharing-device="${esc(d.id)}">${ic(/android|ios|iphone/i.test(d.os||d.plat||'')?'smartphone':'monitor')}<span><b>${esc(d.os||d.plat||(panelIsEnglish()?'Device':'Устройство'))}</b><small>${esc(d.app||d.model||(panelIsEnglish()?'Client':'Клиент'))} · ${panelIsEnglish()?'subscription refresh':'обновление подписки'} ${ago(d.last)}</small></span>${ic('chevronRight')}</button>`).join('')
-    :`<span class="user-canvas-muted">${panelIsEnglish()?'The client has not refreshed the subscription yet':'Клиент ещё не обновлял подписку'}</span>`;
   modal(`<div class="box user-drawer user-canvas">
     <header class="user-head">
       <div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc((u.username||'?')[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2><small class="user-numeric-id">ID пользователя: ${esc(u.id)}</small>${chip(label,statusColor)} <span class="dot" data-user-presence-id="${u.id}" style="${isOn(u)?'':'display:none'}"></span></div></div>
@@ -2103,13 +2100,22 @@ function userDrawer(id,tab){
     <div class="user-canvas-grid">
       <section class="user-pane user-pane-settings" data-user-editor-pane="ov" data-active="true" role="tabpanel" id="user-panel-ov" aria-labelledby="user-tab-ov" tabindex="0" aria-hidden="false">
         <form id="user-edit-form" data-k="uedit" data-id="${u.id}" method="dialog" class="user-inline-editor">
-          <div class="user-edit-fields">
-            ${field(FE.find(f=>f.k==='username'),u.username)}
-            ${field(FE.find(f=>f.k==='limit'),u.limit)}
-            ${userDateField(u)}
-            ${field(FE.find(f=>f.k==='strategy'),u.strategy)}
-            ${FE.filter(f=>!['username','limit','expireAt','strategy','desc'].includes(f.k)).map(f=>field(f,u[f.k])).join('')}
-            <label class="f user-notes-field"><span>Заметка</span><textarea name="desc" rows="4" spellcheck="true" placeholder="Дополнительная информация о пользователе…" data-user-note>${esc(u.desc||'')}</textarea><small class="user-note-meta"><span>Внутренняя заметка администратора</span><span data-user-note-count>${Array.from(u.desc||'').length} символов</span></small></label>
+          <div class="user-edit-fields user-settings-cards">
+            <section class="user-detail-card user-basic-card"><header class="user-card-title">${ic('users')}<div><h3>Основные данные</h3><p>Базовая информация о пользователе</p></div></header>
+              ${field(FE.find(f=>f.k==='username'),u.username)}
+              ${userDateField(u)}
+              ${field(FE.find(f=>f.k==='tg'),u.tg)}
+              ${field(FE.find(f=>f.k==='email'),u.email)}
+            </section>
+            <section class="user-detail-card user-connection-card"><header class="user-card-title">${ic('sliders')}<div><h3>Параметры подключения</h3><p>Ограничения и поведение трафика</p></div></header>
+              ${field(FE.find(f=>f.k==='limit'),u.limit)}
+              ${field(FE.find(f=>f.k==='strategy'),u.strategy)}
+              ${field(FE.find(f=>f.k==='tag'),u.tag)}
+              ${FE.filter(f=>!['username','limit','expireAt','strategy','desc','tg','email','tag'].includes(f.k)).map(f=>field(f,u[f.k])).join('')}
+            </section>
+            <section class="user-detail-card user-note-card"><header class="user-card-title">${ic('file')}<div><h3>Заметка</h3><p>Внутренняя заметка администратора</p></div></header>
+              <label class="f user-notes-field"><span class="sr-only">Заметка</span><textarea name="desc" rows="3" spellcheck="true" placeholder="Дополнительная информация о пользователе…" data-user-note>${esc(u.desc||'')}</textarea><small class="user-note-meta"><span data-user-note-count>${Array.from(u.desc||'').length} символов</span></small></label>
+            </section>
           </div>
         </form>
       </section>
@@ -2133,15 +2139,14 @@ function userDrawer(id,tab){
         <div class="user-traffic-stats" data-user-traffic-id="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем данные…</span></div>
       </section>
       <section class="user-pane user-pane-devices" data-user-editor-pane="dev" data-active="false" role="tabpanel" id="user-panel-dev" aria-labelledby="user-tab-dev" tabindex="0" inert aria-hidden="true">
-        <div class="user-pane-heading"><div><h3>Устройства</h3><p>${u.devices.length}${u.hwid?(panelIsEnglish()?' of ':' из ')+u.hwid:(panelIsEnglish()?' · unlimited':' · без лимита')}</p></div><button type="button" class="gh sm" data-sharing-detail="${u.id}" data-sharing-focus="devices">${panelIsEnglish()?'Manage':'Управлять'}</button></div>
-        <div class="user-devices">${devices}</div>
-        ${u.hwid>0&&u.devices.length>u.hwid?`<p class="er">Количество устройств превышает лимит (${u.hwid}).</p>`:''}
+        <div class="user-inline-devices" data-user-inline-devices></div>
       </section>
     </div>
     <p class="er user-editor-feedback" id="fe" role="status"></p>
     <div class="user-editor-actions"><span class="user-edit-dirty" data-user-edit-dirty role="status" aria-live="polite"></span><button type="submit" form="user-edit-form" class="btn user-save-button">${ic('check')} Сохранить изменения</button></div>
     <footer class="user-canvas-foot"><span>Создан ${new Date(u.created).toLocaleDateString(window.XMeshI18n?.getLocale?.()||'ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
   </div>`,'user-modal');
+  window.XMeshUserDevices.mount(dlg.querySelector('[data-user-inline-devices]'),u.id);
   window.XMeshUserTabs.select(dlg.querySelector('.user-canvas'),tab==='sub'?'acc':tab||'ov');
   // Native dialog/select focus must not leave a reused workspace scrolled.
   const workspace=dlg.querySelector('.user-canvas-grid');

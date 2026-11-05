@@ -290,8 +290,7 @@ async function main() {
         await page.keyboard.press('Escape');
         await page.locator(`tr[data-id="${user.id}"]`).click();
         await page.locator('[data-user-editor-tab=dev]').click();
-        await page.locator('#dlg [data-sharing-detail]').first().click();
-        await dialog.locator('.xm-device-capacity').waitFor();
+        await page.locator('#dlg .xm-device-capacity').waitFor();
         await page.keyboard.press('Escape');await page.keyboard.press('Escape');
         if(width===1920&&count===2){
           await page.evaluate(()=>{sessionUser.role='viewer';XMeshI18n.setLanguage('en')});
@@ -329,10 +328,14 @@ async function main() {
       // must preserve that identity rather than silently selecting the newest.
       await page.locator(`#ut tr[data-id="${user.id}"]`).click();
       await page.locator('[data-user-editor-tab=dev]').click();
-      const previews=page.locator('#dlg .user-device-preview');
+      await page.locator('[data-user-editor-tab=ov]').click();
+      await page.locator('[data-user-note]').fill('Keep this device draft');
+      await page.locator('[data-user-editor-tab=dev]').click();
+      await page.locator('#dlg .xm-sharing-device').first().waitFor();
+      const previews=page.locator('#dlg .xm-sharing-device');
       assert.equal(await previews.count(),2);
       await previews.last().click();
-      const dialog=page.locator('#xm-sharing-dialog');
+      let dialog=page.locator('#dlg .user-inline-devices');
       await dialog.locator('.xm-device-capacity').waitFor();
       assert.equal(await dialog.locator('[data-device-select][aria-pressed="true"]').getAttribute('data-device-select'),String(removed.id),'Clicking a device preview must select that exact device, not the most recent one');
       // Register another device after the UI snapshot. Removing A must not
@@ -343,14 +346,10 @@ async function main() {
       await page.locator('.xm-action-confirm .dg').click();
       await dialog.locator(`[data-device-select="${removed.id}"]`).waitFor({state:'detached'});
       const after=(await api('GET',`/users/${user.id}/subscription`)).deviceLimit.devices;
+      assert.equal(await page.locator('[data-user-note]').inputValue(),'Keep this device draft','Removing a device must preserve the settings draft');
       assert.deepEqual(after.map(d=>d.id).sort(),[retained.id,third.id].sort(),'Real API must delete only the selected SQL row, retaining concurrent registrations');
-      await page.keyboard.press('Escape');
-      await page.locator(`#dlg [data-sharing-device="${removed.id}"]`).waitFor({state:'detached'});
-      await page.locator('#dlg .user-device-preview').first().waitFor();
-      await page.locator('#dlg .user-device-preview').first().click();
-      await dialog.locator('.xm-device-capacity').waitFor();
-      assert.equal(await dialog.locator(`[data-device-select="${removed.id}"]`).count(),0,'Deleted device must not return when reopening from the parent drawer');
-      await page.keyboard.press('Escape');await page.keyboard.press('Escape');await page.reload({waitUntil:'domcontentloaded'});
+      await page.keyboard.press('Escape');await page.reload({waitUntil:'domcontentloaded'});
+      dialog=page.locator('#xm-sharing-dialog');
       await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus=devices]`).click();
       await dialog.locator(`[data-device-select="${retained.id}"]`).waitFor();
       assert.equal(await dialog.locator('.xm-sharing-device').count(),2,'Deletion must survive a full page reload');
