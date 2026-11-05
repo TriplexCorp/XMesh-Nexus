@@ -3068,7 +3068,20 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const nodeTlsFields='<fieldset class="node-tls-settings"><legend>Сертификат ноды</legend>'+
     '<div class="node-tls-effective"><label class="f"><span>TLS по Security</span><span class="sw" data-node-tls-indicator><input type="checkbox" data-node-tls-effective role="switch" disabled aria-label="Не настроено — выберите профиль"><span></span></span></label><small data-node-tls-state role="status">Не настроено — выберите профиль</small></div>'+
     '<p class="node-tls-readiness" data-node-tls-readiness role="status" aria-live="polite"></p>'+
-    '<details data-node-tls-preferences><summary>Параметры сертификата</summary><div class="node-tls-popup"><p class="node-tls-help" data-node-tls-note></p><div class="node-tls-modes">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div><div class="node-tls-details">'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div></div></details></fieldset>';
+    '<button type="button" class="gh sm node-tls-configure" data-node-tls-open aria-haspopup="dialog">Настроить сертификат</button>'+
+    '<div class="node-tls-stored-flags" aria-hidden="true">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div>'+
+    '<dialog class="node-tls-setup-dialog" data-node-tls-dialog aria-labelledby="node-tls-setup-title">'+
+      '<div class="node-tls-setup-shell">'+
+        '<header class="node-tls-setup-heading"><div><span class="node-tls-setup-kicker">SECURITY / TLS</span><h3 id="node-tls-setup-title">Настройка TLS-сертификата</h3><p>Выберите способ получения сертификата для узла.</p></div><button type="button" class="gh sm node-tls-setup-close" data-node-tls-close aria-label="Закрыть">×</button></header>'+
+        '<fieldset class="node-tls-method"><legend>Источник сертификата</legend>'+
+          '<label class="node-tls-method-option"><input type="radio" name="nodeTlsMethod" value="acme" '+(o.tlsManualProvision?'':'checked')+'><span><strong>Let’s Encrypt</strong><small>Получить автоматически по DNS-домену</small></span></label>'+
+          '<label class="node-tls-method-option"><input type="radio" name="nodeTlsMethod" value="external" '+(o.tlsManualProvision?'checked':'')+'><span><strong>Свой сертификат</strong><small>Использовать пути из XRAY STUDIO</small></span></label>'+
+        '</fieldset>'+
+        '<div class="node-tls-acme-fields" data-node-tls-acme>'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div>'+
+        '<p class="node-tls-external-note" data-node-tls-external hidden>Укажите certificateFile и keyFile для каждого TLS inbound в XRAY STUDIO. Файлы должны существовать на ноде.</p>'+
+        '<p class="node-tls-setup-feedback" data-node-tls-note role="status" aria-live="polite"></p>'+
+        '<footer class="node-tls-setup-actions"><span>Настройка сохранится вместе с узлом</span><button type="button" class="btn" data-node-tls-close>Готово</button></footer>'+
+      '</div></dialog></fieldset>';
   const nodeResetAction=id?'<div class="node-reset-action"><div class="node-reset-copy"><strong>Счётчик трафика</strong><span>Обнулить расход ноды. Xray не перезапускается.</span></div><button type="button" class="gh sm node-traffic-reset-button" data-node-reset-traffic="'+esc(String(id))+'" title="">'+ic('redo')+'Обнулить</button><output class="node-traffic-reset-status" data-node-reset-feedback aria-live="polite"></output></div>':'';
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
