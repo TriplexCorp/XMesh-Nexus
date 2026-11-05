@@ -1159,17 +1159,38 @@ function enhanceStatsPeriodSelect(select){
  const shell=document.createElement('span');shell.className='xm-period-select';
  const trigger=document.createElement('button');trigger.type='button';trigger.className='xm-period-trigger';trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');
  const arrow=document.createElement('span');arrow.className='xm-period-chevron';arrow.setAttribute('aria-hidden','true');arrow.textContent='⌄';
- // Keep the fixed-position menu inside its owning native modal dialog.
- // Appending it to document.body makes its options inert while showModal() is active.
+ // Preserve the menu inside the native modal (outside nodes are inert).
+ // Unlike a viewport popover, a fixed descendant of a transformed dialog has
+ // the dialog as its containing block; do not pass viewport coordinates to it.
  const ownerDialog=select.closest('dialog');
  const menu=document.createElement('span');menu.className='xm-period-menu xm-period-portal';menu.setAttribute('role','listbox');menu.hidden=true;
  (ownerDialog||document.body).append(menu);
  const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};
  const position=()=>{
-  const rect=trigger.getBoundingClientRect(),roomBelow=innerHeight-rect.bottom,menuHeight=Math.min(menu.scrollHeight,Math.min(256,innerHeight*.4));
-  const below=roomBelow>=menuHeight||roomBelow>=rect.top;
-  menu.style.left=rect.left+'px';menu.style.width=rect.width+'px';
-  menu.style.top=(below?rect.bottom+5:Math.max(6,rect.top-menuHeight-5))+'px';
+  const rect=trigger.getBoundingClientRect();
+  const dialogRect=ownerDialog?.open?ownerDialog.getBoundingClientRect():null;
+  const visibleLeft=dialogRect?Math.max(8,dialogRect.left+8):8;
+  const visibleRight=dialogRect?Math.min(innerWidth-8,dialogRect.right-8):innerWidth-8;
+  const visibleTop=dialogRect?Math.max(8,dialogRect.top+8):8;
+  const visibleBottom=dialogRect?Math.min(innerHeight-8,dialogRect.bottom-8):innerHeight-8;
+  const width=Math.max(0,Math.min(rect.width,visibleRight-visibleLeft));
+  const left=Math.max(visibleLeft,Math.min(rect.left,visibleRight-width));
+  const desired=Math.min(menu.scrollHeight||256,256,innerHeight*.4);
+  const belowRoom=Math.max(0,visibleBottom-rect.bottom-5);
+  const aboveRoom=Math.max(0,rect.top-visibleTop-5);
+  const below=belowRoom>=desired||belowRoom>=aboveRoom;
+  const height=Math.max(0,Math.min(desired,below?belowRoom:aboveRoom));
+  const top=below?rect.bottom+5:rect.top-height-5;
+  // Native dialogs use a local containing block (also while animating).
+  // Convert viewport geometry into dialog-local CSS pixels exactly once.
+  const scaleX=dialogRect&&ownerDialog.offsetWidth?dialogRect.width/ownerDialog.offsetWidth:1;
+  const scaleY=dialogRect&&ownerDialog.offsetHeight?dialogRect.height/ownerDialog.offsetHeight:1;
+  menu.style.position=dialogRect?'absolute':'fixed';
+  menu.style.right='auto';
+  menu.style.width=width/scaleX+'px';
+  menu.style.maxHeight=height/scaleY+'px';
+  menu.style.left=(left-(dialogRect?.left||0))/scaleX+'px';
+  menu.style.top=(top-(dialogRect?.top||0))/scaleY+'px';
  };
  const sync=()=>{
   trigger.textContent=select.selectedOptions[0]?.textContent||'Выберите период';trigger.append(arrow);
@@ -5010,7 +5031,7 @@ window.addEventListener('keydown',e=>{
  palette();
 },true);
 document.addEventListener('keydown',e=>{
-  if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
+  if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();cur=='users'?$('#uq').focus():palette()}});
 document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!k)return;const er=m=>{e.preventDefault();$('#fe')&&($('#fe').textContent=m)};
   if(k=='user'){
