@@ -58,46 +58,16 @@
     for(const [pattern,render] of patterns){const match=text.match(pattern);if(match)return render(...match)}
     return text;
   };
-  const skip=el=>el?.closest?.('code,pre,textarea,script,style,[contenteditable="true"]');
-  const translateNode=node=>{
-    if(api.getLanguage()!=='en'||!node||skip(node.parentElement))return;
-    const raw=node.nodeValue||'';
-    const trimmed=raw.trim();
-    if(!trimmed)return;
-    const next=translate(trimmed);
-    if(next!==trimmed)node.nodeValue=raw.replace(trimmed,next);
-  };
-  const translateAttrs=el=>{
-    if(api.getLanguage()!=='en'||!(el instanceof Element)||skip(el))return;
-    for(const attr of ['title','aria-label','placeholder']){
-      if(!el.hasAttribute(attr))continue;
-      const value=el.getAttribute(attr)||'';
-      const next=translate(value);
-      if(next!==value)el.setAttribute(attr,next);
-    }
-  };
-  const walk=root=>{
-    if(api.getLanguage()!=='en'||!root)return;
-    if(root.nodeType===Node.TEXT_NODE){translateNode(root);return}
-    if(root.nodeType!==Node.ELEMENT_NODE&&root.nodeType!==Node.DOCUMENT_FRAGMENT_NODE)return;
-    if(root.nodeType===Node.ELEMENT_NODE)translateAttrs(root);
-    const walker=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);
-    let node;while((node=walker.nextNode()))node.nodeType===Node.TEXT_NODE?translateNode(node):translateAttrs(node);
-  };
+  // One runtime owns original values and language restoration. A second writer
+  // would accidentally save English as the Russian original on late renders.
+  window.XMeshI18nConsistency=Object.freeze({translate,exact});
+  const walk=root=>{if(root)api.apply(root)};
   const observer=new MutationObserver(records=>{
-    if(api.getLanguage()!=='en')return;
     for(const record of records){
-      if(record.type==='characterData')translateNode(record.target);
+      if(record.type==='characterData')walk(record.target);
       for(const node of record.addedNodes)walk(node);
     }
   });
   const start=()=>{walk(document.body);observer.observe(document.body,{subtree:true,childList:true,characterData:true})};
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start,{once:true}):start();
-  /* The canonical runtime owns language state. Capture the UI action only to
-   * re-scan already-mounted nodes that did not mutate during the switch. */
-  document.addEventListener('click',event=>{
-    if(!event.target.closest?.('[data-panel-language="en"]'))return;
-    setTimeout(()=>walk(document.body),0);
-  },true);
-  window.XMeshI18nConsistency=Object.freeze({translate,exact});
 })();

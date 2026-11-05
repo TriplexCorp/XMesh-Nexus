@@ -37,7 +37,7 @@
 #client-route-root.crx .crx-page-actions{display:flex;align-items:center;gap:.75rem}
 #client-route-root.crx .crx-total{color:var(--crx-muted);font-size:.75rem}
 #client-route-root.crx .crx-list{display:grid;grid-template-columns:minmax(0,1fr);gap:.75rem}
-#client-route-root.crx .crx-card{display:grid;grid-template-columns:minmax(12rem,.85fr) minmax(0,1.8fr);grid-template-areas:"identity actions" "assignments rules";align-items:start;gap:1.25rem 2rem;min-width:0;padding:1.25rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-bg);background-image:var(--nx-panel-image);box-shadow:var(--nx-panel-shadow)}
+#client-route-root.crx .crx-card{display:grid;grid-template-columns:minmax(12rem,.85fr) minmax(0,1.8fr);grid-template-areas:"identity actions" "details details";align-items:start;gap:1.25rem 2rem;min-width:0;padding:1.25rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-bg);background-image:var(--nx-panel-image);box-shadow:var(--nx-panel-shadow)}
 #client-route-root.crx .crx-card.is-disabled{opacity:.65}
 #client-route-root.crx .crx-card-top,
 #client-route-root.crx .crx-card-footer{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
@@ -188,10 +188,10 @@ html[data-motion=on] #client-route-root.crx .crx-dialog{animation:crx-modal-ente
 #client-route-root.crx .crx-assigned-source>span{min-width:0;display:grid;gap:.2rem;overflow-wrap:anywhere}#client-route-root.crx .crx-assigned-source b{font-weight:650}#client-route-root.crx .crx-assigned-source small{color:var(--crx-muted);font-size:.72rem}
 #client-route-root.crx .crx-assigned-source .crx-flag{flex:none;width:1.5rem;height:1.1rem}
 @container client-routing (max-width:64rem){
- #client-route-root.crx .crx-card{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"identity actions" "assignments assignments" "rules rules";gap:1rem}
+ #client-route-root.crx .crx-card{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"identity actions" "details details";gap:1rem}
 }
 @container client-routing (max-width:36rem){
- #client-route-root.crx .crx-card{grid-template-columns:minmax(0,1fr);grid-template-areas:"identity" "assignments" "rules" "actions"}
+ #client-route-root.crx .crx-card{grid-template-columns:minmax(0,1fr);grid-template-areas:"identity" "details" "actions"}
  #client-route-root.crx .crx-card-footer{justify-content:flex-end}
 }
 
@@ -214,3 +214,18 @@ html[data-motion=on] #client-route-root.crx .crx-dialog{animation:crx-modal-ente
  #client-route-root.crx .crx-rule-chip{grid-template-columns:1.25rem minmax(0,1fr)}
  #client-route-root.crx .crx-rule-chip em{grid-column:2}
 }
+
+/* Interactive template: title expands the overview; each ordered rule opens
+   that rule directly in the existing editor, including keyboard activation. */
+#client-route-root.crx .crx-card-details{grid-area:details;display:grid;grid-template-columns:minmax(12rem,.85fr) minmax(0,1.8fr);grid-template-areas:"assignments rules";gap:2rem;min-width:0}
+#client-route-root.crx .crx-card-details[hidden]{display:none}
+#client-route-root.crx .crx-overview-toggle{display:flex;align-items:center;gap:.6rem;min-height:2rem;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;max-width:100%}
+#client-route-root.crx .crx-overview-toggle>span{overflow-wrap:anywhere;min-width:0}
+#client-route-root.crx .crx-overview-toggle .crx-icon{transition:transform .16s}
+#client-route-root.crx .crx-overview-toggle[aria-expanded=true] .crx-icon{transform:rotate(90deg)}
+#client-route-root.crx button.crx-rule-chip{width:100%;min-height:0;text-align:left;font:inherit;font-size:.75rem;color:var(--crx-text);background:transparent;border-top:0;border-left:0;border-right:0;border-radius:0}
+#client-route-root.crx button.crx-rule-chip:hover{background:var(--nx-hover-bg)}
+@container client-routing (max-width:64rem){#client-route-root.crx .crx-card-details{grid-template-columns:minmax(0,1fr);grid-template-areas:"assignments" "rules";gap:1rem}}
+
+#client-route-root.crx button.crx-assigned-source{width:100%;text-align:left;padding:.35rem;border:0;border-radius:var(--nx-control-radius);background:transparent;color:inherit}
+#client-route-root.crx button.crx-assigned-source:hover{background:var(--nx-hover-bg)}

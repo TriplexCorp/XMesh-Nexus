@@ -641,3 +641,6 @@
     grid-template-rows:minmax(1rem,auto) 3.9rem;
   }
 }
+
+:root[lang="en"] #dlg.user-create-modal .user-create-hold .sw::before{content:"Off"}
+:root[lang="en"] #dlg.user-create-modal .user-create-hold .sw:has(input:checked)::before{content:"On"}

@@ -2,7 +2,7 @@
 'use strict';
 /* Audits statically quoted Cyrillic interface copy. Dynamic strings that carry
  * runtime counts are owned by core/i18n-consistency.js and are checked below.
- * Existing debt is explicit; newly untranslated copy fails CI. */
+ * Missing translations fail CI; no existing-debt baseline is allowed. */
 const fs=require('node:fs');
 const {frontendAsset}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
@@ -39,30 +39,9 @@ for(const file of files){
  });
  if(outstanding.length)missing[file]=outstanding;
 }
-if(process.argv.includes('--update-baseline')){
- fs.writeFileSync('scripts/english-coverage-baseline.json',JSON.stringify(missing,null,2)+'\n');
- console.log('Updated English translation debt baseline from current extracted UI copy.');
- process.exit(0);
-}
-const baseline=JSON.parse(fs.readFileSync('scripts/english-coverage-baseline.json','utf8'));
-const newMissing=[];
-for(const [file,items] of Object.entries(missing)){
- const existing=new Set(baseline[file]||[]);
- for(const value of items)if(!existing.has(value))newMissing.push(file+': '+value);
-}
-const resolved=[];
-for(const [file,items] of Object.entries(baseline)){
- const current=new Set(missing[file]||[]);
- for(const value of items)if(!current.has(value))resolved.push(file+': '+value);
-}
-console.log('English static copy audit: '+examined+' candidates, '+translated+' translated, '+Object.values(missing).reduce((n,x)=>n+x.length,0)+' existing outstanding.');
-if(resolved.length)console.log('Translation debt reduced by '+resolved.length+' phrases. Regenerate the baseline to record progress.');
-if(newMissing.length){
- console.error('New untranslated English UI copy ('+newMissing.length+'):');
- for(const phrase of newMissing.slice(0,80))console.error('  '+phrase);
- if(newMissing.length>80)console.error('  ... +'+(newMissing.length-80)+' more');
- process.exitCode=1;
-}
+const outstandingCount=Object.values(missing).reduce((n,items)=>n+items.length,0);
+console.log('English static copy audit: '+examined+' candidates, '+translated+' translated, '+outstandingCount+' missing.');
+if(outstandingCount){for(const [file,items]of Object.entries(missing))for(const text of items)console.error(file+': '+text);process.exitCode=1}
 const strict=[
  'Перенос строк','Сохранить профиль · Ctrl+S','Новый JSON',
  'Открыть новый JSON-редактор','Публичные подключения',

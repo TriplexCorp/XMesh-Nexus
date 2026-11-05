@@ -639,3 +639,7 @@ dialog#dlg.squad-wide > form.box > .act .btn{flex:1;min-width:0}
   dialog#dlg.squad-wide .squad-inbound-row,
 dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg){transition:none}
 }
+
+:root[lang="en"] dialog#dlg.squad-wide > form.box > h2::after{
+ content:"Manage inbound access and see how the policy affects subscriptions";
+}
