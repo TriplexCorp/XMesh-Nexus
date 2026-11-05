@@ -43,5 +43,12 @@ for(const [flag,iso] of [['🇰🇵','kp'],['🇩🇪','de']]){
   assert(!/flagcdn|https?:\/\//.test(html),'Flags must never depend on external CDN');
 }
 assert(!app.includes('flagcdn.com'),'No flag CDN URLs in UI');
-assert.match(app,/c\.code==='KP'\?' Северная Корея КНДР North Korea DPRK'/);
+const codes=app.match(/const COUNTRY_CODES='([^']+)'\.split\(' '\);/)?.[1]?.split(' ');
+assert.equal(codes?.length,250,'249 ISO codes plus Kosovo XK');
+assert.equal(new Set(codes).size,250,'country codes must be unique');
+for(const code of ['GB','GY','XK','KP','TW','PS','VA'])assert(codes.includes(code),'Missing country '+code);
+assert.match(app,/GB:'UK United Kingdom Англия England/,'UK / England must resolve to GB');
+assert.match(app,/XK:'Kosovo Косово/,'Kosovo must be searchable');
+assert.match(app,/COUNTRIES\.filter\(c=>c\.search\.includes\(q\)\)/,'search must include aliases');
+assert.doesNotMatch(app,/matches\.slice\(0,100\)/,'country list must not be truncated');
 console.log('CRUD dialog lifecycle (create/edit/renew/squad), submit dedupe, and local SVG country flags: OK');

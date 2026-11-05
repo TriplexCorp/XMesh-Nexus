@@ -22,6 +22,13 @@ assert.doesNotMatch(ui,/document\.body\.append\(popup\)/,'a body portal makes po
 assert.match(ui,/instance\.observer\.disconnect\(\)/,'observers cleaned on navigation');
 assert.match(ui,/if\(active&&active!==instance\)dismiss\(active\)/,'only one popover at a time');
 assert.match(ui,/select\.disabled/,'disabled state preserved');
+assert.match(ui,/popup\.getBoundingClientRect\(\)/,'unified selector menus correct modal offsets');
+assert.match(app,/menu\.getBoundingClientRect\(\)/,'statistics selector menus correct modal offsets');
+assert.match(app,/panelIsEnglish\(\)\?\[' Gbps',' Mbps',' Kbps',' bps'\]/,'speed units localize');
+const presentation=fs.readFileSync('frontend/styles/system/nexus-ui-v3.css','utf8');
+const components=fs.readFileSync('frontend/styles/system/nexus-v3-components.css','utf8');
+assert.match(presentation,/dialog\[open\]:not\(#dlg\)\{opacity:1;transform:none\}/,'open dialogs do not offset fixed menus');
+assert.match(components,/#dlg\[open\]\{opacity:1;transform:none\}/,'shared modal does not offset fixed menus');
 assert.match(ui,/select\[multiple\]/,'multi-select remains native');
 assert.match(ui,/\.xm-period-select select/,'existing statistics component is excluded');
 assert.match(app,/const ownerDialog=select\.closest\('dialog'\)/,

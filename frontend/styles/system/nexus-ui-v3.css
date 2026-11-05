@@ -94,7 +94,7 @@ dialog:not(#dlg){
     overlay var(--nx-motion-slow) allow-discrete;
   transition-behavior:allow-discrete;
 }
-dialog[open]:not(#dlg){opacity:1;transform:translateY(0) scale(1)}
+dialog[open]:not(#dlg){opacity:1;transform:none}
 dialog:not(#dlg)::backdrop{
   opacity:0;
   transition:
