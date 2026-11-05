@@ -151,9 +151,10 @@ async function main() {
       assert(await page.locator('#view').isVisible());
     });
     const inboundTag = prefix.replace(/-/g,'_');
-    const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{serverName:'ui.example.invalid'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+    const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{serverName:'ui.example.invalid',certificates:[{certificateFile:'/etc/xmesh/external/fullchain.pem',keyFile:'/etc/xmesh/external/privkey.pem'}]}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',flag:'🇵🇱',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,hosting:'Datagio',tlsManualProvision:true,geoEnabled:true});
     const noTlsProfile=await create('profiles',{name:`${prefix} · Без TLS`,config:JSON.stringify({inbounds:[{tag:inboundTag+'-plain',listen:'127.0.0.1',port:28353,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/tls-indicator'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+    const missingTlsProfile=await create('profiles',{name:prefix+' · TLS без сертификата',config:JSON.stringify({inbounds:[{tag:inboundTag+'-missing',listen:'127.0.0.1',port:28354,protocol:'trojan',settings:{clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
     await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
     const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
@@ -1063,6 +1064,24 @@ async function main() {
       assert.equal(await form.locator('[name="tlsManualProvision"]').isChecked(),true,'Saved override preference must not be erased');
       await form.locator('[name="profileId"]').selectOption(String(profile.id));
       assert.equal(await toggle.isChecked(),true,'Switch must return ON after restoring TLS profile');
+      await page.keyboard.press('Escape');
+    });
+    await checked('TLS certificate setup is required before saving a TLS Node profile',async()=>{
+      await navigate('nodes');
+      await page.locator('[data-ne="nodes:'+node.id+'"]').first().click();
+      const form=page.locator('dialog form[data-ent="nodes"]');
+      await form.locator('[name="profileId"]').selectOption(String(missingTlsProfile.id));
+      const status=form.locator('[data-node-tls-readiness]');
+      await form.locator('[name="tlsManualProvision"]').uncheck();
+      assert.match(await status.innerText(),/DNS-домен/,'Missing ACME domain must show a direct explanation');
+      await form.locator('.act .btn').click();
+      assert(await page.locator('#dlg.node-wide[open]').count(),'Unready TLS must not close the Node editor');
+      assert.match(await page.locator('#fe').innerText(),/DNS-домен/,'TLS save must be rejected before the API call');
+      assert.equal(await form.locator('[data-node-tls-preferences]').evaluate(el=>el.open),true,'Blocked save must open certificate setup');
+      await form.locator('[name="tlsDomain"]').fill('test-node.example.invalid');
+      assert.match(await status.innerText(),/email ACME/,'Missing ACME email must be explained');
+      await form.locator('[name="tlsAcmeEmail"]').fill('tls@example.com');
+      assert.match(await status.innerText(),/Let’s Encrypt настроен/,'Ready ACME settings must be communicated without claiming certificate issuance');
       await page.keyboard.press('Escape');
     });
     await checked('Редактирование узла сохраняется через API',async()=>{
