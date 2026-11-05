@@ -2990,6 +2990,31 @@ function nodeEffectiveTlsMode(profile){
   if(modes.includes('tls'))return 'on';
   return modes.every(mode=>mode==='none'||mode==='reality')?'off':'unconfigured';
 }
+// Security, not protocol or old ACME flags, decides whether TLS is needed.
+// A checked profile switch does not prove a certificate exists on the node.
+function nodeTlsReadiness(profile,data={}){
+  const mode=nodeEffectiveTlsMode(profile);
+  if(mode!=='on')return {mode,ready:mode==='off',method:'none',reason:''};
+  const entries=inbs(profile).filter(x=>String(x?.streamSettings?.security||'').toLowerCase()==='tls');
+  const pathsReady=entries.length>0&&entries.every(x=>{
+    const certs=x?.streamSettings?.tlsSettings?.certificates;
+    return Array.isArray(certs)&&certs.length>0&&certs.every(cert=>
+      typeof cert?.certificateFile==='string'&&cert.certificateFile.startsWith('/')&&cert.certificateFile.trim().length>1&&
+      typeof cert?.keyFile==='string'&&cert.keyFile.startsWith('/')&&cert.keyFile.trim().length>1);
+  });
+  const auto=Boolean(data.tlsAutoProvision),manual=Boolean(data.tlsManualProvision);
+  if(auto&&manual)return {mode,ready:false,method:'conflict',reason:'Выберите один способ получения сертификата: Let’s Encrypt или внешний сертификат.'};
+  if(manual||pathsReady&&!auto)return pathsReady
+    ?{mode,ready:true,method:'external',reason:'В профиле заданы пути сертификата. Наличие файлов на ноде будет проверено отдельно.'}
+    :{mode,ready:false,method:'external',reason:'В XRAY STUDIO укажите certificateFile и keyFile для каждого TLS inbound.'};
+  const domain=String(data.tlsDomain||data.addr||'').trim().toLowerCase();
+  const email=String(data.tlsAcmeEmail||'').trim();
+  const validDomain=/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain);
+  const validEmail=/^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email)&&email.length<=254;
+  if(!validDomain)return {mode,ready:false,method:'acme',field:'tlsDomain',reason:'Для автоматического TLS укажите DNS-домен ноды. IP-адрес для сертификата не подходит.'};
+  if(!validEmail)return {mode,ready:false,method:'acme',field:'tlsAcmeEmail',reason:'Для выпуска Let’s Encrypt укажите контактный email ACME.'};
+  return {mode,ready:true,method:'acme',reason:'Let’s Encrypt настроен. Выпуск сертификата начнётся при применении профиля на ноде.'};
+}
 function syncNodeEffectiveTls(form){
   if(!form||form.dataset.ent!=='nodes')return;
   const profileId=form.elements.namedItem('profileId')?.value;
