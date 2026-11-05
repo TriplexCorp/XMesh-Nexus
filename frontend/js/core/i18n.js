@@ -11,6 +11,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Настройте доступ сквада к подключениям":"Configure the squad's connection access",
+    "Фильтр по профилю":"Filter by profile",
+    "Все профили":"All profiles",
+    "Как выбранные inbound повлияют на текущие подписки":"How the selected inbounds affect current subscriptions",
     "Нет подтверждённых измерений":"No verified measurements",
     "Подтверждённый трафик · 24 часа":"Verified user traffic · 24 hours",
     "Последний срез":"Latest sample",
