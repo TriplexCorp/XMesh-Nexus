@@ -141,7 +141,7 @@
         const destination=rule.action==='server'?(targets.find(t=>t.key===rule.server)?.label||rule.server||actions.server):(actions[rule.action]||rule.action);
         return '<div class="crx-rule-chip"><span class="crx-rule-index">'+String(index+1).padStart(2,'0')+'</span><span class="crx-rule-condition"><small>'+escapeHTML(kinds[rule.match]||rule.match)+'</small><b>'+escapeHTML(rule.value||'—')+'</b><small>'+escapeHTML(rule.network?rule.network.toUpperCase().replace(',', ' + '):'TCP + UDP')+'</small></span><em>→ '+escapeHTML(destination)+'</em></div>';
       });
-      const preview=rulePreview.slice(0,4).join('')+(rules.length>4?'<details class="crx-more-rules"><summary>'+countLabel(rules.length-4,['ещё правило','ещё правила','ещё правил'],['more rule','more rules'])+'</summary>'+rulePreview.slice(4).join('')+'</details>':'');
+      const preview=rulePreview.slice(0,4).join('')+(rules.length>4?'<details class="crx-more-rules"><summary>+ '+countLabel(rules.length-4,['правило','правила','правил'],['rule','rules'])+'</summary>'+rulePreview.slice(4).join('')+'</details>':'');
       return '<article class="crx-card'+(p.enabled===false?' is-disabled':'')+'" data-cr-profile="'+escapeHTML(p.id)+'">'+
         '<div class="crx-card-identity"><h3 class="crx-card-title">'+escapeHTML(p.name||'Без названия')+'</h3>'+
         '<div class="crx-card-stats"><span class="crx-state'+(p.enabled===false?' is-off':'')+'"><i></i>'+(p.enabled===false?'Выключен':'Активен')+'</span>'+
