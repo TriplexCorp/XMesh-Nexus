@@ -798,7 +798,7 @@ async function main() {
           try{
             const g=await page.locator('#dlg').evaluate(d=>{
               const f=d.querySelector('form.box'),r=d.getBoundingClientRect(),b=f.getBoundingClientRect(),s=getComputedStyle(f);
-              return {dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height,scrollHeight:f.scrollHeight,clientHeight:f.clientHeight},tlsInSide:!!f.querySelector('.node-side-stack > .node-tls-settings'),background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
+              return {dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height,scrollHeight:f.scrollHeight,clientHeight:f.clientHeight},tlsInSide:!!f.querySelector('.node-network-stack > .node-tls-settings'),background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
             });
             assert(Math.abs(g.dialog.bottom-g.form.bottom)<=2,'Node dialog must end with the form, without an empty material tail');
             assert(Math.abs(g.form.top-g.dialog.top)<=2,'Node dialog must not reserve an empty surface above the form');
