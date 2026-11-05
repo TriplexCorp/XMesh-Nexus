@@ -91,6 +91,29 @@
 }
 .user-create-template,
 .user-create-xray{min-width:0}
+.user-create-contacts{
+  grid-column:1/-1;
+  min-width:0;
+  margin-top:.1rem;
+  padding-top:.72rem;
+  border-top:1px solid var(--nx-border);
+}
+.user-create-contact-label{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.6rem;
+  margin-bottom:.58rem;
+}
+.user-create-contact-label>span{color:var(--tx);font-size:.73rem;font-weight:760;line-height:1.2}
+.user-create-contact-label>small{color:var(--mu);font-size:.62rem;line-height:1.2}
+.user-create-contact-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.72rem .76rem;
+  align-items:start;
+  min-width:0;
+}
 .user-create-dialog .user-create-field{display:flex;flex-direction:column;gap:.28rem;min-width:0}
 .user-create-dialog .user-create-field>span{font-size:.76rem;font-weight:720;line-height:1.2;color:var(--tx)}
 .user-create-dialog .user-create-field>small{font-size:.62rem;line-height:1.35;color:var(--mu)}
@@ -224,6 +247,7 @@
   .user-create-main-grid,
 .user-create-limits-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:none}
   .user-create-username-row{grid-column:auto;grid-template-columns:minmax(0,1fr)}.user-create-generate{width:100%;margin-top:0}
+  .user-create-contact-grid{grid-template-columns:minmax(0,1fr)}
   .user-create-desc textarea{height:auto;min-height:4.2rem}
   .user-create-footer{padding:.62rem;display:grid;grid-template-columns:1fr}.user-create-footer-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.user-create-footer button,
 .user-create-submit,

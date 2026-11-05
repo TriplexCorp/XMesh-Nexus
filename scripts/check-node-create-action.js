@@ -188,4 +188,22 @@ new Function(strictBootstrap);
 new Function(dialogJs);
 new Function(sharingContext);
 new Function(sharingJs);
+// Keep create and edit user contact fields in sync (both are optional).
+assert.ok(dialogJs.includes("decorate('tg','', 'user-create-tg')"),
+ 'Create dialog must show Telegram ID');
+assert.ok(dialogJs.includes("decorate('email','', 'user-create-email')"),
+ 'Create dialog must show Email');
+assert.ok(dialogJs.includes('user-create-contact-grid'),
+ 'Contact information must use the compact adaptive grid');
+assert.ok(app.includes("{k:'tg',l:'Telegram ID'"),
+ 'Create schema must read Telegram ID');
+assert.ok(app.includes("{k:'email',l:'Email',t:'email'"),
+ 'Create schema must read optional typed email');
+assert.ok(app.includes('tag:d.tag,tg:d.tg,email:d.email,desc:d.desc'),
+ 'Create API payload must persist both contacts');
+assert.ok(app.includes("querySelector('.user-create-submit, .act .btn')"),
+ 'Submitting the new dialog must disable its real create button');
+assert.ok(userCss.includes('.user-create-contact-grid{'),
+ 'Canonical user editor must own contact field styles');
+
 console.log('Node action: create-user v5 + explainable anti-sharing risk, strict-PQ repair and dialog contracts OK');

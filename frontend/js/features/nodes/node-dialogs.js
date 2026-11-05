@@ -61,6 +61,8 @@
 
     const username=decorate('username','', 'user-create-username');
     const xrayProfile=decorate('xrayProfileId','', 'user-create-xray');
+    const telegram=decorate('tg','', 'user-create-tg');
+    const email=decorate('email','', 'user-create-email');
     const limit=decorate('limit',0,'user-create-limit');
     const days=decorate('days',0,'user-create-days');
     const strategy=decorate('strategy','NO_RESET','user-create-strategy');
@@ -83,7 +85,7 @@
           <section class="user-create-section user-create-section-main">
             <div class="user-create-section-head">
               <span class="user-create-section-icon">${ic('layers')}</span>
-              <div><span class="user-create-section-kicker">IDENTITY & ACCESS</span><h3>Профиль доступа</h3><p>Имя пользователя, шаблон и XRAY STUDIO-профиль.</p></div>
+              <div><span class="user-create-section-kicker">IDENTITY & ACCESS</span><h3>Профиль доступа</h3><p>Учётная запись, подключение и контактные данные.</p></div>
             </div>
             <div class="user-create-main-grid">
               <div class="user-create-username-row">
@@ -96,6 +98,10 @@
                 <small>Можно быстро подставить сохранённые параметры.</small>
               </label>
               ${xrayProfile}
+              <div class="user-create-contacts">
+                <div class="user-create-contact-label"><span>Контактные данные</span><small>Необязательно</small></div>
+                <div class="user-create-contact-grid">${telegram}${email}</div>
+              </div>
             </div>
           </section>
 
