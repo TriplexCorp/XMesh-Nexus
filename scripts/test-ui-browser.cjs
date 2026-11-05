@@ -852,6 +852,8 @@ async function main() {
               assert(overlay.formScrollHeight<=overlay.formClientHeight+2,'TLS dialog must not make the node editor scroll: '+JSON.stringify(overlay));
               assert(overlay.left>=0&&overlay.right<=width+1&&overlay.top>=0&&overlay.bottom<=height+1,'TLS dialog must fit the viewport: '+JSON.stringify(overlay));
               assert(overlay.titleFont>=16,'TLS setup heading must be readable');
+              const radioBox=await modal.locator('[name="nodeTlsMethod"]').first().boundingBox();
+              assert(radioBox&&radioBox.width<=24&&radioBox.height<=24,'TLS method radio must not inherit full-width input styling: '+JSON.stringify(radioBox));
               await screenshot(page,`node-tls-setup-${edit?'edit':'create'}-${width}x${height}`);
               await modal.locator('[data-node-tls-close]').first().click();
               assert.equal(await modal.count(),0,'TLS subdialog must close independently');
