@@ -3015,27 +3015,51 @@ function syncNodeEffectiveTls(form){
     tlsAcmeEmail:field('tlsAcmeEmail')?.value,tlsAutoProvision:field('tlsAutoProvision')?.checked,
     tlsManualProvision:field('tlsManualProvision')?.checked});
   const mode=state.mode;
-  const toggle=form.querySelector('[data-node-tls-effective]'),status=form.querySelector('.node-tls-effective');
-  const label=form.querySelector('[data-node-tls-state]'),indicator=form.querySelector('[data-node-tls-indicator]');
+  const status=form.querySelector('[data-node-tls-effective]');
+  const label=form.querySelector('[data-node-tls-state]');
   const feedback=form.querySelector('[data-node-tls-readiness]'),hint=form.querySelector('[data-node-tls-note]');
-  const names={on:'ВКЛ — профиль использует TLS',off:'ВЫКЛ — сертификат TLS не используется',unconfigured:'Не настроено — выберите профиль'};
+  const names={on:'TLS включён',off:'Без TLS',unconfigured:'Профиль не выбран'};
   if(status)status.dataset.state=mode;
-  if(toggle){toggle.checked=mode==='on';toggle.setAttribute('aria-label',names[mode]);}
   if(label)label.textContent=names[mode];
-  if(indicator)indicator.hidden=mode==='unconfigured';
   if(feedback){feedback.dataset.ready=state.ready?'yes':'no';feedback.dataset.mode=mode;
-    feedback.textContent=mode==='on'?state.reason:mode==='off'?'Сертификат не требуется для выбранного Security.':'';}
+    feedback.textContent=mode==='on'?(state.ready?(state.method==='external'?'Внешний сертификат из профиля':String(field('tlsDomain')?.value||field('addr')?.value||'')):state.reason):mode==='off'?'Сертификат не требуется':'Выберите профиль Xray в параметрах подключения';}
   const method=state.method==='external'||field('tlsManualProvision')?.checked?'external':'acme';
   for(const radio of form.querySelectorAll('[name="nodeTlsMethod"]'))radio.checked=radio.value===method;
   const acme=form.querySelector('[data-node-tls-acme]'),external=form.querySelector('[data-node-tls-external]');
   if(acme)acme.hidden=method!=='acme';
   if(external)external.hidden=method!=='external';
-  if(hint)hint.textContent=mode==='on'?state.reason:'Настройки сертификата сохраняются для будущих TLS-профилей.';
+  if(hint){hint.textContent=mode==='on'?(state.ready&&state.method==='acme'?'Выпуск начнётся при применении профиля':state.reason):'Настройки сертификата сохраняются для будущих TLS-профилей.';hint.dataset.ready=state.ready?'yes':'no';hint.hidden=state.ready&&state.method==='external';}
   const open=form.querySelector('[data-node-tls-open]');
-  if(open)open.textContent=mode==='on'&&!state.ready?'Настроить сертификат · требуется':'Настроить сертификат';
+  if(open)open.innerHTML=ic('sliders')+'<span>Настроить сертификат</span>'+ic('chevronRight');
 }
+function selectNodeEditorTab(form,key,focus=false){
+  if(!form||!['connection','network','billing'].includes(key))return;
+  for(const tab of form.querySelectorAll('[data-node-editor-tab]')){
+    const selected=tab.dataset.nodeEditorTab===key;
+    tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;
+    if(selected&&focus)tab.focus();
+  }
+  for(const pane of form.querySelectorAll('[data-node-editor-pane]'))pane.hidden=pane.dataset.nodeEditorPane!==key;
+}
+document.addEventListener('click',event=>{
+  const tab=event.target.closest?.('[data-node-editor-tab]');
+  if(tab)selectNodeEditorTab(tab.closest('form'),tab.dataset.nodeEditorTab);
+});
+document.addEventListener('keydown',event=>{
+  const tab=event.target.closest?.('[data-node-editor-tab]');
+  if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+  event.preventDefault();
+  const form=tab.closest('form'),tabs=[...form.querySelectorAll('[data-node-editor-tab]')],index=tabs.indexOf(tab);
+  const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+  selectNodeEditorTab(form,tabs[next].dataset.nodeEditorTab,true);
+});
+document.addEventListener('invalid',event=>{
+  const pane=event.target.closest?.('[data-node-editor-pane]');
+  if(pane)selectNodeEditorTab(pane.closest('form'),pane.dataset.nodeEditorPane);
+},true);
 function openNodeTlsSetup(form,focusField=''){
   if(!form||form.dataset.ent!=='nodes')return;
+  selectNodeEditorTab(form,'connection');
   syncNodeEffectiveTls(form);
   const modal=form.querySelector('[data-node-tls-dialog]');
   if(!modal||modal.open)return;
@@ -3098,24 +3122,26 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const nodeMainFields=arrangedNodeCoreFields.filter(f=>!tlsKeys.has(f.k)).map(f=>f.k==='addr'
     ?'<div class="node-address-port">'+field(f,o[f.k])+field(nodeCoreFields.find(x=>x.k==='port'),o.port)+'</div>'
     :f.k==='port'?'':field(f,o[f.k])).join('');
-  const tlsField=k=>{const f=nodeCoreFields.find(x=>x.k===k);return f?field(f,o[f.k]):''};
-  const nodeTlsFields='<fieldset class="node-tls-settings"><legend>Сертификат ноды</legend>'+
-    '<div class="node-tls-effective"><label class="f"><span>TLS по Security</span><span class="sw" data-node-tls-indicator><input type="checkbox" data-node-tls-effective role="switch" disabled aria-label="Не настроено — выберите профиль"><span></span></span></label><small data-node-tls-state role="status">Не настроено — выберите профиль</small></div>'+
+  const tlsField=k=>{const f=nodeCoreFields.find(x=>x.k===k);const copy={tlsDomain:{l:'Домен сертификата',h:'DNS-имя, направленное на этот узел'},tlsAcmeEmail:{l:'Email для Let’s Encrypt',h:'Для уведомлений о сертификате'}};return f?field({...f,...copy[k]},o[f.k]):''};
+  const nodeTlsFields='<section class="node-tls-settings" aria-label="Сертификат ноды">'+
+    '<div class="node-tls-symbol" aria-hidden="true">'+ic('shield')+'</div><h3>Защита соединения</h3>'+
+    '<div class="node-tls-effective" data-node-tls-effective role="status"><span data-node-tls-state>Профиль не выбран</span></div>'+
     '<p class="node-tls-readiness" data-node-tls-readiness role="status" aria-live="polite"></p>'+
-    '<button type="button" class="gh sm node-tls-configure" data-node-tls-open aria-haspopup="dialog">Настроить сертификат</button>'+
-    '<div class="node-tls-stored-flags" aria-hidden="true">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div>'+
+    '<button type="button" class="gh node-tls-configure" data-node-tls-open aria-haspopup="dialog">Настроить сертификат</button>'+
+    '<p class="node-tls-context">Режим TLS задаётся в профиле Xray</p>'+
+    '<div class="node-tls-stored-flags" hidden>'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div>'+
     '<dialog class="node-tls-setup-dialog" data-node-tls-dialog aria-labelledby="node-tls-setup-title">'+
       '<div class="node-tls-setup-shell">'+
-        '<header class="node-tls-setup-heading"><div><span class="node-tls-setup-kicker">SECURITY / TLS</span><h3 id="node-tls-setup-title">Настройка TLS-сертификата</h3><p>Выберите способ получения сертификата для узла.</p></div><button type="button" class="gh sm node-tls-setup-close" data-node-tls-close aria-label="Закрыть">×</button></header>'+
+        '<header class="node-tls-setup-heading"><div><h3 id="node-tls-setup-title">TLS-сертификат</h3><p data-no-translate>'+esc(o.name||o.addr||'')+'</p></div><button type="button" class="gh node-tls-setup-close" data-node-tls-close aria-label="Закрыть">'+ic('x')+'</button></header>'+
         '<fieldset class="node-tls-method"><legend>Источник сертификата</legend>'+
-          '<label class="node-tls-method-option"><input type="radio" name="nodeTlsMethod" value="acme" '+(o.tlsManualProvision?'':'checked')+'><span><strong>Let’s Encrypt</strong><small>Получить автоматически по DNS-домену</small></span></label>'+
-          '<label class="node-tls-method-option"><input type="radio" name="nodeTlsMethod" value="external" '+(o.tlsManualProvision?'checked':'')+'><span><strong>Свой сертификат</strong><small>Использовать пути из XRAY STUDIO</small></span></label>'+
+          '<label class="node-tls-method-option"><span class="node-tls-method-icon" aria-hidden="true">'+ic('refresh-cw')+'</span><span><strong>Let’s Encrypt</strong><small>Автоматический выпуск и продление</small></span><input type="radio" name="nodeTlsMethod" value="acme" '+(o.tlsManualProvision?'':'checked')+'></label>'+
+          '<label class="node-tls-method-option"><span class="node-tls-method-icon" aria-hidden="true">'+ic('file')+'</span><span><strong>Свой сертификат</strong><small>Файлы сертификата на узле</small></span><input type="radio" name="nodeTlsMethod" value="external" '+(o.tlsManualProvision?'checked':'')+'></label>'+
         '</fieldset>'+
         '<div class="node-tls-acme-fields" data-node-tls-acme>'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div>'+
-        '<p class="node-tls-external-note" data-node-tls-external hidden>Укажите certificateFile и keyFile для каждого TLS inbound в XRAY STUDIO. Файлы должны существовать на ноде.</p>'+
+        '<div class="node-tls-external-note" data-node-tls-external hidden><strong>Пути в профиле Xray</strong><p>Укажите certificateFile и keyFile для каждого TLS inbound в XRAY STUDIO. Файлы должны существовать на ноде.</p></div>'+
         '<p class="node-tls-setup-feedback" data-node-tls-note role="status" aria-live="polite"></p>'+
-        '<footer class="node-tls-setup-actions"><span>Настройка сохранится вместе с узлом</span><button type="button" class="btn" data-node-tls-close>Готово</button></footer>'+
-      '</div></dialog></fieldset>';
+        '<footer class="node-tls-setup-actions"><span>Сохранится вместе с узлом</span><button type="button" class="btn" data-node-tls-close>Готово</button></footer>'+
+      '</div></dialog></section>';
   const nodeResetAction=id?'<div class="node-reset-action"><div class="node-reset-copy"><strong>Счётчик трафика</strong><span>Обнулить расход ноды. Xray не перезапускается.</span></div><button type="button" class="gh sm node-traffic-reset-button" data-node-reset-traffic="'+esc(String(id))+'" title="">'+ic('redo')+'Обнулить</button><output class="node-traffic-reset-status" data-node-reset-feedback aria-live="polite"></output></div>':'';
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
@@ -3123,11 +3149,13 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт, страну, название и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e.fs):k==='nodes'
-    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section>'+`<div class="node-network-stack"><section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section>${nodeTlsFields}</div><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
+    ?'<nav class="node-editor-tabs" role="tablist" aria-label="Настройки узла">'+[['connection','Подключение','server'],['network','IP-пул','globe'],['billing','Оплата','calendar']].map(([tab,label,icon],index)=>'<button type="button" role="tab" id="node-tab-'+tab+'" aria-controls="node-panel-'+tab+'" aria-selected="'+(index===0)+'" tabindex="'+(index===0?'0':'-1')+'" data-node-editor-tab="'+tab+'">'+ic(icon)+'<span>'+label+'</span></button>').join('')+'</nav><div class="node-form-layout">'+
+      '<div class="node-connection-pane" id="node-panel-connection" role="tabpanel" aria-labelledby="node-tab-connection" data-node-editor-pane="connection"><section class="node-main-section" aria-label="Параметры подключения"><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section><aside class="node-network-stack">'+nodeTlsFields+'</aside></div>'+
+      `<section class="node-ip-section" id="node-panel-network" role="tabpanel" aria-labelledby="node-tab-network" data-node-editor-pane="network" hidden><h3 class="node-form-section-title">IP-пул и ротация</h3><p class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</p><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section" id="node-panel-billing" role="tabpanel" aria-labelledby="node-tab-billing" data-node-editor-pane="billing" hidden><h3 class="node-form-section-title">Оплата сервера</h3><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   const boundedEntityEditor=['tpls','admins'].includes(k);
   const editorFields=boundedEntityEditor?'<div class="entity-editor-body">'+fields+'</div>':fields;
-  modal(`<form class="box${boundedEntityEditor?' entity-editor':''}" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${editorFields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
+  modal(`<form class="box${boundedEntityEditor?' entity-editor':''}" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog">${k==='nodes'?'<header class="node-editor-heading"><div><h2>'+(id?'Настройки узла':'Новый узел')+'</h2><p data-no-translate>'+esc(o.name||o.addr||'')+'</p></div><button type="button" class="gh" data-x aria-label="Закрыть">'+ic('x')+'</button></header>':`<h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`}${editorFields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
   if(k==='nodes')syncNodeEffectiveTls(dlg.querySelector('form[data-ent="nodes"]'));
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
   if(k==='hosts'){

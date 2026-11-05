@@ -10,8 +10,8 @@
  * Only the native dialog owns the edge; the form is its content. */
 dialog#dlg.node-wide{
   box-sizing:border-box;
-  width:min(1680px,calc(100vw - 48px));
-  inline-size:min(1680px,calc(100vw - 48px));
+  width:min(var(--dialog-width,1680px),calc(100vw - 48px));
+  inline-size:min(var(--dialog-width,1680px),calc(100vw - 48px));
   min-width:0;
   max-width:calc(100vw - 48px);
   max-inline-size:calc(100vw - 48px);
