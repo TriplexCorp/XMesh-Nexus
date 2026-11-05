@@ -1888,6 +1888,9 @@ async function main() {
         'Changing inbound selection must preserve expanded impact details');
       await impactDetails.locator('summary').click();
       assert.equal(await impactDetails.getAttribute('open'),null,'Details must collapse without modifying selection');
+      await page.locator('.squad-inbound-row').first().click();
+      assert.equal(await page.locator('input[name="inb"]:checked').count(),0,
+        'Disclosure regression test must restore the empty selection before subsequent checks');
       if(height>=1080){
         const initial=await page.locator('.squad-editor-layout').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
         assert(initial.scroll<=initial.client+1,'New squad with no selected inbound must fit without a small workspace scrollbar: '+JSON.stringify(initial));
