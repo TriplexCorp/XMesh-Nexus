@@ -179,7 +179,7 @@ function renderToolPalette(){
   'Нет inbound — создайте входящее соединение'):'Исправьте JSON для работы с инструментами';
  const selector=selection.length?'<label class="xm-tool-inbound"><span>Входящее соединение</span><select data-tool-inbound aria-label="Выберите inbound для инструментов">'+selection.map(([i,tag,proto])=>'<option value="'+i+'"'+(i===index?' selected':'')+'>'+escapeHtml(tag+' · '+proto)+'</option>').join('')+'</select></label>':'';
  const currentTag=valid&&inbound&&!selection.length?'<span class="xm-tools-current-tag" title="Текущий inbound">'+escapeHtml(inbound.tag||'Inbound')+'</span>':'';
- host.innerHTML='<div class="xm-tools-header"><div class="xm-tools-identity"><span class="xm-tools-eyebrow">КОНТЕКСТНЫЕ ИНСТРУМЕНТЫ</span><strong class="xm-tools-summary">'+escapeHtml(context)+'</strong></div>'+selector+currentTag+'</div>'+
+ host.innerHTML='<div class="xm-tools-header"><div class="xm-tools-identity"><strong class="xm-tools-summary">'+escapeHtml(context)+'</strong></div>'+selector+currentTag+'</div>'+
  (valid?'<div class="xm-tools-groups" role="toolbar" aria-label="Инструменты текущего профиля">'+groups.map(([label,ids])=>toolCluster(label,ids)).join('')+'</div>':'<p class="xm-tools-invalid">Инструменты временно недоступны: исправьте JSON, затем они появятся автоматически.</p>')+
  '<div class="sv-tool-issue" data-tool-issue hidden><span data-tool-issue-message></span><button type="button" data-tool="repair-shortids">Исправить Short ID</button></div><span data-tool-status class="xm-tools-status" role="status" aria-live="polite"></span>';
  const node=host.querySelector('[data-tool-status]');

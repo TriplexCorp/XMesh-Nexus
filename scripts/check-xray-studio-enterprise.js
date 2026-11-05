@@ -30,7 +30,7 @@ assert.match(tools,/host.addEventListener\('change'/,'Inbound selection must upd
 assert.match(js,/toolPaletteHandle\?\.refresh\(\)/,'Template changes must refresh tools');
 assert.match(css,/--vround:var\(--ui-control-radius/,'Global corner radius inherited');
 assert(!page.includes('data-action="format"')&&!page.includes('data-action="expand"'),'No redundant editor toolbar actions');
-assert.match(css,/height:clamp\(36rem,calc\(100dvh - 16rem\)/,'Editor responds to viewport height');
+assert.match(css,/height:clamp\(28rem,calc\(100dvh - 12rem\)/,'Editor responds to viewport height');
 assert.match(css,/\.sv-studio\.sv-outline-hidden \.sv-workspace\{grid-template-columns:minmax\(0,1fr\)\}/,'Hidden inspector restores full editor width');
 assert.match(css,/container:sv-studio-workspace \/ inline-size/,'Workspace must react to the user-selected content width');
 assert.match(css,/@container sv-studio-workspace \(max-width:940px\)/,'Narrow content width stacks inspector');
