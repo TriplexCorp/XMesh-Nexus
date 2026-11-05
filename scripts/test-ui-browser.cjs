@@ -840,16 +840,21 @@ async function main() {
             if(width>=1366&&height>=768&&scale===1){
               assert(g.form.scrollHeight<=g.form.clientHeight+2,'Desktop Node editor must have no scrollbar: '+JSON.stringify(g));
               assert(g.layoutBottom<=g.footerTop+1,'Footer must not cover the final Node fields: '+JSON.stringify(g));
-              const details=page.locator('#dlg [data-node-tls-preferences]');
-              await details.evaluate(el=>{el.open=true});
-              const expanded=await page.locator('#dlg').evaluate(d=>{
-                const f=d.querySelector('form.box'),popup=f.querySelector('.node-tls-popup')?.getBoundingClientRect(),
-                  dialog=d.getBoundingClientRect();
-                return {scrollHeight:f.scrollHeight,clientHeight:f.clientHeight,popupTop:popup?.top,popupBottom:popup?.bottom,dialogTop:dialog.top,dialogBottom:dialog.bottom};
+              await page.locator('#dlg [data-node-tls-open]').click();
+              const modal=page.locator('#dlg [data-node-tls-dialog][open]');
+              assert.equal(await modal.count(),1,'TLS setup must open as a separate modal');
+              const overlay=await page.locator('#dlg').evaluate(d=>{
+                const form=d.querySelector('form.box'),r=d.querySelector('[data-node-tls-dialog]').getBoundingClientRect(),
+                  heading=d.querySelector('.node-tls-setup-heading h3');
+                return {formScrollHeight:form.scrollHeight,formClientHeight:form.clientHeight,
+                  left:r.left,right:r.right,top:r.top,bottom:r.bottom,titleFont:parseFloat(getComputedStyle(heading).fontSize)};
               });
-              assert(expanded.scrollHeight<=expanded.clientHeight+2,'TLS certificate popover must not make Node editor scroll: '+JSON.stringify(expanded));
-              assert(expanded.popupTop>=expanded.dialogTop-2&&expanded.popupBottom<=expanded.dialogBottom+2,'Certificate setup popover must stay inside the screen: '+JSON.stringify(expanded));
-              await details.evaluate(el=>{el.open=false});
+              assert(overlay.formScrollHeight<=overlay.formClientHeight+2,'TLS dialog must not make the node editor scroll: '+JSON.stringify(overlay));
+              assert(overlay.left>=0&&overlay.right<=width+1&&overlay.top>=0&&overlay.bottom<=height+1,'TLS dialog must fit the viewport: '+JSON.stringify(overlay));
+              assert(overlay.titleFont>=16,'TLS setup heading must be readable');
+              await screenshot(page,`node-tls-setup-${edit?'edit':'create'}-${width}x${height}`);
+              await modal.locator('[data-node-tls-close]').first().click();
+              assert.equal(await modal.count(),0,'TLS subdialog must close independently');
             }
             await screenshot(page,`node-editor-${edit?'edit':'create'}-${width}-${scale===1?'normal':'zoom-out'}`);
             return g;
@@ -1108,13 +1113,13 @@ async function main() {
           await page.locator(`[data-ne="nodes:${node.id}"]`).first().click();
           const form=page.locator('dialog form[data-ent="nodes"]');
           const toggle=form.locator('[data-node-tls-effective]');
-          const preferences=form.locator('[data-node-tls-preferences]');
+          const setup=form.locator('[data-node-tls-dialog]');
           assert.equal(await toggle.isChecked(),true,'TLS profile must render certificate toggle ON');
           assert.equal(await toggle.isDisabled(),true,'Derived switch cannot silently rewrite Security');
           await form.locator('[name="profileId"]').selectOption(String(noTlsProfile.id));
           assert.equal(await toggle.isChecked(),false,'Security none must render OFF despite stored external override');
           assert.match(await form.locator('[data-node-tls-state]').innerText(),/ВЫКЛ/);
-          assert.equal(await preferences.evaluate(el=>el.open),false,'Inactive override settings must stay collapsed');
+          assert.equal(await setup.evaluate(el=>el.open),false,'TLS setup dialog stays closed when switching profiles');
           assert.equal(await form.locator('[name="tlsManualProvision"]').isChecked(),true,'Saved override preference must not be erased');
           await form.locator('[name="profileId"]').selectOption(String(profile.id));
           assert.equal(await toggle.isChecked(),true,'Switch must return ON after restoring TLS profile');
@@ -1127,17 +1132,22 @@ async function main() {
           const form=page.locator('dialog form[data-ent="nodes"]');
           await form.locator('[name="profileId"]').selectOption(String(missingTlsProfile.id));
           const status=form.locator('[data-node-tls-readiness]');
-          await form.locator('[data-node-tls-preferences] summary').click();
-          await form.locator('[name="tlsManualProvision"]').uncheck();
+          await form.locator('[data-node-tls-open]').click();
+          const modal=form.locator('[data-node-tls-dialog]');
+          await modal.locator('[name="nodeTlsMethod"][value="acme"]').check();
+          assert.equal(await form.locator('[name="tlsManualProvision"]').isChecked(),false,'Radio selection must disable stale external override');
+          await modal.locator('[data-node-tls-close]').first().click();
           assert.match(await status.innerText(),/DNS-домен/,'Missing ACME domain must show a direct explanation');
           await form.locator('.act .btn').click();
           assert(await page.locator('#dlg.node-wide[open]').count(),'Unready TLS must not close the Node editor');
           assert.match(await page.locator('#fe').innerText(),/DNS-домен/,'TLS save must be rejected before the API call');
-          assert.equal(await form.locator('[data-node-tls-preferences]').evaluate(el=>el.open),true,'Blocked save must open certificate setup');
+          assert.equal(await modal.evaluate(el=>el.open),true,'Blocked save must open the TLS setup dialog');
+          assert.equal(await modal.locator('[name="tlsDomain"]').evaluate(el=>document.activeElement===el),true,'Missing TLS field should receive focus');
           await form.locator('[name="tlsDomain"]').fill('test-node.example.invalid');
           assert.match(await status.innerText(),/email ACME/,'Missing ACME email must be explained');
           await form.locator('[name="tlsAcmeEmail"]').fill('tls@example.com');
           assert.match(await status.innerText(),/Let’s Encrypt настроен/,'Ready ACME settings must be communicated without claiming certificate issuance');
+          await modal.locator('[data-node-tls-close]').first().click();
         }finally{await page.keyboard.press('Escape')}
       });
     }finally{
