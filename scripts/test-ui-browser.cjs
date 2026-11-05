@@ -341,8 +341,8 @@ async function main() {
       const after=(await api('GET',`/users/${user.id}/subscription`)).deviceLimit.devices;
       assert.deepEqual(after.map(d=>d.id).sort(),[retained.id,third.id].sort(),'Real API must delete only the selected SQL row, retaining concurrent registrations');
       await page.keyboard.press('Escape');
+      await page.locator(`#dlg [data-sharing-device="${removed.id}"]`).waitFor({state:'detached'});
       await page.locator('#dlg .user-device-preview').first().waitFor();
-      assert.equal(await page.locator(`#dlg [data-sharing-device="${removed.id}"]`).count(),0,'User drawer must stop offering the deleted device');
       await page.locator('#dlg .user-device-preview').first().click();
       await dialog.locator('.xm-device-capacity').waitFor();
       assert.equal(await dialog.locator(`[data-device-select="${removed.id}"]`).count(),0,'Deleted device must not return when reopening from the parent drawer');
