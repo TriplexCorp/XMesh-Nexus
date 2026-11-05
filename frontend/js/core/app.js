@@ -491,7 +491,7 @@ const modal=(h,c='')=>{
  if(viewerMode()&&c==='user-modal'){
    dlg.querySelectorAll('input,textarea,select').forEach(el=>{el.disabled=true});
    dlg.querySelectorAll('button').forEach(el=>{
-     if(!el.matches('[data-x],[data-user-traffic-refresh]'))el.disabled=true;
+     if(!el.matches('[data-x],[data-user-traffic-refresh],[data-user-editor-tab]'))el.disabled=true;
    });
    dlg.classList.add('viewer-readonly');
    const subscriptionStatus=dlg.querySelector('[data-user-sub-state]');
@@ -2087,7 +2087,7 @@ function userDrawer(id,tab){
     ?hosts.map(host=>`<div class="user-host-line"><span>${esc(host.remark||host.tag)}</span><small title="${esc(host.address||'')}">${esc(host.address||'')}:${esc(host.port||'')}</small></div>`).join('')
     :'<span class="user-canvas-muted">Подходящие серверы не назначены</span>';
   const devices=u.devices.length
-    ?u.devices.slice().sort((a,b)=>(Number(b.last)||0)-(Number(a.last)||0)).slice(0,3).map(d=>`<button type="button" class="user-device-preview" data-sharing-detail="${u.id}" data-sharing-focus="devices" data-sharing-device="${esc(d.id)}">${ic(/android|ios|iphone/i.test(d.os||d.plat||'')?'smartphone':'monitor')}<span><b>${esc(d.os||d.plat||(panelIsEnglish()?'Device':'Устройство'))}</b><small>${esc(d.app||d.model||(panelIsEnglish()?'Client':'Клиент'))} · ${panelIsEnglish()?'subscription refresh':'обновление подписки'} ${ago(d.last)}</small></span>${ic('chevronRight')}</button>`).join('')
+    ?u.devices.slice().sort((a,b)=>(Number(b.last)||0)-(Number(a.last)||0)).map(d=>`<button type="button" class="user-device-preview" data-sharing-detail="${u.id}" data-sharing-focus="devices" data-sharing-device="${esc(d.id)}">${ic(/android|ios|iphone/i.test(d.os||d.plat||'')?'smartphone':'monitor')}<span><b>${esc(d.os||d.plat||(panelIsEnglish()?'Device':'Устройство'))}</b><small>${esc(d.app||d.model||(panelIsEnglish()?'Client':'Клиент'))} · ${panelIsEnglish()?'subscription refresh':'обновление подписки'} ${ago(d.last)}</small></span>${ic('chevronRight')}</button>`).join('')
     :`<span class="user-canvas-muted">${panelIsEnglish()?'The client has not refreshed the subscription yet':'Клиент ещё не обновлял подписку'}</span>`;
   modal(`<div class="box user-drawer user-canvas">
     <header class="user-head">
@@ -2099,10 +2099,10 @@ function userDrawer(id,tab){
       ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,usageRatio*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,usageRatio*100)))}"><i></i></div>`:''}
       <div class="user-identity-row"><span>Xray ID</span>${viewerMode() ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
     </div>
+    <nav class="user-editor-tabs" role="tablist" aria-label="Настройки пользователя">${[['ov','Настройки','sliders'],['acc','Доступ и подписка','globe'],['traffic','Трафик','activity'],['dev','Устройства','monitor']].map(([key,title,icon],index)=>`<button type="button" role="tab" id="user-tab-${key}" aria-controls="user-panel-${key}" aria-selected="${index===0}" tabindex="${index===0?0:-1}" data-user-editor-tab="${key}">${ic(icon)}<span>${title}</span></button>`).join('')}</nav>
     <div class="user-canvas-grid">
-      <section class="user-pane user-pane-settings" aria-label="Настройки пользователя">
-        <div class="user-pane-heading"><div><h3>Настройки</h3><p>Все поля доступны сразу</p></div></div>
-        <form data-k="uedit" data-id="${u.id}" method="dialog" class="user-inline-editor">
+      <section class="user-pane user-pane-settings" data-user-editor-pane="ov" data-active="true" role="tabpanel" id="user-panel-ov" aria-labelledby="user-tab-ov" tabindex="0" aria-hidden="false">
+        <form id="user-edit-form" data-k="uedit" data-id="${u.id}" method="dialog" class="user-inline-editor">
           <div class="user-edit-fields">
             ${field(FE.find(f=>f.k==='username'),u.username)}
             ${field(FE.find(f=>f.k==='limit'),u.limit)}
@@ -2111,12 +2111,10 @@ function userDrawer(id,tab){
             ${FE.filter(f=>!['username','limit','expireAt','strategy','desc'].includes(f.k)).map(f=>field(f,u[f.k])).join('')}
             <label class="f user-notes-field"><span>Заметка</span><textarea name="desc" rows="4" spellcheck="true" placeholder="Дополнительная информация о пользователе…" data-user-note>${esc(u.desc||'')}</textarea><small class="user-note-meta"><span>Внутренняя заметка администратора</span><span data-user-note-count>${Array.from(u.desc||'').length} символов</span></small></label>
           </div>
-          <p class="er" id="fe" role="status"></p>
-          <div class="user-editor-actions"><span class="user-edit-dirty" data-user-edit-dirty role="status" aria-live="polite"></span><button type="submit" class="btn user-save-button">${ic('check')} Сохранить изменения</button></div>
         </form>
       </section>
-      <section class="user-pane user-pane-access" aria-label="Доступ и подписка">
-        <div class="user-pane-heading"><div><h3>Доступ</h3><p>Сквады и подключение</p></div></div>
+      <section class="user-pane user-pane-access" data-user-editor-pane="acc" data-active="false" role="tabpanel" id="user-panel-acc" aria-labelledby="user-tab-acc" tabindex="0" inert aria-hidden="true">
+        <div class="user-access-column"><div class="user-pane-heading"><h3>Доступ</h3></div>
         <div class="user-section-label">Сквады</div>
         <div class="user-squad-options">${squadMarkup}</div>
         <div class="user-section-label">Inbound</div>
@@ -2124,23 +2122,27 @@ function userDrawer(id,tab){
         <div class="user-section-label">Серверы</div>
         <div class="user-host-list">${hostMarkup}</div>
         <div class="user-dev-limit"><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}" aria-label="Лимит устройств"></label></div>
-        <div class="user-section-divider"></div>
+        </div><div class="user-subscription-column">
         <div class="user-pane-heading user-sub-heading"><div><h3>Подписка</h3></div></div>
         <p class="user-sub-note">Постоянная ссылка на подписку. Домен, путь, оформление и приложения управляются в SUBSCRIPTION STUDIO.</p>
         <div class="user-subscription-state" data-user-sub-state="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем ссылку…</span></div>
-        <a class="user-inline-link" href="#subscription" data-x>${ic('globe')} SUBSCRIPTION STUDIO</a>
+        <a class="user-inline-link" href="#subscription" data-x>${ic('globe')} SUBSCRIPTION STUDIO</a></div>
       </section>
-      <section class="user-pane user-pane-insights" aria-label="Статистика и устройства">
+      <section class="user-pane user-pane-insights" data-user-editor-pane="traffic" data-active="false" role="tabpanel" id="user-panel-traffic" aria-labelledby="user-tab-traffic" tabindex="0" inert aria-hidden="true">
         <div class="user-pane-heading"><div><h3>По серверам</h3><p>Персональный трафик Xray</p></div><button type="button" class="ia user-stats-refresh" data-user-traffic-refresh="${u.id}" title="Обновить статистику" aria-label="Обновить статистику">${ic('redo')}</button></div>
         <div class="user-traffic-stats" data-user-traffic-id="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем данные…</span></div>
-        <div class="user-section-divider"></div>
+      </section>
+      <section class="user-pane user-pane-devices" data-user-editor-pane="dev" data-active="false" role="tabpanel" id="user-panel-dev" aria-labelledby="user-tab-dev" tabindex="0" inert aria-hidden="true">
         <div class="user-pane-heading"><div><h3>Устройства</h3><p>${u.devices.length}${u.hwid?(panelIsEnglish()?' of ':' из ')+u.hwid:(panelIsEnglish()?' · unlimited':' · без лимита')}</p></div><button type="button" class="gh sm" data-sharing-detail="${u.id}" data-sharing-focus="devices">${panelIsEnglish()?'Manage':'Управлять'}</button></div>
         <div class="user-devices">${devices}</div>
         ${u.hwid>0&&u.devices.length>u.hwid?`<p class="er">Количество устройств превышает лимит (${u.hwid}).</p>`:''}
       </section>
     </div>
+    <p class="er user-editor-feedback" id="fe" role="status"></p>
+    <div class="user-editor-actions"><span class="user-edit-dirty" data-user-edit-dirty role="status" aria-live="polite"></span><button type="submit" form="user-edit-form" class="btn user-save-button">${ic('check')} Сохранить изменения</button></div>
     <footer class="user-canvas-foot"><span>Создан ${new Date(u.created).toLocaleDateString(window.XMeshI18n?.getLocale?.()||'ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
   </div>`,'user-modal');
+  window.XMeshUserTabs.select(dlg.querySelector('.user-canvas'),tab==='sub'?'acc':tab||'ov');
   // Native dialog/select focus must not leave a reused workspace scrolled.
   const workspace=dlg.querySelector('.user-canvas-grid');
   workspace.scrollTop=0;
@@ -3819,7 +3821,7 @@ document.addEventListener('input',e=>{
     const count=form.querySelector('[data-user-note-count]');
     if(count)count.textContent=Array.from(e.target.value).length+' символов';
   }
-  const dirty=form.querySelector('[data-user-edit-dirty]');
+  const dirty=form.closest('.user-canvas')?.querySelector('[data-user-edit-dirty]');
   if(dirty)dirty.textContent='Есть несохранённые изменения';
 });
 document.addEventListener('input',e=>{

@@ -289,6 +289,7 @@ async function main() {
         }
         await page.keyboard.press('Escape');
         await page.locator(`tr[data-id="${user.id}"]`).click();
+        await page.locator('[data-user-editor-tab=dev]').click();
         await page.locator('#dlg [data-sharing-detail]').first().click();
         await dialog.locator('.xm-device-capacity').waitFor();
         await page.keyboard.press('Escape');await page.keyboard.press('Escape');
@@ -327,6 +328,7 @@ async function main() {
       // Open the older device directly from its preview. The device workspace
       // must preserve that identity rather than silently selecting the newest.
       await page.locator(`#ut tr[data-id="${user.id}"]`).click();
+      await page.locator('[data-user-editor-tab=dev]').click();
       const previews=page.locator('#dlg .user-device-preview');
       assert.equal(await previews.count(),2);
       await previews.last().click();
@@ -588,13 +590,13 @@ async function main() {
         const box=el=>{const r=el.getBoundingClientRect();return {y:r.y,bottom:r.bottom,height:r.height}};
         const q=s=>dialog.querySelector(s),body=q('.user-canvas-grid');
         return {dialog:box(dialog),header:box(q('.user-head')),footer:box(q('.user-canvas-foot')),body:box(body),scrollTop:body.scrollTop,scrollHeight:body.scrollHeight,clientHeight:body.clientHeight,
-          panes:[...body.children].map(box),headings:[...body.querySelectorAll('.user-pane-heading:first-child')].map(box),
+          panes:[...body.children].map(box),headings:[...body.querySelectorAll('[data-active=true] .user-pane-heading:first-child')].map(box),
           controls:[...q('.user-head-actions').children].map(box),usage:box(q('.user-usage-line')),identity:box(q('.user-identity-row')),
           maxHeight:getComputedStyle(dialog).maxHeight,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),
           paneScrolls:[...body.children].filter(p=>getComputedStyle(p).overflowY==='auto'||getComputedStyle(p).overflowY==='scroll').length};
       });
       assert.equal(g.scrollTop,0,'Body must start at top');
-      assert(Math.max(...g.panes.map(r=>r.y))-Math.min(...g.panes.map(r=>r.y))<=4,'Three columns must start together');
+      assert(Math.max(...g.panes.map(r=>r.y))-Math.min(...g.panes.map(r=>r.y))<=4,'Task panels must share the same origin');
       assert(g.headings.every(r=>r.y>=g.body.y),'Initial headings must not be clipped');
       assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.height<=height-1.5*g.rem+1,'Dialog must fit the available viewport height');
       assert(g.header.y>=g.dialog.y&&g.footer.bottom<=height,'Header/footer must remain visible');
@@ -602,17 +604,67 @@ async function main() {
       const centers=g.controls.map(r=>r.y+r.height/2);
       assert(Math.max(...centers)-Math.min(...centers)<=3,'Header controls must share a vertical axis');
       assert(Math.abs(g.usage.y+g.usage.height/2-g.identity.y-g.identity.height/2)<=3,'Usage and Xray ID must align');
-      assert.equal(g.paneScrolls,0,'Columns must not own individual scrollbars');
+      assert.equal(g.paneScrolls,0,'Only the shared body may scroll');
       if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Content must fit without scrolling when viewport height is sufficient');
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
+      for(const key of ['acc','traffic','dev','ov']){
+        await page.locator(`[data-user-editor-tab="${key}"]`).click();
+        const bounds=await page.locator('#dlg').boundingBox();
+        assert(Math.abs(bounds.height-g.dialog.height)<=1&&Math.abs(bounds.y-g.dialog.y)<=1,'User task switching must not shift the dialog');
+        assert.equal(await page.locator('[data-user-editor-pane][inert]').count(),3);
+        await screenshot(page,`user-task-${key}-${width}`);
+      }
       await screenshot(page,`user-details-${width}x${height}`);
       await page.keyboard.press('Escape');
       await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
       return g;
     });
 
+    await checked('User Details: tabs preserve and save one draft',async()=>{
+      await page.setViewportSize({width:1440,height:900});await navigate('users');
+      await page.locator(`tr[data-id="${otherUser.id}"]`).click();
+      await page.locator('[data-user-note]').fill('User tab draft');
+      const first=await page.locator('[data-user-note]').elementHandle();
+      await page.locator('[data-user-editor-tab=acc]').click();
+      await page.locator(`[data-hw="${otherUser.id}"]`).fill('-1');
+      await page.locator('[data-user-editor-tab=traffic]').click();
+      await page.locator('.user-save-button').click();
+      assert.equal(await page.locator('[data-user-editor-tab=acc]').getAttribute('aria-selected'),'true');
+      assert(await page.locator('#dlg #fe').isVisible(),'Validation must be visible outside its original panel');
+      await page.locator(`[data-hw="${otherUser.id}"]`).fill('4');
+      await page.locator(`[data-usq="${otherUser.id}:${squad.id}"]`).uncheck();
+      assert.equal((await api('GET','/bootstrap')).collections.users.find(u=>u.id===otherUser.id).hwid,2,'Switching panels must not persist a draft');
+      await page.locator('[data-user-editor-tab=acc]').press('End');
+      assert.equal(await page.locator('[data-user-editor-tab=dev]').getAttribute('aria-selected'),'true');
+      await page.locator('[data-user-editor-tab=dev]').press('Home');
+      assert.equal(await first.inputValue(),'User tab draft','Tab switches must preserve the original form DOM');
+      await page.locator('[data-user-editor-tab=traffic]').click();
+      const saved=page.waitForResponse(r=>r.url().endsWith(`/collections/users/${otherUser.id}`)&&r.request().method()==='PATCH');
+      await page.locator('.user-save-button').click();assert((await saved).ok());
+      await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
+      const result=(await api('GET','/bootstrap')).collections.users.find(u=>u.id===otherUser.id);
+      assert.equal(result.desc,'User tab draft');assert.equal(result.hwid,4);assert.deepEqual(result.squads,[]);
+      await api('PATCH',`/collections/users/${otherUser.id}`,{desc:'',hwid:2,squads:[squad.id]});
+    });
+
+    await checked('User Details: viewer can navigate every read-only tab',async()=>{
+      await page.setViewportSize({width:1440,height:900});await navigate('users');
+      await page.evaluate(()=>{sessionUser.role='viewer';document.documentElement.dataset.accessRole='viewer'});
+      try{
+        await page.locator(`tr[data-id="${user.id}"]`).click();
+        for(const key of ['ov','acc','traffic','dev']){
+          const tab=page.locator(`[data-user-editor-tab="${key}"]`);
+          assert(await tab.isEnabled());await tab.click();
+          assert.equal(await tab.getAttribute('aria-selected'),'true');
+        }
+        assert(!(await page.locator('.user-save-button').isVisible()));
+        assert(await page.locator(`[data-hw="${user.id}"]`).isDisabled());
+        assert.equal(await page.locator('.user-id-value').count(),0,'Viewer credentials must remain masked');
+      }finally{await page.keyboard.press('Escape');await page.evaluate(()=>{sessionUser.role='owner';document.documentElement.dataset.accessRole='owner'})}
+    });
+
     await checked('User Details: scroll resets when reopening another user',async()=>{
-      await page.setViewportSize({width:1920,height:650});
+      await page.setViewportSize({width:1920,height:500});
       await navigate('users');
       await page.locator(`tr[data-id="${user.id}"]`).click();
       await page.waitForSelector('dialog[open] .user-canvas-grid');
@@ -628,7 +680,7 @@ async function main() {
       await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
     });
 
-    for(const [width,height] of [[390,844],[768,1024]]) await checked(`User Details stacked panes: ${width}×${height}`,async()=>{
+    for(const [width,height] of [[390,844],[768,1024]]) await checked(`User Details responsive tabs: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('users');
       await page.locator(`tr[data-id="${user.id}"]`).click();
@@ -640,10 +692,15 @@ async function main() {
       });
       assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.right<=width+1,'Mobile dialog must fit viewport');
       assert.equal(g.scrollTop,0);
-      assert(g.scrollHeight>g.clientHeight,'Stacked panes must use the workspace scroll owner');
-      for(let i=1;i<g.panes.length;i++){
-        assert(Math.abs(g.panes[i].x-g.panes[0].x)<=3,'Narrow panes must use one column');
-        assert(g.panes[i].y>=g.panes[i-1].bottom-1,'Stacked panes must not overlap');
+      assert.equal(g.panes.length,4,'All task panels must stay mounted');
+      assert.equal(await page.locator('[data-user-editor-pane][data-active=true]').count(),1);
+      assert.equal(await page.locator('[data-user-editor-pane][inert]').count(),3);
+      for(const key of ['acc','traffic','dev','ov']){
+        await page.locator(`[data-user-editor-tab="${key}"]`).click();
+        assert(await page.locator(`[data-user-editor-pane="${key}"]`).isVisible());
+        const bounds=await page.locator('#dlg').boundingBox();
+        assert(bounds.x>=0&&bounds.x+bounds.width<=width+1,'Task switch must fit narrow viewport');
+        assert(Math.abs(bounds.height-g.dialog.height)<=1,'Tasks must retain the same frame height');
       }
       assert(g.footer.bottom<=height+1,'Mobile footer must stay visible');
       await page.screenshot({path:path.join(output,`user-details-${width}x${height}.png`),fullPage:false,animations:'disabled'});

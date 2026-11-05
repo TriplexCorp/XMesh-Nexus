@@ -36,6 +36,13 @@ async function main(){const browser=await chromium.launch({headless:true,executa
   for(const route of routes)await check('English route: '+route,async()=>{await navigate(route);await scan(page,route)});
   const dialogs=[['nodes','[data-ne="nodes"]'],['nodes',`[data-ne="nodes:${node.id}"]`],['hosts','[data-ne="hosts"]'],['squads','[data-ne="squads"]'],['users','[data-nu]'],['users',`tr[data-id="${user.id}"]`],['templates','[data-ne="tpls"]'],['admins','[data-ne="admins"]'],['balancers','#balancer-add'],['clientrouting','[data-cr-add]']];
   for(const [route,selector]of dialogs)await check('English dialog: '+selector,async()=>{await navigate(route);await page.locator(selector).first().click();if(route!=='balancers')await page.locator('dialog[open]').waitFor();await scan(page,selector);if(route==='clientrouting')for(const tab of ['rules','json']){await page.locator('[data-cr-tab="'+tab+'"]').click();await scan(page,'routing '+tab)}await page.keyboard.press('Escape')});
+  await check('English User details tabs',async()=>{
+   await navigate('users');await page.locator(`tr[data-id="${user.id}"]`).click();
+   try{for(const key of ['ov','acc','traffic','dev']){
+    await page.locator(`[data-user-editor-tab="${key}"]`).click();
+    await scan(page,'User '+key);
+   }}finally{await page.keyboard.press('Escape')}
+  });
   await check('English Node settings tabs',async()=>{
    await navigate('nodes');await page.locator(`[data-ne="nodes:${node.id}"]`).click();
    assert.equal(await page.locator('[data-node-tls-state]').innerText(),'Security not configured','A selected profile with missing Security must not be reported as missing');

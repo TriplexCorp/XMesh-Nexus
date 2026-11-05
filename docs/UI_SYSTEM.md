@@ -221,8 +221,11 @@ contract is enforced by `scripts/check-ui-system.js`.
 
 `workspace-dialog-contract.css` owns final dialog geometry; `user-details.css`
 owns feature content. The desktop height budget uses the viewport minus its safe margin, so content
-can grow beyond the former 54rem cap when the screen has room. Header, usage band and footer stay in flow without shrinking. Three
-panes start at the same baseline. `.user-canvas-grid` is the single scroll owner
+can grow beyond the former 54rem cap when the screen has room. Header, usage band, task tabs, shared Save action and footer stay in flow without shrinking.
+Settings, Access & subscription, Traffic and Devices use one intrinsic panel grid.
+Inactive panels remain mounted with `inert` and `aria-hidden`, preserving the
+shared settings/access draft and dialog geometry. Arrow keys, Home and End move
+between tabs. Validation reveals the affected panel; errors stay outside panels. `.user-canvas-grid` is the single scroll owner
 with a stable scrollbar gutter. `userDrawer()` resets that owner's scroll
 position after mounting, including when another user replaces an open dialog.
 
