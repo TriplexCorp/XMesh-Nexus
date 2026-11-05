@@ -3055,6 +3055,8 @@ function syncNodeEffectiveTls(form){
   const profile=DB.profiles.find(p=>String(p.id)===String(profileId));
   const mode=nodeEffectiveTlsMode(profile);
   const toggle=form.querySelector('[data-node-tls-effective]');
+  const status=form.querySelector('.node-tls-effective');
+  if(status)status.dataset.state=mode;
   const label=form.querySelector('[data-node-tls-state]');
   const indicator=form.querySelector('[data-node-tls-indicator]');
   const preferences=form.querySelector('[data-node-tls-preferences]');
