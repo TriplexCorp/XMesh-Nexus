@@ -2757,7 +2757,7 @@ async function squadsP(){
       '<header class="squad-card-head"><div class="squad-card-emblem">'+ic(icon)+'</div>'+
       '<div class="squad-card-identity"><button type="button" class="squad-card-name" data-ne="squads:'+esc(s.id)+'">'+esc(display)+'</button>'+
       '<p>'+esc(s.desc||'Группа доступа к подключениям Xray')+'</p></div>'+
-      '<details class="squad-card-actions"><summary aria-label="'+(panelIsEnglish()?'Squad actions: ':'Действия со сквадом: ')+esc(display)+'" title="Действия">'+ic('more')+'</summary>'+
+      '<details class="squad-card-actions"><summary aria-label="'+(panelIsEnglish()?'Squad actions ':'Действия со сквадом ')+esc(display)+'" title="Действия">'+ic('more')+'</summary>'+
       '<div class="squad-card-menu"><button type="button" data-ne="squads:'+esc(s.id)+'">'+ic('pen')+' Настроить</button>'+
       '<button type="button" class="is-danger" data-del="squads:'+esc(s.id)+'">'+ic('trash')+' Удалить</button></div></details></header>'+
       '<div class="squad-card-tags" aria-label="Назначенные inbound">'+(tags.length?tags.map(tag=>chip(esc(tag),tcol(tag))).join(''):'<span class="squad-card-no-tags">Нет inbound</span>')+'</div>'+
