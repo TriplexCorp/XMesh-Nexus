@@ -2985,7 +2985,7 @@ function squadEditorMarkup(o,e){
       '<div class="squad-section-heading"><div><b>Inbound из XRAY STUDIO</b><p class="squad-section-description">Настройте доступ сквада к подключениям</p></div><span class="squad-selected-count" data-squad-selected>0 выбрано</span></div>'+
       '<div class="squad-editor-toolbar">'+
         '<label class="search squad-inbound-search">'+ic('search')+'<input type="search" data-squad-search placeholder="Найти inbound или профиль…" autocomplete="off" aria-label="Поиск inbound"></label>'+
-        '<label class="squad-profile-filter">'+ic('filter')+'<select data-squad-profile aria-label="Фильтр по профилю"><option value="">Все профили</option>'+profileOptions+'</select></label>'+
+        '<div class="squad-profile-filter">'+ic('filter')+'<select data-squad-profile aria-label="Фильтр по профилю"><option value="">Все профили</option>'+profileOptions+'</select></div>'+
         '<button type="button" class="gh sm" data-squad-select="all">Выбрать все</button>'+
         '<button type="button" class="gh sm" data-squad-select="clear">Очистить</button>'+
       '</div>'+
