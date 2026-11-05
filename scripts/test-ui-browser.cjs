@@ -155,7 +155,7 @@ async function main() {
     const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',flag:'🇵🇱',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,hosting:'Datagio',tlsManualProvision:true,geoEnabled:true});
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
     const host = await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
-    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
+    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1,desc:'Служебная заметка: Лунная комета 73293, проверить доступ'});
     const otherUser = await create('users',{username:`${prefix}-other`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
     await create('tpls',{name:`${prefix} · Standard`,limit:30,days:30,strategy:'NO_RESET',hwid:2,squads:[squad.id]});
 
@@ -165,6 +165,41 @@ async function main() {
     assert(fixtureBootstrap.collections?.users?.some(item=>item.id===user.id),'Bootstrap не увидел тестового пользователя.');
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
+
+    await checked('Global search: user notes, Ctrl+K and command activation',async()=>{
+      await navigate('set');
+      await page.locator('#pal').click();
+      const query=page.locator('#dlg #pq');
+      await query.waitFor({state:'visible'});
+      await query.fill('лУННАЯ КОМЕТА 73293');
+      const result=page.locator('#dlg #pr [data-search-user="'+user.username+'"]');
+      await result.waitFor({state:'visible'});
+      assert((await result.innerText()).includes('Лунная комета'),
+        'Saved user note matches must include the matching excerpt');
+      await result.click();
+      await page.waitForSelector('#dlg.user-modal[open]');
+      assert((await page.locator('#dlg [data-user-note]').inputValue()).includes('Лунная комета'),
+        'Global search result must open the matching user with its note');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
+
+      // Test the actual keyboard shortcut, not only a dispatched synthetic event.
+      await page.locator('#custom-a').focus();
+      await page.keyboard.press('Control+k');
+      await page.locator('#dlg.pal[open] #pq').waitFor({state:'visible'});
+      assert(await page.locator('#dlg #pq').evaluate(el=>document.activeElement===el),
+        'Ctrl+K must focus global search even from an input');
+      await page.keyboard.press('Control+k');
+      assert.equal(await page.locator('#dlg.pal[open]').count(),1,
+        'Pressing Ctrl+K twice must not create another modal');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
+
+      await page.keyboard.press('Meta+k');
+      await page.locator('#dlg.pal[open] #pq').waitFor({state:'visible'});
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
+    });
 
     await checked('Users pagination: 15 / 30 / 60 with enhanced select',async()=>{
       await navigate('users');
@@ -1143,6 +1178,14 @@ async function main() {
         await navigate(route);
         const g=await geometry(page);
         assert.equal(g.material.surface,surface);
+        if(surface==='raised'&&route==='set'){
+          const material=await page.locator('.appearance-layout .card').first().evaluate(el=>{
+            const style=getComputedStyle(el);
+            return{image:style.backgroundImage,shadow:style.boxShadow};
+          });
+          assert.equal(material.image,'none','Raised surfaces must not have a bright gradient sheen');
+          assert.notEqual(material.shadow,'none','Raised cards must retain subtle depth');
+        }
         assert.equal(g.material.sidebar,sidebar);
         assert.equal(g.material.density,density);
         assert.equal(g.material.theme,theme === 'auto' ? 'light' : theme);

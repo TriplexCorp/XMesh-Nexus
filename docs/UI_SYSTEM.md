@@ -156,6 +156,8 @@ Glass must use real transparency/backdrop blur unless the OS requests reduced tr
 
 Raised is a neutral depth hierarchy, not an accent-tinted theme. Accent belongs to selection, focus, status and primary action.
 
+Raised cards must use a low-contrast solid surface and one restrained elevation shadow. Do not paint full-card shine gradients or stack decorative inner shadows on nested sections and controls. The same depth tokens apply across all sections, including Settings.
+
 Nested modal sections do not stack outer shadows or backdrop filters. A dialog has one primary material shell.
 
 Separators are structural and remain quieter than surface borders, including Strong border mode.

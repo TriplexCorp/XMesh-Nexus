@@ -11,6 +11,11 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    // Global command palette: user note search and shortcut discovery.
+    "Поиск команд, страниц и заметок":"Search commands, pages and notes",
+    "Заметка:":"Note:",
+    "Поиск страницы, действия, пользователя или заметки":"Search pages, actions, users or notes",
+    "Введите страницу, команду, пользователя или текст заметки":"Enter a page, command, user or note text",
     // Shared directory toolbar: Host search labels.
     "Поиск хостов":"Search hosts",
     "Поиск по названию, адресу, профилю или inbound":"Search by name, address, profile or inbound",

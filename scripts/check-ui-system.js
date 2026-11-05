@@ -158,4 +158,33 @@ assert.match(hostCss,/\.host-card-footer\{[\s\S]*margin-top:auto/,
 assert.match(hostCss,/@media\(max-width:440px\)/,
  'Host cards must adapt to narrow mobile layouts');
 
+// Global search includes the persisted user note (desc) and the header shortcut.
+assert.match(html,/id="pal"[^>]*aria-keyshortcuts="Control\+K Meta\+K"/,
+ 'Global search must declare the shortcut advertised in the header');
+assert.match(app,/window\.addEventListener\('keydown',e=>\{[\s\S]*?globalSearchShortcut\(e\)/,
+ 'Ctrl/Cmd+K must be handled during capture before document hotkeys');
+assert.match(app,/paletteUserResults\(DB\.users,q\)/,
+ 'Global search must index users and saved notes');
+assert.match(app,/m:note\?paletteNoteExcerpt\(note,q\)/,
+ 'Note hits must show a contextual excerpt');
+const searchFns=app.slice(app.indexOf('const paletteNormalize='),app.indexOf('function palette(){'));
+assert(searchFns.includes('user.desc'),'User note field must be in the global search index');
+const paletteAPI=new Function('panelIsEnglish',searchFns+
+ 'return {paletteUserResults,paletteNoteExcerpt};')(()=>false);
+const usersForSearch=[
+ {id:1,username:'alpha',desc:'Служебная заметка: Восстановить доступ после смены сервера',email:'alpha@example.org'},
+ {id:2,username:'beta',desc:'Проверка другого клиента',tg:123456789},
+ {id:3,username:'charlie',desc:null}
+];
+assert.deepEqual(paletteAPI.paletteUserResults(usersForSearch,'вОССТАНОВИТЬ').map(x=>x.user.id),[1],
+ 'Unicode case-insensitive search must match notes');
+assert.deepEqual(paletteAPI.paletteUserResults(usersForSearch,'example.org').map(x=>x.user.id),[1],
+ 'Email search must remain available');
+assert.deepEqual(paletteAPI.paletteUserResults(usersForSearch,'123456789').map(x=>x.user.id),[2],
+ 'Numeric Telegram ID remains searchable');
+assert.deepEqual(paletteAPI.paletteUserResults(usersForSearch,'not-found'),[],
+ 'Unmatched note search must return no users');
+assert(paletteAPI.paletteNoteExcerpt(usersForSearch[0].desc,'восстановить').includes('Восстановить'),
+ 'Result excerpt must show the matched note phrase');
+
 console.log(`UI architecture: one content-addressed panel graph, three system owners, ${panelFeatureFiles.length} scoped panel features, explicit layout, and dialog safety: PASS`);

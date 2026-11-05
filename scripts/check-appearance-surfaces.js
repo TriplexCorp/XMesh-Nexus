@@ -182,6 +182,18 @@ assert.equal(themeSyncs,3,'Surface switches must update linked subscription appe
 assert.match(app,/aria-pressed="\$\{\(C\[key\]\|\|CDEFAULT\[key\]\)==v\?'true':'false'\}/,
  'Initial material selection must expose aria-pressed');
 
+// Raised is a restrained elevation variant, not a bright gradient slab.
+const darkRaised=foundation.match(/html\[data-surface=raised\]\{([^}]+)\}/)?.[1];
+const lightRaised=foundation.match(/html\[data-theme=light\]\[data-surface=raised\]\{([^}]+)\}/)?.[1];
+assert(darkRaised&&lightRaised,'Both dark and light Raised material overrides must exist');
+for(const [name,block] of [['dark',darkRaised],['light',lightRaised]]){
+ assert.match(block,/--nx-panel-image:none/,'Raised '+name+' cards must have no full-card sheen');
+ assert.doesNotMatch(block,/linear-gradient/,'Raised '+name+' must not paint decorative full-card gradients');
+ assert.match(block,/--nx-panel-shadow:/,'Raised '+name+' needs one restrained elevation');
+ assert.match(block,/--nx-item-shadow:none/,'Nested '+name+' items must not stack raised shadows');
+ assert.match(block,/--nx-control-shadow:none/,'Nested '+name+' controls must not stack raised shadows');
+}
+
 assert.doesNotMatch(html,/styles\/legacy\//,'Historical CSS must not be loaded');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Application script must remain versioned');
 new Function(app);

@@ -20,6 +20,10 @@ assert.equal(api.translate("Поиск по названию, описанию �
 assert.equal(api.translate("Попробуйте другой запрос или очистите поиск."),"Try another query or clear the search.");
 assert.equal(api.translate("Поиск хостов"),"Search hosts");
 assert.equal(api.translate("Поиск по названию, адресу, профилю или inbound"),"Search by name, address, profile or inbound");
+assert.equal(api.translate("Поиск команд, страниц и заметок"),"Search commands, pages and notes");
+assert.equal(api.translate("Заметка: "),"Note: ");
+assert.equal(api.translate("Поиск страницы, действия, пользователя или заметки"),"Search pages, actions, users or notes");
+assert.equal(api.translate("Введите страницу, команду, пользователя или текст заметки"),"Enter a page, command, user or note text");
 assert.equal(api.translate('Версия v26.10.31'),'Version v26.10.31');
 assert.equal(api.translate('3 мин'),'3 min');
 assert.equal(api.translate('1 ч 2 мин'),'1 h 2 min');

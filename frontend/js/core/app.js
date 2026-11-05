@@ -4084,11 +4084,40 @@ async function setP(){
 
 /* ================= ПАЛИТРА КОМАНД ================= */
 let PI=[],PX=0;
-function palette(){modal(`<div class="box palette-box" style="gap:.6rem"><div class="palette-search-wrap"><label class="search palette-search-field" style="cursor:text">${ic('search')}<input id="pq" placeholder="Поиск команд и страниц" autocomplete="off" aria-label="Поиск страницы, действия или пользователя"></label><span class="palette-search-hint">Введите название страницы, действие или пользователя</span></div><div id="pr" role="listbox"></div></div>`,'pal');pdraw('');setTimeout(()=>$('#pq').focus(),40)}
-function pdraw(q){q=q.toLowerCase();const go=k=>()=>{dlg.close();location.hash=k};
-  PI=[...FLAT.map(([k,i,l])=>({i,l:'Перейти: '+l,r:go(k)})),{i:'plus',l:'Новый пользователь',r:()=>userNew()},{i:'plus',l:'Новый хост',r:()=>entForm('hosts')},{i:'plus',l:'Новый узел',r:()=>entForm('nodes')},{i:'plus',l:'Новый сквад',r:()=>entForm('squads')},{i:'sun',l:'Сменить тему',r:()=>{dlg.close();$('#theme').click()}},{i:'sliders',l:'Настроить внешний вид',r:go('set')}].filter(x=>x.l.toLowerCase().includes(q));
-  if(q)PI.push(...DB.users.filter(u=>(u.username+u.tag+u.email+u.tg).toLowerCase().includes(q)).slice(0,6).map(u=>({i:'users',l:u.username,m:STM[st(u)][0],r:()=>userDrawer(u.id,'ov')})));PX=0;
-  $('#pr').innerHTML=PI.slice(0,12).map((x,i)=>`<button class="pi${i?'':' on'}" data-pi="${i}">${ic(x.i)}<span>${esc(x.l)}</span>${x.m?`<em>${x.m}</em>`:''}</button>`).join('')||'<div class="empty">Ничего не найдено</div>'}
+const paletteNormalize=value=>String(value??'').normalize('NFKC').toLocaleLowerCase();
+function paletteUserResults(users,query,limit=8){
+ const needle=paletteNormalize(query).trim();
+ if(!needle)return [];
+ return users.flatMap(user=>{
+   const identity=[user.username,user.tag,user.email,user.tg,user.short]
+     .some(field=>paletteNormalize(field).includes(needle));
+   const note=String(user.desc??'').replace(/\s+/g,' ').trim();
+   const inNote=paletteNormalize(note).includes(needle);
+   return identity||inNote?[{user,identity,note:inNote?note:''}]:[];
+ }).sort((a,b)=>Number(b.identity)-Number(a.identity)).slice(0,limit);
+}
+function paletteNoteExcerpt(note,query){
+ const normalized=paletteNormalize(note),at=normalized.indexOf(paletteNormalize(query).trim());
+ const start=Math.max(0,at-22),end=Math.min(note.length,Math.max(0,at)+64);
+ return (panelIsEnglish()?'Note: ':'Заметка: ')+(start?'…':'')+note.slice(start,end)+(end<note.length?'…':'');
+}
+function palette(){
+ if(dlg.open&&dlg.classList.contains('pal')){$('#pq')?.focus();return}
+ modal(`<div class="box palette-box" style="gap:.6rem"><div class="palette-search-wrap"><label class="search palette-search-field" style="cursor:text">${ic('search')}<input id="pq" placeholder="Поиск команд, страниц и заметок" autocomplete="off" aria-label="Поиск страницы, действия, пользователя или заметки"></label><span class="palette-search-hint">Введите страницу, команду, пользователя или текст заметки</span></div><div id="pr" role="listbox"></div></div>`,'pal');
+ pdraw('');
+ $('#pq')?.focus();
+}
+function pdraw(query){
+ const q=paletteNormalize(query).trim(),go=k=>()=>{dlg.close();location.hash=k};
+ PI=[...FLAT.map(([k,i,l])=>({i,l:'Перейти: '+l,r:go(k)})),{i:'plus',l:'Новый пользователь',r:()=>userNew()},{i:'plus',l:'Новый хост',r:()=>entForm('hosts')},{i:'plus',l:'Новый узел',r:()=>entForm('nodes')},{i:'plus',l:'Новый сквад',r:()=>entForm('squads')},{i:'sun',l:'Сменить тему',r:()=>{dlg.close();$('#theme').click()}},{i:'sliders',l:'Настроить внешний вид',r:go('set')}].filter(x=>paletteNormalize(x.l).includes(q));
+ if(q)PI.push(...paletteUserResults(DB.users,q).map(({user,note})=>({
+   i:'users',l:String(user.username||'Пользователь #'+user.id),
+   m:note?paletteNoteExcerpt(note,q):STM[st(user)]?.[0]||'',
+   r:()=>userDrawer(user.id,'ov')
+ })));
+ PX=0;
+ $('#pr').innerHTML=PI.slice(0,12).map((x,i)=>`<button type="button" class="pi${i?'':' on'}" data-pi="${i}" ${x.i==='users'?'data-search-user="'+esc(String(x.l))+'"':''}>${ic(x.i)}<span>${esc(x.l)}</span>${x.m?`<em>${esc(x.m)}</em>`:''}</button>`).join('')||'<div class="empty">Ничего не найдено</div>';
+}
 
 /* ================= СОБЫТИЯ ================= */
 const copyT=t=>(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Скопировано'),()=>{const i=$('#lk');i.select();document.execCommand('copy');toast('Скопировано')});
@@ -4970,9 +4999,18 @@ document.addEventListener('input',e=>{snapAppearanceSlider(e.target);syncRangePr
  else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,3000);showAppearanceNumber('content-width');previewContentWidth()}
  else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;showAppearanceNumber('gap-scale');previewAppearanceControls()}
  if(e.target.id=='pq')pdraw(e.target.value)});
+const globalSearchShortcut=e=>(e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&
+ (e.code==='KeyK'||String(e.key).toLocaleLowerCase()==='k');
+// Catch the shortcut before document-level handlers, including while focus is
+// inside a search input. Never replace an open editor containing unsaved work.
+window.addEventListener('keydown',e=>{
+ if(!globalSearchShortcut(e)||e.isComposing||e.repeat)return;
+ e.preventDefault();e.stopPropagation();
+ if(dlg.open&&!dlg.classList.contains('pal'))return;
+ palette();
+},true);
 document.addEventListener('keydown',e=>{
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){e.preventDefault();palette();return}
-  if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
+  if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();cur=='users'?$('#uq').focus():palette()}});
 document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!k)return;const er=m=>{e.preventDefault();$('#fe')&&($('#fe').textContent=m)};
   if(k=='user'){
