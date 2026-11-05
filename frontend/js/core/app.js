@@ -3001,7 +3001,7 @@ function nodeTlsReadiness(profile,data={}){
     :{mode,ready:false,method:'external',reason:'В XRAY STUDIO укажите certificateFile и keyFile для каждого TLS inbound.'};
   const domain=String(data.tlsDomain||data.addr||'').trim().toLowerCase();
   const email=String(data.tlsAcmeEmail||'').trim();
-  const validDomain=/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain);
+  const validDomain=/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain)&&/[a-z]/.test(domain.split('.').pop()||'');
   const validEmail=/^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email)&&email.length<=254;
   if(!validDomain)return {mode,ready:false,method:'acme',field:'tlsDomain',reason:'Для автоматического TLS укажите DNS-домен ноды. IP-адрес для сертификата не подходит.'};
   if(!validEmail)return {mode,ready:false,method:'acme',field:'tlsAcmeEmail',reason:'Для выпуска Let’s Encrypt укажите контактный email ACME.'};
