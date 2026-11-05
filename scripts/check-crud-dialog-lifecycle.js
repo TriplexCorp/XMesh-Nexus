@@ -57,7 +57,7 @@ const indexEnd=app.indexOf('// Country flags are bundled',indexStart);
 assert(indexStart>=0&&indexEnd>indexStart,'country index must be available');
 const {COUNTRIES,countrySearchMatches,countryRomanize,normalizeCountrySearch}=new Function(
  'panelIsEnglish',app.slice(indexStart,indexEnd)+
- '\\nreturn {COUNTRIES,countrySearchMatches,countryRomanize,normalizeCountrySearch};'
+ '\nreturn {COUNTRIES,countrySearchMatches,countryRomanize,normalizeCountrySearch};'
 )(()=>false);
 assert.equal(COUNTRIES.length,250,'all ISO-2 countries and Kosovo must be available');
 assert.equal(countrySearchMatches('').length,250,'all countries must be browseable without filtering');
