@@ -107,13 +107,13 @@ dialog#dlg.node-wide>form.box{
  * only owns spacing and internal layout. `dialog#dlg` intentionally matches the
  * legacy users.css selector specificity so this canonical contract wins by load order. */
 dialog#dlg.user-modal{
-  --dialog-width:1960px;
+  --dialog-width:84rem;
   --modal-off:translateY(22px) scale(.972);
   box-sizing:border-box;
   width:min(var(--dialog-width),calc(100vw - 1.5rem));
   inline-size:min(var(--dialog-width),calc(100vw - 1.5rem));
-  min-width:min(1480px,calc(100vw - 1.5rem));
-  min-inline-size:min(1480px,calc(100vw - 1.5rem));
+  min-width:0;
+  min-inline-size:0;
   max-width:calc(100vw - 1.5rem);
   max-inline-size:calc(100vw - 1.5rem);
   min-height:0;
@@ -193,7 +193,7 @@ dialog#dlg.user-modal>.user-canvas{
     padding:.48rem 0 .52rem;
   }
   #dlg.user-modal .user-canvas-grid{
-    grid-template-columns:minmax(0,1.02fr) minmax(0,1.02fr) minmax(0,1.35fr);
+    grid-template-columns:minmax(0,1fr);
     gap:.7rem;
     padding-block:.55rem;
   }
@@ -229,39 +229,6 @@ dialog#dlg.user-modal>.user-canvas{
   }
 }
 
-/* Only genuinely wide desktop surfaces split the intelligence pane again.
- * At 120-130% interface scale the effective CSS viewport becomes narrower;
- * keeping traffic and devices stacked there prevents compressed long-form copy. */
-@media(min-width:1600px){
-  #dlg.user-modal .user-pane-insights{
-    display:grid;
-    grid-template-columns:minmax(0,1.35fr) minmax(12rem,.75fr);
-    grid-template-rows:auto minmax(0,1fr);
-    gap:.42rem .72rem;
-    align-items:start;
-  }
-  #dlg.user-modal .user-pane-insights>.user-pane-heading:first-child{
-    grid-column:1;
-    grid-row:1;
-  }
-  #dlg.user-modal .user-pane-insights>.user-traffic-stats{
-    grid-column:1;
-    grid-row:2;
-  }
-  #dlg.user-modal .user-pane-insights>.user-traffic-stats + .user-section-divider{
-    display:none;
-  }
-  #dlg.user-modal .user-pane-insights>.user-traffic-stats + .user-section-divider + .user-pane-heading{
-    grid-column:2;
-    grid-row:1;
-  }
-  #dlg.user-modal .user-pane-insights>.user-devices{
-    grid-column:2;
-    grid-row:2;
-    align-self:start;
-  }
-}
-
 /* The metadata row is part of the same material surface. Historical viewport
  * safety added a sticky-looking background, shadow and extra bottom inset here,
  * which visually recreated a second card even after .user-canvas was flattened. */
@@ -275,13 +242,6 @@ dialog#dlg.user-modal>.user-canvas{
   border-top:0;
   background:transparent;
   box-shadow:none;
-}
-
-@media(max-width:1480px){
-  dialog#dlg.user-modal{
-    min-width:calc(100vw - 1.5rem);
-    min-inline-size:calc(100vw - 1.5rem);
-  }
 }
 
 @media(max-width:760px){

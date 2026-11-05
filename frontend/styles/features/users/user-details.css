@@ -1366,3 +1366,63 @@ dialog.user-modal .user-pane {
   background:color-mix(in srgb,var(--s2) 32%,var(--s1));
   height:auto;
 }
+
+/* One persistent user draft, four task panels and one scrolling body. Intrinsic
+ * overlapping panels reserve the same frame without measuring content in JS. */
+#dlg.user-modal .user-editor-tabs{
+  display:flex;flex:0 0 auto;gap:.35rem;overflow-x:auto;
+  padding-block:.15rem .65rem;border-bottom:1px solid var(--nx-border);
+}
+#dlg.user-modal .user-editor-tabs [role=tab]{
+  display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
+  flex:0 0 auto;padding:.6rem .85rem;border:1px solid transparent;
+  border-radius:var(--ui-radius);background:transparent;color:var(--mu);
+  font:inherit;font-size:.82rem;white-space:nowrap;cursor:pointer;
+}
+#dlg.user-modal .user-editor-tabs [aria-selected=true]{
+  color:var(--tx);background:color-mix(in srgb,var(--a) 12%,transparent);
+  border-color:color-mix(in srgb,var(--a) 24%,transparent);
+}
+#dlg.user-modal .user-editor-tabs svg{width:1rem;height:1rem}
+#dlg.user-modal .user-canvas-grid{
+  grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:0;
+}
+#dlg.user-modal [data-user-editor-pane]{
+  grid-area:1/1;align-self:start;grid-template-rows:none;min-width:0;
+  padding:0;border:0;border-radius:0;background:transparent;
+}
+#dlg.user-modal [data-user-editor-pane][data-active=false]{
+  visibility:hidden;pointer-events:none;max-height:100%;overflow:clip;
+}
+#dlg.user-modal [data-user-editor-pane][data-active=false] .user-date-calendar{display:none}
+#dlg.user-modal .user-pane-settings .user-edit-fields{
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem 1.2rem;
+}
+#dlg.user-modal .user-pane-access{
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:2rem;
+}
+#dlg.user-modal :is(.user-access-column,.user-subscription-column){
+  display:grid;align-content:start;gap:.75rem;min-width:0;
+}
+#dlg.user-modal .user-subscription-column{
+  padding-inline-start:2rem;border-inline-start:1px solid var(--nx-border);
+}
+#dlg.user-modal .user-pane-insights{grid-template-columns:minmax(0,1fr)}
+#dlg.user-modal .user-devices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+#dlg.user-modal .user-device-preview{min-width:0;width:100%}
+#dlg.user-modal .user-editor-actions{
+  display:flex;align-items:center;justify-content:space-between;gap:.75rem;
+  flex:0 0 auto;margin:0;padding-top:.65rem;border-top:1px solid var(--nx-border);
+}
+#dlg.user-modal .user-edit-dirty{min-width:0}
+#dlg.user-modal .user-save-button{flex:0 0 auto;margin-inline-start:auto}
+@media(max-width:760px){
+  #dlg.user-modal .user-pane-access{grid-template-columns:minmax(0,1fr);gap:1.25rem}
+  #dlg.user-modal .user-subscription-column{padding:1rem 0 0;border-inline-start:0;border-top:1px solid var(--nx-border)}
+  #dlg.user-modal .user-pane-settings .user-edit-fields{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-modal .user-devices{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-modal .user-editor-tabs [role=tab]{padding:.55rem .65rem;font-size:.75rem}
+}
+
+#dlg.user-modal .user-editor-feedback{flex:0 0 auto;margin:0}
+#dlg.user-modal .user-editor-feedback:empty{display:none}

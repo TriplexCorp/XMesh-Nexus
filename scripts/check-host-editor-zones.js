@@ -128,7 +128,7 @@ assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields[^{}]*\
 // User Details is deliberately wider than a form dialog and must have only one
 // material shell. The canonical selector intentionally matches the legacy
 // dialog#dlg:is(.node-wide,.user-modal) specificity so load order is authoritative.
-assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:1960px[\s\S]*?--modal-off:translateY\(22px\) scale\(\.972\)[\s\S]*?min-inline-size:min\(1480px,calc\(100vw - 1\.5rem\)\)[\s\S]*?min-height:0[\s\S]*?max-block-size:calc\(100dvh - 1\.5rem\)/,
+assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:84rem[\s\S]*?--modal-off:translateY\(22px\) scale\(\.972\)[\s\S]*?min-inline-size:0[\s\S]*?min-height:0[\s\S]*?max-block-size:calc\(100dvh - 1\.5rem\)/,
  'User details dialog must outrank the legacy min-height and use the taller wide workspace contract');
 assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?opacity \.34s[\s\S]*?transform \.50s[\s\S]*?overlay \.50s allow-discrete/,
  'User details must use the slower premium open/close motion contract');
@@ -136,10 +136,10 @@ assert.match(css,/dialog#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:au
  'User details canvas must stay single-surface and use the taller desktop viewport budget');
 assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?flex:0 1 auto[\s\S]*?overflow:auto/,
  'User details body must be the shrinkable scroll owner');
-assert.match(css,/@media\(min-width:1200px\)[\s\S]*?#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?grid-template-columns:minmax\(0,1\.02fr\) minmax\(0,1\.02fr\) minmax\(0,1\.35fr\)/,
- 'Desktop User Details must spend more width on the intelligence pane');
-assert.match(css,/@media\(min-width:1600px\)[\s\S]*?#dlg\.user-modal \.user-pane-insights\s*\{[\s\S]*?grid-template-columns:minmax\(0,1\.35fr\) minmax\(12rem,.75fr\)[\s\S]*?grid-template-rows:auto minmax\(0,1fr\)/,
- 'Traffic and devices may split horizontally only on genuinely wide desktop surfaces');
+assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?grid-template-columns:minmax\(0,1fr\);grid-template-rows:minmax\(0,1fr\)/,
+ 'User task panels must share one intrinsic frame');
+assert.match(css,/\[data-user-editor-pane\]\[data-active=false\][\s\S]*?visibility:hidden;pointer-events:none;max-height:100%;overflow:clip/,
+ 'Inactive task content must reserve geometry without extending the active scroll range');
 assert.match(css,/#dlg\.user-modal \.user-canvas-foot\s*\{[\s\S]*?flex:0 0 auto[\s\S]*?position:relative[\s\S]*?border-top:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
  'User details footer must remain metadata, not render as a second material strip');
 assert.match(css,/html\[data-motion=off\] #dlg\.user-modal[\s\S]*?transition:none!important/,
