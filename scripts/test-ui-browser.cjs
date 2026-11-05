@@ -1127,6 +1127,17 @@ async function main() {
         await menu.waitFor({state:'visible'});
         assert(await menu.evaluate(element=>element.closest('dialog')?.id==='stats-user-modal'),
           'Statistics select options must live inside the active native dialog, not inert body');
+        const placement=await page.evaluate(id=>{
+          const trigger=document.querySelector('#stats-user-modal label:has(#'+id+') .xm-period-trigger');
+          const menu=document.querySelector('#stats-user-modal .xm-period-menu:not([hidden])');
+          const a=trigger.getBoundingClientRect(),b=menu.getBoundingClientRect();
+          return {left:b.left,top:b.top,bottom:b.bottom,width:b.width,
+            anchorLeft:a.left,anchorTop:a.top,anchorBottom:a.bottom,anchorWidth:a.width,
+            xError:Math.abs(b.left-a.left),widthError:Math.abs(b.width-a.width),
+            below:Math.abs(b.top-a.bottom-5)<4,above:Math.abs(a.top-b.bottom-5)<4};
+        },id);
+        assert(placement.xError<4&&placement.widthError<4&&(placement.below||placement.above),
+          'Selector '+id+' detached from its field: '+JSON.stringify(placement));
         const option=menu.locator('.xm-period-option[data-value="'+value+'"]');
         const requested=page.waitForRequest(request=>{
           const url=new URL(request.url());
@@ -1151,6 +1162,26 @@ async function main() {
       await chooseStatsFilter('stats-history-node',String(node.id),'observations','nodeId');
       await chooseStatsFilter('stats-history-range','24h','observations','range');
       await page.locator('[data-stats-user-tab="history"]').click();
+      // Same native dialog at narrower viewports. Test all three dropdown
+      // types without relying on screenshots or API traffic.
+      for(const width of [1280,1440]){
+        await page.setViewportSize({width,height:900});
+        for(const id of ['stats-history-inbound','stats-history-node','stats-history-range']){
+          const trigger=page.locator('#stats-user-modal label:has(#'+id+') .xm-period-trigger');
+          await trigger.click();
+          const menu=page.locator('#stats-user-modal .xm-period-menu:not([hidden])');
+          await menu.waitFor({state:'visible'});
+          const placement=await page.evaluate(id=>{
+            const a=document.querySelector('#stats-user-modal label:has(#'+id+') .xm-period-trigger').getBoundingClientRect();
+            const b=document.querySelector('#stats-user-modal .xm-period-menu:not([hidden])').getBoundingClientRect();
+            return {dx:Math.abs(a.left-b.left),dw:Math.abs(a.width-b.width),below:Math.abs(a.bottom+5-b.top),above:Math.abs(a.top-5-b.bottom)};
+          },id);
+          assert(placement.dx<4&&placement.dw<4&&Math.min(placement.below,placement.above)<4,
+            'Selector '+id+' has escaped its field at '+width+'px: '+JSON.stringify(placement));
+          await trigger.click();
+        }
+      }
+      await page.setViewportSize({width:1920,height:1080});
       await screenshot(page,'dialog-user-intelligence-history');
       await page.locator('#stats-user-close').click();
       await page.waitForFunction(()=>!document.querySelector('#stats-user-modal')?.open);

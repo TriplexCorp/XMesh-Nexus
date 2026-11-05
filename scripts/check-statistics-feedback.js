@@ -125,7 +125,12 @@ rejects(app,/^\s*document\.body\.append\(menu\);/m,
   'Body-portaled Statistics filter menus are inert inside native modals');
 matches(app,/ownerDialog\?\.addEventListener\('close',close\)/,
   'Modal close must dismiss expanded filter menus');
-matches(app,/menu\.style\.left=rect\.left/);
+matches(app,/menu\.style\.position=dialogRect\?'absolute':'fixed'/,
+  'Native modal options use dialog-local positioning rather than viewport fixed positioning');
+matches(app,/menu\.style\.left=\(left-\(dialogRect\?\.left\|\|0\)\)\/scaleX/,
+  'Menu left position must be converted from viewport to dialog-local CSS pixels');
+matches(app,/menu\.style\.top=\(top-\(dialogRect\?\.top\|\|0\)\)\/scaleY/,
+  'Menu top position must be converted from viewport to dialog-local CSS pixels');
 matches(css,/\.xm-period-portal\s*\{[\s\S]*?position:fixed[\s\S]*?z-index:var\(--nx-z-tooltip\)/,'Detached period menu must use the shared popover stacking token');
 matches(css,/#stats-history-user::-webkit-inner-spin-button/);
 

@@ -337,6 +337,47 @@ fn validate_heartbeat_report(report: &Heartbeat) -> Result<(), ApiError> {
     Ok(())
 }
 
+fn heartbeat_needs_reconcile(running: bool, applied: Option<&str>, desired: Option<&str>) -> bool {
+    // A stopped node may be intentionally stopped by quota or an administrator.
+    // Reconciliation must not turn a heartbeat into permission to reactivate it.
+    running && (desired.is_none() || applied != desired)
+}
+
+#[cfg(test)]
+mod heartbeat_recovery_tests {
+    use super::heartbeat_needs_reconcile;
+
+    #[test]
+    fn reboot_without_applied_revision_requests_saved_policy() {
+        assert!(heartbeat_needs_reconcile(true, None, Some("saved-routing")));
+        assert!(heartbeat_needs_reconcile(
+            true,
+            Some("old-routing"),
+            Some("saved-routing")
+        ));
+        assert!(!heartbeat_needs_reconcile(
+            true,
+            Some("saved-routing"),
+            Some("saved-routing")
+        ));
+    }
+
+    #[test]
+    fn missing_desired_state_is_rebuilt_without_trusting_reported_digest() {
+        assert!(heartbeat_needs_reconcile(true, Some("reported"), None));
+        assert!(heartbeat_needs_reconcile(true, None, None));
+    }
+
+    #[test]
+    fn stopped_nodes_are_never_reactivated_by_heartbeat() {
+        for applied in [None, Some("old"), Some("saved")] {
+            for desired in [None, Some("saved")] {
+                assert!(!heartbeat_needs_reconcile(false, applied, desired));
+            }
+        }
+    }
+}
+
 pub async fn heartbeat(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -405,18 +446,20 @@ pub async fn heartbeat(
     .bind(&report.version)
     .execute(&state.pool)
     .await?;
-    // The desired-revision table may be empty after a migration even when a
-    // node already has a valid signed policy. Ask the node to fetch desired
-    // config again; never trust its reported revision as desired state.
-    let needs_reconcile = report.xray_running
-        && report.applied_revision.is_some()
-        && sqlx::query_scalar::<_, i64>(
-            "SELECT 1::BIGINT FROM node_desired_revisions WHERE node_id=$1",
-        )
-        .bind(report.node_id)
-        .fetch_optional(&state.pool)
-        .await?
-        .is_none();
+    // Recover missing attestation after boot and stale applied revisions as well
+    // as missing desired-state records. A reported digest never becomes desired
+    // state: only the authenticated desired-config endpoint can issue it.
+    let desired_revision = sqlx::query_scalar::<_, String>(
+        "SELECT revision FROM node_desired_revisions WHERE node_id=$1",
+    )
+    .bind(report.node_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    let needs_reconcile = heartbeat_needs_reconcile(
+        report.xray_running,
+        report.applied_revision.as_deref(),
+        desired_revision.as_deref(),
+    );
     Ok(Json(
         json!({"accepted":true,"reconcileDesired":needs_reconcile}),
     ))
