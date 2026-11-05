@@ -2694,32 +2694,12 @@ async function crudCard(k,showTitle=true){
 async function simple(ks){const h=await Promise.all(ks.map(k=>crudCard(k,ks.length>1)));return [h.join('')]}
 /* Host = client-facing endpoint, not a second Xray server configuration.
    Resolve inherited values for preview only; never expose server privateKey. */
-// Node country has two independent representations:
-// - ISO alpha-2 (PL): subscription grouping/routing in countryCode
-// - flag emoji (🇵🇱): client-visible host Remark, including Happ.
-// Never use the ISO letters as the visible fallback when a valid flag exists.
-function hostNodeCountryCode(node){
-  for(const value of [node?.countryCode,node?.flag]){
-    const code=String(value||'').trim().toUpperCase();
-    if(COUNTRY_CODES.includes(code))return code;
-    const match=COUNTRIES.find(country=>country.flag===value);
-    if(match)return match.code;
-  }
-  return '';
-}
-function hostNodeCountryRemark(node){
-  const code=hostNodeCountryCode(node);
-  const name=String(node?.name||'').trim();
-  const flag=code?countryFlag(code):'';
-  return flag&&name?`${flag} ${name}`:flag||name;
-}
-function hostAutofillNodeFields(form,node,force=false){
-  const code=hostNodeCountryCode(node);
-  const remark=form.elements.namedItem('remark');
-  const country=form.elements.namedItem('countryCode');
-  if(remark && (force || !String(remark.value||'').trim()))remark.value=hostNodeCountryRemark(node);
-  if(country && (force || !String(country.value||'').trim()))country.value=code;
-}
+const {hostEditorMarkup,hostNodeCountryCode,hostNodeCountryRemark,hostAutofillNodeFields}=
+  window.XMeshHostEditor.create({
+    getProfiles:()=>DB.profiles,getNodes:()=>DB.nodes,findProfile:hostProfile,
+    inbounds:inbs,renderField:field,escapeHtml:esc,icon:ic,
+    countryCodes:COUNTRY_CODES,countries:COUNTRIES,countryFlag
+  });
 function hostProfile(profileId){return DB.profiles.find(p=>String(p.id)===String(profileId))}
 function hostInbound(profileId,tag){return inbs(hostProfile(profileId)||{}).find(i=>i.tag===tag)}
 // Client-only X25519 public-key derivation: never export a REALITY private key
@@ -2873,45 +2853,6 @@ function hostEditorRefresh(form,changedProfile=false){
   }
   const count=form.querySelector('[data-host-count]');
   if(count)count.textContent=requiredNodes.length+' нод привязано';
-}
-function hostEditorMarkup(o,e){
-  const fromTag=DB.profiles.find(p=>inbs(p).some(i=>i.tag===o.tag));
-  const selectedProfile=hostProfile(o.profileId)||fromTag||DB.profiles[0];
-  const fields=e.fs;
-  const f=k=>fields.find(x=>x.k===k);
-  const preset='<label class="f"><span>Быстро заполнить из ноды</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(n.id)+'">'+esc(n.name)+' · '+esc(n.addr||'')+' · '+esc(n.port||443)+(hostProfile(n.profileId)?'':' · ⚠ Профиль отсутствует')+'</option>').join('')+'</select></label>';
-  const p=field(f('profileId'),selectedProfile?.id||'');
-  const inboundOptions=selectedProfile?inbs(selectedProfile).map(i=>[i.tag,i.tag+' · '+i.protocol]):[];
-  const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
-  const basic=['remark','address','port','countryCode'].map(k=>field(f(k),o[k])).join('');
-  const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
-  const advanced=['sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'].map(k=>field(f(k),o[k]??'')).join('');
-  // Three permanent, side-by-side editing zones. Keep all input names and
-  // actions unchanged so the existing save and live-preview logic still work.
-  return '<div class="host-editor-layout">'+
-    '<section class="host-editor-main host-primary-panel" aria-label="Подключение и назначение">'+
-    '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
-    '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
-    '<div class="node-form-section-title">Публичная точка</div>'+
-    '<div class="host-public-fields">'+basic+'</div>'+
-    '</section>'+
-    '<div class="host-assignment-panel"><div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
-    '<div class="host-assignment-fields">'+nodes+'</div>'+
-    '<small class="note" data-host-count></small></div>'+
-    '<section class="host-advanced host-advanced-panel" aria-label="Расширенные переопределения">'+
-    '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Расширенные переопределения</span></div>'+
-    '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
-    '<div class="host-advanced-fields">'+advanced+'</div>'+
-    '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></div></section>'+
-    '<section class="host-editor-side" aria-label="Клиентское подключение">'+
-    '<div class="node-form-section-title">'+ic('globe')+'<span>Клиентское подключение</span></div>'+
-    '<p class="node-ip-hint">Предпросмотр из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+
-    '<div class="host-resolved" data-host-resolved></div>'+
-    '<p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p>'+
-    '<p class="host-validation" data-host-warnings role="status" hidden></p>'+
-    '<button type="button" class="gh sm" data-host-repair hidden></button>'+
-    '<button type="button" class="gh sm" data-host-link-profile hidden></button>'+
-    '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p></section></div>';
 }
 
 /* Squad editor: expose the actual access graph, without introducing fake
@@ -3104,7 +3045,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест переключает адрес выбранного пользователя. Публичная подписка использует закреплённый IP до следующего интервала ротации.</small></div>`
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт, страну, название и привязку. Остальные поля сохранятся.</p></div>':'';
-  const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
+  const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e.fs):k==='nodes'
     ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeTlsFields+nodeResetAction+'</section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   const boundedEntityEditor=['tpls','admins'].includes(k);

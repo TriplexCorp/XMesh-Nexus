@@ -1374,6 +1374,92 @@ async function main() {
       return g;
     });
 
+    // Issue #317: exercise the extracted feature through the real adapters,
+    // including implicit/explicit presets and all shared appearance materials.
+    const hostModuleFixtureStart=fixtures.length;
+    try{
+      const hostUniqueProfile=await create('profiles',{name:prefix+' unique preset',config:profile.config});
+      const hostUniqueNode=await create('nodes',{name:prefix+' Poland',addr:'192.0.2.62',port:443,profileId:hostUniqueProfile.id,flag:'PL'});
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
+      const hostAppearance=await page.evaluate(()=>({surface:C.surface,language:XMeshI18n.getLanguage()}));
+      try{
+        for(const surface of ['solid','glass','raised'])for(const language of ['ru','en'])await checked(`Host module: ${surface} · ${language}`,async()=>{
+          await page.setViewportSize(language==='en'?{width:390,height:844}:{width:1920,height:1080});
+          await navigate('set');
+          await page.evaluate(language=>XMeshI18n.setLanguage(language),language);
+          await page.locator(`[data-ui="surface"][data-value="${surface}"]`).click();
+          await navigate('hosts');await page.locator('[data-ne="hosts"]').first().click();
+          const form=page.locator('#dlg form[data-ent="hosts"]');await form.waitFor();
+          const preset=async id=>form.locator('[data-host-node-preset]').evaluate((select,id)=>{select.value=String(id);select.dispatchEvent(new Event('change',{bubbles:true}))},id);
+          await preset(hostUniqueNode.id);
+          assert.equal(await form.locator('[name="countryCode"]').inputValue(),'PL');
+          const manual=prefix+' manual host';await form.locator('[name="remark"]').fill(manual);
+          await form.locator('[name="remark"]').dispatchEvent('change');
+          // A unique compatible node is re-selected implicitly on a new Host.
+          await form.locator(`[name="nodes"][value="${hostUniqueNode.id}"]`).evaluate(input=>{input.checked=false;input.dispatchEvent(new Event('change',{bubbles:true}))});
+          assert.equal(await form.locator('[name="remark"]').inputValue(),manual,'Implicit autofill must preserve the manual remark');
+          assert(await form.locator(`[name="nodes"][value="${hostUniqueNode.id}"]`).isChecked(),'Implicit preset must keep the compatible node binding');
+          await preset(hostPresetNode.id);
+          assert.equal(await form.locator('[name="remark"]').inputValue(),'🇳🇱 '+hostPresetNode.name,'Explicit preset must replace the remark');
+          assert.equal(await form.locator('[name="countryCode"]').inputValue(),'NL');
+          assert.equal(await form.locator('[name="profileId"]').inputValue(),String(hostTlsProfile.id));
+          assert((await form.locator('[data-host-resolved]').innerText()).includes(hostPresetNode.addr),'Client preview must follow preset changes');
+          await form.locator('[name="remark"]').focus();await page.keyboard.press('Tab');
+          assert(await form.locator('[name="address"]').evaluate(input=>input===document.activeElement),'Keyboard order must remain remark → address');
+          assert.equal(await page.locator('html').getAttribute('data-surface'),surface);
+          const g=await geometry(page);assert(g.scrollWidth<=g.viewport.width+1,'Host editor must fit mobile and desktop');
+          await screenshot(page,`host-module-${surface}-${language}`);
+          await page.keyboard.press('Escape');await form.waitFor({state:'hidden'});
+        });
+      }finally{
+        if(await page.locator('#dlg[open]').count())await page.keyboard.press('Escape');
+        await page.evaluate(initial=>{C.surface=initial.surface;apply();XMeshI18n.setLanguage(initial.language)},hostAppearance);
+      }
+      await checked('Host module: create/edit persistence and local X25519 derivation',async()=>{
+        // Public RFC 7748 Alice test vector, never a production credential.
+        const privateKey=Buffer.from('77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a','hex').toString('base64url');
+        const publicKey=Buffer.from('8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a','hex').toString('base64url');
+        const realityProfile=await create('profiles',{name:prefix+' Reality host',config:JSON.stringify({inbounds:[{tag:prefix+'-reality-host',listen:'127.0.0.1',port:29444,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'tcp',security:'reality',realitySettings:{target:'www.microsoft.com:443',serverNames:['reality.example.invalid'],privateKey,shortIds:['0123456789abcdef']}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+        const realityNode=await create('nodes',{name:prefix+' Germany Premium',addr:'192.0.2.61',port:443,profileId:realityProfile.id,flag:'DE'});
+        await page.setViewportSize({width:1920,height:1080});await navigate('hosts');await page.reload({waitUntil:'domcontentloaded'});
+        await page.locator('[data-ne="hosts"]').first().click();const form=page.locator('#dlg form[data-ent="hosts"]');
+        await form.locator('[data-host-node-preset]').evaluate((select,id)=>{select.value=String(id);select.dispatchEvent(new Event('change',{bubbles:true}))},realityNode.id);
+        await page.waitForFunction(expected=>document.querySelector('#dlg [name="publicKey"]')?.value===expected,publicKey);
+        assert.equal(await form.locator('[name="remark"]').inputValue(),'🇩🇪 '+realityNode.name);
+        assert.equal(await form.locator('[name="countryCode"]').inputValue(),'DE');
+        assert(!(await form.innerHTML()).includes(privateKey),'REALITY private key must never enter the Host DOM');
+        assert.equal(await form.locator('[name="privateKey"]').count(),0);
+        const creation=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname==='/api/v1/collections/hosts');
+        await form.locator('.act button.btn').click();const createdResponse=await creation;
+        assert(createdResponse.ok(),'Host creation must retain submit/validation behavior');const createdHost=await createdResponse.json();fixtures.push({collection:'hosts',id:createdHost.id});
+        assert(!JSON.stringify(createdResponse.request().postDataJSON()).includes(privateKey),'Host API payload must contain no server private key');
+        assert.equal(createdHost.publicKey,publicKey);assert.equal(createdHost.countryCode,'DE');
+        assert.deepEqual(createdHost.nodes,[realityNode.id]);
+        await page.locator(`tr[data-e="hosts:${createdHost.id}"]`).click();
+        assert.equal(await form.locator('[name="remark"]').inputValue(),'🇩🇪 '+realityNode.name,'Edit must restore the saved remark');
+        assert.equal(await form.locator('[name="publicKey"]').inputValue(),publicKey);
+        await form.locator('[name="remark"]').fill(prefix+' edited host');
+        const editing=page.waitForResponse(r=>r.request().method()==='PATCH'&&new URL(r.url()).pathname==='/api/v1/collections/hosts/'+createdHost.id);
+        await form.locator('.act button.btn').click();const editedResponse=await editing;
+        assert(editedResponse.ok(),'Host edit must submit successfully');const edited=await editedResponse.json();
+        assert.equal(edited.remark,prefix+' edited host');assert.equal(edited.publicKey,publicKey);assert.equal(edited.countryCode,'DE');
+        await page.locator(`tr[data-e="hosts:${createdHost.id}"]`).click();
+        assert.equal(await form.locator('[name="remark"]').inputValue(),prefix+' edited host','Saved manual changes must survive reopening');
+        await page.keyboard.press('Escape');
+      });
+
+    }finally{
+      if(await page.locator('#dlg[open]').count())await page.keyboard.press('Escape');
+      // Extra Host fixtures must not change the inventory used by subsequent
+      // Squad geometry checks. Remove only this case's tracked records.
+      const temporary=fixtures.slice(hostModuleFixtureStart);
+      for(const collection of ['hosts','nodes','profiles'])for(const fixture of temporary.filter(f=>f.collection===collection)){
+        await api('DELETE',`/collections/${collection}/${fixture.id}`);
+        fixtures.splice(fixtures.indexOf(fixture),1);
+      }
+    }
+
     await create('profiles',{name:`${prefix} · populated squad`,config:JSON.stringify({inbounds:['hysteria-main','masque-main','shadowsocks-main','trojan-main','vless-main'].map((tag,i)=>({tag:prefix+'-'+tag,listen:'127.0.0.1',port:29000+i,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'tcp',security:'none'}})),outbounds:[{tag:'direct',protocol:'freedom'}]})});
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
