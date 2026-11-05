@@ -336,16 +336,8 @@ const ENT={
       // Enrolling a fresh node needs no XRAY STUDIO profile. Configuration is
       // optional until an operator assigns a profile to the enrolled node.
       const nodeProfile=DB.profiles.find(p=>String(p.id)===String(data.profileId));
-      const requiresTLS=nodeProfile&&inbs(nodeProfile).some(ib=>ib.streamSettings?.security==='tls');
-      if(requiresTLS&&data.tlsAutoProvision&&data.tlsManualProvision)
-        return 'Выберите только один способ управления сертификатом.';
-      if(requiresTLS&&data.tlsAutoProvision){
-        const domain=String(data.tlsDomain||data.addr||'').trim().toLowerCase(),email=String(data.tlsAcmeEmail||'').trim();
-        if(!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain))return 'Управляемый TLS: укажите корректный DNS-домен ноды.';
-        // The installer contact is available only to the backend. A blank
-        // node-specific email is valid and inherits PANEL_ACME_EMAIL there.
-        if(email&&!/^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email))return 'Управляемый TLS: укажите контактный email ACME.';
-      }
+      const certificate=nodeTlsReadiness(nodeProfile,data);
+      if(certificate.mode==='on'&&!certificate.ready)return certificate.reason;
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
       if(port&&(!Number.isInteger(port)||port<1||port>65535))return 'Локальный порт Xray должен быть от 1 до 65535.';
       if(port&&port===nodePort)return 'Порт Xray должен отличаться от порта XMesh Node на том же сетевом интерфейсе.';
