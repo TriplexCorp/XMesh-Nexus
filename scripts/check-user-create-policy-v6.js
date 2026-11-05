@@ -50,10 +50,10 @@ assert.match(css,/@container nx-user-extra \(min-width:44rem\)/,
  'Metadata must reflow into two columns at medium widths');
 assert.match(css,/grid-template-areas:"squads squads" "tag hold" "desc desc"/,
  'Long squad lists and notes should receive full-row width on medium layouts');
-assert.match(css,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
- 'On-hold switch must stay a real compact switch instead of a stretched legacy surface');
-assert.match(css,/\.user-create-desc textarea\{[^}]*min-height:3\.9rem;[^}]*resize:vertical/,
- 'Note field must remain bounded while allowing intentional vertical resize');
+assert.match(css,/#dlg\.user-create-modal \.user-create-hold \.sw>span\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
+ 'The toggle track must remain compact inside the adaptive on-hold row');
+assert.match(css,/#dlg\.user-create-modal \.user-create-desc textarea\{[^}]*min-height:5\.2rem;[^}]*resize:vertical;[^}]*overflow-x:hidden;/,
+ 'Notes must have usable height, vertical resize and no horizontal overflow');
 assert.doesNotMatch(css,/\.user-create-(?:limits|duration|extra|hold|desc)[^{]*\{[^}]*!important/,
  'User editor geometry must not depend on legacy !important overrides');
 
