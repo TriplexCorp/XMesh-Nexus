@@ -1556,6 +1556,7 @@ dialog.node-wide .node-side-stack {
   min-width:0;
 }
 dialog.node-wide .node-side-stack > :is(.node-billing-section,.node-tls-settings) {
+  grid-area:auto;
   box-sizing:border-box;
   width:100%;
   min-width:0;
