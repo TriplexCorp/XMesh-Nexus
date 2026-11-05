@@ -292,6 +292,23 @@ Do not create a new standalone card theme: use `--nx-panel-bg`,
 the shared `ic()` icon set. Maintain keyboard-accessible editor and
 Delete actions and verify 1920/1366/mobile viewport geometry in Chromium.
 
+#### Squad editor
+
+Squad create/edit stays a single native Nexus dialog (not an independent visual
+theme). Its two-column editor preserves the actual `{name, desc, inb}`
+CRUD contract and live impact preview, while using shared `ic()` symbols for
+semantic titles, metrics, hosts and nodes. Keep the information density compact:
+no oversized decorative tiles, forced equal heights or nested inbound scrollbars.
+
+An optional **Xray profile** filter intersects with free-text search. It only
+changes the visibility of inbound rows; it must never clear hidden selections,
+alter the persisted inbound tags or silently restrict the global **Clear**
+action. 'Select all' applies only to currently visible, present inbound rows.
+Retain warnings for missing inbound/hosts/nodes and preserve functional labels,
+accessible native selects, global Classic / Glass / Raised materials, and RU/EN
+copy. Browser checks exercise profile filtering and no-scroll geometry on
+1920, 1366 and mobile viewports.
+
 ### Empty states / Templates / Balancers
 
 Empty states stay compact and explicit. They do not become half-screen blank cards.

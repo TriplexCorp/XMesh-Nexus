@@ -2953,6 +2953,7 @@ function squadEditorMarkup(o,e){
       if(!byTag.has(tag))byTag.set(tag,{tag,meta:[]});
       byTag.get(tag).meta.push({
         profile:String(profile.name||'XRAY STUDIO'),
+        profileId:String(profile.id),
         protocol:String(inbound.protocol||'—'),
         network:String(inbound.streamSettings?.network||'tcp')
       });
@@ -2964,24 +2965,27 @@ function squadEditorMarkup(o,e){
   const rows=[...byTag.values()].sort((a,b)=>a.tag.localeCompare(b.tag,'ru')).map(item=>{
     const missing=!item.meta.length;
     const profileNames=[...new Set(item.meta.map(m=>m.profile))];
+    const profileIds=[...new Set(item.meta.map(m=>m.profileId))];
     const details=missing?'Отсутствует в XRAY STUDIO — сохранённая привязка':
       [...new Set(item.meta.map(m=>m.protocol+' / '+m.network))].join(', ')+
       ' · '+profileNames.join(', ');
     const count=DB.hosts.filter(h=>!h.disabled&&String(h.tag)===item.tag).length;
-    return '<label class="squad-inbound-row'+(missing?' is-missing':'')+'" data-squad-option data-squad-filter="'+esc(item.tag+' '+details)+'">'+
+    return '<label class="squad-inbound-row'+(missing?' is-missing':'')+'" data-squad-option data-squad-filter="'+esc(item.tag+' '+details)+'" data-squad-profiles="'+esc(profileIds.join('|'))+'">'+
       '<input type="checkbox" name="inb" value="'+esc(item.tag)+'"'+(saved.includes(item.tag)?' checked':'')+(missing?' data-squad-missing':'')+'>'+
       '<span class="squad-inbound-copy"><b>'+esc(item.tag)+'</b><small>'+esc(details)+'</small></span>'+
       '<span class="squad-inbound-hosts">'+(missing?'Нет профиля':count+' хост.')+'</span></label>';
   }).join('');
+  const profileOptions=DB.profiles.filter(p=>inbs(p).some(i=>String(i?.tag||'').trim())).map(p=>'<option value="'+esc(String(p.id))+'">'+esc(p.name||'XRAY STUDIO')+'</option>').join('');
   return '<div class="squad-editor-layout">'+
     '<section class="squad-editor-main" aria-label="Параметры сквада">'+
-      '<div class="node-form-section-title">Основное</div>'+
+      '<div class="node-form-section-title">'+ic('file')+'<span>Основное</span></div>'+
       '<div class="squad-editor-fields">'+field(e.fs.find(x=>x.k==='name'),o.name||'')+field(e.fs.find(x=>x.k==='desc'),o.desc||'')+'</div>'+
       '</section><section class="squad-editor-connections" aria-label="Подключения сквада">'+
-      '<div class="node-form-section-title">Подключения</div>'+
-      '<div class="squad-section-heading"><div><b>Inbound из XRAY STUDIO</b></div><span class="squad-selected-count" data-squad-selected>0 выбрано</span></div>'+
+      '<div class="node-form-section-title">'+ic('link')+'<span>Подключения</span></div>'+
+      '<div class="squad-section-heading"><div><b>Inbound из XRAY STUDIO</b><p class="squad-section-description">Настройте доступ сквада к подключениям</p></div><span class="squad-selected-count" data-squad-selected>0 выбрано</span></div>'+
       '<div class="squad-editor-toolbar">'+
         '<label class="search squad-inbound-search">'+ic('search')+'<input type="search" data-squad-search placeholder="Найти inbound или профиль…" autocomplete="off" aria-label="Поиск inbound"></label>'+
+        '<div class="squad-profile-filter">'+ic('filter')+'<select data-squad-profile aria-label="Фильтр по профилю"><option value="">Все профили</option>'+profileOptions+'</select></div>'+
         '<button type="button" class="gh sm" data-squad-select="all">Выбрать все</button>'+
         '<button type="button" class="gh sm" data-squad-select="clear">Очистить</button>'+
       '</div>'+
@@ -2990,7 +2994,8 @@ function squadEditorMarkup(o,e){
       '<p class="squad-help">Повторяющиеся теги объединяются. Конфигурация Xray не изменяется.</p>'+
     '</section>'+
     '<section class="squad-editor-side" aria-label="Предпросмотр и влияние">'+
-      '<div class="node-form-section-title">Влияние на подписки</div>'+
+      '<div class="node-form-section-title">'+ic('activity')+'<span>Влияние на подписки</span></div>'+
+      '<p class="squad-section-description">Как выбранные inbound повлияют на текущие подписки</p>'+
       ''+
       '<div data-squad-preview role="status" aria-live="polite"></div>'+
     '</section>'+
@@ -3012,13 +3017,13 @@ function squadEditorRefresh(form){
   const preview=form.querySelector('[data-squad-preview]');
   if(!preview)return;
   const stats=[
-    ['Inbound',selected.length],
-    ['Хосты',hosts.length],
-    ['Назначенные ноды',nodeIds.size],
-    ['Пользователи',users.length]
-  ].map(([label,value])=>'<div class="squad-preview-stat"><b>'+value+'</b><small>'+label+'</small></div>').join('');
+    ['Inbound',selected.length,'layers'],
+    ['Хосты',hosts.length,'server'],
+    ['Назначенные ноды',nodeIds.size,'git-branch'],
+    ['Пользователи',users.length,'users']
+  ].map(([label,value,icon])=>'<div class="squad-preview-stat">'+ic(icon)+'<b>'+value+'</b><small>'+label+'</small></div>').join('');
   const hostList=hosts.length?hosts.slice(0,8).map(h=>
-    '<div class="squad-preview-line"><b>'+esc(h.remark||h.tag||'Хост')+'</b><small>'+esc(h.address||'Адрес не задан')+' · '+esc(h.tag||'Без тега')+' · '+(Array.isArray(h.nodes)?h.nodes.length:0)+' нод</small></div>'
+    '<div class="squad-preview-line">'+ic('server')+'<span class="squad-preview-host-copy"><b>'+esc(h.remark||h.tag||'Хост')+'</b><small>'+esc(h.address||'Адрес не задан')+' · '+esc(h.tag||'Без тега')+'</small></span><span class="squad-preview-host-nodes">'+(Array.isArray(h.nodes)?h.nodes.length:0)+' нод</span></div>'
   ).join('')+(hosts.length>8?'<small class="squad-help">И ещё '+(hosts.length-8)+' хост.</small>':''):
     '<p class="squad-help">Для выбранных inbound нет включённых хостов.</p>';
   const userList=users.length?users.slice(0,12).map(u=>'<span class="squad-user-chip">'+esc(u.username)+'</span>').join('')+
@@ -3032,26 +3037,34 @@ function squadEditorRefresh(form){
   const assignedNodes=[...nodeIds].map(id=>DB.nodes.find(n=>String(n.id)===id)).filter(Boolean);
   const nodeList=assignedNodes.length?assignedNodes.slice(0,8).map(n=>'<span class="squad-user-chip">'+esc(n.name||n.addr||String(n.id))+'</span>').join(''):'<span class="squad-help">Нет назначенных нод</span>';
   preview.innerHTML='<div class="squad-preview-stats">'+stats+'</div>'+
-    '<div class="squad-preview-section"><b>Хосты, соответствующие выбору</b><div class="squad-preview-list">'+hostList+'</div></div>'+
-    '<div class="squad-preview-section"><b>Затронутые пользователи</b><div class="squad-user-list">'+userList+'</div></div>'+
-    '<div class="squad-preview-section squad-preview-nodes"><b>Связанные ноды</b><div class="squad-user-list">'+nodeList+'</div></div>'+
+    '<div class="squad-preview-section"><b>'+ic('server')+' Хосты, соответствующие выбору</b><div class="squad-preview-list">'+hostList+'</div></div>'+
+    '<div class="squad-preview-section"><b>'+ic('users')+' Затронутые пользователи</b><div class="squad-user-list">'+userList+'</div></div>'+
+    '<div class="squad-preview-section squad-preview-nodes"><b>'+ic('git-branch')+' Связанные ноды</b><div class="squad-user-list">'+nodeList+'</div></div>'+
     (warnings.length?'<div class="squad-preview-warnings" role="note">'+warnings.map(w=>'<p>'+ic('alert-triangle')+esc(w)+'</p>').join('')+'</div>':'<p class="squad-preview-ready">'+ic('check')+'Связи в панели найдены. Доступность серверов проверяется отдельно.</p>');
 }
-document.addEventListener('input',event=>{
-  const input=event.target;
-  if(!input.matches?.('form[data-ent="squads"] [data-squad-search]'))return;
-  const form=input.closest('form');
-  const term=input.value.trim().toLocaleLowerCase('ru');
+function squadEditorFilter(form){
+  if(!form||form.dataset.ent!=='squads')return;
+  const term=String(form.querySelector('[data-squad-search]')?.value||'').trim().toLocaleLowerCase('ru');
+  const profile=String(form.querySelector('[data-squad-profile]')?.value||'');
   let visible=0;
   for(const row of form.querySelectorAll('[data-squad-option]')){
-    row.hidden=!String(row.dataset.squadFilter||'').toLocaleLowerCase('ru').includes(term);
+    const matchesText=String(row.dataset.squadFilter||'').toLocaleLowerCase('ru').includes(term);
+    const matchesProfile=!profile||String(row.dataset.squadProfiles||'').split('|').includes(profile);
+    row.hidden=!(matchesText&&matchesProfile);
     if(!row.hidden)visible++;
   }
   const empty=form.querySelector('[data-squad-no-results]');
   if(empty)empty.hidden=visible>0;
+}
+document.addEventListener('input',event=>{
+  if(event.target.matches?.('form[data-ent="squads"] [data-squad-search]'))
+    squadEditorFilter(event.target.closest('form'));
 });
 document.addEventListener('change',event=>{
-  if(event.target.matches?.('form[data-ent="squads"] input[name="inb"]'))squadEditorRefresh(event.target.closest('form'));
+  if(event.target.matches?.('form[data-ent="squads"] [data-squad-profile]'))
+    squadEditorFilter(event.target.closest('form'));
+  if(event.target.matches?.('form[data-ent="squads"] input[name="inb"]'))
+    squadEditorRefresh(event.target.closest('form'));
 });
 document.addEventListener('click',event=>{
   const button=event.target.closest?.('form[data-ent="squads"] [data-squad-select]');
@@ -3249,7 +3262,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :standardFields;
   const boundedEntityEditor=['tpls','admins'].includes(k);
   const editorFields=boundedEntityEditor?'<div class="entity-editor-body">'+fields+'</div>':fields;
-  modal(`<form class="box${boundedEntityEditor?' entity-editor':''}" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog">${k==='nodes'?'<header class="node-editor-heading"><div><h2>'+(id?'Настройки узла':'Новый узел')+'</h2><p data-no-translate>'+esc(o.name||o.addr||'')+'</p></div><button type="button" class="gh" data-x aria-label="Закрыть">'+ic('x')+'</button></header>':`<h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`}${editorFields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
+  modal(`<form class="box${boundedEntityEditor?' entity-editor':''}" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog">${k==='nodes'?'<header class="node-editor-heading"><div><h2>'+(id?'Настройки узла':'Новый узел')+'</h2><p data-no-translate>'+esc(o.name||o.addr||'')+'</p></div><button type="button" class="gh" data-x aria-label="Закрыть">'+ic('x')+'</button></header>':k==='squads'?`<h2><span class="squad-heading-icon">${ic('layers')}</span>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`:`<h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`}${editorFields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
   if(k==='nodes')syncNodeEffectiveTls(dlg.querySelector('form[data-ent="nodes"]'));
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
   if(k==='hosts'){

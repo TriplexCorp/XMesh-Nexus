@@ -1795,6 +1795,27 @@ async function main() {
       await page.waitForSelector('.squad-inbound-row');
       const count=await page.locator('.squad-inbound-row').count();
       assert(count>=6,'Fixture must exercise a populated inbound list');
+      const profileFilter=page.locator('[data-squad-profile]');
+      await page.locator('.squad-profile-filter .xm-select-trigger').waitFor({state:'visible'});
+      assert(await page.locator('.squad-profile-filter .xm-select-trigger').isVisible(),'Xray profile filter must retain the shared Nexus selector');
+      const profileRows=page.locator('[data-squad-option]');
+      const tagged=profileRows.filter({has:page.locator('input[name="inb"][value="'+prefix+'-hysteria-main"]')});
+      const profileId=String(await tagged.getAttribute('data-squad-profiles')).split('|')[0];
+      assert(profileId,'Known inbound must have an owning Xray profile');
+      await profileFilter.selectOption(profileId);
+      assert(await tagged.isVisible(),'Profile filter must retain matching inbound');
+      const filteredCount=await page.locator('.squad-inbound-row:visible').count();
+      assert(filteredCount>=5&&filteredCount<count,'Profile filter must narrow choices without deleting them');
+      await page.locator('[data-squad-select="all"]').click();
+      assert.equal(await page.locator('input[name="inb"]:checked').count(),filteredCount,'Select all must respect active profile filter');
+      await profileFilter.selectOption('');
+      assert.equal(await page.locator('input[name="inb"]:checked').count(),filteredCount,'Changing filter must preserve selected inbound');
+      await page.locator('[data-squad-select="clear"]').click();
+      assert.equal(await page.locator('input[name="inb"]:checked').count(),0,'Clear must affect all selections');
+      assert.equal(await page.locator('.squad-editor-main .node-form-section-title .ic').count(),1,'Main section must retain native icon');
+      assert.equal(await page.locator('.squad-editor-connections .node-form-section-title .ic').count(),1,'Connection section must retain native icon');
+      assert.equal(await page.locator('.squad-editor-side .node-form-section-title .ic').count(),1,'Impact section must retain native icon');
+      assert.equal(await page.locator('.squad-preview-stat > svg.ic').count(),4,'Impact metrics must use semantic Nexus icons');
       if(height>=1080){
         const initial=await page.locator('.squad-editor-layout').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
         assert(initial.scroll<=initial.client+1,'New squad with no selected inbound must fit without a small workspace scrollbar: '+JSON.stringify(initial));
