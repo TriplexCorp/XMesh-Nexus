@@ -786,7 +786,7 @@ async function main() {
       return g;
     });
 
-    for(const [width,height,scale] of [[1920,1080,1],[2560,1440,1],[4096,1582,.5],[390,844,1]]){
+    for(const [width,height,scale] of [[1366,768,1],[1920,768,1],[1920,1080,1],[2560,1440,1],[4096,1582,.5],[390,844,1]]){
       await page.setViewportSize({width,height});
       const zoom=scale===1?null:await context.newCDPSession(page);
       if(zoom)await zoom.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:scale,mobile:false});
@@ -798,7 +798,7 @@ async function main() {
           try{
             const g=await page.locator('#dlg').evaluate(d=>{
               const f=d.querySelector('form.box'),r=d.getBoundingClientRect(),b=f.getBoundingClientRect(),s=getComputedStyle(f);
-              return {dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height},background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
+              return {dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height,scrollHeight:f.scrollHeight,clientHeight:f.clientHeight},tlsInSide:!!f.querySelector('.node-side-stack > .node-tls-settings'),background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
             });
             assert(Math.abs(g.dialog.bottom-g.form.bottom)<=2,'Node dialog must end with the form, without an empty material tail');
             assert(Math.abs(g.form.top-g.dialog.top)<=2,'Node dialog must not reserve an empty surface above the form');
@@ -807,6 +807,20 @@ async function main() {
             assert.equal(g.border,0,'Only the dialog owns the outer edge');
             assert(g.dialog.top>=0&&g.dialog.bottom<=height+1&&g.dialog.left>=0&&g.dialog.right<=width+1,'Node editor must fit the viewport');
             assert.equal(g.overflow,'hidden','Native shell must not gain a second scrollbar');
+            assert(g.tlsInSide,'TLS settings must live alongside billing, not below main fields');
+            if(width>=1366&&height>=768&&scale===1){
+              assert(g.form.scrollHeight<=g.form.clientHeight+2,'Desktop Node editor must have no scrollbar: '+JSON.stringify(g));
+              const details=page.locator('#dlg [data-node-tls-preferences]');
+              await details.evaluate(el=>{el.open=true});
+              const expanded=await page.locator('#dlg').evaluate(d=>{
+                const f=d.querySelector('form.box'),popup=f.querySelector('.node-tls-popup')?.getBoundingClientRect(),
+                  dialog=d.getBoundingClientRect();
+                return {scrollHeight:f.scrollHeight,clientHeight:f.clientHeight,popupTop:popup?.top,popupBottom:popup?.bottom,dialogTop:dialog.top,dialogBottom:dialog.bottom};
+              });
+              assert(expanded.scrollHeight<=expanded.clientHeight+2,'TLS certificate popover must not make Node editor scroll: '+JSON.stringify(expanded));
+              assert(expanded.popupTop>=expanded.dialogTop-2&&expanded.popupBottom<=expanded.dialogBottom+2,'Certificate setup popover must stay inside the screen: '+JSON.stringify(expanded));
+              await details.evaluate(el=>{el.open=false});
+            }
             await screenshot(page,`node-editor-${edit?'edit':'create'}-${width}-${scale===1?'normal':'zoom-out'}`);
             return g;
           }finally{
@@ -1072,6 +1086,7 @@ async function main() {
       const form=page.locator('dialog form[data-ent="nodes"]');
       await form.locator('[name="profileId"]').selectOption(String(missingTlsProfile.id));
       const status=form.locator('[data-node-tls-readiness]');
+      await form.locator('[data-node-tls-preferences] summary').click();
       await form.locator('[name="tlsManualProvision"]').uncheck();
       assert.match(await status.innerText(),/DNS-домен/,'Missing ACME domain must show a direct explanation');
       await form.locator('.act .btn').click();
