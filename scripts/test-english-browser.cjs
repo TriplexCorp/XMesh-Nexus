@@ -45,12 +45,12 @@ async function main(){const browser=await chromium.launch({headless:true,executa
    const tlsProfile=await create('profiles',{name:prefix+' TLS setup',config:JSON.stringify({inbounds:[{tag:prefix+'-tls',listen:'127.0.0.1',port:28443,protocol:'trojan',settings:{clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
    await navigate('nodes');await page.locator(`[data-ne="nodes:${node.id}"]`).click();
    try{
-    const form=page.locator('#dlg form[data-ent="nodes"]'),status=form.locator('[data-node-tls-readiness]');
+    const form=page.locator('#dlg form[data-ent="nodes"]'),status=form.locator('[data-node-tls-note]');
     await form.locator('[name="profileId"]').selectOption(String(tlsProfile.id));
     await form.locator('.act .btn').click();
     await scan(page,'missing TLS domain');assert.match(await status.innerText(),/DNS domain/i);
-    assert(await form.locator('[data-node-tls-dialog]').evaluate(el=>el.open),'Validation must open the TLS setup dialog');
-    await scan(page,'TLS certificate dialog');
+    assert(await form.locator('[data-node-tls-inline]').isVisible(),'Certificate controls must be expanded inline');
+    await scan(page,'inline TLS certificate controls');
     await form.locator('[name="tlsDomain"]').fill('node.example.invalid');
     await scan(page,'missing ACME email');assert.match(await status.innerText(),/email/i);
     await form.locator('[name="tlsAcmeEmail"]').fill('ops@example.com');
@@ -58,8 +58,6 @@ async function main(){const browser=await chromium.launch({headless:true,executa
     await form.locator('[name="nodeTlsMethod"][value="external"]').check();
     await scan(page,'external certificate missing paths');assert.match(await status.innerText(),/certificateFile/);
    }finally{
-    const setup=page.locator('[data-node-tls-dialog][open]');
-    if(await setup.count())await setup.locator('[data-node-tls-close]').first().click();
     await page.keyboard.press('Escape');
    }
   });

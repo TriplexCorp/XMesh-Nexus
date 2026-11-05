@@ -38,7 +38,7 @@ assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{security:'tls'}}
 assert.equal(mode(null),'unconfigured');
 assert.equal(mode({inbounds:[] }),'unconfigured');
 assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{}}]}),'unconfigured');
-for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-dialog','data-node-tls-open','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
+for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-inline','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
  assert(ui.includes(contract),'Node TLS UI contract missing: '+contract);
 
 // A TLS-required profile cannot be saved without a real certificate source.
@@ -65,15 +65,15 @@ assert.equal(readiness(makeProfile('trojan','tls'),{addr:'node.example.org',tlsM
 assert.equal(readiness(makeProfile('vless','tls'),{addr:'node.example.org',tlsAcmeEmail:''}).ready,false);
 assert.equal(readiness(makeProfile('vless','tls'),{tlsDomain:'node.example.org',tlsAcmeEmail:'ops@example.org',tlsAutoProvision:true,tlsManualProvision:true}).ready,false);
 assert.match(ui,/data-node-tls-readiness/);
-assert.match(ui,/data-node-tls-dialog/);
-assert.match(ui,/data-node-tls-open/);
+assert.match(ui,/data-node-tls-inline/);
+assert(!ui.includes('data-node-tls-dialog'),'TLS controls must not require a secondary dialog');
 assert.match(ui,/nodeTlsMethod/);
-assert.match(ui,/openNodeTlsSetup\(f,readiness\.field\)/);
+assert.match(ui,/focusNodeTlsSetup\(f,readiness\.field\)/);
 assert(!ui.includes('node-tls-popup'),'Legacy overlapping TLS popover must not return');
 assert.match(ui,/node-network-stack/);
 assert.match(ui,/certificate\.mode==='on'&&!certificate\.ready/);
 assert(css.includes('dialog.node-wide .node-network-stack {'),'TLS settings must have right-column layout');
-assert(css.includes('dialog.node-wide dialog.node-tls-setup-dialog'),'Certificate setup must have an independent modal surface');
+assert(css.includes('dialog.node-wide .node-tls-inline'),'Certificate setup must be inline in the connection sidebar');
 assert(!css.includes('.node-tls-popup'),'Old overlapping popup CSS should be removed');
 
 // Shared dialog safety is independent of a node-specific placement patch.
@@ -85,4 +85,4 @@ assert.match(v3Layout,/100dvh/,'Dialogs must be bounded by the dynamic viewport'
 assert.match(v3Layout,/overflow\s*:\s*(?:auto|hidden)/,'Dialog overflow must be owned by its shell/body');
 const syntax=spawnSync(process.execPath,['--check','frontend/js/core/app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Task-based Node editor, independent TLS setup and viewport safety: OK');
+console.log('Task-based Node editor, inline TLS setup and viewport safety: OK');
