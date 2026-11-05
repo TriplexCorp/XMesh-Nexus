@@ -710,6 +710,9 @@ dialog#dlg.squad-wide .squad-preview-toggle-indicator{
 dialog#dlg.squad-wide .squad-preview-details[open] .squad-preview-toggle-indicator{
   transform:rotate(225deg);
 }
+dialog#dlg.squad-wide .squad-preview-details:not([open])>.squad-preview-details-body{
+  display:none;
+}
 dialog#dlg.squad-wide .squad-preview-details-body{
   display:grid;
   gap:.65rem;
