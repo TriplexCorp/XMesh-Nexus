@@ -1457,6 +1457,50 @@ dialog.node-wide .node-tls-settings legend {
   font-weight:750;
   color:var(--tx);
 }
+dialog.node-wide .node-tls-effective {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:.4rem 1rem;
+  justify-content:space-between;
+  padding:.65rem .8rem;
+  margin-bottom:.75rem;
+  border:1px solid var(--nx-border);
+  border-radius:var(--ui-control-radius);
+  background:var(--nx-section-bg);
+}
+dialog.node-wide .node-tls-effective[data-state="on"] {
+  border-color:color-mix(in srgb,var(--a) 45%,var(--nx-border));
+}
+dialog.node-wide .node-tls-effective .f {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.75rem;
+  flex:1 1 13rem;
+}
+dialog.node-wide .node-tls-effective [data-node-tls-indicator] { opacity:1; }
+dialog.node-wide .node-tls-effective [data-node-tls-indicator][hidden] { display:none; }
+dialog.node-wide .node-tls-effective [data-node-tls-state] {
+  color:var(--tx);
+  font-size:.78rem;
+  font-weight:750;
+}
+dialog.node-wide [data-node-tls-preferences] summary {
+  width:fit-content;
+  max-width:100%;
+  color:var(--tx);
+  font-size:.81rem;
+  font-weight:680;
+  cursor:pointer;
+  margin-bottom:.35rem;
+}
+dialog.node-wide [data-node-tls-preferences] summary:focus-visible {
+  outline:2px solid var(--a);
+  outline-offset:3px;
+  border-radius:var(--ui-control-radius);
+}
+dialog.node-wide [data-node-tls-preferences][open] > .node-tls-help { margin:.4rem 0 .8rem; }
 dialog.node-wide .node-tls-help {
   margin:0 0 .85rem;
   color:var(--mu);
