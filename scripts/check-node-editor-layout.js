@@ -37,7 +37,7 @@ assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{security:'tls'}}
 assert.equal(mode(null),'unconfigured');
 assert.equal(mode({inbounds:[] }),'unconfigured');
 assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{}}]}),'unconfigured');
-for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-preferences','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
+for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-dialog','data-node-tls-open','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
  assert(ui.includes(contract),'Node TLS UI contract missing: '+contract);
 
 // A TLS-required profile cannot be saved without a real certificate source.
