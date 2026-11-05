@@ -235,6 +235,27 @@ viewport-safe height without the former 54rem cap, pane baselines, and reopening
 Artifacts include `nodes-{width}x{height}.png` and
 `user-details-{width}x{height}.png` at 1920×1080, 2560×1440 and 3440×1440.
 
+#### User creation: resilient metadata layout
+
+The create-user “Дополнительно” section is a named CSS **size container**
+(`nx-user-extra`) whose layout follows its *actual available inline size*, not
+the browser viewport. This protects normal screens, browser zoom and nested
+dialog widths alike. Use a single metadata column on narrow surfaces, two
+balanced columns with full-width Squads/Notes at medium widths, and only
+enable four metadata columns when the section is genuinely wide enough.
+
+Every grid child must have `min-width:0`; field labels must wrap naturally.
+Squad chips wrap inside a bounded, **vertical-only** scroll area. Notes must
+wrap and allow vertical resizing without horizontal scrolling. On-hold remains
+a native accessible checkbox/switch in a full-width field row. Do not impose
+identical fixed heights or wide minimum widths on independent fields.
+
+This is feature-scoped composition using existing Nexus material tokens;
+never introduce a separate field theme. The scrollable dialog body and fixed
+footer remain the existing single-scroll-owner contract. Browser regression
+must exercise narrow, medium and wide viewports, many squad chips, long
+notes and on-hold interaction.
+
 #### User Details visual continuity
 
 User Details is an **existing Nexus workspace**, not a separate design product.

@@ -1098,6 +1098,64 @@ async function main() {
       });
     }
 
+    // The create-user metadata section must adapt to the *section* width,
+    // including browser zoom and a long list of squad names. It may scroll
+    // vertically within the chips box, never horizontally across other fields.
+    for(const [width,height] of [[390,844],[768,1024],[1366,768],[1920,1080]]) await checked(`Create user metadata layout: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('users');
+      await page.locator('[data-nu]').first().click();
+      await page.waitForSelector('dialog#dlg.user-create-modal[open] .user-create-extra-grid');
+      try{
+        const squads=page.locator('.user-create-squads .ms');
+        await squads.evaluate(list=>{
+          const first=list.querySelector('label.ck');
+          if(!first)return;
+          for(let i=0;i<10;i++){
+            const item=first.cloneNode(true);
+            item.querySelector('input').value='layout-test-'+i;
+            item.querySelector('input').checked=false;
+            item.querySelector('span').textContent='Очень длинное название сквада '+i+' с несколькими словами';
+            list.append(item);
+          }
+        });
+        const note=page.locator('.user-create-desc textarea');
+        await note.fill('Комментарий для администраторов и дополнительная информация '.repeat(12));
+        const hold=page.locator('.user-create-hold input[name="hold"]');
+        await hold.check();
+        assert(await hold.isChecked(),'On-hold toggle must remain interactive');
+        const geo=await page.locator('.user-create-extra-grid').evaluate(grid=>{
+          const rect=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width}};
+          const section=grid.closest('.user-create-section-extra');
+          const squads=grid.querySelector('.user-create-squads .ms');
+          const note=grid.querySelector('.user-create-desc textarea');
+          return{
+            grid:rect(grid),section:rect(section),fields:[...grid.children].map(el=>({className:el.className,...rect(el)})),
+            sectionWidth:section.clientWidth,sectionScroll:section.scrollWidth,
+            gridWidth:grid.clientWidth,gridScroll:grid.scrollWidth,
+            squadsWidth:squads.clientWidth,squadsScroll:squads.scrollWidth,
+            squadsHeight:squads.clientHeight,squadsScrollHeight:squads.scrollHeight,
+            noteWidth:note.clientWidth,noteScroll:note.scrollWidth,
+            holdWidth:grid.querySelector('.user-create-hold .sw').getBoundingClientRect().width
+          };
+        });
+        assert(geo.grid.width>0&&geo.section.width>0,'Metadata section must have real width');
+        assert(geo.sectionScroll<=geo.sectionWidth+2,`Metadata section overflows: ${JSON.stringify(geo)}`);
+        assert(geo.gridScroll<=geo.gridWidth+2,`Metadata grid overflows: ${JSON.stringify(geo)}`);
+        assert(geo.squadsScroll<=geo.squadsWidth+2,'Squad chips must only scroll vertically');
+        assert(geo.noteScroll<=geo.noteWidth+2,'Note must wrap instead of scrolling horizontally');
+        assert(geo.holdWidth>=120,'On-hold row must not collapse');
+        for(const field of geo.fields){
+          assert(field.left>=geo.grid.left-2&&field.right<=geo.grid.right+2,
+            `Metadata control escapes grid: ${JSON.stringify(field)}`);
+        }
+        await screenshot(page,`user-create-metadata-${width}x${height}`);
+      }finally{
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('dialog[open]',{state:'detached'});
+      }
+    });
+
     for(const [width,height] of [[1920,1080],[2560,1440],[768,900],[390,844]]) await checked(`Host assignments: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('hosts');
