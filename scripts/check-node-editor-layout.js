@@ -49,7 +49,7 @@ const nodeLayout=ui.slice(nodeLayoutStart,nodeLayoutEnd);
 assert(nodeLayout.includes('node-side-stack'),'Node editor must have a separate certificate/billing side stack');
 assert(nodeLayout.includes("${billingFields}</div></section>${nodeTlsFields}"),'Certificate must follow billing in its own section');
 assert(!nodeLayout.includes("nodeMainFields+'</div>'+nodeTlsFields"),'TLS must not expand primary node fields');
-assert.match(css,/dialog\\.node-wide \\.node-side-stack \\{/,'Right-side node stack must have scoped geometry');
+assert(css.includes('dialog.node-wide .node-side-stack {'),'Right-side node stack must have scoped geometry');
 
 // Shared dialog safety is independent of a node-specific placement patch.
 assert.match(css,/node-form-layout/,'Node editor must retain its form sections');
