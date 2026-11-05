@@ -32,8 +32,13 @@
   const width=Math.min(Math.max(120,b.width),Math.max(0,innerWidth-16));
   popup.style.width=width+'px';
   popup.style.maxHeight=maxHeight+'px';
-  popup.style.left=Math.max(8,Math.min(b.left,innerWidth-width-8))+'px';
-  popup.style.top=Math.round(below?b.bottom+5:Math.max(8,b.top-height-5))+'px';
+  const left=Math.max(8,Math.min(b.left,innerWidth-width-8));
+  const top=Math.round(below?b.bottom+5:Math.max(8,b.top-height-5));
+  popup.style.left=left+'px';popup.style.top=top+'px';
+  // Correct the actual offset while a native dialog is animating in.
+  const actual=popup.getBoundingClientRect();
+  if(Math.abs(actual.left-left)>1)popup.style.left=(left+left-actual.left)+'px';
+  if(Math.abs(actual.top-top)>1)popup.style.top=(top+top-actual.top)+'px';
  }
  function buildOptions(instance){
   const {select,popup}=instance;

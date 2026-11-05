@@ -373,10 +373,108 @@ const ENT={
 const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'tg',l:'Telegram ID',ph:'Например, 123456789'},{k:'email',l:'Email',t:'email',ph:'name@example.com'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
 const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
 
-const COUNTRY_CODES='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KH? KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.replace(' KH?','').split(' ');
+// All 249 ISO 3166-1 alpha-2 regions, plus Kosovo (user-assigned XK).
+// ISO GB is the United Kingdom; UK and England are search aliases, not duplicate codes.
+const COUNTRY_CODES='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW'.split(' ');
 const COUNTRY_NAMES=new Intl.DisplayNames(['ru'],{type:'region'});
+const COUNTRY_NAMES_EN=new Intl.DisplayNames(['en'],{type:'region'});
+const COUNTRY_ALIASES={
+ GB:'UK United Kingdom Англия England Великобритания Great Britain Britain Британия Соединённое Королевство',
+ XK:'Kosovo Косово Kosova Republic of Kosovo',
+ KP:'Северная Корея КНДР North Korea DPRK'
+};
+// ISO-3 aliases in COUNTRY_CODES order; Kosovo XKX is a user-assigned identifier.
+const COUNTRY_ISO3='AND ARE AFG ATG AIA ALB ARM AGO ATA ARG ASM AUT AUS ABW ALA AZE BIH BRB BGD BEL BFA BGR BHR BDI BEN BLM BMU BRN BOL BES BRA BHS BTN BVT BWA BLR BLZ CAN CCK COD CAF COG CHE CIV COK CHL CMR CHN COL CRI CUB CPV CUW CXR CYP CZE DEU DJI DNK DMA DOM DZA ECU EST EGY ESH ERI ESP ETH FIN FJI FLK FSM FRO FRA GAB GBR GRD GEO GUF GGY GHA GIB GRL GMB GIN GLP GNQ GRC SGS GTM GUM GNB GUY HKG HMD HND HRV HTI HUN IDN IRL ISR IMN IND IOT IRQ IRN ISL ITA JEY JAM JOR JPN KEN KGZ KHM KIR COM KNA PRK KOR KWT CYM KAZ LAO LBN LCA LIE LKA LBR LSO LTU LUX LVA LBY MAR MCO MDA MNE MAF MDG MHL MKD MLI MMR MNG MAC MNP MTQ MRT MSR MLT MUS MDV MWI MEX MYS MOZ NAM NCL NER NFK NGA NIC NLD NOR NPL NRU NIU NZL OMN PAN PER PYF PNG PHL PAK POL SPM PCN PRI PSE PRT PLW PRY QAT REU ROU SRB RUS RWA SAU SLB SYC SDN SWE SGP SHN SVN SJM SVK SLE SMR SEN SOM SUR SSD STP SLV SXM SYR SWZ TCA TCD ATF TGO THA TJK TKL TLS TKM TUN TON TUR TTO TUV TWN TZA UKR UGA UMI USA URY UZB VAT VCT VEN VGB VIR VNM VUT WLF WSM XKX YEM MYT ZAF ZMB ZWE'.split(' ');
+// Common alternative names. The universal index also covers every country's ISO
+// codes, official RU/EN forms, CLDR short forms, other languages and romanization.
+const COUNTRY_EXTRA_ALIASES={
+ "AE": "UAE|Emirates",
+ "AF": "Afghan",
+ "AG": "Antigua & Barbuda",
+ "BA": "Bosnia|Bosnia Herzegovina",
+ "BN": "Brunei Darussalam",
+ "BO": "Plurinational State of Bolivia",
+ "BR": "Brasil",
+ "BY": "Belorussia|Byelorussia",
+ "CD": "DRC|DR Congo|Congo Kinshasa|Zaire|Democratic Republic of the Congo",
+ "CG": "Congo Brazzaville|Republic of the Congo",
+ "CI": "Ivory Coast|Cote d Ivoire",
+ "CN": "PRC|People's Republic of China",
+ "CV": "Cabo Verde",
+ "CZ": "Czech Republic|Czechia",
+ "DE": "Deutschland|Federal Republic of Germany",
+ "EG": "Arab Republic of Egypt",
+ "ES": "Espana|España",
+ "FM": "Federated States of Micronesia",
+ "GE": "Sakartvelo",
+ "GR": "Hellas|Hellenic Republic",
+ "IN": "Bharat|Republic of India",
+ "IR": "Persia|Islamic Republic of Iran",
+ "IT": "Italia",
+ "JP": "Nippon|Nihon",
+ "KR": "ROK|Republic of Korea|South Korea",
+ "LA": "Laos|Lao PDR",
+ "MD": "Moldova|Republic of Moldova",
+ "MK": "Macedonia|FYROM",
+ "MM": "Burma",
+ "NL": "Holland|The Netherlands",
+ "NZ": "Aotearoa",
+ "PS": "Palestine|State of Palestine",
+ "RU": "Russian Federation|Rossiya|RF",
+ "SA": "KSA|Kingdom of Saudi Arabia",
+ "SD": "Republic of the Sudan",
+ "SY": "Syrian Arab Republic",
+ "SZ": "Swaziland",
+ "TH": "Siam",
+ "TL": "East Timor|Timor Leste",
+ "TR": "Turkey|Turkiye",
+ "TW": "ROC|Republic of China",
+ "TZ": "United Republic of Tanzania",
+ "UA": "Ukraina",
+ "US": "USA|America|United States of America",
+ "VA": "Holy See|Vatican City State",
+ "VN": "Viet Nam",
+ "XK": "Republic of Kosovo|Kosova",
+ "ZA": "RSA|Republic of South Africa"
+};
+const COUNTRY_REGION_NAMES=[
+ ...['ru','en'].flatMap(locale=>['long','short'].map(style=>new Intl.DisplayNames([locale],{type:'region',style}))),
+ ...['uk','de','fr','es','it','pt','pl','tr','ja','zh','ar'].map(locale=>new Intl.DisplayNames([locale],{type:'region'}))
+];
+const normalizeCountrySearch=value=>String(value||'').normalize('NFKD')
+ .replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('ru').replace(/ё/g,'е')
+ .replace(/ß/g,'ss').replace(/æ/g,'ae').replace(/œ/g,'oe').replace(/ł/g,'l')
+ .replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
+const COUNTRY_CYRILLIC_ROMAN={\u0430:'a',\u0431:'b',\u0432:'v',\u0433:'g',\u0434:'d',\u0435:'e',\u0436:'zh',\u0437:'z',\u0438:'i',\u0439:'y',\u043a:'k',\u043b:'l',\u043c:'m',\u043d:'n',\u043e:'o',\u043f:'p',\u0440:'r',\u0441:'s',\u0442:'t',\u0443:'u',\u0444:'f',\u0445:'kh',\u0446:'ts',\u0447:'ch',\u0448:'sh',\u0449:'shch',\u044b:'y',\u044d:'e',\u044e:'yu',\u044f:'ya',\u044c:'',\u044a:'',\u0456:'i',\u0457:'yi',\u0454:'ye',\u0491:'g'};
+const countryRomanize=value=>[...normalizeCountrySearch(value)].map(ch=>COUNTRY_CYRILLIC_ROMAN[ch]??ch).join('');
+const countrySearchForms=variants=>[...new Set(variants.flatMap(value=>{
+ const form=normalizeCountrySearch(value);
+ return form?[form,countryRomanize(form)]:[];
+}))];
+const countrySearchMatches=query=>{
+ const q=normalizeCountrySearch(query);
+ if(!q)return COUNTRIES;
+ return COUNTRIES.map(country=>{
+  const terms=country.searchTerms;
+  const rank=country.code.toLowerCase()===q||country.iso3.toLowerCase()===q?0:
+   terms.some(term=>term===q)?1:terms.some(term=>term.startsWith(q))?2:
+   terms.some(term=>term.includes(q))?3:Infinity;
+  return {country,rank};
+ }).filter(row=>Number.isFinite(row.rank)).sort((a,b)=>a.rank-b.rank).map(row=>row.country);
+};
 const countryFlag=code=>String.fromCodePoint(...code.toUpperCase().split('').map(c=>127397+c.charCodeAt(0)));
-const COUNTRIES=COUNTRY_CODES.map(code=>({code,flag:countryFlag(code),name:COUNTRY_NAMES.of(code)})).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+const COUNTRIES=COUNTRY_CODES.map((code,index)=>{
+ const name=code==='GB'?'Великобритания (UK)':code==='XK'?'Косово':COUNTRY_NAMES.of(code);
+ const enName=code==='GB'?'United Kingdom (UK)':code==='XK'?'Kosovo':COUNTRY_NAMES_EN.of(code);
+ const iso3=COUNTRY_ISO3[index];
+ const terms=countrySearchForms([
+  code,iso3,name,enName,...COUNTRY_REGION_NAMES.map(display=>display.of(code)),
+  ...(COUNTRY_EXTRA_ALIASES[code]||'').split('|'),COUNTRY_ALIASES[code]||'',
+  ...(code==='GB'?['UK']:[])
+ ]);
+ return {code,iso3,flag:countryFlag(code),name,enName,searchTerms:terms};
+}).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+const countryLabel=country=>panelIsEnglish()?country.enName:country.name;
 // Country flags are bundled in the Docker image. No external CDN at runtime.
 const flagView=(value,cls='flag-img')=>{
  const country=COUNTRIES.find(c=>c.flag===value);
@@ -391,7 +489,7 @@ function field(f,v){
     const existing=COUNTRIES.find(c=>c.flag===v);
     const current=existing?existing.flag:(v||'');
     i=`<div class="country-picker country-picker-dropdown">
-      <button type="button" class="country-trigger" data-country-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="country-options-${f.k}"><span class="country-trigger-value">${flagView(current,'country-flag-preview')}<span data-country-label>${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></span><span class="country-trigger-chevron">⌄</span></button>
+      <button type="button" class="country-trigger" data-country-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="country-options-${f.k}"><span class="country-trigger-value">${flagView(current,'country-flag-preview')}<span data-country-label>${existing?esc(countryLabel(existing)):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></span><span class="country-trigger-chevron">⌄</span></button>
       <div class="country-dropdown" hidden><div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="Поиск страны или кода…" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-${f.k}" aria-expanded="false"></div><div class="country-options" id="country-options-${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
       <input type="hidden" name="${f.k}" class="country-value" value="${esc(current)}">
     </div>`
@@ -1043,11 +1141,13 @@ const statsValue=(v,unit='')=>v===null||v===undefined||!Number.isFinite(Number(v
   ?'Нет данных':fmt(Number(v),1)+unit;
 const statsBytes=v=>v===null||v===undefined||!Number.isFinite(Number(v))
  ?'Нет данных':sysBytes(Number(v));
-// Display network speeds in bits/s; lifetime data usage stays in bytes.
+// Speeds are bits/s (not bytes/s); translate dynamic numeric values at source.
+const speedUnitMbps=()=>panelIsEnglish()?' Mbps':' Мбит/с';
 const statsRate=v=>{
  if(v===null||v===undefined||!Number.isFinite(Number(v)))return 'Нет данных';
  const bps=Number(v)*8,abs=Math.abs(bps);
- return abs>=1e9?fmt(bps/1e9,2)+' Гбит/с':abs>=1e6?fmt(bps/1e6,2)+' Мбит/с':abs>=1e3?fmt(bps/1e3,1)+' Кбит/с':fmt(bps,0)+' бит/с';
+ const units=panelIsEnglish()?[' Gbps',' Mbps',' Kbps',' bps']:[' Гбит/с',' Мбит/с',' Кбит/с',' бит/с'];
+ return abs>=1e9?fmt(bps/1e9,2)+units[0]:abs>=1e6?fmt(bps/1e6,2)+units[1]:abs>=1e3?fmt(bps/1e3,1)+units[2]:fmt(bps,0)+units[3];
 };
 const statsMetric=(label,value,hint='')=>`<div class="stats-tile"><small>${esc(label)}</small><strong>${esc(String(value))}</strong>${hint?`<span>${esc(hint)}</span>`:''}</div>`;
 const statsRow=(label,value)=>`<div class="stats-kv"><span>${esc(label)}</span><b>${esc(String(value))}</b></div>`;
@@ -1084,7 +1184,7 @@ const statsDetailedChart=(points,chartWidth=1000)=>{
    return '<g class="stats-detail-point-wrap '+cls+'" tabindex="0" role="button" data-bucket-ms="'+Number(p.bucketMs)+'" data-series="'+cls+'">'+
     '<circle class="stats-detail-point-hit" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="13"/>'+ 
     '<circle class="stats-detail-point-ring" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="10"/>'+
-    '<circle class="stats-detail-point-core" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+' Мбит/с')+'</title></circle></g>';
+    '<circle class="stats-detail-point-core" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+speedUnitMbps())+'</title></circle></g>';
   }).join('');
   return '<path class="stats-detail-area '+cls+'" d="'+area+'"/><path class="stats-detail-line '+cls+'" d="'+d+'"/>'+dots;
  };
@@ -1581,12 +1681,12 @@ function systemPanel(s,error=''){
 /* ================= RX/TX HISTORY ================= */
 const trafficMbit=value=>Math.max(0,Number(value)||0)*8/1_000_000;
 const trafficRateLabel=value=>{
-  const mbps=trafficMbit(value);
-  if(mbps>=1000)return fmt(mbps/1000,2)+' Гбит/с';
-  if(mbps>=1)return fmt(mbps,2)+' Мбит/с';
-  if(mbps>=0.01)return fmt(mbps*1000,1)+' Кбит/с';
-  if(mbps===0)return '0 Мбит/с';
-  return fmt(mbps*1000,3)+' Кбит/с';
+  const mbps=trafficMbit(value),en=panelIsEnglish();
+  if(mbps>=1000)return fmt(mbps/1000,2)+(en?' Gbps':' Гбит/с');
+  if(mbps>=1)return fmt(mbps,2)+speedUnitMbps();
+  if(mbps>=0.01)return fmt(mbps*1000,1)+(en?' Kbps':' Кбит/с');
+  if(mbps===0)return '0'+speedUnitMbps();
+  return fmt(mbps*1000,3)+(en?' Kbps':' Кбит/с');
 };
 function trafficSummaryMarkup(payload){
   const points=Array.isArray(payload?.points)?payload.points:[];
@@ -3883,7 +3983,7 @@ async function nodesP(){
         ${nodeGauge(n,'ram-'+n.id,'RAM',Number.isFinite(l.ram)?l.ram:0,Number.isFinite(l.ram)?Math.round(l.ram)+'%':'—',Number.isFinite(l.ram)?'занято':'нет данных','--wr')}
         ${nodeGauge(n,'traffic-'+n.id,'Трафик сети',n.limit?k*100:0,trafficGb===null?'—':n.limit?Math.round(k*100)+'%':'∞',trafficGb===null?'нет данных':(n.limit?`${gb(trafficGb)} / ${gb(n.limit)}`:`${gb(trafficGb)} · без лимита`)+(nodeTrafficFactor(n)!==1?` · ×${nodeTrafficFactor(n)} (учётный)`:''),tc)}
       </div>
-      <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div></div></div>
+      <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+speedUnitMbps():'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div></div></div>
       <footer class="acts" data-ui-toolbar="actions"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить агент ноды</button><button class="gh sm" data-nr="${n.id}" ${n.disabled||nodeXrayRestarting.has(Number(n.id))?'disabled':''} title="Перезапустить Xray">${renderNodeRestart(n.id)}</button><button class="gh sm" data-xray-update="${n.id}">${ic('dl')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button type="button" class="gh sm node-routing-open" data-node-routing="${n.id}" title="Направление трафика по GeoSite, GeoIP и через другие ноды">${ic("git-branch")}Маршрутизация</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('server')}Создать хост</button></footer></div>`;
   });
   const cardById=new Map(r.items.map((n,i)=>[n.id,cards[i]]));
@@ -3976,7 +4076,7 @@ function updateNodeGauges(){DB.nodes.forEach(n=>{
   setNodeGauge('traffic-'+n.id,traffic,trafficGb===null?'—':n.limit?Math.round(traffic)+'%':'∞',
     trafficGb===null?'нет данных':n.limit?`${gb(trafficGb)} / ${gb(n.limit)}`:`${gb(trafficGb)} · без лимита`);
   const ta=$('#ngarc-traffic-'+n.id);if(ta)ta.style.setProperty('--g-color',`var(${tc})`);
-  const speed=$('#nm'+n.id),bar=$('#npm'+n.id);if(speed)speed.textContent=Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—';if(bar)bar.style.setProperty('--w',Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100)+'%':'0%');
+  const speed=$('#nm'+n.id),bar=$('#npm'+n.id);if(speed)speed.textContent=Number.isFinite(l.mbps)?fmt(l.mbps)+speedUnitMbps():'—';if(bar)bar.style.setProperty('--w',Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100)+'%':'0%');
 });}
 
 /* ================= ДИАГНОСТИКА ================= */
@@ -4793,14 +4893,14 @@ the old node will lose access. Cancel and create a new Node ID if both must work
 function renderCountryOptions(picker, query=''){
  const input=picker.querySelector('[data-country-search]'),select=picker.querySelector('input.country-value[name=flag]'),options=picker.querySelector('.country-options');
  if(!input||!select||!options)return;
- const q=String(query||'').trim().toLocaleLowerCase('ru');
- const matches=COUNTRIES.filter(c=>(c.name+' '+c.code+(c.code==='KP'?' Северная Корея КНДР North Korea DPRK':'')).toLocaleLowerCase('ru').includes(q));
+ const q=normalizeCountrySearch(query);
+ const matches=countrySearchMatches(q);
  const selected=select.value;
  const custom=selected&&!COUNTRIES.some(c=>c.flag===selected)?selected:'';
  const rows=[];
  if(!q)rows.push('<button type="button" class="country-option country-option-clear" role="option" data-country-choice="" aria-selected="'+(!selected?'true':'false')+'"><span class="country-option-empty">∅</span><span class="country-option-copy"><b>Не выбрана</b><small>Очистить выбор страны</small></span></button>');
  if(custom&&(!q||custom.toLocaleLowerCase('ru').includes(q)))rows.push('<button type="button" class="country-option" role="option" data-country-choice="'+esc(custom)+'" aria-selected="true">'+flagView(custom,'country-option-flag')+'<span class="country-option-copy"><b>'+esc(custom)+'</b><small>Сохранённое значение</small></span></button>');
- rows.push(...matches.slice(0,100).map(c=>'<button type="button" class="country-option" role="option" data-country-choice="'+esc(c.flag)+'" data-country-code="'+c.code+'" aria-selected="'+(c.flag===selected?'true':'false')+'">'+flagView(c.flag,'country-option-flag')+'<span class="country-option-copy"><b>'+esc(c.name)+'</b><small>'+c.code+'</small></span>'+(c.flag===selected?'<span class="country-option-check">✓</span>':'')+'</button>'));
+ rows.push(...matches.map(c=>'<button type="button" class="country-option" role="option" data-country-choice="'+esc(c.flag)+'" data-country-code="'+c.code+'" aria-selected="'+(c.flag===selected?'true':'false')+'">'+flagView(c.flag,'country-option-flag')+'<span class="country-option-copy"><b>'+esc(countryLabel(c))+'</b><small>'+c.code+'</small></span>'+(c.flag===selected?'<span class="country-option-check">✓</span>':'')+'</button>'));
  if(!rows.length)rows.push('<div class="country-no-results">Страна не найдена. Попробуйте другое название или ISO-код.</div>');
  options.innerHTML=rows.join('');
  options.hidden=false;

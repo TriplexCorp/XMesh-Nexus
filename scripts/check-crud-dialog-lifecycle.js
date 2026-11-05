@@ -43,5 +43,41 @@ for(const [flag,iso] of [['🇰🇵','kp'],['🇩🇪','de']]){
   assert(!/flagcdn|https?:\/\//.test(html),'Flags must never depend on external CDN');
 }
 assert(!app.includes('flagcdn.com'),'No flag CDN URLs in UI');
-assert.match(app,/c\.code==='KP'\?' Северная Корея КНДР North Korea DPRK'/);
+const codes=app.match(/const COUNTRY_CODES='([^']+)'\.split\(' '\);/)?.[1]?.split(' ');
+assert.equal(codes?.length,250,'249 ISO codes plus Kosovo XK');
+assert.equal(new Set(codes).size,250,'country codes must be unique');
+for(const code of ['GB','GY','XK','KP','TW','PS','VA'])assert(codes.includes(code),'Missing country '+code);
+assert.match(app,/GB:'UK United Kingdom Англия England/,'UK / England must resolve to GB');
+assert.match(app,/XK:'Kosovo Косово/,'Kosovo must be searchable');
+assert.match(app,/const matches=countrySearchMatches\(q\)/,'picker must use unified country index');
+assert.doesNotMatch(app,/matches\.slice\(0,100\)/,'country list must not be truncated');
+// Execute the real country index (without DOM) and cover every entry, not just UK.
+const indexStart=app.indexOf('const COUNTRY_CODES=');
+const indexEnd=app.indexOf('// Country flags are bundled',indexStart);
+assert(indexStart>=0&&indexEnd>indexStart,'country index must be available');
+const {COUNTRIES,countrySearchMatches,countryRomanize,normalizeCountrySearch}=new Function(
+ 'panelIsEnglish',app.slice(indexStart,indexEnd)+
+ '\nreturn {COUNTRIES,countrySearchMatches,countryRomanize,normalizeCountrySearch};'
+)(()=>false);
+assert.equal(COUNTRIES.length,250,'all ISO-2 countries and Kosovo must be available');
+assert.equal(countrySearchMatches('').length,250,'all countries must be browseable without filtering');
+assert.equal(new Set(COUNTRIES.map(c=>c.iso3)).size,250,'ISO-3 codes must be unique');
+for(const country of COUNTRIES){
+ for(const query of [country.code,country.iso3]){
+  assert.equal(countrySearchMatches(query)[0]?.code,country.code,'exact code must rank first: '+query);
+ }
+ for(const query of [country.name,country.enName,countryRomanize(country.name)]){
+  assert(countrySearchMatches(query).some(c=>c.code===country.code),'country must match localized or romanized name: '+query);
+ }
+}
+for(const [query,code] of Object.entries({
+ UK:'GB',England:'GB',GBR:'GB',USA:'US',America:'US',UAE:'AE',Deutschland:'DE',
+ Germaniya:'DE',Rossiya:'RU',Holland:'NL',Kosova:'XK',Czechia:'CZ',
+ 'Czech Republic':'CZ','Cote d Ivoire':'CI','Ivory Coast':'CI',
+ 'East Timor':'TL','South Korea':'KR',España:'ES',
+ 'Великобритания':'GB','Англия':'GB','Косово':'XK','Германия':'DE','США':'US'
+}))assert.equal(countrySearchMatches(query)[0]?.code,code,'common alias must rank first: '+query);
+assert.equal(normalizeCountrySearch('CÔTE—D’IVOIRE'),normalizeCountrySearch('Cote d Ivoire'),
+ 'search must ignore accent, case and punctuation differences');
+console.log('Country index: 250 entries × RU/EN/transliteration/ISO-2/ISO-3 + common aliases: PASS');
 console.log('CRUD dialog lifecycle (create/edit/renew/squad), submit dedupe, and local SVG country flags: OK');

@@ -11,6 +11,11 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    // Country picker search aliases are internal data; display labels still need full EN coverage.
+    "UK United Kingdom Англия England Великобритания Great Britain Britain Британия Соединённое Королевство":"UK United Kingdom England Great Britain Britain",
+    "Kosovo Косово Kosova Republic of Kosovo":"Kosovo Kosova Republic of Kosovo",
+    "Великобритания (UK)":"United Kingdom (UK)",
+    "Косово":"Kosovo",
     // Global command palette: user note search and shortcut discovery.
     "Поиск команд, страниц и заметок":"Search commands, pages and notes",
     "Заметка:":"Note:",

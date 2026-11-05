@@ -20,7 +20,10 @@ WORKDIR /flags
 RUN npm pack flag-icons@7.5.0 --silent \
     && tar -xzf flag-icons-7.5.0.tgz \
     && test -s package/flags/4x3/kp.svg \
-    && test -s package/flags/4x3/de.svg
+    && test -s package/flags/4x3/de.svg \
+    && test -s package/flags/4x3/gb.svg \
+    && test -s package/flags/4x3/gy.svg \
+    && test -s package/flags/4x3/xk.svg
 
 FROM debian:bookworm-slim AS runtime
 ENV APP_ADDR=0.0.0.0:8080 \
