@@ -361,7 +361,7 @@ async function main() {
       await page.reload({waitUntil:'domcontentloaded'});
     });
 
-    await checked('Routing workspace: compact populated rows and contextual saving',async()=>{
+    await checked('Routing workspace: readable interactive gallery and contextual saving',async()=>{
       const original=await page.evaluate(()=>structuredClone(DB.set.clientRoutingProfiles||[]));
       try{
         await page.evaluate(id=>{DB.set.clientRoutingProfiles=[{id:'ui-route-main',name:'RU DIRECT',enabled:true,servers:['node:'+id],rules:[{match:'geosite',value:'category-ru',action:'direct'},{match:'geoip',value:'ru',action:'direct'},{match:'domain',value:'ads.example.invalid',action:'block',network:'udp'}]},{id:'ui-route-empty',name:'Draft routing',enabled:false,servers:[],rules:[]},{id:'ui-route-long',name:'Long values',enabled:true,servers:[],rules:[{match:'domain',value:'long-subdomain-'.repeat(12)+'.example.invalid',action:'proxy'}]}]},node.id);
@@ -374,10 +374,31 @@ async function main() {
           const g=await geometry(page);assert(g.scrollWidth<=width+1,'Populated routing rows must not overflow');
           assert.equal(g.outside.length,0,'Routing controls must stay inside the viewport');
           assert((await page.locator('.crx-assigned-source').innerText()).includes(node.name),'Assigned node name must be readable');
-          if(width>=1920)assert((await page.locator('[data-cr-profile="ui-route-main"]').boundingBox()).height<480,'Template overview must expose three rules without excessive height');
+          assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-assigned-source svg rect[fill="#dc143c"]').count(),1,'Explicit Polish flag must override the Moscow fixture name');
+          if(width>=1920){const card=await page.locator('[data-cr-profile="ui-route-main"]').boundingBox();assert(card.width<900,'Routing cards must keep a readable width');assert(card.height<650,'Three rules and an assignment must remain compact');const scope=await page.locator('[data-cr-profile="ui-route-main"] .crx-card-flags').boundingBox();const rules=await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').boundingBox();assert(rules.y>=scope.y+scope.height,'Assignments must precede ordered rules inside each card');}
           assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-rule-chip').count(),3,'All three rules must be visible in the overview');
           assert((await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').innerText()).includes('ads.example.invalid'),'The third rule must not be silently omitted');
           await screenshot(page,'routing-list-'+width);
+        }
+        const galleryAppearance=await page.evaluate(()=>({surface:C.surface,theme:C.theme,language:XMeshI18n.getLanguage()}));
+        try{
+          for(const theme of ['dark','light'])for(const surface of ['solid','glass','raised']){
+            await page.setViewportSize({width:1920,height:1080});
+            await page.evaluate(({theme,surface})=>{C.theme=theme;C.surface=surface;apply()}, {theme,surface});
+            const material=await page.locator('[data-cr-profile="ui-route-main"]').evaluate(el=>({backdrop:getComputedStyle(el).backdropFilter,shadow:getComputedStyle(el).boxShadow,radius:getComputedStyle(el).borderRadius}));
+            if(surface==='glass')assert.notEqual(material.backdrop,'none','Routing Glass must inherit the shared backdrop material');
+            assert.notEqual(material.radius,'0px','Routing cards must inherit global rounding');
+            await screenshot(page,'routing-gallery-'+theme+'-'+surface);
+          }
+          await page.evaluate(async()=>{XMeshI18n.setLanguage('en');syncTopLanguage();await render(1)});
+          await page.locator('[data-cr-profile="ui-route-main"]').waitFor();
+          await page.waitForTimeout(150);
+          const englishRules=await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').innerText();assert(!/[А-Яа-яЁё]/u.test(englishRules),'Populated routing rules must be fully English: '+JSON.stringify(englishRules));
+          assert((await page.locator('[data-cr-profile="ui-route-main"] .crx-card-stats').innerText()).includes('3 rules'),'Populated counters must use English plurals');
+          await screenshot(page,'routing-gallery-english');
+        }finally{
+          await page.evaluate(initial=>{C.theme=initial.theme;C.surface=initial.surface;apply();XMeshI18n.setLanguage(initial.language);syncTopLanguage();render(1)},galleryAppearance);
+          await page.locator('[data-cr-profile="ui-route-main"]').waitFor();
         }
         await page.locator('[data-cr-source-open="ui-route-main"]').click();
         assert(await page.locator('[data-cr-source="node:'+node.id+'"]').isChecked(),'Assignment click must open the assigned source');
@@ -408,6 +429,16 @@ async function main() {
         await page.locator('[data-cr-reset]').click();
         assert.equal(await page.locator('[data-cr-profile]').count(),3,'Reset must restore saved templates');
         assert(await page.locator('[data-cr-bottom]').isHidden());
+        const demo=await page.evaluate(id=>{const target=DB.nodes.find(n=>n.id===id);const previous={name:target.name,profiles:structuredClone(DB.set.clientRoutingProfiles)};target.name='Польша';DB.set.clientRoutingProfiles=[{...DB.set.clientRoutingProfiles[0],rules:DB.set.clientRoutingProfiles[0].rules.slice(0,2)}];return previous},node.id);
+        try{
+          await page.setViewportSize({width:1920,height:1080});await page.evaluate(()=>render(1));
+          await page.locator('[data-cr-profile="ui-route-main"]').waitFor();
+          const single=await page.locator('[data-cr-profile="ui-route-main"]').boundingBox();
+          assert(single.width<900,'A single template must keep its readable card width');
+          assert.equal(await page.locator('[data-cr-profile]').count(),1);
+          assert.equal(await page.locator('.crx-assigned-source svg rect[fill="#dc143c"]').count(),1,'Polish assignment must retain its flag');
+          await screenshot(page,'routing-single-template');
+        }finally{await page.evaluate(({id,demo})=>{DB.nodes.find(n=>n.id===id).name=demo.name;DB.set.clientRoutingProfiles=demo.profiles},{id:node.id,demo})}
       }finally{
         if(await page.locator('dialog.crx-overlay[open]').count())await page.keyboard.press('Escape');
         await page.evaluate(value=>{DB.set.clientRoutingProfiles=value},original);
