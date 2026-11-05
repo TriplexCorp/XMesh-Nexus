@@ -3017,20 +3017,54 @@ function syncNodeEffectiveTls(form){
   const mode=state.mode;
   const toggle=form.querySelector('[data-node-tls-effective]'),status=form.querySelector('.node-tls-effective');
   const label=form.querySelector('[data-node-tls-state]'),indicator=form.querySelector('[data-node-tls-indicator]');
-  const preferences=form.querySelector('[data-node-tls-preferences]');
-  const hint=form.querySelector('[data-node-tls-note]'),feedback=form.querySelector('[data-node-tls-readiness]');
+  const feedback=form.querySelector('[data-node-tls-readiness]'),hint=form.querySelector('[data-node-tls-note]');
   const names={on:'ВКЛ — профиль использует TLS',off:'ВЫКЛ — сертификат TLS не используется',unconfigured:'Не настроено — выберите профиль'};
   if(status)status.dataset.state=mode;
   if(toggle){toggle.checked=mode==='on';toggle.setAttribute('aria-label',names[mode]);}
   if(label)label.textContent=names[mode];
   if(indicator)indicator.hidden=mode==='unconfigured';
-  if(preferences&&mode!=='on')preferences.open=false;
-  if(hint)hint.textContent=mode==='on'?'Выберите способ получения сертификата: автоматический выпуск или внешний сертификат из профиля.':'Настройки сохраняются для будущих TLS-профилей.';
   if(feedback){feedback.dataset.ready=state.ready?'yes':'no';feedback.dataset.mode=mode;
     feedback.textContent=mode==='on'?state.reason:mode==='off'?'Сертификат не требуется для выбранного Security.':'';}
-  const summary=preferences?.querySelector('summary');
-  if(summary)summary.textContent=mode==='on'&&!state.ready?'Настроить сертификат · требуется':'Параметры сертификата';
+  const method=state.method==='external'||field('tlsManualProvision')?.checked?'external':'acme';
+  for(const radio of form.querySelectorAll('[name="nodeTlsMethod"]'))radio.checked=radio.value===method;
+  const acme=form.querySelector('[data-node-tls-acme]'),external=form.querySelector('[data-node-tls-external]');
+  if(acme)acme.hidden=method!=='acme';
+  if(external)external.hidden=method!=='external';
+  if(hint)hint.textContent=mode==='on'?state.reason:'Настройки сертификата сохраняются для будущих TLS-профилей.';
+  const open=form.querySelector('[data-node-tls-open]');
+  if(open)open.textContent=mode==='on'&&!state.ready?'Настроить сертификат · требуется':'Настроить сертификат';
 }
+function openNodeTlsSetup(form,focusField=''){
+  if(!form||form.dataset.ent!=='nodes')return;
+  syncNodeEffectiveTls(form);
+  const modal=form.querySelector('[data-node-tls-dialog]');
+  if(!modal||modal.open)return;
+  modal.showModal();
+  const target=focusField&&form.elements.namedItem(focusField);
+  if(target&&!target.closest('[hidden]'))target.focus();
+  else (modal.querySelector('[name="nodeTlsMethod"]:checked')||modal.querySelector('[data-node-tls-close]'))?.focus();
+}
+document.addEventListener('click',event=>{
+  const trigger=event.target.closest?.('[data-node-tls-open]');
+  if(trigger){event.preventDefault();openNodeTlsSetup(trigger.closest('form'));return;}
+  const close=event.target.closest?.('[data-node-tls-close]');
+  if(close){event.preventDefault();close.closest('[data-node-tls-dialog]')?.close();}
+});
+document.addEventListener('change',event=>{
+  const radio=event.target.closest?.('form[data-ent="nodes"] [name="nodeTlsMethod"]');
+  if(!radio)return;
+  const form=radio.closest('form');
+  const acme=form.elements.namedItem('tlsAutoProvision'),external=form.elements.namedItem('tlsManualProvision');
+  if(acme)acme.checked=radio.value==='acme';
+  if(external)external.checked=radio.value==='external';
+  syncNodeEffectiveTls(form);
+});
+document.addEventListener('close',event=>{
+  if(event.target.matches?.('[data-node-tls-dialog]')){
+    const form=event.target.closest('form');
+    if(form?.isConnected&&form.closest('#dlg')?.open)form.querySelector('[data-node-tls-open]')?.focus();
+  }
+},true);
 
 document.addEventListener('change',event=>{
   if(event.target.matches?.('form[data-ent="nodes"] [name="profileId"]'))syncNodeEffectiveTls(event.target.closest('form'));
@@ -4635,11 +4669,7 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
         const profile=DB.profiles.find(p=>String(p.id)===String(d.profileId));
         const readiness=nodeTlsReadiness(profile,d);
         if(readiness.mode==='on'&&!readiness.ready){
-          const preferences=f.querySelector('[data-node-tls-preferences]');
-          if(preferences)preferences.open=true;
-          syncNodeEffectiveTls(f);
-          const target=readiness.field&&f.elements.namedItem(readiness.field);
-          target?.focus?.();
+          openNodeTlsSetup(f,readiness.field);
         }
       }
       return er(m);
