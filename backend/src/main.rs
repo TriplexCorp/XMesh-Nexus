@@ -3361,16 +3361,22 @@ async fn get_squad_traffic_24h(
         }));
     }
     let mut headers = HeaderMap::new();
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-store"),
+    );
     headers.insert(header::VARY, HeaderValue::from_static("Cookie"));
-    Ok((headers, Json(json!({
-        "source":"verified_traffic_deltas",
-        "sourceType":"user",
-        "range":"24h",
-        "membership":"current",
-        "bucketSeconds":3600,
-        "items":items
-    }))))
+    Ok((
+        headers,
+        Json(json!({
+            "source":"verified_traffic_deltas",
+            "sourceType":"user",
+            "range":"24h",
+            "membership":"current",
+            "bucketSeconds":3600,
+            "items":items
+        })),
+    ))
 }
 
 async fn get_traffic_metrics(
