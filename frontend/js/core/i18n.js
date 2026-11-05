@@ -11,6 +11,22 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Нет подтверждённых измерений":"No verified measurements",
+    "Подтверждённый трафик · 24 часа":"Verified user traffic · 24 hours",
+    "Последний срез":"Latest sample",
+    "Статистика недоступна":"Statistics unavailable",
+    "Группа доступа к подключениям Xray":"Xray connection access group",
+    "Действия со сквадом":"Squad actions",
+    "Назначенные inbound":"Assigned inbounds",
+    "Нет inbound":"No inbounds",
+    "Нет профиля для":"No profile for",
+    "Загрузка статистики…":"Loading statistics…",
+    "Трафик берётся только из подтверждённых персональных счётчиков Xray за 24 часа. Пользователь в нескольких сквадах учитывается в каждом из них.":"Traffic comes only from verified per-user Xray counters over 24 hours. Users assigned to multiple squads appear in each squad.",
+    "Хосты":"Hosts",
+    "Ноды":"Nodes",
+    "Последняя активность":"Last activity",
+    "Настроить":"Configure",
+    "Удалить":"Delete",
     "Доля трафика":"Traffic share",
     "Последний подтверждённый срез:":"Latest verified sample:",
     "Назначенные ресурсы и ограничения":"Assigned resources and limits",

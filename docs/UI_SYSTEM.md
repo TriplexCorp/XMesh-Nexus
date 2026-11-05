@@ -269,6 +269,29 @@ escaping helpers plus the country catalog. It owns no DB copy or route state.
 event dispatch and submit ownership. The module does not define styles or a
 second control/material system.
 
+#### Squads directory
+
+The Squad directory uses responsive content-height cards rather than a
+stretched table. Cards retain Nexus materials, tokens, controls, icon renderer,
+inbound chips and the existing Squad CRUD/editor. No per-squad device quota is
+invented. Summary counts derive only from existing user membership and enabled
+Host/Node relationships.
+
+The 24-hour sparkline and volume come exclusively from
+`GET /api/v1/squads/traffic/24h`, which aggregates `source_type='user'`
+signed `verified_traffic_deltas` for **current** Squad membership, in
+one-hour buckets. Never use node-network RX/TX as user consumption, fabricate
+missing hourly samples, infer deltas from lifetime counters, or sum inbound and
+user metric families. Sparse/empty data gets a truthful empty state, not a
+fake curve. A user assigned to multiple Squads appears in each Squad; these
+card totals are not additive for system billing. Latest activity reflects the
+last verified sample, not an unverified live connection.
+
+Do not create a new standalone card theme: use `--nx-panel-bg`,
+`--nx-border-strong`, `--nx-card-radius`, `--nx-panel-shadow` and
+the shared `ic()` icon set. Maintain keyboard-accessible editor and
+Delete actions and verify 1920/1366/mobile viewport geometry in Chromium.
+
 ### Empty states / Templates / Balancers
 
 Empty states stay compact and explicit. They do not become half-screen blank cards.

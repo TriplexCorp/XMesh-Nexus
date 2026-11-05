@@ -158,12 +158,45 @@ async function main() {
     const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
     const otherUser = await create('users',{username:`${prefix}-other`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
     await create('tpls',{name:`${prefix} · Standard`,limit:30,days:30,strategy:'NO_RESET',hwid:2,squads:[squad.id]});
+
     const fixtureBootstrap=await api('GET','/bootstrap');
     assert(fixtureBootstrap.collections?.profiles?.some(item=>item.id===profile.id),'Bootstrap не увидел тестовый профиль.');
     assert(fixtureBootstrap.collections?.nodes?.some(item=>item.id===node.id),'Bootstrap не увидел тестовый узел.');
     assert(fixtureBootstrap.collections?.users?.some(item=>item.id===user.id),'Bootstrap не увидел тестового пользователя.');
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
+
+    await checked('Squad cards: real access mapping, traffic source and responsive grid',async()=>{
+      const metrics=await api('GET','/squads/traffic/24h');
+      assert.equal(metrics.source,'verified_traffic_deltas');
+      assert.equal(metrics.sourceType,'user');
+      assert.equal(metrics.range,'24h');
+      assert.equal(metrics.membership,'current');
+      assert(Array.isArray(metrics.items),'Squad traffic must be backed by verified counter data');
+      for(const [width,height] of [[1920,1080],[1366,768],[390,844]]){
+        await page.setViewportSize({width,height});
+        await navigate('squads');
+        const card=page.locator(`[data-squad-card="${squad.id}"]`);
+        assert(await card.isVisible(),'Squad must render as a card');
+        assert.equal(await page.locator('.squad-card-grid [data-e]').count(),0,'Legacy table rows must not appear');
+        assert.equal(await card.locator('.squad-card-metrics strong').first().innerText(),'2','Members from current user assignments');
+        assert.equal(await card.locator('.squad-card-metrics strong').nth(1).innerText(),'1','Inbound count from saved squad');
+        assert.equal(await card.locator('.squad-card-relations b').first().innerText(),'1','Hosts from enabled host mapping');
+        await page.waitForFunction(id=>!!document.querySelector(`[data-squad-traffic="${id}"] .squad-card-traffic-value`),squad.id);
+        const g=await page.locator('.squad-card-grid').evaluate(el=>{
+          const rect=el.getBoundingClientRect();
+          return{left:rect.left,right:rect.right,viewport:innerWidth,
+            columns:getComputedStyle(el).gridTemplateColumns.split(' ').length};
+        });
+        assert(g.left>=0&&g.right<=g.viewport+1,'Cards must fit horizontally');
+        assert.equal(g.columns,width<860?1:width<1450?2:3,'Squad grid breakpoint must be deterministic');
+        await screenshot(page,`squad-cards-${width}x${height}`);
+        await card.locator('.squad-card-name').click();
+        assert(await page.locator('form[data-ent="squads"]').isVisible(),'Squad card must open existing CRUD editor');
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('dialog[open]',{state:'detached'});
+      }
+    });
 
     for (const [width,height] of sizes) {
       await page.setViewportSize({width,height});
