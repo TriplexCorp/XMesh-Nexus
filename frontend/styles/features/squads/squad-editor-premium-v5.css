@@ -599,6 +599,15 @@ dialog#dlg.squad-wide .squad-profile-filter select{
   background:transparent;color:var(--tx);box-shadow:none;
   font:inherit;font-size:.77rem;cursor:pointer;
 }
+dialog#dlg.squad-wide .squad-profile-filter .xm-select-shell{min-width:0;flex:1;width:auto}
+dialog#dlg.squad-wide .squad-profile-filter .xm-select-trigger{
+  min-height:38px;width:100%;padding:0 .2rem 0 .3rem;
+  border:0;border-radius:var(--ui-control-radius);background:transparent;
+  box-shadow:none;font-size:.77rem;white-space:nowrap;
+}
+dialog#dlg.squad-wide .squad-profile-filter .xm-select-caption{
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
 dialog#dlg.squad-wide .squad-profile-filter:focus-within{
   outline:2px solid var(--nx-focus);outline-offset:1px;
 }
