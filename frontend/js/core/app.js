@@ -4617,7 +4617,20 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     }catch(error){er('Не удалось сохранить пользователя: '+(error.message||'ошибка API'))}
     finally{delete f.dataset.saving;if(button?.isConnected)button.disabled=false}
   }
-  else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(key==='nodes'?e2.fs.filter(field=>!field.k.startsWith('geo')):e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
+  else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(key==='nodes'?e2.fs.filter(field=>!field.k.startsWith('geo')):e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m){
+      if(key==='nodes'){
+        const profile=DB.profiles.find(p=>String(p.id)===String(d.profileId));
+        const readiness=nodeTlsReadiness(profile,d);
+        if(readiness.mode==='on'&&!readiness.ready){
+          const preferences=f.querySelector('[data-node-tls-preferences]');
+          if(preferences)preferences.open=true;
+          syncNodeEffectiveTls(f);
+          const target=readiness.field&&f.elements.namedItem(readiness.field);
+          target?.focus?.();
+        }
+      }
+      return er(m);
+    }
     if(key==='admins'){
       if(!id&&d.password.length<16)return er('Для нового администратора требуется пароль минимум 16 символов.');
       if(id&&!d.password)delete d.password;
