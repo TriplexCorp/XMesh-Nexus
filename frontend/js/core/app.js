@@ -445,7 +445,7 @@ const normalizeCountrySearch=value=>String(value||'').normalize('NFKD')
  .replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('ru').replace(/ё/g,'е')
  .replace(/ß/g,'ss').replace(/æ/g,'ae').replace(/œ/g,'oe').replace(/ł/g,'l')
  .replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
-const COUNTRY_CYRILLIC_ROMAN={а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'kh',ц:'ts',ч:'ch',ш:'sh',щ:'shch',ы:'y',э:'e',ю:'yu',я:'ya',ь:'',ъ:'',і:'i',ї:'yi',є:'ye',ґ:'g'};
+const COUNTRY_CYRILLIC_ROMAN={\u0430:'a',\u0431:'b',\u0432:'v',\u0433:'g',\u0434:'d',\u0435:'e',\u0436:'zh',\u0437:'z',\u0438:'i',\u0439:'y',\u043a:'k',\u043b:'l',\u043c:'m',\u043d:'n',\u043e:'o',\u043f:'p',\u0440:'r',\u0441:'s',\u0442:'t',\u0443:'u',\u0444:'f',\u0445:'kh',\u0446:'ts',\u0447:'ch',\u0448:'sh',\u0449:'shch',\u044b:'y',\u044d:'e',\u044e:'yu',\u044f:'ya',\u044c:'',\u044a:'',\u0456:'i',\u0457:'yi',\u0454:'ye',\u0491:'g'};
 const countryRomanize=value=>[...normalizeCountrySearch(value)].map(ch=>COUNTRY_CYRILLIC_ROMAN[ch]??ch).join('');
 const countrySearchForms=variants=>[...new Set(variants.flatMap(value=>{
  const form=normalizeCountrySearch(value);
