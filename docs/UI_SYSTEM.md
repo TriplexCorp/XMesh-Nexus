@@ -313,6 +313,17 @@ Do not create a new standalone card theme: use `--nx-panel-bg`,
 the shared `ic()` icon set. Maintain keyboard-accessible editor and
 Delete actions and verify 1920/1366/mobile viewport geometry in Chromium.
 
+#### Squad impact summary
+
+Squad editing shows **four counts only** in its always-visible impact
+preview: selected inbound, enabled matching hosts, assigned nodes, affected
+users. Host/user/node identities remain available in one native, collapsed
+`<details>` disclosure (closed by default). Preserve the disclosure state when
+live inbound selection changes, and never hide warnings about missing inbound,
+uncovered hosts, or missing node assignments. Do not render a sprawling chip
+list in the default editor. The same rule applies across Classic / Glass /
+Raised; do not introduce separate surfaces or controls.
+
 #### Squad editor
 
 Squad create/edit stays a single native Nexus dialog (not an independent visual
