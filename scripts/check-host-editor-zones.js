@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 'use strict';
-const {panelStyles}=require('./ci/frontend-source.cjs');
+const {frontendAsset,panelStyles,assertPackaged}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const css=panelStyles();
 new Function(app); // Catch invalid JavaScript before shipping any layout changes.
-const start=app.indexOf('function hostEditorMarkup(o,e){');
-const end=app.indexOf('\nfunction squadEditorMarkup(',start);
-assert(start>=0&&end>start,'Missing host editing template');
-const source=app.slice(start,end);
+const feature=fs.readFileSync(frontendAsset('host-editor.js'),'utf8');
+new Function(feature);
+const scope={};
+new Function('window',feature)(scope);
+assert.deepEqual(Object.keys(scope),['XMeshHostEditor'],'Hosts must expose one explicit factory, not new implicit globals');
+assert.deepEqual(Object.keys(scope.XMeshHostEditor),['create']);
+assert(Object.isFrozen(scope.XMeshHostEditor),'The feature namespace must not carry mutable application state');
 const DB={
   profiles:[{id:1,name:'Sample profile'}],
   nodes:[{id:5,name:'Netherlands',addr:'example.net',port:443,profileId:1}],
@@ -18,19 +21,27 @@ const field=(f,value)=>'<label class="f"><span>'+f.l+'</span><input name="'+f.k+
 const names=['profileId','tag','nodes','disabled','remark','address','port','countryCode',
  'sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'];
 const fspec=names.map(k=>({k,l:k}));
-const editor=new Function('DB','hostProfile','inbs','field','esc','ic',source+'\nreturn hostEditorMarkup;')(
- DB,()=>DB.profiles[0],()=>[{tag:'vless-main-2',protocol:'vless'}],
- field,x=>String(x).replace(/&/g,'&amp;').replace(/"/g,'&quot;'),()=>''
-);
-const helperStart=app.indexOf('function hostNodeCountryCode(node){');
-const helperEnd=app.indexOf('function hostProfile(',helperStart);
-assert(helperStart>=0&&helperEnd>helperStart,'Missing canonical node country preset helpers');
 const countries=[{code:'NL',flag:'🇳🇱'},{code:'PL',flag:'🇵🇱'},{code:'DE',flag:'🇩🇪'}];
 const flag=code=>String.fromCodePoint(...code.split('').map(c=>127397+c.charCodeAt(0)));
-const helpers=new Function('COUNTRY_CODES','COUNTRIES','countryFlag',
-  app.slice(helperStart,helperEnd)+'return {hostNodeCountryCode,hostNodeCountryRemark,hostAutofillNodeFields};')(
-  countries.map(c=>c.code),countries,flag
-);
+const helpers=scope.XMeshHostEditor.create({
+ getProfiles:()=>DB.profiles,getNodes:()=>DB.nodes,
+ findProfile:id=>DB.profiles.find(p=>String(p.id)===String(id)),
+ inbounds:()=>[{tag:'vless-main-2',protocol:'vless'}],renderField:field,
+ escapeHtml:x=>String(x).replace(/&/g,'&amp;').replace(/"/g,'&quot;'),icon:()=>'',
+ countryCodes:countries.map(c=>c.code),countries,countryFlag:flag
+});
+assert(Object.isFrozen(helpers),'An instance must only expose its bounded operations');
+const editor=helpers.hostEditorMarkup;
+const index=fs.readFileSync('frontend/index.html','utf8');
+assert.match(index,/<script src="\/js\/features\/hosts\/host-editor\.js\?v=[a-f0-9]{12}"><\/script>/,'Hosts must use a content-addressed classic script');
+assert(index.indexOf('/js/features/hosts/host-editor.js?v=')<index.indexOf('/js/core/app.js?v='),'Hosts factory must load before app consumes it');
+assertPackaged(assert,['host-editor.js']);
+for(const name of ['hostEditorMarkup','hostNodeCountryCode','hostNodeCountryRemark','hostAutofillNodeFields']){
+ assert(!app.includes('function '+name+'('),'Moved function must not remain duplicated in app.js: '+name);
+ assert.equal((feature.match(new RegExp('function '+name+'\\(','g'))||[]).length,1,'Feature must own exactly one '+name);
+}
+assert.match(app,/getProfiles:\(\)=>DB\.profiles,getNodes:\(\)=>DB\.nodes/,'The adapter must read live collections instead of copying mutable DB');
+assert.match(app,/hostEditorMarkup\(o,e\.fs\)/,'Hosts renderer receives only the relevant field schema');
 assert.equal(helpers.hostNodeCountryCode({flag:'🇳🇱'}),'NL','Flag emoji must resolve to ISO country');
 assert.equal(helpers.hostNodeCountryCode({flag:'pl'}),'PL','Legacy ISO flag must be accepted');
 assert.equal(helpers.hostNodeCountryCode({countryCode:'DE',flag:'🇳🇱'}),'DE','Explicit node ISO must be authoritative');
@@ -40,6 +51,8 @@ assert.equal(helpers.hostNodeCountryRemark({flag:'NL',name:'Нидерланды
 assert.equal(helpers.hostNodeCountryRemark({countryCode:'DE',flag:'🇵🇱',name:'Custom Berlin'}),'🇩🇪 Custom Berlin','Explicit ISO override determines the emoji while preserving node name');
 assert.equal(helpers.hostNodeCountryRemark({flag:'PL',name:'Warsaw Premium #2'}),'🇵🇱 Warsaw Premium #2','Custom names must be transferred verbatim');
 assert.equal(helpers.hostNodeCountryRemark({flag:'PL',name:'  Польша  '}),'🇵🇱 Польша','Surrounding whitespace must not leak into client remarks');
+assert.equal(helpers.hostNodeCountryRemark({flag:'DE',name:'Germany Premium'}),'🇩🇪 Germany Premium');
+assert.equal(helpers.hostNodeCountryRemark({flag:'PL',name:'  '}),'🇵🇱');
 assert.equal(helpers.hostNodeCountryRemark({flag:'PL'}),'🇵🇱','Unnamed node retains its flag');
 assert.equal(helpers.hostNodeCountryRemark({name:'Custom node',flag:'❓'}),'Custom node','Unknown country must not generate a fake flag');
 const fields={remark:{value:''},countryCode:{value:''}};
@@ -56,7 +69,7 @@ assert.equal(fields.countryCode.value,'PL','Explicit node preset must update cou
 assert.match(app,/hostAutofillNodeFields\(form,node,true\)/,'Node preset must fill country and remark');
 assert.match(app,/remark:hostNodeCountryRemark\(node\)\|\|'Новый хост',countryCode/,'Create Host from a node must use emoji for client and ISO for routing');
 const html=editor({profileId:1,tag:'vless-main-2',remark:'🇳🇱',
- address:'example.net',port:443,nodes:[5]}, {fs:fspec});
+ address:'example.net',port:443,nodes:[5]}, fspec);
 const sections=[...html.matchAll(/<section class="([^"]+)"/g)].map(x=>x[1]);
 assert.deepEqual(sections,[
  'host-editor-main host-primary-panel',
@@ -72,6 +85,16 @@ for(const action of ['data-host-node-preset','data-host-count','data-host-resolv
  assert(html.includes(action),'Missing working host editor action '+action);
 }
 assert(!html.includes('<details'),'Advanced options must be always visible');
+// Bootstrap refreshes replace arrays. An existing feature instance must see
+// the new collections and must leave their objects untouched during rendering.
+DB.profiles=[{id:2,name:'Replacement profile'}];
+DB.nodes=[{id:6,name:'Replacement node',addr:'new.example.net',profileId:2}];
+const snapshot=JSON.stringify(DB);
+const updated=editor({profileId:2},fspec);
+assert(updated.includes('Replacement node'),'The factory must not retain stale node arrays');
+assert(updated.includes('name="profileId" value="2"'),'The factory must not retain stale profiles');
+assert.equal(JSON.stringify(DB),snapshot,'Rendering must not mutate application collections');
+
 
 // Host geometry is feature-owned inside the canonical panel graph. Desktop keeps
 // three permanent zones on one row; smaller viewports deliberately reflow them.

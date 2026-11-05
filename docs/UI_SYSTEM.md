@@ -238,6 +238,14 @@ Short tables are short surfaces. They do not reserve fleet-scale height. Empty p
 
 Large data sets may use more horizontal space, but form controls and text still need deliberate reading widths.
 
+Host editor markup and Node → Host country/remark presets belong to
+`frontend/js/features/hosts/host-editor.js`. Its classic-script factory receives
+live profile/node getters, profile/inbound lookup and the existing field/icon/
+escaping helpers plus the country catalog. It owns no DB copy or route state.
+`app.js` supplies the adapter and retains live preview, validation, X25519,
+event dispatch and submit ownership. The module does not define styles or a
+second control/material system.
+
 ### Empty states / Templates / Balancers
 
 Empty states stay compact and explicit. They do not become half-screen blank cards.
