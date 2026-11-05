@@ -19,34 +19,11 @@
  font-weight:800;padding-inline:1.1rem
 }
 .sv-studio button.sv-primary:hover{background:color-mix(in srgb,var(--vaccent) 83%,white)}
-/* Product header */
-.sv-studio .sv-title{
- display:flex;align-items:center;gap:.85rem;min-height:4.2rem;
- padding:.25rem 0 .55rem;border-bottom:1px solid color-mix(in srgb,var(--vline) 70%,transparent)
-}
-.sv-title-symbol{
- display:grid;place-items:center;flex:none;width:2.75rem;height:2.75rem;
- border:1px solid color-mix(in srgb,var(--vaccent) 28%,var(--vline));border-radius:var(--nx-control-radius);
- background:color-mix(in srgb,var(--vaccent) 10%,var(--vpanel));color:var(--vaccent)
-}
-.sv-title-symbol svg{height:1.3rem;width:1.3rem}
-.sv-title-copy{display:grid;min-width:0;gap:.07rem}
-.sv-studio .sv-eyebrow{
- color:var(--vaccent);font-size:.63rem;letter-spacing:.12em;font-weight:800
-}
-.sv-title-copy h2{font-size:1.3rem;line-height:1.2;margin:0;letter-spacing:-.035em;font-weight:830}
-.sv-studio .sv-subtitle{color:var(--vmute);font-size:.77rem;line-height:1.45;margin:.08rem 0 0}
-.sv-title-mode{
- display:inline-flex;align-items:center;gap:.5rem;margin-left:auto;flex:none;
- padding:.4rem .65rem;border:1px solid var(--vline);border-radius:var(--nx-control-radius);
- color:var(--vmute);font:750 .65rem/1.2 var(--vcode);letter-spacing:.04em
-}
-.sv-live-dot{width:.45rem;height:.45rem;border-radius:50%;background:var(--vaccent)}
 /* Product navigation + commands */
 .sv-studio .sv-topbar{
- display:flex;min-width:0;min-height:4.25rem;
- padding:.45rem .6rem;border:1px solid var(--vline);border-radius:var(--nx-control-radius);
- background:var(--vpanel)
+ display:flex;min-width:0;min-height:3.4rem;
+ padding:.35rem 0 .65rem;border:0;border-bottom:1px solid var(--vline);border-radius:0;
+ background:transparent
 }
 .sv-studio .sv-topbar>.sv-page-tabs{margin:0;
  border:0;background:transparent
@@ -81,7 +58,7 @@
  display:flex;flex-wrap:wrap;align-items:center;
  gap:.45rem
 }
-.sv-studio .sv-topbar>.sv-actions button{min-height:2.55rem;padding:.5rem .75rem}
+.sv-studio .sv-topbar>.sv-actions button{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;min-height:2.55rem;padding:.5rem .75rem;white-space:nowrap}
 .sv-studio .sv-topbar>.sv-actions .sv-primary{min-width:7.2rem}
 .sv-action-divider{height:1.45rem;align-self:center;border-left:1px solid var(--vline);margin:0 .1rem}
 .sv-studio.sv-profiles-active .sv-topbar>.sv-actions{display:none}
@@ -92,7 +69,7 @@
 .sv-studio .sv-workspace{
  display:grid;grid-template-columns:minmax(0,1fr) minmax(15.75rem,17.5rem);
  grid-template-rows:minmax(0,1fr);min-width:0;width:100%;
- height:clamp(36rem,calc(100dvh - 16rem),74rem);
+ height:clamp(28rem,calc(100dvh - 12rem),74rem);
  border:1px solid var(--vline);border-radius:var(--nx-control-radius);
  background:var(--vpanel);overflow:hidden;
 }
@@ -140,6 +117,7 @@
  background:transparent;border-color:transparent;font-size:.77rem
 }
 .sv-studio .sv-codebar-actions button:hover{background:var(--vfield);border-color:var(--vline)}
+.sv-codebar-actions button{display:inline-flex;align-items:center;justify-content:center;gap:.4rem}
 .sv-codebar-actions button[aria-expanded=true]{color:var(--vaccent)}
 .sv-codebar-divider{height:1.25rem;border-left:1px solid var(--vline);margin:0 .18rem}
 /* Commands — two quiet, readable groups, instead of a rainbow toolbar. */
@@ -155,18 +133,18 @@
 }
 .sv-studio .xm-tools-grid{display:flex;align-items:center;flex-wrap:wrap}
 .sv-studio .sv-inline-tools .sv-toolitem{
- display:inline-flex;align-items:center;justify-content:flex-start;gap:.5rem;
- width:auto;min-height:2.35rem;padding:.3rem .72rem .3rem .38rem;
- background:var(--vfield);border:1px solid var(--vline);border-radius:var(--nx-control-radius);
- color:var(--vtext);font-weight:710;font-size:.75rem
+ display:inline-flex;align-items:center;justify-content:flex-start;gap:.4rem;
+ width:auto;min-height:2.35rem;padding:.3rem .5rem;
+ background:transparent;border:1px solid transparent;border-radius:var(--nx-control-radius);
+ color:var(--vtext);font-weight:650;font-size:.75rem
 }
 .sv-studio .sv-inline-tools .sv-toolitem:hover{
  background:color-mix(in srgb,var(--vaccent) 8%,var(--vfield));
  border-color:color-mix(in srgb,var(--vaccent) 45%,var(--vline))
 }
 .sv-studio .sv-tool-glyph{
- display:grid;place-items:center;flex:none;width:1.55rem;height:1.55rem;
- border-radius:var(--nx-control-radius);background:color-mix(in srgb,var(--vaccent) 10%,var(--vpanel));color:var(--vaccent)
+ display:grid;place-items:center;flex:none;width:1rem;height:1rem;
+ border-radius:0;background:transparent;color:var(--vmute)
 }
 .sv-studio .sv-tool-glyph svg{display:block;width:.94rem;height:.94rem}
 .sv-studio .sv-tool-label{white-space:nowrap}
@@ -187,6 +165,9 @@
  gap:.65rem 1rem;padding:0 0 .6rem;margin-bottom:.6rem;
  border-bottom:1px solid color-mix(in srgb,var(--vline) 66%,transparent)
 }
+/* With one inbound the command labels already describe the context. Keep
+ * the context row only when it contains a selector or an invalid-JSON notice. */
+.sv-studio .xm-tools-header:not(:has(.xm-tool-inbound)):has(+.xm-tools-groups){display:none}
 .sv-studio .xm-tools-identity{
  display:flex;align-items:center;flex-wrap:wrap;gap:.35rem .7rem;min-width:0;
 }
@@ -226,7 +207,7 @@
 }
 .sv-studio .xm-tool-cluster:last-child{padding-right:0;border-right:0}
 .sv-studio .xm-tools-grid{gap:.35rem}
-.sv-studio .xm-tools-groups{gap:.55rem .9rem}
+.sv-studio .xm-tools-groups{gap:.45rem .6rem}
 @container sv-studio-workspace (max-width:940px){
  .sv-studio .xm-tools-header{align-items:flex-start;flex-direction:column}
  .sv-studio .xm-tools-current-tag{max-width:100%}
@@ -318,7 +299,7 @@
 }
 .sv-outline-head{
  display:flex;align-items:center;justify-content:space-between;flex:none;gap:.75rem;
- min-height:4.15rem;padding:1rem 1rem .8rem;border-bottom:1px solid var(--vline)
+ min-height:3.65rem;padding:.7rem 1rem;border-bottom:1px solid var(--vline)
 }
 .sv-outline-eyebrow{font-size:.59rem;font-weight:800;letter-spacing:.08em;color:var(--vaccent)}
 .sv-outline-head h3{font-size:1rem;margin:.17rem 0 0;letter-spacing:-.02em}
@@ -330,8 +311,8 @@
 .sv-overview-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.3rem}
 .sv-overview-metrics>div{
  display:flex;flex-direction:column;gap:.22rem;align-items:center;
- padding:.72rem .15rem;border:1px solid var(--vline);
- border-radius:var(--nx-control-radius);background:var(--vfield)
+ padding:.5rem .15rem;border:0;
+ border-radius:0;background:transparent
 }
 .sv-overview-metrics strong{font-size:1.12rem;line-height:1.1;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
 .sv-overview-metrics span{font-size:.62rem;color:var(--vmute)}
@@ -346,8 +327,8 @@
  display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;
  align-items:center;text-align:left;column-gap:.35rem;row-gap:.1rem;
  width:100%;min-width:0;min-height:2.95rem;padding:.54rem .67rem;
- border:1px solid var(--vline);border-radius:var(--nx-control-radius);
- background:color-mix(in srgb,var(--vfield) 65%,var(--vpanel));color:var(--vtext)
+ border:0;border-bottom:1px solid var(--vline);border-radius:0;
+ background:transparent;color:var(--vtext)
 }
 .sv-studio .sv-outline-item:hover{border-color:var(--vaccent);background:var(--vfield)}
 .sv-outline-item-label{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:750;font-size:.74rem}
