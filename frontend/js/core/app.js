@@ -3017,25 +3017,38 @@ function nodeTlsReadiness(profile,data={}){
 }
 function syncNodeEffectiveTls(form){
   if(!form||form.dataset.ent!=='nodes')return;
-  const profileId=form.elements.namedItem('profileId')?.value;
-  const profile=DB.profiles.find(p=>String(p.id)===String(profileId));
-  const mode=nodeEffectiveTlsMode(profile);
-  const toggle=form.querySelector('[data-node-tls-effective]');
-  const status=form.querySelector('.node-tls-effective');
-  if(status)status.dataset.state=mode;
-  const label=form.querySelector('[data-node-tls-state]');
-  const indicator=form.querySelector('[data-node-tls-indicator]');
+  const field=k=>form.elements.namedItem(k);
+  const profile=DB.profiles.find(p=>String(p.id)===String(field('profileId')?.value));
+  const state=nodeTlsReadiness(profile,{addr:field('addr')?.value,tlsDomain:field('tlsDomain')?.value,
+    tlsAcmeEmail:field('tlsAcmeEmail')?.value,tlsAutoProvision:field('tlsAutoProvision')?.checked,
+    tlsManualProvision:field('tlsManualProvision')?.checked});
+  const mode=state.mode;
+  const toggle=form.querySelector('[data-node-tls-effective]'),status=form.querySelector('.node-tls-effective');
+  const label=form.querySelector('[data-node-tls-state]'),indicator=form.querySelector('[data-node-tls-indicator]');
   const preferences=form.querySelector('[data-node-tls-preferences]');
-  const hint=form.querySelector('[data-node-tls-note]');
-  const names={on:'ВКЛ — профиль использует TLS',off:'ВЫКЛ — сертификат TLS не используется',unconfigured:'Не настроено — выберите корректный профиль'};
+  const hint=form.querySelector('[data-node-tls-note]'),feedback=form.querySelector('[data-node-tls-readiness]');
+  const names={on:'ВКЛ — профиль использует TLS',off:'ВЫКЛ — сертификат TLS не используется',unconfigured:'Не настроено — выберите профиль'};
+  if(status)status.dataset.state=mode;
   if(toggle){toggle.checked=mode==='on';toggle.setAttribute('aria-label',names[mode]);}
   if(label)label.textContent=names[mode];
   if(indicator)indicator.hidden=mode==='unconfigured';
   if(preferences&&mode!=='on')preferences.open=false;
-  if(hint)hint.textContent=mode==='on'?'Можно выбрать способ получения сертификата.':'Настройки сохранены, но при выбранном Security сертификат TLS не используется.';
+  if(hint)hint.textContent=mode==='on'?'Выберите способ получения сертификата: автоматический выпуск или внешний сертификат из профиля.':'Настройки сохраняются для будущих TLS-профилей.';
+  if(feedback){feedback.dataset.ready=state.ready?'yes':'no';feedback.dataset.mode=mode;
+    feedback.textContent=mode==='on'?state.reason:mode==='off'?'Сертификат не требуется для выбранного Security.':'';}
+  const summary=preferences?.querySelector('summary');
+  if(summary)summary.textContent=mode==='on'&&!state.ready?'Настроить сертификат · требуется':'Параметры сертификата';
 }
+
 document.addEventListener('change',event=>{
   if(event.target.matches?.('form[data-ent="nodes"] [name="profileId"]'))syncNodeEffectiveTls(event.target.closest('form'));
+});
+
+document.addEventListener('input',event=>{
+  if(event.target.matches?.('form[data-ent="nodes"] :is([name="addr"],[name="tlsDomain"],[name="tlsAcmeEmail"])'))syncNodeEffectiveTls(event.target.closest('form'));
+});
+document.addEventListener('change',event=>{
+  if(event.target.matches?.('form[data-ent="nodes"] :is([name="tlsAutoProvision"],[name="tlsManualProvision"])'))syncNodeEffectiveTls(event.target.closest('form'));
 });
 
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
