@@ -1868,7 +1868,7 @@ async function main() {
     // activating a node or writing synthetic telemetry to the backend.
     const runtimePattern=/\/api\/v1\/nodes\/\d+\/runtime(?:\?.*)?$/;
     const runtimeFixture=async route=>{
-      if(new URL(route.request().url()).pathname!==`/api/v1/nodes/${node.id}/runtime`)return route.continue();
+      if(![node.id,hostPresetNode.id].some(id=>new URL(route.request().url()).pathname===`/api/v1/nodes/${id}/runtime`))return route.continue();
       await route.fulfill({json:{connected:true,xrayUpdateSupported:true,version:'control-v6.0.7',xrayVersion:'26.10.31',xrayRunning:true,routerRunning:true,desiredRevisionSource:'current',desiredRevision:'fixture',appliedRevision:'fixture',tlsStatus:{state:'valid',daysRemaining:87},geoData:{state:'current',files:{geoip:{},geosite:{}}}}});
     };
     const metricsPattern='**/api/v1/statistics/overview';
@@ -1882,6 +1882,14 @@ async function main() {
     await page.route(metricsPattern,metricsFixture);
     try{
       await page.reload({waitUntil:'domcontentloaded'});
+      await checked('TLS certificate is visible for profile-derived TLS without manual flags',async()=>{
+        await navigate('nodes');
+        const card=page.locator(`[data-node-card-id="${hostPresetNode.id}"]`);
+        const badge=card.locator('[data-node-tls-status]');
+        await badge.waitFor({state:'visible'});
+        await page.waitForFunction(id=>document.querySelector(`[data-node-card-id="${id}"] [data-node-tls-label]`)?.textContent.includes('87'),hostPresetNode.id);
+        assert.match(await badge.innerText(),/87 дн\./,'TLS certificate expiry days should be visible on the node card');
+      });
       await checked('Xray release picker: control-v6 loading animation and catalog',async()=>{
         // A control-v6 heartbeat must not be rejected by the historic v3/v4
         // browser regex. Only the backend-authorized capability is consulted.
