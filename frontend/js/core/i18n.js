@@ -11,6 +11,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    // Squad directory search controls.
+    "Поиск сквадов":"Search squads",
+    "Поиск по названию, описанию или inbound":"Search by name, description or inbound",
+    "Попробуйте другой запрос или очистите поиск.":"Try another query or clear the search.",
     // Host directory cards and clipboard actions.
     "Всего хостов":"Total hosts",
     "Активных":"Active",

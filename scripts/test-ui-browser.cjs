@@ -295,6 +295,47 @@ async function main() {
       }
     });
 
+    await checked('Squad directory: instant search by name, description and inbound',async()=>{
+      for(const [width,height] of [[1920,1080],[390,844]]){
+        await page.setViewportSize({width,height});
+        await navigate('squads');
+        const search=page.locator('[data-squad-search]');
+        const card=page.locator('[data-squad-card="'+squad.id+'"]');
+        const clear=page.locator('[data-squad-search-clear]');
+        const empty=page.locator('[data-squad-search-empty]');
+        await search.waitFor({state:'visible'});
+        assert(await card.isVisible(),'Squad must be initially visible');
+        const before=await page.locator('.squad-card-grid .squad-card:visible').count();
+        assert(before>=1,'Squad inventory must contain test squad');
+        for(const phrase of [squad.name,'Данные браузерной проверки',inboundTag.toUpperCase()]){
+          await search.fill(phrase);
+          assert(await card.isVisible(),'Search must match name, description and inbound (case-insensitive): '+phrase);
+          assert.equal(await page.locator('.squad-card-grid .squad-card:visible').count(),1,
+            'Search result must not include unrelated squads');
+          assert(await page.locator('[data-squad-search-count]').isVisible(),'Search must display result count');
+          assert.equal(await page.locator('[data-squad-search-count-value]').innerText(),'1');
+        }
+        await search.fill('___no_squad_matches_this_phrase___');
+        assert.equal(await page.locator('.squad-card-grid .squad-card:visible').count(),0);
+        assert(await empty.isVisible(),'Empty search must have a visible explanation');
+        assert.equal(await page.locator('[data-squad-search-count-value]').innerText(),'0');
+        await clear.click();
+        assert.equal(await search.inputValue(),'');
+        assert.equal(await page.locator('.squad-card-grid .squad-card:visible').count(),before);
+        assert(!(await empty.isVisible()),'Empty search state must disappear on clear');
+        await search.fill('___nothing___');
+        await search.press('Escape');
+        assert.equal(await search.inputValue(),'','Escape must clear active search');
+        assert(await card.isVisible(),'Escape must restore squad cards');
+        const layout=await page.locator('.squad-directory-actions').evaluate(el=>{
+          const bounds=el.getBoundingClientRect(),input=el.querySelector('[data-squad-search]').getBoundingClientRect();
+          return{bounds:{left:bounds.left,right:bounds.right},input:{left:input.left,right:input.right},viewport:window.innerWidth};
+        });
+        assert(layout.bounds.left>=0&&layout.bounds.right<=layout.viewport+1,'Search toolbar must fit viewport');
+        assert(layout.input.left>=layout.bounds.left&&layout.input.right<=layout.bounds.right+1,'Search must stay within toolbar');
+      }
+    });
+
     await checked('Squad cards: real access mapping, traffic source and responsive grid',async()=>{
       const metrics=await api('GET','/squads/traffic/24h');
       assert.equal(metrics.source,'verified_traffic_deltas');

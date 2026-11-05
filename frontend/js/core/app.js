@@ -2742,8 +2742,32 @@ async function loadSquadCardTraffic(root){
     }
   }
 }
+// Preserve the user's filter across in-place edits and data refreshes.
+let squadSearchQuery='';
+const squadSearchKey=value=>String(value||'').normalize('NFKC').toLocaleLowerCase();
+function applySquadSearch(root){
+  const input=root?.querySelector('[data-squad-search]');
+  if(!input)return;
+  const query=squadSearchKey(input.value.trim());
+  const cards=[...root.querySelectorAll('.squad-card-grid .squad-card')];
+  let matches=0;
+  for(const card of cards){
+    const visible=!query||squadSearchKey(card.dataset.squadSearchText).includes(query);
+    card.hidden=!visible;
+    if(visible)matches++;
+  }
+  const clear=root.querySelector('[data-squad-search-clear]');
+  if(clear)clear.hidden=!input.value;
+  const count=root.querySelector('[data-squad-search-count]');
+  if(count)count.hidden=!query;
+  const value=root.querySelector('[data-squad-search-count-value]');
+  if(value)value.textContent=String(matches);
+  const empty=root.querySelector('[data-squad-search-empty]');
+  if(empty)empty.hidden=!query||matches>0;
+}
 async function squadsP(){
   const {items}=await api.list('squads',{sort:'id'});
+  if(!items.length)squadSearchQuery='';
   const knownTags=new Set(DB.profiles.flatMap(p=>inbs(p).map(i=>String(i.tag||''))));
   const cards=items.map(s=>{
     const tags=[...new Set((Array.isArray(s.inb)?s.inb:[]).map(String))];
@@ -2753,7 +2777,8 @@ async function squadsP(){
     const missing=tags.filter(tag=>!knownTags.has(tag));
     const display=String(s.name||'Сквад');
     const icon=/(?:tls|secure|защит)/i.test(display)?'shield':/(?:vless|reality)/i.test(display)?'activity':/(?:hysteria)/i.test(display)?'activity':/(?:masque)/i.test(display)?'layers':/(?:trojan)/i.test(display)?'key':'layers';
-    return '<article class="squad-card" data-squad-card="'+esc(s.id)+'">'+
+    const searchText=[display,s.desc||'',...tags].join(' ');
+    return '<article class="squad-card" data-squad-card="'+esc(s.id)+'" data-squad-search-text="'+esc(searchText)+'">'+
       '<header class="squad-card-head"><div class="squad-card-emblem">'+ic(icon)+'</div>'+
       '<div class="squad-card-identity"><button type="button" class="squad-card-name" data-ne="squads:'+esc(s.id)+'">'+esc(display)+'</button>'+
       '<p>'+esc(s.desc||'Группа доступа к подключениям Xray')+'</p></div>'+
@@ -2769,13 +2794,33 @@ async function squadsP(){
       '<div class="squad-card-traffic" data-squad-traffic="'+esc(s.id)+'" aria-live="polite"><span class="squad-card-traffic-loading">'+ic('activity')+' Загрузка статистики…</span></div>'+
       '</article>';
   }).join('');
+  const search=items.length?'<div class="squad-directory-search">'+ic('search')+
+    '<input type="search" data-squad-search aria-label="Поиск сквадов" placeholder="Поиск по названию, описанию или inbound" autocomplete="off" spellcheck="false" value="'+esc(squadSearchQuery)+'">'+
+    '<button type="button" class="squad-directory-search-clear" data-squad-search-clear aria-label="Очистить поиск" title="Очистить поиск" '+(squadSearchQuery?'':'hidden')+'>'+ic('x')+'</button></div>':'';
   const html='<section class="squad-directory"><div class="squad-directory-toolbar"><p>Доступ пользователей к подключениям Xray.</p>'+
-    '<button type="button" class="btn sm" data-ne="squads">'+ic('plus')+' Сквад</button></div>'+
-    (items.length?'<div class="squad-card-grid" data-ui-layout="cards">'+cards+'</div>'+
+    '<div class="squad-directory-actions">'+search+'<button type="button" class="btn sm" data-ne="squads">'+ic('plus')+' Сквад</button></div></div>'+
+    (items.length?'<p class="squad-directory-search-count" data-squad-search-count hidden><span>Найдено:</span> <b data-squad-search-count-value></b></p>'+
+    '<div class="squad-card-grid" data-ui-layout="cards">'+cards+'</div>'+
+    '<div class="squad-directory-search-empty" data-squad-search-empty hidden>'+ic('search')+
+    '<b>Совпадений не найдено</b><span>Попробуйте другой запрос или очистите поиск.</span></div>'+
     '<p class="squad-directory-note">'+ic('shield')+' Трафик берётся только из подтверждённых персональных счётчиков Xray за 24 часа. Пользователь в нескольких сквадах учитывается в каждом из них.</p>':
     '<div class="card empty"><b>Сквадов пока нет</b><span>Создайте группу доступа на основе inbound.</span><button class="gh sm" data-ne="squads">'+ic('plus')+' Сквад</button></div>')+
     '</section>';
-  return [html,()=>{const root=$('.squad-directory');if(items.length)void loadSquadCardTraffic(root)}];
+  return [html,()=>{
+    const root=$('.squad-directory');
+    if(!root||!items.length)return;
+    const input=root.querySelector('[data-squad-search]');
+    input?.addEventListener('input',()=>{squadSearchQuery=input.value;applySquadSearch(root)});
+    input?.addEventListener('keydown',event=>{
+      if(event.key!=='Escape'||!input.value)return;
+      event.preventDefault();squadSearchQuery='';input.value='';applySquadSearch(root);
+    });
+    root.querySelector('[data-squad-search-clear]')?.addEventListener('click',()=>{
+      squadSearchQuery='';input.value='';applySquadSearch(root);input.focus();
+    });
+    applySquadSearch(root);
+    void loadSquadCardTraffic(root);
+  }];
 }
 
 /* Host directory: use existing persisted Host records and readiness contract.

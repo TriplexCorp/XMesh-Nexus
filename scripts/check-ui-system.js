@@ -81,6 +81,24 @@ assert.match(app,/UQ\.size=size;\s*UQ\.page=1;\s*void drawUsers\(\)/,
  'Page-size changes reset page 1 and rerender');
 
 const squadCards=read('frontend/styles/features/squads/squad-cards.css');
+// Search is purely client-side and must not mutate the inventory or rebuild
+// cards on every keystroke (their verified live statistics must remain stable).
+assert.match(app,/function applySquadSearch\(root\)/,
+ 'Squad search must have its own scoped filter function');
+assert.match(app,/data-squad-search-text/,
+ 'Squad cards need a precomputed search index');
+assert.match(app,/const searchText=\[display,s\.desc\|\|'',\.\.\.tags\]/,
+ 'Squad search must cover names, descriptions and inbound tags');
+assert.match(app,/card\.hidden=!visible/,
+ 'Search must toggle existing squad cards without remounting them');
+assert.match(app,/input\?\.addEventListener\('input'/,
+ 'Squad search must react immediately to input');
+assert.match(app,/data-squad-search-empty/,
+ 'Squad search must show a distinct empty-results state');
+assert.match(app,/data-squad-search-clear/,
+ 'Squad search must provide a clear control');
+
+
 assert.match(squadCards,/\.squad-card-grid\{[\s\S]*align-items:stretch/,
  'Squad cards must stretch inside each grid row');
 assert.match(squadCards,/@supports \(grid-template-rows:subgrid\)/,
