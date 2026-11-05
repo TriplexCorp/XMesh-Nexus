@@ -1545,15 +1545,15 @@ dialog.node-wide .node-tls-details {
 
 /* TLS readiness + compact certificate wizard: one row of status, no tall
  * form expander. The profile remains the authority for Security. */
-dialog.node-wide .node-side-stack {
-  grid-area:billing;
+dialog.node-wide .node-network-stack {
+  grid-area:ips;
   display:grid;
   grid-template-columns:minmax(0,1fr);
   align-content:start;
   gap:.55rem;
   min-width:0;
 }
-dialog.node-wide .node-side-stack > :is(.node-billing-section,.node-tls-settings) {
+dialog.node-wide .node-network-stack > :is(.node-ip-section,.node-tls-settings) {
   grid-area:auto;
   box-sizing:border-box;
   min-width:0;
@@ -1566,28 +1566,28 @@ dialog.node-wide .node-side-stack > :is(.node-billing-section,.node-tls-settings
   background:color-mix(in srgb,var(--s2) 48%,var(--s1));
   box-shadow:none;
 }
-dialog.node-wide .node-side-stack .node-tls-settings {
+dialog.node-wide .node-network-stack .node-tls-settings {
   position:relative;
   overflow:visible;
 }
-dialog.node-wide .node-side-stack .node-tls-settings legend {
+dialog.node-wide .node-network-stack .node-tls-settings legend {
   padding-inline:.3rem;
   font-size:.82rem;
 }
-dialog.node-wide .node-side-stack .node-tls-effective {
+dialog.node-wide .node-network-stack .node-tls-effective {
   padding:.35rem .45rem;
   margin:0 0 .38rem;
   gap:.2rem;
 }
-dialog.node-wide .node-side-stack .node-tls-effective .f {
+dialog.node-wide .node-network-stack .node-tls-effective .f {
   flex:1 1 100%;
   min-width:0;
   gap:.38rem;
 }
-dialog.node-wide .node-side-stack .node-tls-effective .f > span:first-child {
+dialog.node-wide .node-network-stack .node-tls-effective .f > span:first-child {
   font-size:.72rem;
 }
-dialog.node-wide .node-side-stack .node-tls-effective [data-node-tls-state] {
+dialog.node-wide .node-network-stack .node-tls-effective [data-node-tls-state] {
   font-size:.7rem;
   font-weight:650;
   line-height:1.25;
@@ -1609,7 +1609,7 @@ dialog.node-wide .node-tls-readiness[data-mode="on"][data-ready="no"] {
 dialog.node-wide .node-tls-readiness[data-mode="on"][data-ready="yes"] {
   color:var(--tx);
 }
-dialog.node-wide .node-side-stack [data-node-tls-preferences] summary {
+dialog.node-wide .node-network-stack [data-node-tls-preferences] summary {
   display:inline-flex;
   align-items:center;
   width:auto;
@@ -1619,12 +1619,12 @@ dialog.node-wide .node-side-stack [data-node-tls-preferences] summary {
   cursor:pointer;
   color:var(--a);
 }
-dialog.node-wide .node-side-stack [data-node-tls-preferences] summary:focus-visible {
+dialog.node-wide .node-network-stack [data-node-tls-preferences] summary:focus-visible {
   outline:2px solid var(--a);
   outline-offset:3px;
   border-radius:var(--ui-control-radius);
 }
-dialog.node-wide .node-side-stack .node-tls-popup {
+dialog.node-wide .node-network-stack .node-tls-popup {
   position:absolute;
   bottom:calc(100% + .35rem);
   right:0;
@@ -1641,18 +1641,18 @@ dialog.node-wide .node-side-stack .node-tls-popup {
   background:var(--nx-panel-bg);
   box-shadow:var(--nx-section-shadow);
 }
-dialog.node-wide .node-side-stack .node-tls-popup .node-tls-help {
+dialog.node-wide .node-network-stack .node-tls-popup .node-tls-help {
   margin:0;
   font-size:.72rem;
 }
-dialog.node-wide .node-side-stack .node-tls-popup :is(.node-tls-details,.node-tls-modes) {
+dialog.node-wide .node-network-stack .node-tls-popup :is(.node-tls-details,.node-tls-modes) {
   gap:.45rem .6rem;
   margin:0;
 }
-dialog.node-wide .node-side-stack .node-tls-popup .f > span:first-child {
+dialog.node-wide .node-network-stack .node-tls-popup .f > span:first-child {
   font-size:.74rem;
 }
-dialog.node-wide .node-side-stack .node-tls-popup input:not([type="checkbox"]) {
+dialog.node-wide .node-network-stack .node-tls-popup input:not([type="checkbox"]) {
   height:2.35rem;
   min-height:2.35rem;
   font-size:.78rem;
@@ -1710,7 +1710,7 @@ dialog.node-wide .node-billing-fields {
     grid-template-columns:minmax(0,1fr);
     grid-template-areas:"primary" "ips" "billing";
   }
-  dialog.node-wide .node-side-stack .node-tls-popup {
+  dialog.node-wide .node-network-stack .node-tls-popup {
     position:static;
     width:100%;
     max-height:none;
