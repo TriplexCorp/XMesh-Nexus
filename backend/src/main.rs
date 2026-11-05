@@ -3136,14 +3136,10 @@ async fn get_user_traffic(
         .unwrap_or(0.0);
     let rows = sqlx::query(
         "SELECT totals.node_id,
-                COALESCE(
-                  NULLIF(node.data->>'remark', ''),
-                  NULLIF(node.data->>'name', ''),
-                  NULLIF(node.data->>'tag', ''),
-                  NULLIF(history.display_name, ''),
+                COALESCE(NULLIF(node.data->>'remark',''),NULLIF(node.data->>'name',''),
+                  NULLIF(node.data->>'tag',''),NULLIF(history.display_name,''),
                   CASE WHEN node.id IS NULL THEN 'Архивная нода #' || totals.node_id::text
-                       ELSE 'Узел #' || totals.node_id::text END
-                ) AS node_name,
+                       ELSE 'Узел #' || totals.node_id::text END) AS node_name,
                 (node.id IS NULL) AS node_archived,
                 totals.uplink_bytes,
                 totals.downlink_bytes,
