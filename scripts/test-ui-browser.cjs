@@ -1098,6 +1098,10 @@ async function main() {
     try{
       const noTlsProfile=await create('profiles',{name:`${prefix} · Без TLS`,config:JSON.stringify({inbounds:[{tag:inboundTag+'-plain',listen:'127.0.0.1',port:28353,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/tls-indicator'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
       const missingTlsProfile=await create('profiles',{name:prefix+' · TLS без сертификата',config:JSON.stringify({inbounds:[{tag:inboundTag+'-missing',listen:'127.0.0.1',port:28354,protocol:'trojan',settings:{clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+      // A hash-only navigation retains the current bootstrap snapshot. Reload
+      // after API fixture changes so the editor reads the intended inventory.
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
       await checked('Node certificate switch follows Security, not saved TLS overrides',async()=>{
         try{
           await navigate('nodes');
@@ -1139,6 +1143,8 @@ async function main() {
     }finally{
       await page.keyboard.press('Escape');
       for(const fixture of fixtures.splice(tlsFixtureStart))await api('DELETE','/collections/'+fixture.collection+'/'+fixture.id);
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
     }
     await checked('Редактирование узла сохраняется через API',async()=>{
       await navigate('nodes');
