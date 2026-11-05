@@ -3036,10 +3036,18 @@ function squadEditorRefresh(form){
   if(hosts.some(h=>!Array.isArray(h.nodes)||!h.nodes.length))warnings.push('У некоторых хостов не назначены ноды.');
   const assignedNodes=[...nodeIds].map(id=>DB.nodes.find(n=>String(n.id)===id)).filter(Boolean);
   const nodeList=assignedNodes.length?assignedNodes.slice(0,8).map(n=>'<span class="squad-user-chip">'+esc(n.name||n.addr||String(n.id))+'</span>').join(''):'<span class="squad-help">Нет назначенных нод</span>';
+  // Keep the editing surface focused on the numbers. Full entity names are
+  // available on demand and never expand the left column by default.
+  const detailsWereOpen=Boolean(preview.querySelector('[data-squad-impact-details]')?.open);
+  const details='<details class="squad-impact-details" data-squad-impact-details'+(detailsWereOpen?' open':'')+'>'+
+    '<summary>'+ic('list')+'<span>Подробности связей</span>'+ic('chevron-down')+'</summary>'+
+    '<div class="squad-impact-details-body">'+
+      '<div class="squad-preview-section"><b>'+ic('server')+' Хосты</b><div class="squad-preview-list">'+hostList+'</div></div>'+
+      '<div class="squad-preview-section"><b>'+ic('users')+' Пользователи</b><div class="squad-user-list">'+userList+'</div></div>'+
+      '<div class="squad-preview-section squad-preview-nodes"><b>'+ic('git-branch')+' Связанные ноды</b><div class="squad-user-list">'+nodeList+'</div></div>'+
+    '</div></details>';
   preview.innerHTML='<div class="squad-preview-stats">'+stats+'</div>'+
-    '<div class="squad-preview-section"><b>'+ic('server')+' Хосты, соответствующие выбору</b><div class="squad-preview-list">'+hostList+'</div></div>'+
-    '<div class="squad-preview-section"><b>'+ic('users')+' Затронутые пользователи</b><div class="squad-user-list">'+userList+'</div></div>'+
-    '<div class="squad-preview-section squad-preview-nodes"><b>'+ic('git-branch')+' Связанные ноды</b><div class="squad-user-list">'+nodeList+'</div></div>'+
+    details+
     (warnings.length?'<div class="squad-preview-warnings" role="note">'+warnings.map(w=>'<p>'+ic('alert-triangle')+esc(w)+'</p>').join('')+'</div>':'<p class="squad-preview-ready">'+ic('check')+'Связи в панели найдены. Доступность серверов проверяется отдельно.</p>');
 }
 function squadEditorFilter(form){
