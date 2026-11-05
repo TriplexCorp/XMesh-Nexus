@@ -216,6 +216,7 @@
   --nx-border:color-mix(in srgb,var(--ln) 84%,var(--tx) 4%);
   --nx-border-strong:color-mix(in srgb,var(--border-strong,var(--ln)) 88%,var(--tx) 5%);
 
+  --nx-panel-image:none;
   --nx-panel-bg:var(--s1);
   --nx-dialog-bg:var(--s1);
   --nx-section-bg:color-mix(in srgb,var(--s2) 38%,var(--s1));
@@ -334,6 +335,7 @@ html[data-borders=strong]{
 
 /* Classic — opaque and calm. */
 html[data-surface=solid]{
+  --nx-panel-image:none;
   --nx-panel-bg:var(--s1);
   --nx-dialog-bg:var(--s1);
   --nx-section-bg:color-mix(in srgb,var(--s2) 38%,var(--s1));
@@ -354,7 +356,8 @@ html[data-surface=solid]{
 /* Glass — transparency exists only on material surfaces, never as a separate
  * feature skin. */
 html[data-surface=glass]{
-  --nx-panel-bg:color-mix(in srgb,var(--s1) 62%,transparent);
+  --nx-panel-image:linear-gradient(135deg,rgba(255,255,255,.09),transparent 46%,color-mix(in srgb,var(--a) 7%,transparent));
+  --nx-panel-bg:color-mix(in srgb,var(--s1) 34%,transparent);
   --nx-dialog-bg:color-mix(in srgb,var(--s1) 72%,transparent);
   --nx-section-bg:color-mix(in srgb,var(--s2) 45%,transparent);
   --nx-item-bg:color-mix(in srgb,var(--s1) 55%,transparent);
@@ -369,13 +372,13 @@ html[data-surface=glass]{
   --nx-item-shadow:none;
   --nx-control-shadow:none;
   --nx-floating-shadow:0 28px 70px -34px rgba(0,0,0,.84);
-  --nx-backdrop:blur(18px) saturate(132%);
+  --nx-backdrop:blur(28px) saturate(155%);
 }
 
 /* Glass keeps border strength independent from the material. Light surfaces
  * need daylight shadows rather than the dark theme's near-black elevation. */
 html[data-theme=light][data-surface=glass]{
-  --nx-panel-bg:color-mix(in srgb,var(--s1) 48%,transparent);
+  --nx-panel-bg:color-mix(in srgb,var(--s1) 42%,transparent);
   --nx-dialog-bg:color-mix(in srgb,var(--s1) 68%,transparent);
   --nx-panel-shadow:0 10px 32px -18px rgba(36,48,68,.18);
   --nx-dialog-shadow:0 24px 64px -24px rgba(36,48,68,.28);
@@ -384,7 +387,8 @@ html[data-theme=light][data-surface=glass]{
 
 /* Raised — neutral depth hierarchy, not accent-coloured slabs. */
 html[data-surface=raised]{
-  --nx-panel-bg:color-mix(in srgb,var(--s1) 94%,var(--s2) 6%);
+  --nx-panel-image:linear-gradient(165deg,color-mix(in srgb,var(--tx) 6%,transparent),transparent 58%);
+  --nx-panel-bg:color-mix(in srgb,var(--s1) 92%,var(--tx) 8%);
   --nx-dialog-bg:color-mix(in srgb,var(--s1) 92%,var(--s2) 8%);
   --nx-section-bg:color-mix(in srgb,var(--s2) 42%,var(--s1));
   --nx-item-bg:color-mix(in srgb,var(--s1) 78%,var(--s2) 22%);
@@ -392,7 +396,7 @@ html[data-surface=raised]{
   --nx-floating-bg:color-mix(in srgb,var(--s1) 88%,var(--s2) 12%);
   --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 28%,transparent);
   --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 82%,var(--s2) 18%);
-  --nx-panel-shadow:0 24px 66px -38px rgba(0,0,0,.88),0 8px 22px -18px rgba(0,0,0,.5),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
+  --nx-panel-shadow:0 12px 26px -8px rgba(0,0,0,.65),0 3px 6px -2px rgba(0,0,0,.45);
   --nx-dialog-shadow:0 38px 110px -34px rgba(0,0,0,.92),0 16px 42px -28px rgba(0,0,0,.58),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
   --nx-section-shadow:0 8px 20px -18px rgba(0,0,0,.62),inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
   --nx-item-shadow:0 5px 14px -12px rgba(0,0,0,.64),inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
@@ -402,7 +406,7 @@ html[data-surface=raised]{
 }
 
 html[data-theme=light][data-surface=raised]{
-  --nx-panel-bg:color-mix(in srgb,var(--s1) 74%,var(--s2) 26%);
+  --nx-panel-bg:color-mix(in srgb,var(--s1) 98%,var(--tx) 2%);
   --nx-dialog-bg:color-mix(in srgb,var(--s1) 80%,var(--s2) 20%);
   --nx-section-bg:color-mix(in srgb,var(--s1) 42%,var(--s2) 58%);
   --nx-item-bg:color-mix(in srgb,var(--s1) 60%,var(--s2) 40%);
@@ -410,7 +414,8 @@ html[data-theme=light][data-surface=raised]{
   --nx-floating-bg:color-mix(in srgb,var(--s1) 89%,var(--s2) 11%);
   --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 46%,var(--s1));
   --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 64%,var(--s2) 36%);
-  --nx-panel-shadow:0 18px 42px -16px rgba(36,48,68,.34),0 6px 14px -8px rgba(36,48,68,.2),inset 0 1px 0 rgba(255,255,255,.94);
+  --nx-panel-image:linear-gradient(165deg,rgba(255,255,255,.85),transparent 65%);
+  --nx-panel-shadow:0 12px 28px -8px rgba(36,48,68,.22),0 3px 6px -2px rgba(36,48,68,.12);
   --nx-dialog-shadow:0 30px 68px -18px rgba(36,48,68,.42),0 10px 24px -12px rgba(36,48,68,.24),inset 0 1px 0 rgba(255,255,255,.96);
   --nx-section-shadow:0 8px 18px -14px rgba(36,48,68,.28),inset 0 1px 0 rgba(255,255,255,.82);
   --nx-item-shadow:0 4px 10px -8px rgba(36,48,68,.24),inset 0 1px 0 rgba(255,255,255,.88);
@@ -420,7 +425,8 @@ html[data-theme=light][data-surface=raised]{
 
 @media(prefers-reduced-transparency:reduce){
   html[data-surface=glass]{
-    --nx-panel-bg:var(--s1);
+    --nx-panel-image:none;
+  --nx-panel-bg:var(--s1);
     --nx-dialog-bg:var(--s1);
     --nx-section-bg:color-mix(in srgb,var(--s2) 42%,var(--s1));
     --nx-item-bg:color-mix(in srgb,var(--s1) 84%,var(--s2));
