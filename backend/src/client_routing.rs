@@ -277,7 +277,7 @@ pub fn build_server(source: Value, all: &[Value], settings: &Value) -> Result<Va
     }
     let mut proxy_list = vec![source.clone()];
     let mut targets = HashMap::new();
-    for rule in rows {
+    for rule in &rows {
         if rule["action"] != "server" {
             continue;
         }
@@ -318,7 +318,7 @@ pub fn build_server(source: Value, all: &[Value], settings: &Value) -> Result<Va
         .ok_or("Нет исходящего сервера")?
         .clone();
     let mut mapped = Vec::new();
-    for rule in rows {
+    for rule in &rows {
         let action = rule["action"].as_str().unwrap_or("");
         let tag = match action {
             "proxy" => first.as_str(),
