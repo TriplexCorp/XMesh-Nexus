@@ -1154,6 +1154,51 @@ const statsRate=v=>{
 };
 const statsMetric=(label,value,hint='')=>`<div class="stats-tile"><small>${esc(label)}</small><strong>${esc(String(value))}</strong>${hint?`<span>${esc(hint)}</span>`:''}</div>`;
 const statsRow=(label,value)=>`<div class="stats-kv"><span>${esc(label)}</span><b>${esc(String(value))}</b></div>`;
+// Select time intervals, not whichever overlapping SVG circle was painted last.
+function bindStatisticsChartSelection(root,openBucket){
+ if(!root)return;
+ let press=null,suppressClick=false;
+ const bucketAt=event=>{
+  const svg=root.querySelector('.stats-detail-chart'),matrix=svg?.getScreenCTM();
+  if(!matrix)return null;
+  const point=svg.createSVGPoint();point.x=event.clientX;point.y=event.clientY;
+  const local=point.matrixTransform(matrix.inverse());
+  for(const target of svg.querySelectorAll('.stats-detail-bucket-target')){
+   const x=Number(target.getAttribute('x')),y=Number(target.getAttribute('y'));
+   if(local.x>=x&&local.x<=x+Number(target.getAttribute('width'))&&local.y>=y&&local.y<=y+Number(target.getAttribute('height')))return Number(target.dataset.bucketMs);
+  }
+  return null;
+ };
+ root.addEventListener('pointerdown',event=>{
+  suppressClick=false;
+  press=event.button===0?{bucket:bucketAt(event),x:event.clientX,y:event.clientY}:null;
+  if(press&&press.bucket!==null)root.setPointerCapture(event.pointerId);
+ });
+ root.addEventListener('pointercancel',()=>{press=null;suppressClick=true});
+ root.addEventListener('pointerup',event=>{
+  const down=press;press=null;
+  if(!down)return;
+  suppressClick=true;
+  if(down.bucket!==null&&Math.hypot(event.clientX-down.x,event.clientY-down.y)<=8)void openBucket(down.bucket);
+ });
+ root.addEventListener('click',event=>{
+  const point=event.target.closest?.('.stats-detail-point-wrap');
+  if(event.detail===0){if(point?.dataset.bucketMs)void openBucket(Number(point.dataset.bucketMs));return}
+  if(suppressClick){suppressClick=false;return}
+  const bucket=bucketAt(event);
+  if(bucket!==null)void openBucket(bucket);
+ });
+ root.addEventListener('keydown',event=>{
+  const point=event.target.closest?.('.stats-detail-point-wrap[role="button"]');
+  if(!point)return;
+  if(event.key==='Enter'||event.key===' '){event.preventDefault();press=null;void openBucket(Number(point.dataset.bucketMs));return}
+  if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+  event.preventDefault();
+  const targets=[...root.querySelectorAll('.stats-detail-point-wrap[role="button"]')],index=targets.indexOf(point);
+  const next=event.key==='Home'?0:event.key==='End'?targets.length-1:Math.max(0,Math.min(targets.length-1,index+(event.key==='ArrowRight'?1:-1)));
+  targets.forEach((target,i)=>{target.tabIndex=i===next?0:-1});targets[next]?.focus({preventScroll:true});
+ });
+}
 // Detailed chart uses the same RX/TX color vocabulary as the dashboard.
 // Each plotted point must be an actual TimescaleDB observation; nulls break paths.
 const statsDetailedChart=(points,chartWidth=1000)=>{
@@ -1184,7 +1229,7 @@ const statsDetailedChart=(points,chartWidth=1000)=>{
    if(!valid(p[key]))return '';
    const v=Number(p[key])*8/1e6;
    const when=new Date(Number(p.bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU');
-   return '<g class="stats-detail-point-wrap '+cls+'" tabindex="0" role="button" data-bucket-ms="'+Number(p.bucketMs)+'" data-series="'+cls+'">'+
+   return '<g class="stats-detail-point-wrap '+cls+'" aria-hidden="true" data-bucket-ms="'+Number(p.bucketMs)+'" data-series="'+cls+'">'+
     '<circle class="stats-detail-point-hit" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="13"/>'+ 
     '<circle class="stats-detail-point-ring" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="10"/>'+
     '<circle class="stats-detail-point-core" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+speedUnitMbps())+'</title></circle></g>';
@@ -1193,9 +1238,17 @@ const statsDetailedChart=(points,chartWidth=1000)=>{
  };
  // Paint every decorative series before the interactive point layer.
  const series=metrics.map(line);
+ // Disjoint vertical strips make dense/overlapping series unambiguous.
+ let targetIndex=0;
+ const targets=samples.map((p,i)=>{
+  if(!metrics.some(key=>valid(p[key])))return '';
+  const from=i===0?left:(x(i-1)+x(i))/2,to=i===samples.length-1?w-right:(x(i)+x(i+1))/2;
+  const label=new Date(Number(p.bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU')+' · '+metrics.map((key,j)=>(j?'TX':'RX')+': '+(valid(p[key])?fmt(Number(p[key])*8/1e6,3)+speedUnitMbps():(panelIsEnglish()?'No data':'Нет данных'))).join(' · ');
+  return '<g class="stats-detail-point-wrap bucket" role="button" tabindex="'+(targetIndex++===0?'0':'-1')+'" data-bucket-ms="'+Number(p.bucketMs)+'" data-series="bucket" aria-label="'+esc(label)+'"><title>'+esc(label)+'</title><rect class="stats-detail-bucket-target" data-bucket-ms="'+Number(p.bucketMs)+'" x="'+from+'" y="'+top+'" width="'+(to-from)+'" height="'+ph+'"/></g>';
+ }).join('');
  const grid=[0,.25,.5,.75,1].map(f=>'<line class="stats-detail-grid" x1="'+left+'" x2="'+(w-right)+'" y1="'+y(max*f)+'" y2="'+y(max*f)+'"/><text class="stats-detail-label" x="'+(left-12)+'" y="'+(y(max*f)+4)+'" text-anchor="end">'+esc(fmt(max*f,2))+'</text>').join('');
  const ticks=[0,Math.floor((samples.length-1)/2),samples.length-1].filter((v,i,a)=>a.indexOf(v)===i).map(i=>'<text class="stats-detail-label" x="'+x(i)+'" y="'+(h-15)+'" text-anchor="'+(i===0?'start':i===samples.length-1?'end':'middle')+'">'+esc(new Date(Number(samples[i].bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</text>').join('');
- return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="История RX и TX, Мбит/с. Наведите на точки для значений"><text class="stats-detail-axis" x="17" y="'+(top+ph/2)+'" transform="rotate(-90 17 '+(top+ph/2)+')" text-anchor="middle">Мбит/с</text>'+grid+series.map(s=>s.paths).join('')+series.map(s=>s.dots).join('')+ticks+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> RX · принято нодами</span><span><i class="tx"></i> TX · отправлено нодами</span><small>Наведите на точку для времени и скорости. Пропуски не интерполируются.</small></div>';
+ return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="group" aria-label="История RX и TX, Мбит/с. Выберите интервал для подробностей"><text class="stats-detail-axis" x="17" y="'+(top+ph/2)+'" transform="rotate(-90 17 '+(top+ph/2)+')" text-anchor="middle">Мбит/с</text>'+grid+series.map(s=>s.paths).join('')+series.map(s=>s.dots).join('')+ticks+targets+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> RX · принято нодами</span><span><i class="tx"></i> TX · отправлено нодами</span><small>Выберите интервал на графике для подробностей. Пропуски не интерполируются.</small></div>';
 };
 // SVG coordinates are resized horizontally, not scaled as a whole.
 // Match the viewBox width to the *actual* CSS viewport ratio so labels and
@@ -1219,15 +1272,11 @@ const syncResponsiveTrafficChart=(kind,selector,renderSvg,logicalHeight)=>{
   template.innerHTML=renderSvg(logicalWidth);
   const replacement=template.content.querySelector('svg');
   if(!replacement)return;
-  // Restore the selected bucket when reflowing the Statistics SVG.
   const selected=current.querySelector('.stats-detail-point-wrap.is-selected');
-  if(selected){
-   const candidate=[...replacement.querySelectorAll('.stats-detail-point-wrap')].find(
-    point=>point.dataset.bucketMs===selected.dataset.bucketMs&&point.dataset.series===selected.dataset.series
-   );
-   candidate?.classList.add('is-selected');
-  }
+  const focused=current.contains(document.activeElement)?document.activeElement?.dataset.bucketMs:null;
+  if(selected)replacement.querySelectorAll('.stats-detail-point-wrap').forEach(point=>point.classList.toggle('is-selected',point.dataset.bucketMs===selected.dataset.bucketMs));
   current.replaceWith(replacement);
+  if(focused){const target=[...replacement.querySelectorAll('[role="button"]')].find(point=>point.dataset.bucketMs===focused);if(target){replacement.querySelectorAll('[role="button"]').forEach(point=>{point.tabIndex=point===target?0:-1});target.focus({preventScroll:true})}}
  };
  const observer=new ResizeObserver(update);
  trafficChartResizeObservers[kind]=observer;
@@ -1434,8 +1483,16 @@ function statisticsP(){
     if(trafficSignature!==lastTrafficSignature||period!==lastTrafficPeriod){
      lastTrafficSignature=trafficSignature;
      lastTrafficPeriod=period;
+     const focusedBucket=$('#stats-trend').contains(document.activeElement)?document.activeElement?.dataset.bucketMs:null;
      $('#stats-trend').innerHTML='<div class="stats-detail-kpis"><div><b>RX</b><strong>'+(latest.rxBytesPerSec!=null?statsRate(latest.rxBytesPerSec):'Нет данных')+'</strong></div><div><b>TX</b><strong>'+(latest.txBytesPerSec!=null?statsRate(latest.txBytesPerSec):'Нет данных')+'</strong></div><div><b>Временных интервалов</b><strong>'+esc(String(points.length))+'</strong></div></div>'+statsDetailedChart(points)+'<small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB':' · Источник: TimescaleDB')+'</small>';
      syncResponsiveTrafficChart('statistics','#stats-trend',width=>statsDetailedChart(points,width),340);
+     const refreshedPoints=$('#stats-trend').querySelectorAll('.stats-detail-point-wrap');
+     refreshedPoints.forEach(point=>point.classList.toggle('is-selected',Number(point.dataset.bucketMs)===selectedBucketMs));
+     if(focusedBucket){
+      const targets=[...$('#stats-trend').querySelectorAll('.bucket[role="button"]')];
+      const target=targets.find(point=>point.dataset.bucketMs===focusedBucket)||targets[0];
+      if(target){targets.forEach(point=>{point.tabIndex=point===target?0:-1});target.focus({preventScroll:true})}
+     }
     }
     updateLiveStatus();
     $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
@@ -1483,14 +1540,7 @@ function statisticsP(){
         '<p class="note">Источник: TimescaleDB · server_metric_samples'+(detail.truncated?' · Показаны первые 500 нод':'')+'. Отсутствующие измерения не заменены нулями.</p>';
     }catch(e){if(requestId===detailRequest&&panel)panel.textContent='Ошибка детализации: '+(e.message||'API error')}
   };
-  $('#stats-trend')?.addEventListener('click',e=>{
-    const point=e.target.closest?.('.stats-detail-point-wrap');
-    if(point)void openBucket(Number(point.dataset.bucketMs));
-  });
-  $('#stats-trend')?.addEventListener('keydown',e=>{
-    const point=e.target.closest?.('.stats-detail-point-wrap');
-    if(point&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void openBucket(Number(point.dataset.bucketMs))}
-  });
+  bindStatisticsChartSelection($('#stats-trend'),openBucket);
   $('#stats-bucket-detail')?.addEventListener('click',e=>{
     if(e.target.closest?.('[data-stats-detail-close]')){
       selectedBucketMs=null;++detailRequest;$('#stats-bucket-detail').hidden=true;
