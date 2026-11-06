@@ -21,14 +21,15 @@
     [/финлян|finland|(?:^|[\s_-])fi(?:$|[\s_-])/i,'fi'],
     [/франци|france|(?:^|[\s_-])fr(?:$|[\s_-])/i,'fr'],
     [/сша|usa|united states|(?:^|[\s_-])us(?:$|[\s_-])/i,'us'],
-    [/испан|spain|(?:^|[\s_-])es(?:$|[\s_-])/i,'es']
+    [/испан|spain|(?:^|[\s_-])es(?:$|[\s_-])/i,'es'],
+    [/англи|великобритани|британи|england|britain|united kingdom|(?:^|[\s_-])(?:gb|uk)(?:$|[\s_-])/i,'gb']
   ];
   function countryCode(...parts) {
     const name = parts.filter(Boolean).join(' ');
-    const explicit = parts.find(p => typeof p === 'string' && /^(nl|pl|de|ru|se|swe|ee|fi|fr|us|es)$/i.test(p.trim()));
-    if (explicit) return explicit.toLowerCase() === 'swe' ? 'se' : explicit.toLowerCase();
+    const explicit = parts.find(p => typeof p === 'string' && /^(nl|pl|de|ru|se|swe|ee|fi|fr|us|es|gb|uk)$/i.test(p.trim()));
+    if (explicit) return ({swe:'se',uk:'gb'})[explicit.toLowerCase()] || explicit.toLowerCase();
     const emoji=parts.find(p=>typeof p==='string'&&/^[\u{1F1E6}-\u{1F1FF}]{2}$/u.test(p));
-    if(emoji)return Array.from(emoji,c=>String.fromCharCode(c.codePointAt(0)-127397)).join('').toLowerCase();
+    if(emoji){const iso=Array.from(emoji,c=>String.fromCharCode(c.codePointAt(0)-127397)).join('').toLowerCase();return iso==='uk'?'gb':iso;}
     return flagPatterns.find(([pattern]) => pattern.test(name))?.[1] || '';
   }
   function flag(code) {
@@ -47,6 +48,14 @@
     else if (code === 'se') shape = rect('#006aa7',1,1,30,22)+rect('#fecc00',10,1,5,22)+rect('#fecc00',1,10,30,5);
     else if (code === 'es') shape = rect('#aa151b',1,1,30,22)+rect('#f1bf00',1,6,30,12);
     else if (code === 'us') shape = stripes(['#b22234','#fff','#b22234','#fff','#b22234','#fff','#b22234'])+rect('#3c3b6e',1,1,14,12);
+    else if (code === 'gb' || code === 'uk') {
+      // Union Jack: diagonal white/red saltires beneath the central cross.
+      shape = rect('#012169',1,1,30,22)
+        +'<path d="M1 1L31 23M31 1L1 23" stroke="#fff" stroke-width="6"/>'
+        +'<path d="M1 1L31 23M31 1L1 23" stroke="#c8102e" stroke-width="2"/>'
+        +rect('#fff',13,1,6,22)+rect('#fff',1,9,30,6)
+        +rect('#c8102e',14,1,4,22)+rect('#c8102e',1,10,30,4);
+    }
     else return '<span class="crx-globe" aria-hidden="true">◎</span>';
     return start+shape+end;
   }
