@@ -3,13 +3,9 @@
 // catalogue. Editing is staged until the user card's existing Save action.
 (()=>{
   const instances=new WeakMap();
-  const activeRoots=new Set();
   document.addEventListener('xmesh:locale-changed',()=>{
-    for(const root of activeRoots){
-      if(!root.isConnected){activeRoots.delete(root);continue;}
-      const redraw=root.__userRoutingRedraw;
-      if(typeof redraw==='function')redraw();
-    }
+    const root=document.querySelector('#dlg.user-modal [data-user-client-routing-root]');
+    instances.get(root)?.redraw?.();
   });
   const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,char=>({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -125,8 +121,7 @@
       if(field==='action'||field==='match')paint();
       markDirty();
     });
-    root.__userRoutingRedraw=paint;
-    activeRoots.add(root);
+    state.redraw=paint;
     paint();
   }
   function serialize(canvas){
