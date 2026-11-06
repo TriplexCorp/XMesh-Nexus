@@ -436,7 +436,9 @@ mod tests {
         let host = serde_json::json!({"clientHeaders":null});
         assert_eq!(
             super::client_metadata(&inbound, &host, "clientHeaders"),
-            inbound.get("xmesh").and_then(|value| value.get("clientHeaders"))
+            inbound
+                .get("xmesh")
+                .and_then(|value| value.get("clientHeaders"))
         );
         let empty = serde_json::json!({"clientHeaders":{}});
         assert_eq!(
