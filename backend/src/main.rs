@@ -4269,6 +4269,11 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
         }
     }
     if collection == "users" {
+        if let Some(personal) = object.get("clientRouting") {
+            client_routing::validate_user_override(personal).map_err(|detail| {
+                ApiError::new(StatusCode::BAD_REQUEST, detail)
+            })?;
+        }
         let username = object
             .get("username")
             .and_then(Value::as_str)
