@@ -188,7 +188,7 @@ assert.match(app,/aria-pressed="\$\{\(C\[key\]\|\|CDEFAULT\[key\]\)==v\?'true':'
 const darkRaised=foundation.match(/html\[data-surface=raised\]\{([^}]+)\}/)?.[1];
 const lightRaised=foundation.match(/html\[data-theme=light\]\[data-surface=raised\]\{([^}]+)\}/)?.[1];
 assert(darkRaised&&lightRaised,'Both dark and light Raised material overrides must exist');
-for(const [name,block] of [['dark',darkRaised],['light',lightRaised']]){
+for(const [name,block] of [['dark',darkRaised],['light',lightRaised]]){
  const sheen=block.match(/--nx-panel-image:linear-gradient\(180deg,rgba\((\d+),(\d+),(\d+),([\d.]+)\),transparent (\d+)%\)/);
  assert(sheen,'Raised '+name+' must have a subtle top-edge reflection, fading to transparent');
  const [,r,g,b,a,stop]=sheen;
