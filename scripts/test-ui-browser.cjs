@@ -739,7 +739,7 @@ async function main() {
           const single=await page.locator('[data-cr-profile="ui-route-main"]').boundingBox();
           assert(single.width<900,'A single template must keep its readable card width');
           assert.equal(await page.locator('[data-cr-profile]').count(),1);
-          assert.equal(await page.locator('.crx-assigned-source svg rect[fill="#dc143c"]').count(),1,'Polish assignment must retain its flag');
+          assert.equal(await page.locator('.crx-assigned-source img.crx-flag[src="/flags/pl.svg"]').count(),1,'Polish assignment must retain its flag');
           await screenshot(page,'routing-single-template');
         }finally{await page.evaluate(({id,demo})=>{DB.nodes.find(n=>n.id===id).name=demo.name;DB.set.clientRoutingProfiles=demo.profiles},{id:node.id,demo})}
       }finally{
