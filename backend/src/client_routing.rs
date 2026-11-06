@@ -176,6 +176,38 @@ pub fn validate(value: &Value) -> Result<(), String> {
     }
     Ok(())
 }
+/// A personal rule is a higher-priority exception, never a replacement for
+/// globally assigned node/host routing. Reuse the exact global rule validator.
+pub fn validate_user_override(value: &Value) -> Result<(), String> {
+    let obj = value.as_object().ok_or("Личная маршрутизация должна быть объектом")?;
+    if obj.keys().any(|k| !["mode", "rules"].contains(&k.as_str())) {
+        return err("Неизвестное поле персональной маршрутизации");
+    }
+    let mode = obj.get("mode").and_then(Value::as_str).ok_or("Не указан режим маршрутизации")?;
+    if !["inherit", "custom"].contains(&mode) {
+        return err("Режим маршрутизации должен быть inherit или custom");
+    }
+    let rows = obj.get("rules").and_then(Value::as_array).ok_or("Правила должны быть массивом")?;
+    if rows.len() > 32 {
+        return err("Не более 32 персональных правил");
+    }
+    // An inert inherited draft may retain rules for future re-enabling.
+    validate(&json!([{
+        "id":"personal-routing", "name":"Personal routing",
+        "enabled":true, "servers":[], "rules":rows
+    }]))
+}
+
+/// This value is passed only within the authenticated user's subscription
+/// generation request; never write it back to global panel settings.
+pub fn scoped_settings(settings: &Value, user: &Value) -> Value {
+    let mut scoped = settings.clone();
+    if let Some(override_value) = user.get("clientRouting") {
+        scoped["xmeshUserClientRouting"] = override_value.clone();
+    }
+    scoped
+}
+
 fn root_source_key(source: &Value) -> Option<String> {
     let key = source.get("xmeshSourceKey")?.as_str()?;
     if !source_key(key, false) {
@@ -227,14 +259,24 @@ fn make_rule(spec: &Value, target: &str) -> Value {
 /// the subscriber's already authorized endpoints. Missing targets resolve to
 /// 'block', never to direct or another accidental server.
 pub fn build_server(source: Value, all: &[Value], settings: &Value) -> Result<Value, String> {
-    let Some(profile) = assigned(&source, settings) else {
+    let mut rows: Vec<Value> = Vec::new();
+    if let Some(personal) = settings.get("xmeshUserClientRouting") {
+        validate_user_override(personal)?;
+        if personal["mode"] == "custom" {
+            if let Some(extra) = personal["rules"].as_array() {
+                rows.extend(extra.iter().cloned());
+            }
+        }
+    }
+    if let Some(profile) = assigned(&source, settings) {
+        let shared = profile["rules"].as_array().ok_or("Некорректный шаблон маршрутизации")?;
+        rows.extend(shared.iter().cloned());
+    }
+    if rows.is_empty() {
         return crate::subscription_json::build(vec![source], settings);
-    };
+    }
     let mut proxy_list = vec![source.clone()];
     let mut targets = HashMap::new();
-    let rows = profile["rules"]
-        .as_array()
-        .ok_or("Некорректный шаблон маршрутизации")?;
     for rule in rows {
         if rule["action"] != "server" {
             continue;
