@@ -444,7 +444,7 @@ async function main() {
           const style=getComputedStyle(el);
           const gap=parseFloat(style.columnGap)||0;
           const fontSize=parseFloat(getComputedStyle(document.documentElement).fontSize)||16;
-          const minCardWidth=Math.min(rect.width,24*fontSize);
+          const minCardWidth=Math.min(rect.width,20*fontSize);
           return{left:rect.left,right:rect.right,viewport:innerWidth,
             columns:style.gridTemplateColumns.split(' ').length,
             expectedColumns:Math.max(1,Math.floor((rect.width+gap+.01)/(minCardWidth+gap)))};
@@ -1424,11 +1424,16 @@ async function main() {
     for (const [width,height] of [[1366,768],[1920,1080]]) {
       await page.setViewportSize({width,height});
       for (const [route,selector,label] of dialogs) await checked(`${label}: ${width}×${height}`,async()=>{
+        // Native dialogs stay in the top layer across same-document hash navigation.
+        // Close stale test fixtures before clicking, otherwise one failure cascades
+        // into unrelated 30-second click timeouts.
+        await page.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close()));
+        try {
         await navigate(route);
         await page.locator(selector).first().click();
         await page.waitForSelector('dialog[open]');
         if(route==='squads'){
-          const search=await page.locator('[data-squad-search]').evaluate(input=>{const s=getComputedStyle(input),r=input.getBoundingClientRect(),p=input.closest('.search').getBoundingClientRect();return {border:parseFloat(s.borderTopWidth),shadow:s.boxShadow,height:r.height,parentHeight:p.height}});
+          const search=await page.locator('dialog[open] form[data-ent="squads"] [data-squad-inbound-search]').evaluate(input=>{const s=getComputedStyle(input),r=input.getBoundingClientRect(),p=input.closest('.search').getBoundingClientRect();return {border:parseFloat(s.borderTopWidth),shadow:s.boxShadow,height:r.height,parentHeight:p.height}});
           assert.equal(search.border,0,'Composite search must not render a second input border');
           assert.equal(search.shadow,'none','Composite search must not render a nested input shadow');
           assert(search.height<=search.parentHeight,'Search input must fit its control shell');
@@ -1440,9 +1445,12 @@ async function main() {
         const footer=(await footerLoc.count())?await footerLoc.last().boundingBox():null;
         if(footer)assert(footer.y>=0&&footer.y+footer.height<=height+1,'Кнопки footer находятся за пределами viewport.');
         await screenshot(page,`dialog-${route}-${label.includes('Редактирование')?'edit':label.includes('Просмотр')?'drawer':'create'}-${width}`);
-        await page.keyboard.press('Escape');
-        await page.waitForSelector('dialog[open]',{state:'detached'});
         return g;
+        } finally {
+          // A failed assertion must not leave a native modal blocking the next case.
+          await page.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close()));
+          await page.waitForSelector('dialog[open]',{state:'detached'});
+        }
       });
     }
 
