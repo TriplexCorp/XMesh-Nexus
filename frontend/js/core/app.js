@@ -477,7 +477,7 @@ const COUNTRIES=COUNTRY_CODES.map((code,index)=>{
 }).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
 const countryLabel=country=>panelIsEnglish()?country.enName:country.name;
 // Shared country metadata for feature-owned UIs; no second flag dictionary.
-window.XMeshCountryCatalog=Object.freeze({countries:COUNTRIES,normalize:normalizeCountrySearch});
+if(typeof window!=='undefined')window.XMeshCountryCatalog=Object.freeze({countries:COUNTRIES,normalize:normalizeCountrySearch});
 // Country flags are bundled in the Docker image. No external CDN at runtime.
 const flagView=(value,cls='flag-img')=>{
  const country=COUNTRIES.find(c=>c.flag===value);
