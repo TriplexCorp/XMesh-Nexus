@@ -3287,7 +3287,7 @@ function squadEditorMarkup(o,e){
       '<div class="node-form-section-title">'+ic('link')+'<span>Подключения</span></div>'+
       '<div class="squad-section-heading"><div><b>Inbound из XRAY STUDIO</b><p class="squad-section-description">Настройте доступ сквада к подключениям</p></div><span class="squad-selected-count" data-squad-selected>0 выбрано</span></div>'+
       '<div class="squad-editor-toolbar">'+
-        '<label class="search squad-inbound-search">'+ic('search')+'<input type="search" data-squad-search placeholder="Найти inbound или профиль…" autocomplete="off" aria-label="Поиск inbound"></label>'+
+        '<label class="search squad-inbound-search">'+ic('search')+'<input type="search" data-squad-inbound-search placeholder="Найти inbound или профиль…" autocomplete="off" aria-label="Поиск inbound"></label>'+
         '<div class="squad-profile-filter">'+ic('filter')+'<select data-squad-profile aria-label="Фильтр по профилю"><option value="">Все профили</option>'+profileOptions+'</select></div>'+
         '<button type="button" class="gh sm" data-squad-select="all">Выбрать все</button>'+
         '<button type="button" class="gh sm" data-squad-select="clear">Очистить</button>'+
@@ -3356,7 +3356,7 @@ function squadEditorRefresh(form){
 }
 function squadEditorFilter(form){
   if(!form||form.dataset.ent!=='squads')return;
-  const term=String(form.querySelector('[data-squad-search]')?.value||'').trim().toLocaleLowerCase('ru');
+  const term=String(form.querySelector('[data-squad-inbound-search]')?.value||'').trim().toLocaleLowerCase('ru');
   const profile=String(form.querySelector('[data-squad-profile]')?.value||'');
   let visible=0;
   for(const row of form.querySelectorAll('[data-squad-option]')){
@@ -3369,7 +3369,7 @@ function squadEditorFilter(form){
   if(empty)empty.hidden=visible>0;
 }
 document.addEventListener('input',event=>{
-  if(event.target.matches?.('form[data-ent="squads"] [data-squad-search]'))
+  if(event.target.matches?.('form[data-ent="squads"] [data-squad-inbound-search]'))
     squadEditorFilter(event.target.closest('form'));
 });
 document.addEventListener('change',event=>{
