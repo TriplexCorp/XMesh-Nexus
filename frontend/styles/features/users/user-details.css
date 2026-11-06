@@ -1565,3 +1565,44 @@ dialog.user-modal .user-pane {
 #dlg.user-modal .user-server-archive-note{
   margin:.32rem 0;font-size:.72rem;line-height:1.45;color:var(--mu)
 }
+
+/* Per-user client routing: shared modal tokens; no new detached overlay. */
+#dlg.user-modal .user-pane-routing{width:100%;min-width:0}
+#dlg.user-modal [data-user-client-routing-root]{display:grid;gap:1rem;min-width:0}
+#dlg.user-modal .user-route-intro{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;padding:1rem 1.1rem;border:1px solid var(--nx-border);background:var(--nx-surface,transparent);border-radius:var(--ui-radius)}
+#dlg.user-modal .user-route-intro h3{margin:0 0 .35rem;font-size:1rem;color:var(--tx)}
+#dlg.user-modal .user-route-intro p{margin:0;color:var(--mu);font-size:.82rem;line-height:1.6;max-width:55rem}
+#dlg.user-modal .user-route-count{padding:.35rem .7rem;border:1px solid var(--nx-border);border-radius:999px;white-space:nowrap;font-size:.75rem;color:var(--mu)}
+#dlg.user-modal .user-route-mode{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+#dlg.user-modal .user-route-mode label{display:flex;align-items:center;gap:.85rem;min-width:0;padding:.9rem 1rem;border:1px solid var(--nx-border);border-radius:var(--ui-radius);background:var(--nx-surface,transparent);cursor:pointer}
+#dlg.user-modal .user-route-mode label.active{border-color:color-mix(in srgb,var(--a) 50%,var(--nx-border));background:color-mix(in srgb,var(--a) 8%,transparent)}
+#dlg.user-modal .user-route-mode input{width:1rem;height:1rem;flex:none;accent-color:var(--a)}
+#dlg.user-modal .user-route-mode label span{display:grid;gap:.28rem;min-width:0}
+#dlg.user-modal .user-route-mode b{font-size:.83rem;color:var(--tx)}
+#dlg.user-modal .user-route-mode small{font-size:.72rem;color:var(--mu)}
+#dlg.user-modal .user-route-rules{display:grid;gap:.75rem}
+#dlg.user-modal .user-route-rule{display:grid;gap:.75rem;padding:1rem 1.1rem;border:1px solid var(--nx-border);border-radius:var(--ui-radius);background:var(--nx-surface,transparent)}
+#dlg.user-modal .user-route-rule-head{display:flex;justify-content:space-between;align-items:center;gap:.75rem}
+#dlg.user-modal .user-route-rule-head strong{font-size:.84rem}
+#dlg.user-modal .user-route-rule-actions{display:flex;gap:.3rem;align-items:center;flex-wrap:wrap}
+#dlg.user-modal .user-route-rule-actions button,
+#dlg.user-modal .user-route-add{display:inline-flex;align-items:center;justify-content:center;min-height:2rem;min-width:2rem;padding:.3rem .65rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:transparent;color:var(--tx);font:inherit;font-size:.75rem;cursor:pointer}
+#dlg.user-modal .user-route-rule-actions button:disabled{opacity:.35;cursor:default}
+#dlg.user-modal .user-route-rule-actions .user-route-remove{color:var(--er)}
+#dlg.user-modal .user-route-add{justify-self:start;padding:.55rem .9rem;border-color:color-mix(in srgb,var(--a) 28%,var(--nx-border))}
+#dlg.user-modal .user-route-rule-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.65rem}
+#dlg.user-modal .user-route-rule-fields label{display:grid;align-content:start;gap:.35rem;min-width:0;color:var(--mu);font-size:.73rem}
+#dlg.user-modal .user-route-rule-fields :is(input,select){width:100%;min-width:0;height:2.4rem;padding:.4rem .55rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-surface,transparent);color:var(--tx);font:inherit;font-size:.8rem}
+#dlg.user-modal .user-route-rule-fields :is(input,select):focus-visible{outline:2px solid var(--nx-focus);outline-offset:1px}
+#dlg.user-modal .user-route-rule-fields .user-route-target{grid-column:1/-1}
+#dlg.user-modal .user-route-empty{margin:0;padding:1.25rem 1rem;border:1px dashed var(--nx-border);border-radius:var(--ui-radius);color:var(--mu);font-size:.82rem}
+#dlg.user-modal .user-route-warning{margin:0;font-size:.76rem;color:var(--mu);line-height:1.65}
+@media(max-width:900px){
+  #dlg.user-modal .user-route-rule-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:580px){
+  #dlg.user-modal .user-route-intro{flex-direction:column}
+  #dlg.user-modal .user-route-mode{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-modal .user-route-rule-fields{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-modal .user-route-rule-fields .user-route-target{grid-column:auto}
+}
