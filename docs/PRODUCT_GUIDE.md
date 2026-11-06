@@ -23,7 +23,7 @@ XMesh Nexus does not proxy user VPN traffic through the panel. Xray-core on mana
 | --- | --- | --- |
 | **Dashboard** | Infrastructure overview, node/user state and operational signals | Displayed state depends on real API/agent telemetry |
 | **Nodes** | Enrollment, bootstrap, health, Agent/Xray versions, configuration assignment, restart/update operations, Xray update, metrics, network traffic, quotas and diagnostics | Queued operations must be verified from runtime state |
-| **Users** | CRUD, status, expiry, traffic limits, access state, detailed card, subscription access and individual fingerprint override | Per-user fingerprint can inherit from host |
+| **Users** | CRUD, status, expiry, traffic limits, access state, detailed card, subscription access and individual fingerprint override and personal client routing rules (inheriting global templates by default) | Per-user fingerprint can inherit from host |
 | **Squads** | Grouping/assignment of users and policy-oriented administration | Exact behavior depends on current panel policy model |
 | **Hosts / endpoints** | Public endpoint metadata, domain/address/port, TLS/REALITY/client parameters, fingerprint and mapping to infrastructure | Host fingerprint defaults to Chrome |
 | **XRAY STUDIO** | Composer, form editor, manual JSON, diagnostics, profile assignment, transports, security, XHTTP, FinalMask, routing-related config and advanced settings | Explicit `security` is authoritative |
