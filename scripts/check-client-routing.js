@@ -9,9 +9,18 @@ const source=fs.readFileSync('frontend/js/features/routing/client-routing.js','u
 const sandbox={window:{},crypto:require('node:crypto').webcrypto};
 new vm.Script(source,{filename:'client-routing.js'}).runInNewContext(sandbox);
 assert.equal(typeof sandbox.window.XMeshClientRouting?.create,'function');
-const flagSandbox={window:{}};
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const catalogStart=app.indexOf('const COUNTRY_CODES=');
+const catalogEnd=app.indexOf('// Country flags are bundled',catalogStart);
+assert(catalogStart>=0&&catalogEnd>catalogStart,'Canonical country index must be present');
+const catalogWindow={};
+const catalog=new Function('panelIsEnglish','window',
+  app.slice(catalogStart,catalogEnd)+'return window.XMeshCountryCatalog;')(
+  ()=>false,catalogWindow);
+assert(catalog.countries.length>=250,'Routing must use the complete country catalog');
+const flagSandbox={window:{XMeshCountryCatalog:catalog}};
 new vm.Script(source.replace('  function create(db, saveSettings, toast) {',
-  '  window.__routingFlagTests={countryCode,flag};\n  function create(db, saveSettings, toast) {')
+  '  window.__routingFlagTests={countryCode,flag};\\n  function create(db, saveSettings, toast) {')
 ).runInNewContext(flagSandbox);
 const {countryCode,flag}=flagSandbox.window.__routingFlagTests;
 for(const label of ['Англия','England','Великобритания','United Kingdom','GB','UK','🇬🇧'])
@@ -28,9 +37,21 @@ for(const [label,parts] of [
 }
 
 assert.equal(countryCode('Польша'),'pl','Polish flags must not regress');
-assert.match(flag(countryCode('Англия')),/class="crx-flag"/,'England must render a real flag');
-assert.match(flag('gb'),/#012169/,'British flag must contain Union Jack colors');
+assert.match(flag(countryCode('Англия')),/src="\/flags\/gb\.svg"/,'England must use the bundled UK flag');
 assert.doesNotMatch(flag('gb'),/crx-globe/,'British flag must not fall back to globe');
+for(const country of catalog.countries){
+  assert.equal(countryCode(country.code),country.code.toLowerCase(),country.code+' ISO flag');
+  assert.equal(countryCode(country.iso3),country.code.toLowerCase(),country.code+' ISO3 flag');
+  assert.equal(countryCode(country.flag),country.code.toLowerCase(),country.code+' emoji flag');
+  assert.equal(countryCode(country.name),country.code.toLowerCase(),country.code+' Russian country name');
+  assert.equal(countryCode(country.enName),country.code.toLowerCase(),country.code+' English country name');
+  assert.match(flag(country.code.toLowerCase()),new RegExp('src="/flags/'+country.code.toLowerCase()+'\\.svg"'));
+}
+assert.equal(countryCode('Польша-2'),'pl');
+assert.equal(countryCode('GB Англия'),'gb');
+assert.equal(countryCode('unknown custom server'),'');
+assert.match(flag(''),/crx-globe/,'Unknown locations retain a neutral marker');
+assert.doesNotMatch(source,/#012169|flagPatterns/,'Routing must not maintain a separate manual flag palette');
 
 const [markup,mount]=sandbox.window.XMeshClientRouting.create({
  nodes:[{id:2,name:'Netherlands',profileId:3}],
