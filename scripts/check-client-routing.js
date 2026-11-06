@@ -38,6 +38,10 @@ for(const [label,parts] of [
 }
 
 assert.equal(countryCode('Польша'),'pl','Polish flags must not regress');
+assert.equal(countryCode('', '🇵🇱', '', 'Москва'),'pl',
+ 'Explicit Polish flag must override the unrelated Moscow node name');
+assert.match(flag(countryCode('', '🇵🇱', '', 'Москва')),/src="\/flags\/pl\.svg"/,
+ 'Polish node marker must use the locally bundled SVG asset');
 assert.match(flag(countryCode('Англия')),/src="\/flags\/gb\.svg"/,'England must use the bundled UK flag');
 assert.doesNotMatch(flag('gb'),/crx-globe/,'British flag must not fall back to globe');
 for(const country of catalog.countries){
