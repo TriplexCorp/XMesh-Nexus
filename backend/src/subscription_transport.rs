@@ -139,6 +139,7 @@ fn device_xhttp<'a>(inbound: &'a Value, device: &str) -> Option<&'a Value> {
 }
 fn client_metadata<'a>(inbound: &'a Value, host: &'a Value, key: &str) -> Option<&'a Value> {
     host.get(key)
+        .filter(|value| !value.is_null())
         .or_else(|| inbound.get("xmesh").and_then(|v| v.get(key)))
 }
 fn client_transport(
@@ -429,6 +430,23 @@ pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Valu
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cleared_host_metadata_inherits_profile_metadata() {
+        let inbound = serde_json::json!({"xmesh":{"clientHeaders":{"Host":"profile.example"}}});
+        let host = serde_json::json!({"clientHeaders":null});
+        assert_eq!(
+            super::client_metadata(&inbound, &host, "clientHeaders"),
+            inbound
+                .get("xmesh")
+                .and_then(|value| value.get("clientHeaders"))
+        );
+        let empty = serde_json::json!({"clientHeaders":{}});
+        assert_eq!(
+            super::client_metadata(&inbound, &empty, "clientHeaders"),
+            empty.get("clientHeaders")
+        );
+    }
+
     use super::*;
     #[test]
     fn xhttp_obfs_and_session_fields_survive_without_server_limits() {

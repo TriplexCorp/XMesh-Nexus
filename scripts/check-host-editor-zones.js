@@ -19,7 +19,7 @@ const DB={
 };
 const field=(f,value)=>'<label class="f"><span>'+f.l+'</span><input name="'+f.k+'" value="'+String(value??'')+'"></label>';
 const names=['profileId','tag','nodes','disabled','remark','address','port','countryCode',
- 'sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'];
+ 'sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'];
 const fspec=names.map(k=>({k,l:k}));
 const countries=[{code:'NL',flag:'🇳🇱'},{code:'PL',flag:'🇵🇱'},{code:'DE',flag:'🇩🇪'}];
 const flag=code=>String.fromCodePoint(...code.split('').map(c=>127397+c.charCodeAt(0)));
@@ -84,7 +84,8 @@ for(const action of ['data-host-node-preset','data-host-count','data-host-resolv
   'data-host-runtime','data-host-clear-overrides']){
  assert(html.includes(action),'Missing working host editor action '+action);
 }
-assert(!html.includes('<details'),'Advanced options must be always visible');
+assert(!html.includes('<details class="host-advanced'),'Existing transport and security overrides must remain visible');
+assert(html.includes('host-client-settings'),'Expert client metadata must have its own disclosure');
 // Bootstrap refreshes replace arrays. An existing feature instance must see
 // the new collections and must leave their objects untouched during rendering.
 DB.profiles=[{id:2,name:'Replacement profile'}];

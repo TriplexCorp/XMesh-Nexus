@@ -67,6 +67,27 @@
   }else if(security!=='none'){
    throw new Error('Неизвестный режим защиты '+security+'. Требуется ручная проверка Xray.');
   }
+  const metadata=key=>host[key]??inbound.xmesh?.[key];
+  const merge=(target,value,keys)=>{if(value&&typeof value==='object'&&!Array.isArray(value))for(const key of keys)if(value[key]!==undefined&&value[key]!==null)target[key]=copy(value[key])};
+  if(network==='xhttp'){
+   const target=result.xhttpSettings||={};const extra=metadata('clientXhttpSettings');
+   merge(target,extra,["path", "host", "mode", "headers", "xPaddingBytes", "xPaddingObfsMode", "xPaddingKey", "xPaddingHeader", "xPaddingPlacement", "xPaddingMethod", "uplinkHTTPMethod", "sessionIDPlacement", "sessionIDKey", "sessionIDTable", "sessionIDLength", "seqPlacement", "seqKey", "uplinkDataPlacement", "uplinkDataKey", "uplinkChunkSize", "noGRPCHeader", "noSSEHeader", "scMaxEachPostBytes", "scMinPostsIntervalMs", "xmux"]);
+   if(extra?.downloadSettings&&typeof extra.downloadSettings==='object'&&!Array.isArray(extra.downloadSettings))target.downloadSettings=copy(extra.downloadSettings);
+  }
+  if(['ws','websocket','httpupgrade'].includes(network)&&metadata('clientHeaders')&&typeof metadata('clientHeaders')==='object'){
+   const target=result[map[network]]||={};target.headers=copy(metadata('clientHeaders'));
+  }
+  if(security==='tls'){
+   if(nonempty(host.alpn))result.tlsSettings.alpn=host.alpn.split(',').map(v=>v.trim()).filter(Boolean);
+   merge(result.tlsSettings,metadata('clientTlsSettings'),['verifyPeerCertByName','allowInsecure','alpn','fingerprint','pinnedPeerCertSha256','useSystemCA','disableSystemRoot','enableSessionResumption','echConfigList','echSockopt','minVersion','maxVersion','cipherSuites','curvePreferences']);
+  }
+  if(network==='grpc'&&nonempty(host.serviceName))(result.grpcSettings||={}).serviceName=host.serviceName;
+  if(network==='masque'){
+   result.masqueSettings=copy(source.masqueSettings||{});
+   merge(result.masqueSettings,metadata('clientMasqueSettings'),['host','headers','xmux']);
+   if(nonempty(host.host))result.masqueSettings.host=host.host;
+   if(nonempty(host.path))result.masqueSettings.path=host.path;
+  }
   const clientHost=nonempty(host.host)||nonempty(host.externalHost);
   const path=nonempty(host.path);
   for(const prop of ['xhttpSettings','wsSettings','httpupgradeSettings']){

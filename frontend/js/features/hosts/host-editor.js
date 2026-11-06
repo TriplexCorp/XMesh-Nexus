@@ -44,6 +44,7 @@ window.XMeshHostEditor=(() => {
       const basic=['remark','address','port','countryCode'].map(k=>field(f(k),o[k])).join('');
       const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
       const advanced=['sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'].map(k=>field(f(k),o[k]??'')).join('');
+      const clientFields=['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].filter(k=>f(k)).map(k=>field(f(k),typeof o[k]==='object'&&o[k]!==null?JSON.stringify(o[k],null,2):o[k]||'')).join('');
       // Three permanent, side-by-side editing zones. Keep all input names and
       // actions unchanged so the existing save and live-preview logic still work.
       return '<div class="host-editor-layout">'+
@@ -60,7 +61,8 @@ window.XMeshHostEditor=(() => {
         '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Расширенные переопределения</span></div>'+
         '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
         '<div class="host-advanced-fields">'+advanced+'</div>'+
-        '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></div></section>'+
+        '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button>'+
+        '<details class="host-client-settings"><summary>Настройки клиента</summary><p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details></div></section>'+
         '<section class="host-editor-side" aria-label="Клиентское подключение">'+
         '<div class="node-form-section-title">'+ic('globe')+'<span>Клиентское подключение</span></div>'+
         '<p class="node-ip-hint">Предпросмотр из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+

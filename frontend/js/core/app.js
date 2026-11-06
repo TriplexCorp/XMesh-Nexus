@@ -265,10 +265,20 @@ const ENT={
     {k:'spiderX',l:'REALITY spiderX',ph:'/'},
     {k:'alpn',l:'TLS ALPN',ph:'h2,http/1.1'},
     {k:'serviceName',l:'gRPC serviceName',ph:'Из inbound'},
-    {k:'clientEncryption',l:'VLESS Encryption (клиент)',ph:'Наследуется из inbound или пользователя'}
+    {k:'clientEncryption',l:'VLESS Encryption (клиент)',ph:'Наследуется из inbound или пользователя'},
+    {k:'clientXhttpSettings',l:'XHTTP · JSON',t:'area',rows:5},
+    {k:'clientHeaders',l:'HTTP headers · JSON',t:'area',rows:5},
+    {k:'clientTlsSettings',l:'TLS · JSON',t:'area',rows:5},
+    {k:'clientMasqueSettings',l:'MASQUE · JSON',t:'area',rows:5}
   ],
     def:()=>({port:443,fp:'chrome',order:DB.hosts.length+1,nodes:[],profileId:DB.profiles[0]?.id||0}),
     chk:d=>{
+      for(const key of ['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings']){
+        const raw=d[key];
+        if(!raw){d[key]=null;continue}
+        try{const value=typeof raw==='string'?JSON.parse(raw):raw;if(!value||Array.isArray(value)||typeof value!=='object')throw new Error();d[key]=value}
+        catch(_){return (panelIsEnglish()?'Enter a JSON object: ':'Укажите JSON-объект: ')+key}
+      }
       if(d.disabled)return '';
       if(!d.remark.trim()||!d.address.trim())return 'Укажите название и публичный адрес.';
       if(!Number.isInteger(d.port)||d.port<1||d.port>65535)return 'Публичный порт должен быть от 1 до 65535.';
@@ -3389,6 +3399,7 @@ function hostEditorRefresh(form,changedProfile=false){
     path:['ws','xhttp'].includes(stream.network),
     fp:['reality','tls'].includes(security),
     publicKey:security==='reality',shortId:security==='reality',spiderX:security==='reality',
+    clientXhttpSettings:stream.network==='xhttp',clientHeaders:['ws','websocket','httpupgrade'].includes(stream.network),clientTlsSettings:security==='tls',clientMasqueSettings:stream.network==='masque',
     alpn:security==='tls',serviceName:stream.network==='grpc',
     clientEncryption:inbound?.protocol==='vless'
   })){
@@ -3396,6 +3407,8 @@ function hostEditorRefresh(form,changedProfile=false){
     const wrapper=input?.closest('.f');
     if(wrapper)wrapper.hidden=!show;
   }
+  const clientSection=form.querySelector('.host-client-settings');
+  if(clientSection)clientSection.hidden=!['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].some(key=>get(key)?.closest('.f')?.hidden===false);
   const xhttp=stream.xhttpSettings||{};
   const val=k=>String(get(k)?.value||'').trim();
   const securityName=security==='reality'?'REALITY':security==='tls'?'TLS':security;
@@ -3417,6 +3430,7 @@ function hostEditorRefresh(form,changedProfile=false){
       show('Inbound',inbound?.tag||'Не выбран')+
       show('Протокол / транспорт',inbound?(inbound.protocol+' / '+(stream.network||'tcp')):'—')+
       show('Защита',securityName)+
+      ['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].filter(key=>val(key)&&!get(key)?.closest('.f')?.hidden).map(key=>show(key,(()=>{try{return Object.keys(JSON.parse(val(key))).join(', ')||'{}'}catch(_){return panelIsEnglish()?'Invalid JSON':'Некорректный JSON'}})())).join('')+
       show('Страна (ISO)',val('countryCode').toUpperCase()||'Авто из названия / ZZ')+
       show('Публичный endpoint',val('address')?val('address')+':'+(val('port')||'443'):'Выберите ноду')+
       show('SNI',sni)+
@@ -4513,7 +4527,7 @@ document.addEventListener('input',e=>{
   if(dirty)dirty.textContent='Есть несохранённые изменения';
 });
 document.addEventListener('input',e=>{
-  if(e.target.closest('form[data-ent="hosts"]')&&['remark','address','port','sni','host','path','fp','publicKey','shortId','alpn','serviceName','clientEncryption'].includes(e.target.name)){
+  if(e.target.closest('form[data-ent="hosts"]')&&['remark','address','port','sni','host','path','fp','publicKey','shortId','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].includes(e.target.name)){
     hostEditorRefresh(e.target.closest('form'));return;
   }
   if(!e.target.matches('form[data-ent="nodes"] [name="rotationIps"]'))return;
@@ -4790,7 +4804,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-qr]')){await api.update('users',+b.dataset.qr,{used:0});toast('Трафик сброшен');render(1)}
   else if(b=g('[data-host-clear-overrides]')){
     const form=b.closest('form');
-    if(form){['sni','host','path','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','fp'].forEach(key=>{const input=form.elements.namedItem(key);if(input){input.value=key==='fp'?'chrome':'';if(key==='fp')input.dispatchEvent(new Event('input'));}});hostEditorRefresh(form);toast('Переопределения сброшены — применятся настройки XRAY STUDIO после сохранения');}
+    if(form){['sni','host','path','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings','fp'].forEach(key=>{const input=form.elements.namedItem(key);if(input){input.value=key==='fp'?'chrome':'';if(key==='fp')input.dispatchEvent(new Event('input'));}});hostEditorRefresh(form);toast('Переопределения сброшены — применятся настройки XRAY STUDIO после сохранения');}
   }
   else if(b=g('[data-node-create-host]')){
     const node=DB.nodes.find(n=>String(n.id)===b.dataset.nodeCreateHost);
@@ -5436,6 +5450,7 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     finally{delete f.dataset.saving;if(button?.isConnected)button.disabled=false}
   }
   else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(key==='nodes'?e2.fs.filter(field=>!field.k.startsWith('geo')):e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m){
+      if(key==='hosts'&&m.includes('JSON')){const advanced=f.querySelector('.host-client-settings');if(advanced)advanced.open=true;const field=e2.fs.find(field=>m.includes(field.k));if(field)f.elements.namedItem(field.k)?.focus();}
       if(key==='nodes'){
         const profile=DB.profiles.find(p=>String(p.id)===String(d.profileId));
         const readiness=nodeTlsReadiness(profile,d);
