@@ -3,8 +3,12 @@
  * XMesh Nexus interface locale (admin UI only).
  * Sources retain Russian text; known UI copy is translated in one centralized
  * catalog instead of scattering language checks through business logic.
- * Translates text/attributes, never form values, JSON, code, or arbitrary user
- * content. A MutationObserver handles asynchronously rendered drawers/dialogs.
+ * Translates UI text/attributes, never form values, JSON, code, or arbitrary user
+ * content. Persisted entity names (nodes, hosts, profiles, users, inbounds) must
+ * be rendered inside an element with translate="no" (or data-no-translate);
+ * this rule applies even when the name coincides with a UI dictionary entry
+ * such as 'Польша'. Generated fallback labels are localized before rendering.
+ * A MutationObserver handles asynchronously rendered drawers/dialogs.
  */
 window.XMeshI18n=(()=>{
   const key='xmeshNexusLanguage';
