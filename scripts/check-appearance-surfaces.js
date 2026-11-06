@@ -182,20 +182,13 @@ assert.equal(themeSyncs,3,'Surface switches must update linked subscription appe
 assert.match(app,/aria-pressed="\$\{\(C\[key\]\|\|CDEFAULT\[key\]\)==v\?'true':'false'\}/,
  'Initial material selection must expose aria-pressed');
 
-// Raised needs a small directional reflection to distinguish it from Classic
-// in both palettes, but it must never become a bright full-card gradient slab.
-// The visual browser audit independently checks three distinct materials.
+// Raised is a restrained elevation variant, not a bright gradient slab.
 const darkRaised=foundation.match(/html\[data-surface=raised\]\{([^}]+)\}/)?.[1];
 const lightRaised=foundation.match(/html\[data-theme=light\]\[data-surface=raised\]\{([^}]+)\}/)?.[1];
 assert(darkRaised&&lightRaised,'Both dark and light Raised material overrides must exist');
 for(const [name,block] of [['dark',darkRaised],['light',lightRaised]]){
- const sheen=block.match(/--nx-panel-image:linear-gradient\(180deg,rgba\((\d+),(\d+),(\d+),([\d.]+)\),transparent (\d+)%\)/);
- assert(sheen,'Raised '+name+' must have a subtle top-edge reflection, fading to transparent');
- const [,r,g,b,a,stop]=sheen;
- assert(Math.max(+r,+g,+b)-Math.min(+r,+g,+b)<=20,'Raised '+name+' must keep a neutral reflection');
- assert(+a>0&&+a<=(name==='dark'?.05:.30),'Raised '+name+' reflection must stay low intensity');
- assert(+stop>=25&&+stop<=45,'Raised '+name+' reflection must fade near the top edge');
- assert.equal((block.match(/gradient\(/g)||[]).length,1,'Raised '+name+' must not stack decorative gradients');
+ assert.match(block,/--nx-panel-image:none/,'Raised '+name+' cards must have no full-card sheen');
+ assert.doesNotMatch(block,/linear-gradient/,'Raised '+name+' must not paint decorative full-card gradients');
  assert.match(block,/--nx-panel-shadow:/,'Raised '+name+' needs one restrained elevation');
  assert.match(block,/--nx-item-shadow:none/,'Nested '+name+' items must not stack raised shadows');
  assert.match(block,/--nx-control-shadow:none/,'Nested '+name+' controls must not stack raised shadows');

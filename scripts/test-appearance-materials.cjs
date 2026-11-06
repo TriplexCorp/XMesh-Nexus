@@ -26,12 +26,21 @@ const {chromium}=require('./browser/node_modules/playwright');
     assert(samples.every(s=>s.backgroundAlpha>0&&s.backgroundAlpha<255),'Glass must remain translucent');
     assert(samples.every(s=>s.backdrop.includes('blur')),'Glass must blur its backdrop');
     assert(samples.every(s=>!s.shadow.includes('inset')),'Glass must not reintroduce hidden borders via inset shadows');
-   }else assert(samples.every(s=>s.backgroundAlpha===255),'Opaque materials must stay opaque');
+   }else {
+    assert(samples.every(s=>s.backgroundAlpha===255),'Opaque materials must stay opaque');
+    assert(samples.every(s=>s.image==='none'),'Classic and Raised must not paint decorative full-card gradients');
+   }
   }
   for(const theme of ['light','dark']){
    const variants=['solid','glass','raised'].map(surface=>materials.get(theme+' '+surface));
    assert.equal(new Set(variants.map(v=>v.background)).size,3,theme+': materials need distinct fills');
-   assert.equal(new Set(variants.map(v=>v.image)).size,3,theme+': materials need distinct lighting');
+   // Glass gets the directional light overlay; Classic is flat and Raised
+   // gets its depth from elevation, not a bright gradient. The combination
+   // of fill, transparency, lighting and shadow must distinguish all three.
+   assert.equal(variants[0].image,'none',theme+': Classic must remain flat');
+   assert(variants[1].image.includes('gradient('),theme+': Glass must retain its lighting');
+   assert.equal(variants[2].image,'none',theme+': Raised must remain gradient-free');
+   assert.equal(new Set(variants.map(v=>[v.background,v.image,v.shadow,v.backdrop].join('|'))).size,3,theme+': materials need distinct combined appearances');
    assert.equal(new Set(variants.map(v=>v.shadow)).size,3,theme+': materials need distinct elevation');
    if(process.env.XMESH_MATERIAL_OUTPUT)for(const surface of ['solid','glass','raised']){
     await page.evaluate(v=>Object.assign(document.documentElement.dataset,v),{theme,surface,borders:'soft'});

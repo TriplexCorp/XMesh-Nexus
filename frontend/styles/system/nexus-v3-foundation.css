@@ -389,9 +389,7 @@ html[data-theme=light][data-surface=glass]{
  * Depth comes from one soft outer shadow, never a bright full-card gradient or
  * multiple stacked inner highlights. Nested controls keep their normal tokens. */
 html[data-surface=raised]{
-  /* A faint top-edge sheen distinguishes Raised from Classic without a
-   * full-card gradient; depth still comes primarily from the outer shadow. */
-  --nx-panel-image:linear-gradient(180deg,rgba(255,255,255,.028),transparent 38%);
+  --nx-panel-image:none;
   --nx-panel-bg:color-mix(in srgb,var(--s1) 98%,var(--tx) 2%);
   --nx-dialog-bg:color-mix(in srgb,var(--s1) 96%,var(--s2) 4%);
   --nx-section-bg:color-mix(in srgb,var(--s1) 68%,var(--s2) 32%);
@@ -409,7 +407,7 @@ html[data-surface=raised]{
   --nx-backdrop:none;
 }
 html[data-theme=light][data-surface=raised]{
-  --nx-panel-image:linear-gradient(180deg,rgba(225,233,242,.28),transparent 38%);
+  --nx-panel-image:none;
   --nx-panel-bg:color-mix(in srgb,var(--s1) 99%,var(--tx) 1%);
   --nx-dialog-bg:color-mix(in srgb,var(--s1) 95%,var(--s2) 5%);
   --nx-section-bg:color-mix(in srgb,var(--s1) 72%,var(--s2) 28%);
