@@ -8,11 +8,11 @@
   }[char]));
   const english=()=>window.XMeshI18n?.getLanguage?.()==='en';
   const tr=(ru,en)=>english()?en:ru;
-  const matches=[
+  const matches=()=>[
     ['geosite','GeoSite'],['geoip','GeoIP'],['domain',tr('Домен','Domain')],
     ['ip','IP / CIDR'],['port',tr('Порт','Port')]
   ];
-  const actions=[
+  const actions=()=>[
     ['proxy',tr('Основной сервер','Primary server')],
     ['server',tr('Другой сервер','Another server')],
     ['direct',tr('Напрямую','Direct')],
@@ -53,9 +53,9 @@
             '<button type="button" data-user-route-remove="'+index+'" class="user-route-remove">'+tr('Удалить','Remove')+'</button>'+
           '</div></div>'+
         '<div class="user-route-rule-fields">'+
-          '<label><span>'+tr('Условие','Match')+'</span><select data-user-route-field="match" data-index="'+index+'">'+options(matches,rule.match)+'</select></label>'+
+          '<label><span>'+tr('Условие','Match')+'</span><select data-user-route-field="match" data-index="'+index+'">'+options(matches(),rule.match)+'</select></label>'+
           '<label><span>'+tr('Значение','Value')+'</span><input type="text" data-user-route-field="value" data-index="'+index+'" maxlength="200" value="'+escapeHTML(rule.value)+'" placeholder="youtube"></label>'+
-          '<label><span>'+tr('Действие','Action')+'</span><select data-user-route-field="action" data-index="'+index+'">'+options(actions,rule.action)+'</select></label>'+
+          '<label><span>'+tr('Действие','Action')+'</span><select data-user-route-field="action" data-index="'+index+'">'+options(actions(),rule.action)+'</select></label>'+
           '<label><span>'+tr('Сеть','Network')+'</span><select data-user-route-field="network" data-index="'+index+'">'+options(networks,rule.network||'tcp,udp')+'</select></label>'+
           (rule.action==='server'?'<label class="user-route-target"><span>'+tr('Целевое подключение','Destination')+'</span><select data-user-route-field="server" data-index="'+index+'" data-no-translate>'+targetChoices(rule)+'</select></label>':'')+
         '</div></article>';
@@ -117,6 +117,7 @@
       if(field==='action'||field==='match')paint();
       markDirty();
     });
+    document.addEventListener('xmesh:locale-changed',()=>{if(root.isConnected)paint();},{signal:undefined});
     paint();
   }
   function serialize(canvas){
@@ -131,7 +132,7 @@
           throw Object.assign(new Error(tr('Выберите целевой сервер для каждого правила.','Select a destination for each server rule.')),{tab:'routing'});
       }
     }
-    return {mode:state.mode,rules:state.rules.map(rule=>{
+    return {mode:state.mode,rules:(state.mode==='inherit'?[]:state.rules).map(rule=>{
       const entry={match:rule.match,value:String(rule.value||'').trim(),action:rule.action,network:rule.network||'tcp,udp'};
       if(rule.action==='server')entry.server=rule.server||'';
       return entry;
