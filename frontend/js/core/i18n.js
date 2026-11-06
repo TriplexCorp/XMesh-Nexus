@@ -16,6 +16,12 @@ window.XMeshI18n=(()=>{
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
     "Архив":"Archived",
+    "Личная маршрутизация должна быть объектом": "Personal routing must be an object",
+    "Неизвестное поле персональной маршрутизации": "Unknown personal routing field",
+    "Не указан режим маршрутизации": "Routing mode is required",
+    "Режим маршрутизации должен быть inherit или custom": "Routing mode must be inherit or custom",
+    "Правила должны быть массивом": "Rules must be an array",
+    "Не более 32 персональных правил": "No more than 32 personal rules",
     "Домен": "Domain",
     "Порт": "Port",
     "Основной сервер": "Primary server",
