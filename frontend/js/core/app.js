@@ -3157,11 +3157,11 @@ async function templatesP(){
   const itemId=item=>text(item.id);
   const metric=(icon,label,value)=>'<div class="template-metric">'+
     '<span class="template-metric-label">'+ic(icon)+text(label)+'</span>'+
-    '<strong data-no-translate>'+text(value)+'</strong></div>';
+    '<strong>'+text(value)+'</strong></div>';
   const actions=(kind,item)=>'<div class="template-card-footer">'+
     '<button type="button" class="gh sm template-configure" data-ne="'+kind+':'+itemId(item)+'">'+ic('sliders')+' Настроить</button>'+
     (kind==='tpls'
-      ?'<button type="button" class="gh sm template-use" data-template-create-user="'+itemId(item)+'">'+ic('userPlus')+' Создать пользователя</button>'
+      ?'<button type="button" class="gh sm template-use" data-template-create-user="'+itemId(item)+'">'+ic('users')+' Создать пользователя</button>'
       :'<a class="gh sm template-studio-link" href="#subscription">'+ic('globe')+' SUBSCRIPTION STUDIO</a>')+
     '<details class="template-more"><summary aria-label="Действия с шаблоном" title="Дополнительные действия">'+ic('more')+'</summary>'+
       '<div class="template-more-menu">'+
@@ -3183,12 +3183,12 @@ async function templatesP(){
         '<span class="template-status '+(item.hold?'is-hold':'')+'">'+(item.hold?'С первого подключения':'Обычный')+'</span></header>'+
       '<div class="template-metrics">'+
         metric('activity','Трафик',traffic)+metric('calendar','Срок',period)+
-        metric('monitor','Устройства',count)+metric('repeat','Сброс',reset)+
+        metric('monitor','Устройства',count)+metric('redo','Сброс',reset)+
       '</div>'+
       '<div class="template-card-access">'+
         '<span class="template-access-label">'+ic('layers')+' Сквады <b>'+squads.length+'</b></span>'+
-        '<div class="template-access-chips" data-no-translate>'+(squadNames.length
-          ?squadNames.slice(0,2).map(name=>'<span class="template-squad-chip" title="'+text(name)+'">'+text(name)+'</span>').join('')+
+        '<div class="template-access-chips">'+(squadNames.length
+          ?squadNames.slice(0,2).map(name=>'<span class="template-squad-chip" data-no-translate title="'+text(name)+'">'+text(name)+'</span>').join('')+
             (squadNames.length>2?'<span class="template-squad-chip">+'+(squadNames.length-2)+'</span>':'')
           :'<span class="template-access-none">Не назначены</span>')+'</div>'+
       '</div>'+actions('tpls',item)+'</article>';
@@ -3197,12 +3197,12 @@ async function templatesP(){
     const format=String(item.fmt||'XRAY_JSON').toUpperCase();
     const length=String(item.content||'').length;
     return '<article class="template-card template-subscription-card" data-template-card="subs:'+itemId(item)+'" data-template-search-text="'+text([item.name,format].join(' '))+'">'+
-      '<header class="template-card-header"><span class="template-card-emblem">'+ic('fileCode')+'</span>'+
+      '<header class="template-card-header"><span class="template-card-emblem">'+ic('code')+'</span>'+
         '<div class="template-card-title"><span class="template-card-eyebrow">Заготовка конфигурации</span>'+
           '<button type="button" class="template-card-name" data-ne="subs:'+itemId(item)+'" data-no-translate title="'+text(item.name)+'">'+text(item.name)+'</button></div>'+
         '<span class="template-status">Черновик</span></header>'+
       '<div class="template-metrics">'+
-        metric('code','Формат',format)+metric('fileText','Размер',length+' симв.')+
+        metric('code','Формат',format)+metric('file','Размер',length+' симв.')+
       '</div>'+
       '<p class="template-card-note">'+ic('info')+' Сохранённая заготовка. Не применяется к подпискам автоматически.</p>'+
       actions('subs',item)+'</article>';
@@ -3223,7 +3223,7 @@ async function templatesP(){
           '<div class="template-grid" data-ui-layout="cards">'+items.map(renderItem).join('')+'</div>'+
           '<p class="template-no-matches" data-template-no-results="'+kind+'" hidden>'+ic('search')+' Ничего не найдено. Измените запрос.</p>'
         :'<div class="template-empty">'+
-           '<span class="template-empty-icon">'+ic(kind==='tpls'?'users':'fileCode')+'</span>'+
+           '<span class="template-empty-icon">'+ic(kind==='tpls'?'users':'code')+'</span>'+
            '<div><strong>'+(kind==='tpls'?'Пока нет шаблонов пользователей':'Шаблонов подписки пока нет')+'</strong>'+
              '<p>'+(kind==='tpls'?'Создайте готовый тарифный пресет: срок, трафик, устройства и сквады.':
               'Это хранилище заготовок; реальная выдача настраивается в SUBSCRIPTION STUDIO.')+'</p></div>'+
@@ -3233,10 +3233,10 @@ async function templatesP(){
   const html='<div class="templates-workspace" data-ui-page="templates">'+
     '<header class="templates-heading"><div><span class="templates-kicker">Управление пресетами</span>'+
       '<h2>Шаблоны</h2><p>Готовые параметры для пользователей и сохранённые заготовки конфигураций.</p></div>'+
-      '<div class="templates-heading-actions"><button type="button" class="gh sm" data-ne="subs">'+ic('fileCode')+' Шаблон подписки</button>'+
+      '<div class="templates-heading-actions"><button type="button" class="gh sm" data-ne="subs">'+ic('code')+' Шаблон подписки</button>'+
         '<button type="button" class="btn sm" data-ne="tpls">'+ic('plus')+' Шаблон пользователя</button></div></header>'+
     section('tpls',users.items,'Шаблоны пользователей','Лимиты, срок и доступ для новых пользователей.','users',templateCard)+
-    section('subs',subscriptions.items,'Шаблоны подписки','Сохранённые заготовки. Выдачей управляет SUBSCRIPTION STUDIO.','fileCode',subscriptionCard)+
+    section('subs',subscriptions.items,'Шаблоны подписки','Сохранённые заготовки. Выдачей управляет SUBSCRIPTION STUDIO.','code',subscriptionCard)+
     '</div>';
   return [html,()=>{
     const root=document.querySelector('.templates-workspace');
