@@ -74,6 +74,8 @@ jobs:
         run: node scripts/check-static-assets.js
       - name: Verify per-server client routing templates and assignments
         run: node scripts/check-client-routing.js
+      - name: Verify personal client routing and global inheritance
+        run: node scripts/check-user-client-routing.js
       - name: Validate RU/EN panel and portal localization
         run: node scripts/check-i18n.js
       - name: Install pinned English audit parser
