@@ -67,6 +67,7 @@ const wrapper={
 };
 function svg(width){
  return {
+  contains:()=>false,
   getBoundingClientRect:()=>({width:renderedWidth,height:340}),
   getAttribute:key=>key==='viewBox'?'0 0 '+width+' 340':null,
   querySelector:()=>null,
