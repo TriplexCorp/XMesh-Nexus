@@ -82,3 +82,39 @@
  .template-empty>button{margin-left:3.4rem}
  .template-card-footer>.template-use,.template-card-footer>.template-studio-link{flex:1 1 auto}
 }
+
+/* Quiet directory: a single toolbar and standalone cards, without nested panels. */
+.templates-tabs{display:flex;gap:.35rem;border-bottom:1px solid var(--nx-border);padding-bottom:.65rem}
+.templates-tabs [role=tab]{display:inline-flex;align-items:center;gap:.55rem;padding:.65rem .9rem;border:1px solid transparent;border-radius:var(--nx-control-radius);background:transparent;color:var(--mu);font:inherit;font-size:.88rem;cursor:pointer}
+.templates-tabs [aria-selected=true]{color:var(--tx);background:var(--nx-section-bg);border-color:var(--nx-border)}
+.templates-tabs [role=tab]>span{color:var(--mu);font-size:.75rem;font-variant-numeric:tabular-nums}
+.templates-tabs [role=tab]:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
+.template-section{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;gap:1.1rem}
+.template-section[hidden]{display:none}
+.template-section-tools{justify-content:flex-start;flex-wrap:wrap}
+.template-section-tools>.btn{margin-left:auto;display:inline-flex;align-items:center;gap:.4rem}
+.template-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,25rem),1fr));gap:1rem}
+.template-card{max-inline-size:34rem;padding:1.2rem;gap:1.1rem;background:var(--nx-panel-bg);box-shadow:var(--nx-panel-shadow)}
+.template-card-emblem{width:2.3rem;height:2.3rem;border:0;background:color-mix(in srgb,var(--a) 9%,transparent)}
+.template-card-eyebrow{display:none}
+.template-card-title{min-height:2.3rem}
+.template-card-name{font-size:1.1rem}
+.template-metrics{gap:1rem .8rem;padding-block:.2rem}
+.template-metric{border:0;border-radius:0;background:transparent;padding:0;min-height:0;gap:.4rem}
+.template-metric strong{font-size:1rem}
+.template-card-access{padding-block:.8rem;border-top:1px solid var(--nx-border)}
+.template-squad-chip{border-radius:var(--nx-control-radius)}
+.template-card-footer{padding-top:.8rem;gap:.5rem}
+.template-card-footer>.template-configure{flex:0 1 auto}
+.template-card-footer>.template-use{margin-left:auto}
+.template-empty{border:0;background:transparent;padding:2.5rem 0;min-height:0;justify-content:center}
+.template-empty>div{flex:0 1 auto}
+@media(max-width:560px){
+ .templates-tabs [role=tab]{padding:.6rem .7rem;font-size:.82rem}
+ .template-section-tools{gap:.7rem}
+ .template-search{flex:1 1 100%}
+ .template-card{padding:1rem}
+ .template-empty{justify-content:flex-start;padding-block:1.5rem}
+ .template-card-footer>.template-use{flex:1 1 auto}
+}
+.template-card-footer>.template-more{margin-left:0}
