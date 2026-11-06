@@ -15,6 +15,11 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Настройки клиента":"Client settings",
+    "JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.":"JSON object. Leave blank to inherit profile settings. Applies only to client configurations.",
+    "Укажите JSON-объект:":"Enter a JSON object:",
+    "Укажите JSON-объект: ":"Enter a JSON object: ",
+    "Некорректный JSON":"Invalid JSON",
     "Архив":"Archived",
     "Тип шаблонов": "Template type",
     "Пользовательские": "User templates",

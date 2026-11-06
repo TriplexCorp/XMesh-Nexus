@@ -3989,6 +3989,22 @@ mod subscription_host_protocol_tests {
 }
 
 async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
+    for key in [
+        "clientXhttpSettings",
+        "clientHeaders",
+        "clientTlsSettings",
+        "clientMasqueSettings",
+    ] {
+        if host
+            .get(key)
+            .is_some_and(|value| !value.is_null() && !value.is_object())
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Host client overrides must be JSON objects or null.",
+            ));
+        }
+    }
     // Disabled hosts are allowed to remain drafts and can always be switched off.
     // Re-enabling them validates the full runtime profile/node relationship.
     if host.get("disabled").and_then(Value::as_bool) == Some(true) {

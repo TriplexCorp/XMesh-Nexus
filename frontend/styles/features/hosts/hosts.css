@@ -175,3 +175,7 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36p
   .host-card-primary-actions{flex:1 1 auto}
   .host-card-order{margin-left:auto}
 }
+.host-client-settings{min-width:0;border-top:1px solid var(--nx-border);padding-top:.75rem}
+.host-client-settings>summary{cursor:pointer;color:var(--tx);font-weight:650;padding:.35rem 0}
+.host-client-settings .f{margin-top:.65rem}
+.host-client-settings textarea{font-family:var(--font-mono,monospace);min-height:7rem;resize:vertical}
