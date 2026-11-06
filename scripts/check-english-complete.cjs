@@ -37,6 +37,8 @@ assert.equal(api.translate('Неизвестный параметр Xray-core: p
 assert.equal(api.translate('1 строк'),'1 line');
 assert.equal(api.translate('Строка 12, столбец 4'),'Line 12, column 4');
 assert.equal(api.translate('Выбрать Москва'),'Select Москва','User-provided names must remain unchanged');
+assert.equal(api.translate('Архивная нода'),'Archived node');
+assert.equal(api.translate('Архивная нода #'),'Archived node #');
 assert.equal(api.translate('Параметры settings'),'Protocol settings');
 for(const [ru,en] of api.dict){
  assert(en.trim(),'Empty English translation: '+ru);
