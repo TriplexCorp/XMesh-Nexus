@@ -3,7 +3,7 @@
 
   // Panels stay mounted so settings and access remain one unsaved draft.
   const select=(canvas,key,focus=false)=>{
-    if(!canvas||!['ov','acc','traffic','dev'].includes(key))return;
+    if(!canvas||!['ov','acc','routing','traffic','dev'].includes(key))return;
     UT=key;
     for(const tab of canvas.querySelectorAll('[data-user-editor-tab]')){
       const active=tab.dataset.userEditorTab===key;
@@ -96,6 +96,15 @@
       setError(form,panelIsEnglish()?'Device limit must be a non-negative integer.':'Лимит устройств должен быть целым числом от 0.');
       select(canvas,'acc');
       deviceLimit?.focus();
+      return;
+    }
+
+    try{
+      const personal=window.XMeshUserClientRouting?.serialize(canvas);
+      if(personal)data.clientRouting=personal;
+    }catch(error){
+      setError(form,error?.message||'Invalid personal routing');
+      select(canvas,error?.tab||'routing');
       return;
     }
 
