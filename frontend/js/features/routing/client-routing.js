@@ -11,64 +11,52 @@
   const clone = v => JSON.parse(JSON.stringify(v));
   const kinds = {geosite:'GeoSite',geoip:'GeoIP',domain:'Домен',ip:'IP / CIDR',port:'Порт'};
   const actions = {proxy:'Через выбранный сервер',direct:'Напрямую',block:'Блокировать',server:'Через другой сервер'};
-  const flagPatterns = [
-    [/нидерланд|голланд|netherland|(?:^|[\s_-])nl(?:$|[\s_-])/i,'nl'],
-    [/польш|poland|(?:^|[\s_-])pl(?:$|[\s_-])/i,'pl'],
-    [/герман|germany|deutsch|(?:^|[\s_-])de(?:$|[\s_-])/i,'de'],
-    [/росси|russia|(?:^|[\s_-])ru(?:$|[\s_-])/i,'ru'],
-    [/швеци|sweden|(?:^|[\s_-])(?:se|swe)(?:$|[\s_-])/i,'se'],
-    [/эстони|estonia|(?:^|[\s_-])ee(?:$|[\s_-])/i,'ee'],
-    [/финлян|finland|(?:^|[\s_-])fi(?:$|[\s_-])/i,'fi'],
-    [/франци|france|(?:^|[\s_-])fr(?:$|[\s_-])/i,'fr'],
-    [/сша|usa|united states|(?:^|[\s_-])us(?:$|[\s_-])/i,'us'],
-    [/испан|spain|(?:^|[\s_-])es(?:$|[\s_-])/i,'es'],
-    [/англи|великобритани|британи|england|britain|united kingdom|(?:^|[\s_-])(?:gb|uk)(?:$|[\s_-])/i,'gb']
-  ];
+  // The central catalog is assembled in core/app.js from all ISO regions,
+  // multilingual aliases and locally bundled flag assets.
   function countryCode(...parts) {
-    // Country metadata is not uniform across node and public-host records.
-    // Prefer explicit ISO/emoji values, but recover from human-readable names
-    // even when a stored flag is missing or contains other presentation text.
-    const fields=parts.filter(p=>typeof p==='string'&&p.trim()).map(p=>p.trim().normalize('NFKC'));
-    const iso=/^(nl|pl|de|ru|se|swe|ee|fi|fr|us|es|gb|uk)$/i;
-    const explicit=fields.find(p=>iso.test(p));
-    if(explicit)return ({swe:'se',uk:'gb'})[explicit.toLowerCase()]||explicit.toLowerCase();
+    const catalog=global.XMeshCountryCatalog;
+    if(!catalog?.countries?.length)return '';
+    const countries=catalog.countries;
+    const normalize=catalog.normalize;
+    const fields=parts.filter(p=>typeof p==='string'&&p.trim()).map(p=>p.trim());
+    // Explicit stored ISO codes or complete flag emoji always win over names.
     for(const field of fields){
+      const code=field.toUpperCase();
+      if(code==='UK')return 'gb';
+      if(countries.some(c=>c.code===code))return code.toLowerCase();
       const emoji=field.match(/[\u{1F1E6}-\u{1F1FF}]{2}/u)?.[0];
       if(emoji){
-        const code=Array.from(emoji,c=>String.fromCharCode(c.codePointAt(0)-127397)).join('').toLowerCase();
-        if(code==='uk')return 'gb';
-        if(iso.test(code))return code;
+        const iso=Array.from(emoji,c=>String.fromCharCode(c.codePointAt(0)-127397)).join('').toUpperCase();
+        if(iso==='UK')return 'gb';
+        if(countries.some(c=>c.code===iso))return iso.toLowerCase();
       }
     }
-    const name=fields.join(' ');
-    return flagPatterns.find(([pattern])=>pattern.test(name))?.[1]||'';
+    // Match complete human-readable aliases within names such as "GB Англия",
+    // while avoiding substring mistakes ("us" within "Russia", etc.).
+    for(const field of fields){
+      const normalized=normalize(field);
+      if(!normalized)continue;
+      let best=null;
+      for(const country of countries){
+        for(const term of country.searchTerms){
+          if(!term||term.length<2)continue;
+          if(normalized===term || normalized.startsWith(term+' ') ||
+             normalized.endsWith(' '+term) || normalized.includes(' '+term+' ')){
+            if(!best||term.length>best.length)best={code:country.code,length:term.length};
+          }
+        }
+      }
+      if(best)return best.code.toLowerCase();
+    }
+    return '';
   }
   function flag(code) {
-    const start = '<svg class="crx-flag" width="29" height="22" viewBox="0 0 32 24" aria-hidden="true" focusable="false"><defs><clipPath id="crx-flag-clip"><rect x="1" y="1" width="30" height="22" rx="4"/></clipPath></defs><g clip-path="url(#crx-flag-clip)">';
-    const end = '</g><rect x="1" y="1" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-opacity=".14"/></svg>';
-    const rect = (color,x,y,w,h) => '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+color+'"/>';
-    const stripes = colors => colors.map((c,i) => rect(c,1,1+i*22/colors.length,30,22/colors.length+0.3)).join('');
-    let shape = '';
-    if (code === 'nl') shape = stripes(['#ae1c28','#fff','#21468b']);
-    else if (code === 'pl') shape = stripes(['#fff','#dc143c']);
-    else if (code === 'de') shape = stripes(['#111','#dd0000','#ffce00']);
-    else if (code === 'ru') shape = stripes(['#fff','#0039a6','#d52b1e']);
-    else if (code === 'ee') shape = stripes(['#4891d9','#111','#fff']);
-    else if (code === 'fr') shape = ['#0055a4','#fff','#ef4135'].map((c,i)=>rect(c,1+10*i,1,10.2,22)).join('');
-    else if (code === 'fi') shape = rect('#fff',1,1,30,22)+rect('#003580',10,1,5,22)+rect('#003580',1,10,30,5);
-    else if (code === 'se') shape = rect('#006aa7',1,1,30,22)+rect('#fecc00',10,1,5,22)+rect('#fecc00',1,10,30,5);
-    else if (code === 'es') shape = rect('#aa151b',1,1,30,22)+rect('#f1bf00',1,6,30,12);
-    else if (code === 'us') shape = stripes(['#b22234','#fff','#b22234','#fff','#b22234','#fff','#b22234'])+rect('#3c3b6e',1,1,14,12);
-    else if (code === 'gb' || code === 'uk') {
-      // Union Jack: diagonal white/red saltires beneath the central cross.
-      shape = rect('#012169',1,1,30,22)
-        +'<path d="M1 1L31 23M31 1L1 23" stroke="#fff" stroke-width="6"/>'
-        +'<path d="M1 1L31 23M31 1L1 23" stroke="#c8102e" stroke-width="2"/>'
-        +rect('#fff',13,1,6,22)+rect('#fff',1,9,30,6)
-        +rect('#c8102e',14,1,4,22)+rect('#c8102e',1,10,30,4);
-    }
-    else return '<span class="crx-globe" aria-hidden="true">◎</span>';
-    return start+shape+end;
+    // Every bundled country uses the same server-local SVG, with no external CDN.
+    if(!code)return '<span class="crx-globe" aria-hidden="true">◎</span>';
+    const iso=String(code).toUpperCase();
+    if(!global.XMeshCountryCatalog?.countries?.some(c=>c.code===iso))
+      return '<span class="crx-globe" aria-hidden="true">◎</span>';
+    return '<img class="crx-flag" width="29" height="22" src="/flags/'+iso.toLowerCase()+'.svg" alt="" loading="lazy" decoding="async">';
   }
   function icon(name) {
     const paths = {
