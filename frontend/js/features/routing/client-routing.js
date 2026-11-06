@@ -31,8 +31,8 @@
         if(countries.some(c=>c.code===iso))return iso.toLowerCase();
       }
     }
-    // Match complete human-readable aliases within names such as "GB Англия",
-    // while avoiding substring mistakes ("us" within "Russia", etc.).
+    // Match complete human-readable aliases inside country-prefixed node names,
+    // avoiding accidental substrings in unrelated words.
     for(const field of fields){
       const normalized=normalize(field);
       if(!normalized)continue;
