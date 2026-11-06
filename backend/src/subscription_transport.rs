@@ -175,7 +175,10 @@ fn client_hostname<'a>(stream: &'a Value, host: &'a Value) -> Option<&'a str> {
 fn set_client_hostname(transport: &mut Value, network: &str, hostname: &str) {
     transport["host"] = json!(hostname);
     if ["ws", "websocket"].contains(&network) {
-        let mut headers = transport["headers"].as_object().cloned().unwrap_or_default();
+        let mut headers = transport["headers"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
         headers.retain(|key, _| !key.eq_ignore_ascii_case("host"));
         headers.insert("Host".into(), json!(hostname));
         transport["headers"] = Value::Object(headers);
