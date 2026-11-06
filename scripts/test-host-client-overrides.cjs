@@ -26,3 +26,21 @@ for(const key of ['clientXhttpSettings','clientHeaders','clientTlsSettings','cli
  const explicit={disabled:true,[key]:'{"mode":"auto"}'};assert.equal(check(explicit),'');assert.deepEqual(explicit[key],{mode:'auto'});
 }
 console.log('Host client overrides: inheritance, clearing, serialization, precedence, secret exclusion and validation passed');
+const normalSource=fs.readFileSync('frontend/js/core/app.js','utf8');
+const from=normalSource.indexOf('function hostSyncClientControls('),to=normalSource.indexOf('function hostEditorRefresh(',from);
+const sync=new Function('window',normalSource.slice(from,to)+';return hostSyncClientControls;')({});
+const controls={clientXhttpSettings:{value:'{"mode":"auto","xmux":{"maxConcurrency":4}}'},xhttpMode:{name:'xhttpMode',value:'packet-up'},clientTlsSettings:{value:''},tlsVerification:{name:'tlsVerification',value:'insecure'}};
+const form={elements:{namedItem:key=>controls[key]}};
+sync(form,controls.xhttpMode);assert.equal(JSON.parse(controls.clientXhttpSettings.value).mode,'packet-up');
+controls.xhttpMode.value='';sync(form,controls.xhttpMode);assert(!('mode' in JSON.parse(controls.clientXhttpSettings.value)));assert.equal(JSON.parse(controls.clientXhttpSettings.value).xmux.maxConcurrency,4);
+sync(form,controls.tlsVerification);assert.equal(JSON.parse(controls.clientTlsSettings.value).allowInsecure,true);
+controls.tlsVerification.value='verify';sync(form,controls.tlsVerification);assert.equal(JSON.parse(controls.clientTlsSettings.value).allowInsecure,false);
+const stream=gen.build(user,{...host,sni:'sni.example',host:'old.example',useSniAsHost:true},inbound).outbounds[0].streamSettings;
+assert.equal(stream.xhttpSettings.host,'sni.example');
+const vmess={...inbound,protocol:'vmess'};
+assert.equal(gen.build(user,{...host,securityLayer:'none'},vmess).outbounds[0].streamSettings.security,'none');
+const plaintext={...vmess,streamSettings:{network:'ws',security:'none',wsSettings:{path:'/ws'}}};
+assert.equal(gen.build(user,{...host,securityLayer:'tls'},plaintext).outbounds[0].streamSettings.tlsSettings.serverName,'node.example');
+console.log('Structured host controls: TLS/XHTTP synchronization, inherited reset, SNI as Host and security-layer projection passed');
+
+assert.deepEqual(build({alpn:'h3,h2',clientTlsSettings:{alpn:['http/1.1']}}).tlsSettings.alpn,['h3','h2'],'Normal ALPN control must override expert JSON');

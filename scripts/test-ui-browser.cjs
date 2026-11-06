@@ -2117,6 +2117,13 @@ async function main() {
       assert(focus.offset<=0,'Focus must stay inside the control without a detached double contour');
       assert.equal(focus.shadow,'none','Text fields must not add a second focus shadow');
       await screenshot(page,`audit-focus-host-${width}`);
+      for(const [name,value] of [['xhttpMode','packet-up'],['tlsVerification','insecure']]){
+        await page.locator(`[name="${name}"]`).evaluate((input,next)=>{input.value=next;input.dispatchEvent(new Event('change',{bubbles:true}))},value);
+      }
+      assert.equal(JSON.parse(await page.locator('[name="clientXhttpSettings"]').inputValue()).mode,'packet-up','XHTTP dropdown must update the persisted client configuration');
+      assert.equal(JSON.parse(await page.locator('[name="clientTlsSettings"]').inputValue()).allowInsecure,true,'Certificate control must update the persisted TLS settings');
+      assert.equal(await page.locator('[name="alpn"]').evaluate(el=>el.tagName),'SELECT','ALPN must be a normal selection control');
+      assert(!(await page.locator('[name="clientTlsSettings"]').isVisible()),'Raw JSON must remain hidden in the expert disclosure');
       await page.locator('[name="sni"]').fill('override.example.invalid');
       await page.locator('[name="sni"]').dispatchEvent('change');
       assert((await page.locator('[data-host-resolved]').innerText()).includes('override.example.invalid'),'Live preview must reflect SNI override');

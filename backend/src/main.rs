@@ -3989,6 +3989,15 @@ mod subscription_host_protocol_tests {
 }
 
 fn validate_host_client_overrides(host: &Value) -> Result<(), ApiError> {
+    if host
+        .get("securityLayer")
+        .is_some_and(|value| !matches!(value.as_str(), Some("" | "tls" | "none")))
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid host security layer.",
+        ));
+    }
     for key in [
         "clientXhttpSettings",
         "clientHeaders",
@@ -4034,6 +4043,21 @@ mod host_client_override_validation_tests {
             }
         }
     }
+}
+
+fn validate_host_client_security(host: &Value, inbound: &Value) -> Result<(), ApiError> {
+    if crate::subscription_transport::client_security(
+        inbound.get("streamSettings").unwrap_or(&Value::Null),
+        host,
+    )
+    .is_none()
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid host security layer for this inbound.",
+        ));
+    }
+    Ok(())
 }
 
 async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
@@ -4084,6 +4108,7 @@ async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiErr
             "Выбранный inbound не поддерживается генератором JSON-подписок.",
         ));
     }
+    validate_host_client_security(host, inbound)?;
     let all_nodes = load_records(pool, "nodes").await?;
     for node_id in nodes {
         let id = node_id

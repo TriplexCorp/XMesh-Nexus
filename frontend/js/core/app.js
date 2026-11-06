@@ -256,14 +256,18 @@ const ENT={
     {k:'address',l:'Публичный адрес',req:1},
     {k:'countryCode',l:'Код страны',ph:'NL, DE, SE…',h:'Две буквы: NL, DE, SE. Необязательно.'},
     {k:'port',l:'Публичный порт',t:'num'},
-    {k:'sni',l:'SNI (переопределение)',ph:'Из inbound, если пусто'},
-    {k:'host',l:'HTTP Host (переопределение)',ph:'Из inbound, если пусто'},
-    {k:'path',l:'Путь транспорта (переопределение)',ph:'Из inbound, если пусто'},
+    {k:'sni',l:'SNI',ph:'Из inbound, если пусто'},
+    {k:'host',l:'HTTP Host',ph:'Из inbound, если пусто'},
+    {k:'path',l:'Путь транспорта',ph:'Из inbound, если пусто'},
     {k:'fp',l:'uTLS fingerprint',t:'sel',o:[['chrome','chrome'],['firefox','firefox'],['safari','safari'],['ios','ios'],['android','android'],['edge','edge'],['360','360'],['qq','qq'],['random','random'],['randomized','randomized'],['randomizednoalpn','randomizednoalpn'],['unsafe','unsafe'],['hellofirefox_120','hellofirefox_120'],['hellofirefox_148','hellofirefox_148'],['hellochrome_120','hellochrome_120'],['hellochrome_131','hellochrome_131'],['hellochrome_133','hellochrome_133'],['helloios_13','helloios_13'],['helloios_14','helloios_14'],['helloedge_106','helloedge_106'],['hellosafari_26_3','hellosafari_26_3'],['hello360_11_0','hello360_11_0'],['helloqq_11_1','helloqq_11_1'],['hellogolang','hellogolang'],['hellorandomized','hellorandomized'],['hellorandomizedalpn','hellorandomizedalpn'],['hellorandomizednoalpn','hellorandomizednoalpn'],['hellofirefox_auto','hellofirefox_auto'],['hellofirefox_55','hellofirefox_55'],['hellofirefox_56','hellofirefox_56'],['hellofirefox_63','hellofirefox_63'],['hellofirefox_65','hellofirefox_65'],['hellofirefox_99','hellofirefox_99'],['hellofirefox_102','hellofirefox_102'],['hellofirefox_105','hellofirefox_105'],['hellochrome_auto','hellochrome_auto'],['hellochrome_58','hellochrome_58'],['hellochrome_62','hellochrome_62'],['hellochrome_70','hellochrome_70'],['hellochrome_72','hellochrome_72'],['hellochrome_83','hellochrome_83'],['hellochrome_87','hellochrome_87'],['hellochrome_96','hellochrome_96'],['hellochrome_100','hellochrome_100'],['hellochrome_102','hellochrome_102'],['hellochrome_106_shuffle','hellochrome_106_shuffle'],['helloios_auto','helloios_auto'],['helloios_11_1','helloios_11_1'],['helloios_12_1','helloios_12_1'],['helloandroid_11_okhttp','helloandroid_11_okhttp'],['helloedge_85','helloedge_85'],['helloedge_auto','helloedge_auto'],['hellosafari_16_0','hellosafari_16_0'],['hellosafari_auto','hellosafari_auto'],['hello360_auto','hello360_auto'],['hello360_7_5','hello360_7_5'],['helloqq_auto','helloqq_auto'],['hellochrome_100_psk','hellochrome_100_psk'],['hellochrome_112_psk_shuf','hellochrome_112_psk_shuf'],['hellochrome_114_padding_psk_shuf','hellochrome_114_padding_psk_shuf'],['hellochrome_115_pq','hellochrome_115_pq'],['hellochrome_115_pq_psk','hellochrome_115_pq_psk'],['hellochrome_120_pq','hellochrome_120_pq']]},
     {k:'publicKey',l:'REALITY publicKey (клиентский)',ph:'Если отсутствует в inbound'},
     {k:'shortId',l:'REALITY shortId',ph:'Первый ShortID inbound'},
     {k:'spiderX',l:'REALITY spiderX',ph:'/'},
-    {k:'alpn',l:'TLS ALPN',ph:'h2,http/1.1'},
+    {k:'securityLayer',l:'Защита подключения',t:'sel',o:[['','Из inbound'],['tls','TLS'],['none','None']]},
+    {k:'alpn',l:'TLS ALPN',t:'sel',o:[['','Из inbound'],['h3','h3'],['h2','h2'],['http/1.1','http/1.1'],['h3,h2,http/1.1','h3,h2,http/1.1'],['h3,h2','h3,h2'],['h2,http/1.1','h2,http/1.1']]},
+    {k:'useSniAsHost',l:'Использовать SNI как Host',t:'bool'},
+    {k:'tlsVerification',l:'Проверка сертификата',t:'sel',o:[['','Из профиля'],['verify','Проверять'],['insecure','Не проверять']]},
+    {k:'xhttpMode',l:'Режим XHTTP',t:'sel',o:[['','Из профиля'],['auto','auto'],['packet-up','packet-up'],['stream-up','stream-up'],['stream-one','stream-one']]},
     {k:'serviceName',l:'gRPC serviceName',ph:'Из inbound'},
     {k:'clientEncryption',l:'VLESS Encryption (клиент)',ph:'Наследуется из inbound или пользователя'},
     {k:'clientXhttpSettings',l:'XHTTP · JSON',t:'area',rows:5},
@@ -273,12 +277,17 @@ const ENT={
   ],
     def:()=>({port:443,fp:'chrome',order:DB.hosts.length+1,nodes:[],profileId:DB.profiles[0]?.id||0}),
     chk:d=>{
+      d.securityLayer=String(d.securityLayer||'');d.alpn=String(d.alpn||'');
       for(const key of ['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings']){
         const raw=d[key];
         if(!raw){d[key]=null;continue}
         try{const value=typeof raw==='string'?JSON.parse(raw):raw;if(!value||Array.isArray(value)||typeof value!=='object')throw new Error();d[key]=value}
         catch(_){return (panelIsEnglish()?'Enter a JSON object: ':'Укажите JSON-объект: ')+key}
       }
+      if(!['','tls','none'].includes(d.securityLayer||''))return panelIsEnglish()?'Invalid security layer':'Некорректный режим защиты';
+      if(d.tlsVerification){d.clientTlsSettings={...(d.clientTlsSettings||{}),allowInsecure:d.tlsVerification==='insecure'}}
+      if(d.xhttpMode){d.clientXhttpSettings={...(d.clientXhttpSettings||{}),mode:d.xhttpMode}}
+      delete d.tlsVerification;delete d.xhttpMode;
       if(d.disabled)return '';
       if(!d.remark.trim()||!d.address.trim())return 'Укажите название и публичный адрес.';
       if(!Number.isInteger(d.port)||d.port<1||d.port>65535)return 'Публичный порт должен быть от 1 до 65535.';
@@ -290,6 +299,7 @@ const ENT={
       if(!d.nodes.length)return 'Назначьте хотя бы одну ноду с выбранным профилем.';
       const bad=d.nodes.some(id=>{const node=DB.nodes.find(n=>String(n.id)===String(id));return !node||node.disabled||String(node.profileId)!==String(profile.id)});
       if(bad)return 'Одна из нод не использует выбранный XRAY-профиль или отключена. Исправьте привязку ноды.';
+      if(inbound.streamSettings?.security==='reality'&&d.securityLayer)return panelIsEnglish()?'REALITY requires the inbound security layer':'Для REALITY используется защита inbound';
       const reality=inbound.streamSettings?.realitySettings||{};
       if(inbound.streamSettings?.security==='reality' &&
          !(d.publicKey||inbound.publicKey||reality.publicKey))
@@ -3357,6 +3367,28 @@ async function hostDeriveRealityPublic(form){
     // warning rather than silently publishing an unusable subscription.
   }
 }
+function hostSyncClientControls(form,target){
+  const mappings={tlsVerification:['clientTlsSettings','allowInsecure'],xhttpMode:['clientXhttpSettings','mode']};
+  const mapping=mappings[target.name];
+  if(mapping){
+    const [key,property]=mapping,input=form.elements.namedItem(key);
+    try{
+      const value=input.value.trim()?JSON.parse(input.value):{};
+      if(!value||typeof value!=='object'||Array.isArray(value))return;
+      if(target.value)value[property]=target.name==='tlsVerification'?target.value==='insecure':target.value;
+      else delete value[property];
+      input.value=Object.keys(value).length?JSON.stringify(value,null,2):'';
+    }catch(_){}
+  }else if(['clientTlsSettings','clientXhttpSettings'].includes(target.name)){
+    try{
+      const value=target.value.trim()?JSON.parse(target.value):{};
+      const name=target.name==='clientTlsSettings'?'tlsVerification':'xhttpMode';
+      const control=form.elements.namedItem(name);
+      if(control)control.value=name==='tlsVerification'?(value.allowInsecure===true?'insecure':value.allowInsecure===false?'verify':''):value.mode||'';
+      window.XMeshSelects?.refresh(form);
+    }catch(_){}
+  }
+}
 function hostEditorRefresh(form,changedProfile=false){
   if(!form||form.dataset.ent!=='hosts')return;
   const get=k=>form.elements.namedItem(k);
@@ -3389,14 +3421,15 @@ function hostEditorRefresh(form,changedProfile=false){
   }
   const inbound=candidates.find(i=>i.tag===inboundSelect?.value);
   const stream=inbound?.streamSettings||{};
-  const security=stream.security||'none';
+  const security=get('securityLayer')?.value||stream.security||'none';
   const reality=stream.realitySettings||{};
   const tls=stream.tlsSettings||{};
   // Show only client overrides relevant to the selected transport/security.
   for(const [name,show] of Object.entries({
-    sni:security==='reality'||security==='tls',
-    host:['ws','xhttp'].includes(stream.network),
-    path:['ws','xhttp'].includes(stream.network),
+    securityLayer:true,tlsVerification:security==='tls',xhttpMode:stream.network==='xhttp',useSniAsHost:['ws','websocket','xhttp','httpupgrade','masque'].includes(stream.network),
+    sni:security==='reality'||security==='tls'||get('useSniAsHost')?.checked,
+    host:['ws','websocket','xhttp','httpupgrade','masque'].includes(stream.network),
+    path:['ws','websocket','xhttp','httpupgrade','masque'].includes(stream.network),
     fp:['reality','tls'].includes(security),
     publicKey:security==='reality',shortId:security==='reality',spiderX:security==='reality',
     clientXhttpSettings:stream.network==='xhttp',clientHeaders:['ws','websocket','httpupgrade'].includes(stream.network),clientTlsSettings:security==='tls',clientMasqueSettings:stream.network==='masque',
@@ -3434,6 +3467,8 @@ function hostEditorRefresh(form,changedProfile=false){
       show('Страна (ISO)',val('countryCode').toUpperCase()||'Авто из названия / ZZ')+
       show('Публичный endpoint',val('address')?val('address')+':'+(val('port')||'443'):'Выберите ноду')+
       show('SNI',sni)+
+      show('HTTP Host',get('useSniAsHost')?.checked?sni:val('host'))+
+      show('XHTTP mode',val('xhttpMode')||xhttp.mode||'auto')+
       show('Путь',val('path')||xhttp.path||stream.wsSettings?.path||'—')+
       show('REALITY publicKey',security==='reality'?(realityKey?'Задан':'Отсутствует'):'Не требуется')+
       show('ShortID',security==='reality'?(shortId?'Задан':'Не задан'):'Не требуется');
@@ -4527,8 +4562,8 @@ document.addEventListener('input',e=>{
   if(dirty)dirty.textContent='Есть несохранённые изменения';
 });
 document.addEventListener('input',e=>{
-  if(e.target.closest('form[data-ent="hosts"]')&&['remark','address','port','sni','host','path','fp','publicKey','shortId','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].includes(e.target.name)){
-    hostEditorRefresh(e.target.closest('form'));return;
+  if(e.target.closest('form[data-ent="hosts"]')&&['remark','address','port','sni','host','path','fp','publicKey','shortId','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings','securityLayer','alpn','tlsVerification','xhttpMode','useSniAsHost'].includes(e.target.name)){
+    hostSyncClientControls(e.target.closest('form'),e.target);hostEditorRefresh(e.target.closest('form'));return;
   }
   if(!e.target.matches('form[data-ent="nodes"] [name="rotationIps"]'))return;
   const form=e.target.closest('form'),count=form?.querySelector('[data-node-pool-count]'),feedback=form?.querySelector('[data-node-pool-feedback]');
@@ -4804,7 +4839,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-qr]')){await api.update('users',+b.dataset.qr,{used:0});toast('Трафик сброшен');render(1)}
   else if(b=g('[data-host-clear-overrides]')){
     const form=b.closest('form');
-    if(form){['sni','host','path','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings','fp'].forEach(key=>{const input=form.elements.namedItem(key);if(input){input.value=key==='fp'?'chrome':'';if(key==='fp')input.dispatchEvent(new Event('input'));}});hostEditorRefresh(form);toast('Переопределения сброшены — применятся настройки XRAY STUDIO после сохранения');}
+    if(form){['sni','host','path','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings','securityLayer','tlsVerification','xhttpMode','fp'].forEach(key=>{const input=form.elements.namedItem(key);if(input){input.value=key==='fp'?'chrome':'';if(key==='fp')input.dispatchEvent(new Event('input'));}});const sniAsHost=form.elements.namedItem('useSniAsHost');if(sniAsHost)sniAsHost.checked=false;hostEditorRefresh(form);toast('Переопределения сброшены — применятся настройки XRAY STUDIO после сохранения');}
   }
   else if(b=g('[data-node-create-host]')){
     const node=DB.nodes.find(n=>String(n.id)===b.dataset.nodeCreateHost);
@@ -5288,6 +5323,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   }
   if(t.closest('form[data-ent="hosts"]')){
     const form=t.closest('form');
+    hostSyncClientControls(form,t);
     if(t.name==='profileId'){
       const key=form.elements.namedItem('publicKey');
       if(key){key.value='';delete key.dataset.hostAutoPublic}
