@@ -20,7 +20,7 @@
 @import url("../features/settings/appearance-runtime.css?v=1e0f22ab0274");
 @import url("../features/settings/settings-updates.css?v=5e16121d5fc4");
 @import url("../features/settings/settings.css?v=699c5cd100d7");
-@import url("../features/squads/squad-editor-premium-v5.css?v=9d0a784986c3");
+@import url("../features/squads/squad-editor-premium-v5.css?v=43df105290d2");
 @import url("../features/squads/squad-cards.css?v=e6c17f951d87");
 @import url("../features/statistics/statistics.css?v=0d6a72c8409d");
 @import url("../features/subscriptions/subscription-studio.css?v=7e484d60213d");
@@ -62,9 +62,9 @@ button{
 }
 /* Motion belongs only to actual controls. Containers that happen to reuse a
  * control-looking class must not imply clickability on hover. */
-:where(button:not(:disabled),a[href],[role="button"]:not([aria-disabled="true"]),summary,.xm-select-trigger:not([aria-disabled="true"])):hover{
-  transform:translateY(-1px);
-}
+/* Moving click targets on :hover can create pointer feedback loops: as the
+ * element shifts out from under the cursor, :hover toggles continuously.
+ * Keep color/focus hover feedback; only :active uses a press transform. */
 button:not(:disabled):active,
 a[href]:active,
 [role="button"]:not([aria-disabled="true"]):active{
