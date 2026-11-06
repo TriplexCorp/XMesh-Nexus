@@ -2278,9 +2278,12 @@ async function main() {
       }
       await page.locator('[data-squad-select="all"]').click();
       assert.equal(await page.locator('input[name="inb"]:checked').count(),count,'Select all must still work');
-      await page.locator('[data-squad-search]').fill('hysteria-main');
-      assert.equal(await page.locator('.squad-inbound-row:visible').count(),1,'Search must filter actual inbound choices');
-      await page.locator('[data-squad-search]').fill('');
+      // Search the inbound choices inside the editor, not the separate
+      // directory-wide squad search in the background page.
+      const inboundSearch=page.locator('#dlg form[data-ent="squads"] [data-squad-inbound-search]');
+      await inboundSearch.fill('hysteria-main');
+      assert.equal(await page.locator('#dlg .squad-inbound-row:visible').count(),1,'Search must filter actual inbound choices');
+      await inboundSearch.fill('');
       await page.locator('[data-squad-select="clear"]').click();
       assert.equal(await page.locator('input[name="inb"]:checked').count(),0,'Clear must still work');
       await details.locator('summary').click();
