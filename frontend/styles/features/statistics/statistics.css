@@ -1492,5 +1492,15 @@ dialog.user-modal .user-stats-refresh:hover {
 /* Decorative series must never intercept another series' point targets. */
 .stats-detail-area,.stats-detail-line,.stats-detail-grid,.stats-detail-label,.stats-detail-axis{pointer-events:none}
 /* One hit target per observed time interval, independent of line height. */
-.stats-detail-bucket-target{fill:transparent;stroke:none;pointer-events:all;cursor:crosshair}
+.stats-detail-bucket-target{fill:transparent;stroke:none;pointer-events:all;cursor:pointer}
 .stats-detail-point-wrap.bucket:focus-visible .stats-detail-bucket-target{stroke:var(--a);stroke-width:1;vector-effect:non-scaling-stroke}
+
+/* Hover follows the interval, but the feedback stays on its data points. */
+.stats-detail-point-wrap.is-hovered .stats-detail-point-core{r:6.5}
+.stats-detail-point-wrap.is-hovered .stats-detail-point-ring{opacity:.45}
+.stats-bucket-content{min-height:0;overflow:hidden;display:grid;gap:1rem}
+.stats-bucket-detail{grid-template-rows:1fr;transition:grid-template-rows .24s ease-out,opacity .2s ease-out,transform .24s ease-out}
+@starting-style{.stats-bucket-detail:not([hidden]){grid-template-rows:0fr;opacity:0;transform:translateY(6px)}}
+.stats-bucket-detail[aria-busy=true] .stats-bucket-content{opacity:.65;transition:opacity .15s ease}
+@media(prefers-reduced-motion:reduce){.stats-bucket-detail,.stats-bucket-content,.stats-detail-point-core,.stats-detail-point-ring{transition:none!important}}
+html[data-motion=off] :is(.stats-bucket-detail,.stats-bucket-content,.stats-detail-point-core,.stats-detail-point-ring){transition:none!important}

@@ -53,6 +53,40 @@ const styles=fs.readFileSync('frontend/styles/features/statistics/statistics.css
   assert.equal(await page.evaluate(()=>window.selected.length),0,'Missing intervals must not be interpolated into a selection');
   await mount(points,1440);b=await page.locator('.stats-detail-bucket-target').nth(30).boundingBox();await page.touchscreen.tap(b.x+b.width/2,b.y+30);
   assert.equal(await page.evaluate(()=>window.selected.at(-1)),points[30].bucketMs,'Touch must select the same interval');
-  await context.close();console.log(`Statistics selection: ${cases} density/viewport/scale cases, keyboard, live refresh, drag, missing intervals and touch passed`);
+  await mount(points,1440);b=await page.locator('.stats-detail-bucket-target').nth(30).boundingBox();
+  await page.mouse.move(b.x+b.width/2,b.y+30);await page.waitForTimeout(200);
+  assert.equal(await page.locator('.rx.is-hovered,.tx.is-hovered').count(),2,'Hover must highlight both visible points for the interval');
+  assert.equal(await page.locator('.stats-detail-bucket-target').nth(30).evaluate(el=>getComputedStyle(el).cursor),'pointer','Clickable intervals must use a hand, never a crosshair');
+  assert(parseFloat(await page.locator('.rx.is-hovered .stats-detail-point-core').evaluate(el=>getComputedStyle(el).r))>5,'Hovered data points must visibly grow');
+  await page.mouse.move(0,650);assert.equal(await page.locator('.is-hovered').count(),0,'Leaving the plot must clear hover');
+  const detailStart=source.indexOf('  const openBucket=async(bucketMs)=>{'),detailEnd=source.indexOf("  bindStatisticsChartSelection($('#stats-trend'),openBucket);",detailStart);
+  const closeStart=source.indexOf("  $('#stats-bucket-detail')?.addEventListener",detailEnd),closeEnd=source.indexOf("  $('#stats-refresh')?.addEventListener",closeStart);
+  await page.setContent('<style>'+styles+'</style><div id="stats-trend"></div><section id="stats-bucket-detail" class="stats-bucket-detail" hidden></section>');
+  await page.addScriptTag({content:`window.detailC={motion:true};window.pending=[];window.testOpen=(()=>{
+   const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],C=window.detailC,cur='statistics',esc=String,fmt=String,statsRate=String,panelIsEnglish=()=>true;
+   let selectedBucketMs=null,detailRequest=0;const chartPoints=[{bucketMs:1},{bucketMs:2},{bucketMs:3}];
+   const backendRequest=()=>new Promise((resolve,reject)=>window.pending.push({resolve,reject}));
+   ${source.slice(detailStart,detailEnd)}
+   ${source.slice(closeStart,closeEnd)}
+   return openBucket;})();`});
+  const resolve=async(index,name)=>page.evaluate(({index,name})=>window.pending[index].resolve({nodes:[{id:1,name,rxBytesPerSec:100,txBytesPerSec:200,sampleCount:1}]}),{index,name});
+  await page.evaluate(()=>{window.testOpen(1)});
+  assert(await page.locator('#stats-bucket-detail').evaluate(el=>el.hidden),'Initial load must not create a tiny placeholder card that then jumps in height');
+  await resolve(0,'First interval');await page.locator('.stats-bucket-content').waitFor();await page.waitForTimeout(300);
+  const before=await page.locator('#stats-bucket-detail').boundingBox();
+  await page.evaluate(()=>{window.testOpen(2)});
+  assert.match(await page.locator('#stats-bucket-detail').innerText(),/First interval/,'Switching intervals must retain the previous card until data arrives');
+  assert.equal((await page.locator('#stats-bucket-detail').boundingBox()).height,before.height,'Pending requests must not collapse the details card');
+  await resolve(1,'Second interval');await page.getByRole('cell',{name:'Second interval',exact:true}).waitFor();
+  assert(await page.locator('.stats-bucket-content').evaluate(el=>el.getAnimations().length>0),'Replacement content must fade in');
+  await page.emulateMedia({reducedMotion:'reduce'});await page.evaluate(()=>{window.testOpen(3)});await resolve(2,'Reduced motion');
+  await page.getByRole('cell',{name:'Reduced motion',exact:true}).waitFor();
+  assert.equal(await page.locator('.stats-bucket-content').evaluate(el=>el.getAnimations().length),0,'OS reduced motion must disable the fade');
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.evaluate(()=>{window.detailC.motion=false;document.documentElement.dataset.motion='off';window.testOpen(1)});await resolve(3,'Motion off');
+  await page.getByRole('cell',{name:'Motion off',exact:true}).waitFor();
+  assert.equal(await page.locator('.stats-bucket-content').evaluate(el=>el.getAnimations().length),0,'Panel motion preference must disable the fade');
+  await page.evaluate(()=>{window.testOpen(2)});await page.locator('[data-stats-detail-close]').click();await resolve(4,'Late response');
+  assert(await page.locator('#stats-bucket-detail').evaluate(el=>el.hidden),'A late response must not reopen closed details');
+  await context.close();console.log(`Statistics selection: ${cases} density/viewport/scale cases, keyboard, live refresh, drag, missing intervals, touch, hover and smooth details passed`);
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

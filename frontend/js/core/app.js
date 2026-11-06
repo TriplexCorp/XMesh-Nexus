@@ -1169,6 +1169,16 @@ function bindStatisticsChartSelection(root,openBucket){
   }
   return null;
  };
+ let hovered=null;
+ const highlight=bucket=>{
+  if(hovered===bucket&&root.querySelector('.is-hovered'))return;
+  hovered=bucket;
+  root.querySelectorAll('.stats-detail-point-wrap').forEach(point=>point.classList.toggle('is-hovered',bucket!==null&&Number(point.dataset.bucketMs)===bucket));
+ };
+ root.addEventListener('pointermove',event=>{if(event.pointerType!=='touch')highlight(bucketAt(event))});
+ root.addEventListener('pointerleave',()=>highlight(null));
+ root.addEventListener('focusin',event=>{const point=event.target.closest?.('.bucket');if(point)highlight(Number(point.dataset.bucketMs))});
+ root.addEventListener('focusout',event=>{if(!root.contains(event.relatedTarget))highlight(null)});
  root.addEventListener('pointerdown',event=>{
   suppressClick=false;
   press=event.button===0?{bucket:bucketAt(event),x:event.clientX,y:event.clientY}:null;
@@ -1521,8 +1531,8 @@ function statisticsP(){
     selectedBucketMs=bucketMs;
     const panel=$('#stats-bucket-detail'),requestId=++detailRequest;
     if(!panel)return;
-    panel.hidden=false;
-    panel.innerHTML='<p class="note">Загрузка показаний узлов…</p>';
+    panel.setAttribute('aria-busy','true');
+    $('#stats-trend')?.setAttribute('aria-busy','true');
     $$('.stats-detail-point-wrap').forEach(el=>el.classList.toggle('is-selected',Number(el.dataset.bucketMs)===bucketMs));
     try{
       const range=$('#stats-period')?.value||'live';
@@ -1533,17 +1543,21 @@ function statisticsP(){
       const rx=totals('rxBytesPerSec'),tx=totals('txBytesPerSec');
       const peak=nodes.filter(n=>n.rxBytesPerSec!=null).sort((a,b)=>Number(b.rxBytesPerSec)-Number(a.rxBytesPerSec))[0];
       const rows=nodes.map(n=>'<tr><td>'+esc(n.name||'Нода #'+n.id)+'</td><td>'+statsRate(n.rxBytesPerSec)+'</td><td>'+statsRate(n.txBytesPerSec)+'</td><td>'+esc(String(n.sampleCount??'—'))+'</td><td>'+(n.lastSampleMs?esc(new Date(n.lastSampleMs).toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU')):'—')+'</td></tr>').join('');
-      panel.innerHTML='<div class="stats-detail-header"><div><h4>Детали интервала · '+esc(new Date(bucketMs).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'))+'</h4><p class="note">RX — принято сетевыми интерфейсами; TX — отправлено. Другие сервисы хоста тоже учитываются. Это не персональный трафик Xray.</p></div><button class="gh sm" type="button" data-stats-detail-close>Закрыть</button></div>'+
+      const wasOpen=!panel.hidden;
+      panel.innerHTML='<div class="stats-bucket-content"><div class="stats-detail-header"><div><h4>Детали интервала · '+esc(new Date(bucketMs).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'))+'</h4><p class="note">RX — принято сетевыми интерфейсами; TX — отправлено. Другие сервисы хоста тоже учитываются. Это не персональный трафик Xray.</p></div><button class="gh sm" type="button" data-stats-detail-close>Закрыть</button></div>'+
         '<div class="stats-detail-kpis"><div><b>RX всех учтённых нод</b><strong>'+statsRate(rx)+'</strong></div><div><b>TX всех учтённых нод</b><strong>'+statsRate(tx)+'</strong></div><div><b>Нод с измерениями</b><strong>'+nodes.length+'</strong></div></div>'+
         (peak?'<p class="note">Наибольший вклад RX: '+esc(peak.name||'Нода #'+peak.id)+' · '+statsRate(peak.rxBytesPerSec)+(rx>0?' ('+fmt(Number(peak.rxBytesPerSec)/rx*100,1)+'%)':'')+'</p>':'')+
         '<div class="stats-bucket-table-wrap"><table><thead><tr><th>Нода</th><th>RX</th><th>TX</th><th>Измерений</th><th>Последняя точка</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
-        '<p class="note">Источник: TimescaleDB · server_metric_samples'+(detail.truncated?' · Показаны первые 500 нод':'')+'. Отсутствующие измерения не заменены нулями.</p>';
-    }catch(e){if(requestId===detailRequest&&panel)panel.textContent='Ошибка детализации: '+(e.message||'API error')}
+        '<p class="note">Источник: TimescaleDB · server_metric_samples'+(detail.truncated?' · Показаны первые 500 нод':'')+'. Отсутствующие измерения не заменены нулями.</p></div>';
+      panel.hidden=false;
+      if(wasOpen&&C.motion&&!matchMedia('(prefers-reduced-motion: reduce)').matches)panel.firstElementChild?.animate?.([{opacity:.35},{opacity:1}],{duration:180,easing:'ease-out'});
+    }catch(e){if(requestId===detailRequest&&panel){panel.textContent='Ошибка детализации: '+(e.message||'API error');panel.hidden=false}}
+    finally{if(requestId===detailRequest){panel.removeAttribute('aria-busy');$('#stats-trend')?.removeAttribute('aria-busy')}}
   };
   bindStatisticsChartSelection($('#stats-trend'),openBucket);
   $('#stats-bucket-detail')?.addEventListener('click',e=>{
     if(e.target.closest?.('[data-stats-detail-close]')){
-      selectedBucketMs=null;++detailRequest;$('#stats-bucket-detail').hidden=true;
+      selectedBucketMs=null;++detailRequest;$('#stats-bucket-detail').hidden=true;$('#stats-bucket-detail').removeAttribute('aria-busy');$('#stats-trend')?.removeAttribute('aria-busy');
       $$('.stats-detail-point-wrap').forEach(el=>el.classList.remove('is-selected'));
     }
   });
