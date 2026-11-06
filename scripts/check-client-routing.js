@@ -9,6 +9,19 @@ const source=fs.readFileSync('frontend/js/features/routing/client-routing.js','u
 const sandbox={window:{},crypto:require('node:crypto').webcrypto};
 new vm.Script(source,{filename:'client-routing.js'}).runInNewContext(sandbox);
 assert.equal(typeof sandbox.window.XMeshClientRouting?.create,'function');
+const flagSandbox={window:{}};
+new vm.Script(source.replace('  function create(db, saveSettings, toast) {',
+  '  window.__routingFlagTests={countryCode,flag};\n  function create(db, saveSettings, toast) {')
+).runInNewContext(flagSandbox);
+const {countryCode,flag}=flagSandbox.window.__routingFlagTests;
+for(const label of ['Англия','England','Великобритания','United Kingdom','GB','UK','🇬🇧'])
+  assert.equal(countryCode(label),'gb','British node flag for '+label);
+assert.equal(countryCode('GB','Англия'),'gb');
+assert.equal(countryCode('Польша'),'pl','Polish flags must not regress');
+assert.match(flag(countryCode('Англия')),/class="crx-flag"/,'England must render a real flag');
+assert.match(flag('gb'),/#012169/,'British flag must contain Union Jack colors');
+assert.doesNotMatch(flag('gb'),/crx-globe/,'British flag must not fall back to globe');
+
 const [markup,mount]=sandbox.window.XMeshClientRouting.create({
  nodes:[{id:2,name:'Netherlands',profileId:3}],
  hosts:[{id:7,tag:'NL',remark:'CDN NL'}],
