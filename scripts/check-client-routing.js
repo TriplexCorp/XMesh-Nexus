@@ -17,6 +17,16 @@ const {countryCode,flag}=flagSandbox.window.__routingFlagTests;
 for(const label of ['Англия','England','Великобритания','United Kingdom','GB','UK','🇬🇧'])
   assert.equal(countryCode(label),'gb','British node flag for '+label);
 assert.equal(countryCode('GB','Англия'),'gb');
+
+for(const [label,parts] of [
+  ['node with empty country', ['',null,'','Англия']],
+  ['host with mixed country flag', ['🇬🇧 Англия','GB Англия','uk.example.test']],
+  ['host with language prefix', ['', 'GB Англия']],
+  ['named British host', ['', '', 'GB Англия']]
+]){
+  assert.equal(countryCode(...parts),'gb',label+' must use UK flag');
+}
+
 assert.equal(countryCode('Польша'),'pl','Polish flags must not regress');
 assert.match(flag(countryCode('Англия')),/class="crx-flag"/,'England must render a real flag');
 assert.match(flag('gb'),/#012169/,'British flag must contain Union Jack colors');
