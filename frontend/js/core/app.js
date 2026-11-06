@@ -470,7 +470,7 @@ const COUNTRIES=COUNTRY_CODES.map((code,index)=>{
  const terms=countrySearchForms([
   code,iso3,name,enName,...COUNTRY_REGION_NAMES.map(display=>display.of(code)),
   ...(COUNTRY_EXTRA_ALIASES[code]||'').split('|'),COUNTRY_ALIASES[code]||'',
-  ...(code==='GB'?['UK']:[])
+  ...(code==='GB'?['UK','Англия','England','Великобритания','Great Britain','Britain','Британия','Соединённое Королевство']:[])
  ]);
  return {code,iso3,flag:countryFlag(code),name,enName,searchTerms:terms};
 }).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
