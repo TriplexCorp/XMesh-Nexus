@@ -2,11 +2,11 @@
 .squad-directory{display:grid;gap:var(--nx-page-gap);min-width:0}
 .squad-card[hidden]{display:none}
 /* Size tracks by available workspace width, not browser viewport.
- * auto-fill preserves compact 20rem tracks and four-up wide-desktop layout
+ * auto-fill preserves compact 17rem tracks and four-up wide-desktop layout
  * even if there are only one or two squads. */
 .squad-card-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr));
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr));
   align-items:stretch;
   gap:var(--nx-page-gap);
   min-width:0;
