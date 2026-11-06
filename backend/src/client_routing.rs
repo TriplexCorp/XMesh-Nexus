@@ -270,10 +270,10 @@ pub fn build_server(source: Value, all: &[Value], settings: &Value) -> Result<Va
     let mut rows: Vec<Value> = Vec::new();
     if let Some(personal) = settings.get("xmeshUserClientRouting") {
         validate_user_override(personal)?;
-        if personal["mode"] == "custom" {
-            if let Some(extra) = personal["rules"].as_array() {
-                rows.extend(extra.iter().cloned());
-            }
+        if personal["mode"] == "custom"
+            && let Some(extra) = personal["rules"].as_array()
+        {
+            rows.extend(extra.iter().cloned());
         }
     }
     if let Some(profile) = assigned(&source, settings) {
