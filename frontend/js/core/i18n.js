@@ -16,6 +16,8 @@ window.XMeshI18n=(()=>{
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
     "Архив":"Archived",
+    "Архивная нода":"Archived node",
+    "Архивная нода #":"Archived node #",
     "Узел #{id}":"Node #{id}",
     "архив":"archived",
     "Исторический трафик; нода больше не зарегистрирована":"Historical traffic; node is no longer registered",
