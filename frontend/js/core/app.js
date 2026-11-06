@@ -3255,7 +3255,8 @@ async function templatesP(){
       }
       section.querySelector('[data-template-clear]').hidden=!query;
       section.querySelector('[data-template-no-results]').hidden=visible!==0;
-      section.querySelector('[data-template-count]').textContent=query?visible+' / '+cards.length:'Всего: '+cards.length;
+      section.querySelector('[data-template-count]').textContent=query?visible+' / '+cards.length:
+        (typeof panelIsEnglish==='function'&&panelIsEnglish()?'Total: ':'Всего: ')+cards.length;
     }
     for(const kind of ['tpls','subs'])applyFilter(kind);
     root.addEventListener('input',event=>{
