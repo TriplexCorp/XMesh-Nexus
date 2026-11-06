@@ -1493,5 +1493,4 @@ dialog.user-modal .user-stats-refresh:hover {
 .stats-detail-area,.stats-detail-line,.stats-detail-grid,.stats-detail-label,.stats-detail-axis{pointer-events:none}
 /* One hit target per observed time interval, independent of line height. */
 .stats-detail-bucket-target{fill:transparent;stroke:none;pointer-events:all;cursor:crosshair}
-.stats-detail-point-wrap.bucket:is(:hover,:focus-visible,.is-selected) .stats-detail-bucket-target{fill:color-mix(in srgb,var(--a) 10%,transparent)}
 .stats-detail-point-wrap.bucket:focus-visible .stats-detail-bucket-target{stroke:var(--a);stroke-width:1;vector-effect:non-scaling-stroke}
