@@ -175,7 +175,10 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36p
   .host-card-primary-actions{flex:1 1 auto}
   .host-card-order{margin-left:auto}
 }
-.host-client-settings{min-width:0;border-top:1px solid var(--nx-border);padding-top:.75rem}
-.host-client-settings>summary{cursor:pointer;color:var(--tx);font-weight:650;padding:.35rem 0}
+.host-advanced-actions{display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:start;gap:.5rem}
+.host-advanced-actions>[data-host-clear-overrides]{min-width:0;white-space:normal}
+.host-client-settings{min-width:0}
+.host-client-settings[open]{grid-column:1/-1}
+.host-client-settings>summary{cursor:pointer;color:var(--tx);font-size:.73rem;font-weight:650;line-height:1.3;padding:.55rem .65rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg)}
 .host-client-settings .f{margin-top:.65rem}
 .host-client-settings textarea{font-family:var(--font-mono,monospace);min-height:7rem;resize:vertical}

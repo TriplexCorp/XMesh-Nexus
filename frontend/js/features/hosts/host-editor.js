@@ -61,8 +61,8 @@ window.XMeshHostEditor=(() => {
         '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Расширенные переопределения</span></div>'+
         '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
         '<div class="host-advanced-fields">'+advanced+'</div>'+
-        '<details class="host-client-settings"><summary>Настройки клиента</summary><p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details>'+
-        '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></div></section>'+
+        '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button>'+
+        '<details class="host-client-settings"><summary>Настройки клиента</summary><p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details></div></section>'+
         '<section class="host-editor-side" aria-label="Клиентское подключение">'+
         '<div class="node-form-section-title">'+ic('globe')+'<span>Клиентское подключение</span></div>'+
         '<p class="node-ip-hint">Предпросмотр из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+
