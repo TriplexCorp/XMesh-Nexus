@@ -83,6 +83,26 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
+  // Shared destination catalogue for global templates and per-user rules.
+  // Only concrete outbound keys are selectable; the backend enforces access.
+  function destinations(db){
+    const nodes=(db.nodes||[]).filter(n=>!n.disabled);
+    const hosts=(db.hosts||[]).filter(h=>!h.disabled);
+    return [
+      ...hosts.filter(h=>Number.isSafeInteger(Number(h.id))&&Number(h.id)>0).map(h=>({
+        key:'host:'+h.id, label:(h.remark||h.name||h.address||'Хост #'+h.id)+' · '+(h.tag||'')
+      })),
+      ...nodes.flatMap(n=>{
+        const p=(db.profiles||[]).find(p=>String(p.id)===String(n.profileId));
+        let config;
+        try { config=typeof p?.config==='string'?JSON.parse(p.config):p?.config; } catch (_) {}
+        return (config?.inbounds||[]).filter(x=>x.tag&&
+          !hosts.some(h=>h.tag===x.tag&&(!h.profileId||String(h.profileId)===String(p.id))))
+          .map(x=>({key:'node:'+n.id+':'+x.tag,label:(n.name||'Узел #'+n.id)+' · '+x.tag}));
+      })
+    ];
+  }
+
   function create(db, saveSettings, toast) {
     const nodes = (db.nodes||[]).filter(n=>!n.disabled);
     const hosts = (db.hosts||[]).filter(h=>!h.disabled);
@@ -96,19 +116,7 @@
         detail:h.tag||'Без inbound', code:countryCode(h.countryCode,h.country,h.remark,h.name,h.address)
       }))
     ];
-    const targets = [
-      ...hosts.filter(h=>Number.isSafeInteger(Number(h.id))&&Number(h.id)>0).map(h=>({
-        key:'host:'+h.id, label:(h.remark||h.name||h.address||'Хост #'+h.id)+' · '+(h.tag||'')
-      })),
-      ...nodes.flatMap(n=>{
-        const p=(db.profiles||[]).find(p=>String(p.id)===String(n.profileId));
-        let config;
-        try { config=typeof p?.config==='string'?JSON.parse(p.config):p?.config; } catch (_) {}
-        return (config?.inbounds||[]).filter(x=>x.tag&&
-          !hosts.some(h=>h.tag===x.tag&&(!h.profileId||String(h.profileId)===String(p.id))))
-          .map(x=>({key:'node:'+n.id+':'+x.tag,label:(n.name||'Узел #'+n.id)+' · '+x.tag}));
-      })
-    ];
+    const targets = destinations(db);
     const sourceByKey=new Map(sources.map(s=>[s.key,s]));
     let draft=clone(Array.isArray(db.set?.clientRoutingProfiles)?db.set.clientRoutingProfiles:[]);
     let saved=JSON.stringify(draft);
@@ -523,5 +531,5 @@
     }
     return [rootMarkup,wire];
   }
-  global.XMeshClientRouting={create};
+  global.XMeshClientRouting={create,destinations};
 })(window);
