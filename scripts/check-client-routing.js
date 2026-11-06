@@ -18,6 +18,7 @@ const catalog=new Function('panelIsEnglish','window',
   app.slice(catalogStart,catalogEnd)+'return window.XMeshCountryCatalog;')(
   ()=>false,catalogWindow);
 assert(catalog.countries.length>=250,'Routing must use the complete country catalog');
+sandbox.window.XMeshCountryCatalog=catalog;
 const flagSandbox={window:{XMeshCountryCatalog:catalog}};
 new vm.Script(source.replace('  function create(db, saveSettings, toast) {',
   '  window.__routingFlagTests={countryCode,flag};\n  function create(db, saveSettings, toast) {')
