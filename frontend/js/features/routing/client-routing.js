@@ -25,12 +25,23 @@
     [/англи|великобритани|британи|england|britain|united kingdom|(?:^|[\s_-])(?:gb|uk)(?:$|[\s_-])/i,'gb']
   ];
   function countryCode(...parts) {
-    const name = parts.filter(Boolean).join(' ');
-    const explicit = parts.find(p => typeof p === 'string' && /^(nl|pl|de|ru|se|swe|ee|fi|fr|us|es|gb|uk)$/i.test(p.trim()));
-    if (explicit) return ({swe:'se',uk:'gb'})[explicit.toLowerCase()] || explicit.toLowerCase();
-    const emoji=parts.find(p=>typeof p==='string'&&/^[\u{1F1E6}-\u{1F1FF}]{2}$/u.test(p));
-    if(emoji){const iso=Array.from(emoji,c=>String.fromCharCode(c.codePointAt(0)-127397)).join('').toLowerCase();return iso==='uk'?'gb':iso;}
-    return flagPatterns.find(([pattern]) => pattern.test(name))?.[1] || '';
+    // Country metadata is not uniform across node and public-host records.
+    // Prefer explicit ISO/emoji values, but recover from human-readable names
+    // even when a stored flag is missing or contains other presentation text.
+    const fields=parts.filter(p=>typeof p==='string'&&p.trim()).map(p=>p.trim().normalize('NFKC'));
+    const iso=/^(nl|pl|de|ru|se|swe|ee|fi|fr|us|es|gb|uk)$/i;
+    const explicit=fields.find(p=>iso.test(p));
+    if(explicit)return ({swe:'se',uk:'gb'})[explicit.toLowerCase()]||explicit.toLowerCase();
+    for(const field of fields){
+      const emoji=field.match(/[\u{1F1E6}-\u{1F1FF}]{2}/u)?.[0];
+      if(emoji){
+        const code=Array.from(emoji,c=>String.fromCharCode(c.codePointAt(0)-127397)).join('').toLowerCase();
+        if(code==='uk')return 'gb';
+        if(iso.test(code))return code;
+      }
+    }
+    const name=fields.join(' ');
+    return flagPatterns.find(([pattern])=>pattern.test(name))?.[1]||'';
   }
   function flag(code) {
     const start = '<svg class="crx-flag" width="29" height="22" viewBox="0 0 32 24" aria-hidden="true" focusable="false"><defs><clipPath id="crx-flag-clip"><rect x="1" y="1" width="30" height="22" rx="4"/></clipPath></defs><g clip-path="url(#crx-flag-clip)">';
