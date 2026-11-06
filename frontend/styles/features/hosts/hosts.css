@@ -33,7 +33,7 @@ dialog.host-wide .node-form-section-title{display:flex;align-items:center;gap:.6
 .host-editor-layout .ms label>input{margin-top:.1rem}
 .host-editor-layout .ms label>span{min-width:0;overflow-wrap:anywhere}
 .host-editor-layout [data-host-count]{font-size:.73rem;line-height:1.4;color:var(--mu)}
-.host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:1/-1}
+.host-advanced-fields .f:has([name="publicKey"]){grid-column:1/-1}
 .host-advanced-fields .f:has([name="publicKey"])>span,.host-advanced-fields .f:has([name="clientEncryption"])>span{min-block-size:0}
 .host-advanced-heading{display:grid;gap:6px}
 .host-advanced-actions{display:flex;justify-content:flex-start;padding-top:12px;border-top:1px solid var(--nx-border)}

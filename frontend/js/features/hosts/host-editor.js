@@ -45,7 +45,7 @@ window.XMeshHostEditor=(() => {
       const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
       const advanced=['sni','host','path','securityLayer','alpn','fp','xhttpMode','tlsVerification','useSniAsHost','serviceName','publicKey','shortId','spiderX','clientEncryption'].filter(k=>f(k)).map(k=>{
         const value=k==='tlsVerification'?(o.clientTlsSettings?.allowInsecure===true?'insecure':o.clientTlsSettings?.allowInsecure===false?'verify':''):k==='xhttpMode'?(o.clientXhttpSettings?.mode||''):o[k]??'';
-        const spec=k==='alpn'&&value&&!f(k).o.some(([key])=>key===value)?{...f(k),o:[...f(k).o,[value,value]]}:f(k);
+        const spec=k==='alpn'&&value&&!f(k).o.some(([key])=>key===value)?{...f(k),o:[...f(k).o,[value,value]]}:k==='clientEncryption'?{...f(k),l:'VLESS Encryption'}:f(k);
         const hint=k==='securityLayer'?'Если перед нодой стоит промежуточный сервер, выберите защиту публичного подключения.':k==='tlsVerification'?'Проверка сертификата применяется только к TLS-подключению клиента.':'';
         const markup=field(spec,value);
         return hint?markup.replace('<span>'+spec.l+'</span>','<span>'+spec.l+' <span class="host-field-help" tabindex="0" role="img" title="'+esc(hint)+'" aria-label="'+esc(hint)+'">ⓘ</span></span>'):markup;
