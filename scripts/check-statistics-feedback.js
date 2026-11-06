@@ -252,7 +252,7 @@ matches(englishMarked,/<b data-no-translate title="Archived node #111">Archived 
 matches(englishMarked,/<b data-no-translate title="Польша">Польша<\/b>/);
 matches(englishMarked,/<span translate="no">Польша<\/span>/);
 matches(english,/<b data-no-translate title="Польша">Польша<\/b>/);
-matches(app,/data-stats-history-user=".*?<span translate="no">/);
+matches(app,/<span translate="no">\x27\+esc\(item\.name/);
 matches(app,/<span translate="no">.*?localizedTrafficNodeName\(item\.name/);
 
 matches(marked,/user-server-archive-note/);
