@@ -463,7 +463,7 @@ const countrySearchMatches=query=>{
  }).filter(row=>Number.isFinite(row.rank)).sort((a,b)=>a.rank-b.rank).map(row=>row.country);
 };
 const countryFlag=code=>String.fromCodePoint(...code.toUpperCase().split('').map(c=>127397+c.charCodeAt(0)));
-const gbRussianWords=COUNTRY_ALIASES.GB.match(/[\\p{Script=Cyrillic}]+/gu)||[];
+const gbRussianWords=COUNTRY_ALIASES.GB.match(/[\p{Script=Cyrillic}]+/gu)||[];
 const COUNTRIES=COUNTRY_CODES.map((code,index)=>{
  const name=code==='GB'?'Великобритания (UK)':code==='XK'?'Косово':COUNTRY_NAMES.of(code);
  const enName=code==='GB'?'United Kingdom (UK)':code==='XK'?'Kosovo':COUNTRY_NAMES_EN.of(code);
