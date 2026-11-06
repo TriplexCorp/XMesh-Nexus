@@ -209,6 +209,12 @@ assert.equal((historicalApi.match(/"nodeArchived":/g)||[]).length,2,
  'Per-node and per-inbound responses must both identify archived nodes');
 matches(app,/archivedCount=servers.filter\(r=>r.nodeArchived\).length/);
 matches(app,/user-server-archive-note/);
+matches(app,/function localizedTrafficNodeName\(name,nodeId,nodeArchived\)/);
+matches(app,/Archived node #/);
+matches(app,/localizedTrafficNodeName\(r\.name,r\.nodeId,r\.nodeArchived\)/);
+matches(app,/localizedTrafficNodeName\(r\.nodeName,r\.nodeId,r\.nodeArchived\)/);
+matches(app,/localizedTrafficNodeName\(item\.name,item\.nodeId,item\.nodeArchived\)/);
+
 // Render the real donut markup with a deleted node: bytes and share are not lost.
 const trafficMarkupStart=app.indexOf('function userTrafficDonutsMarkup(payload){');
 const trafficMarkupEnd=app.indexOf('function userInboundTrafficMarkup(',trafficMarkupStart);
