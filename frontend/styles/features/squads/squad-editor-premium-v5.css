@@ -808,3 +808,6 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg){transition:none}
 :root[lang="en"] dialog#dlg.squad-wide > form.box > h2::after{
  content:"Manage inbound access and see how the policy affects subscriptions";
 }
+
+/* A filtered inbound must not inherit the grid display from visible rows. */
+dialog#dlg.squad-wide .squad-inbound-row[hidden]{display:none}

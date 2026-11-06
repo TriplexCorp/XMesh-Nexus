@@ -33,8 +33,10 @@ async function checked(label, fn) {
     const detail = await fn();
     report.checks.push({label, detail});
   } catch (error) {
-    report.failures.push({label, error: shortError(error)});
+    const details = String(error.stack || error.message || error);
+    report.failures.push({label, error: shortError(error), details: details.slice(0, 4000)});
     console.error(`ОШИБКА: ${label}: ${shortError(error)}`);
+    if (/Timeout|locator\.click/.test(details)) console.error(details.split('\n').slice(1, 12).join('\n'));
   }
 }
 
@@ -124,8 +126,14 @@ async function main() {
     return item;
   }
   async function navigate(route) {
+    // An earlier failing case must not leave a native top-layer dialog blocking this route.
+    await page.evaluate(() => document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()));
     await page.goto(base + dashboard + '#' + route, {waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
+    // Soft hash navigation can still be rendering the previous route at this point.
+    // Wait for the actual destination, not just a nonempty #view.
+    const destination = {admins:'[data-ne="admins"]',squads:'[data-ne="squads"]',templates:'.templates-workspace'}[route];
+    if(destination) await page.locator('#view').locator(destination).first().waitFor({state:'visible'});
     await page.waitForTimeout(150);
     assert(!await page.locator('#login-form').count(), 'Сессия авторизации потеряна.');
   }
@@ -1558,6 +1566,7 @@ async function main() {
     });
 
     for(const [width,height] of [[1366,768],[1920,1080],[390,844]]) for(const [route,entity] of [['templates','tpls'],['admins','admins']]) await checked(`Entity editor containment: ${entity} · ${width}×${height}`,async()=>{
+      try {
       await page.setViewportSize({width,height});
       await navigate(route);
       await page.locator(`[data-ne="${entity}"]`).first().click();
@@ -1585,6 +1594,9 @@ async function main() {
       await page.keyboard.press('Escape');
       await page.waitForSelector('dialog[open]',{state:'detached'});
       return g;
+      } finally {
+        await page.evaluate(() => document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()));
+      }
     });
 
     const inspectStudioDialog=async(selector)=>page.locator(selector).evaluate(dialog=>{
@@ -2222,6 +2234,7 @@ async function main() {
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
     for(const [width,height] of [[1920,1080],[2560,1440],[1366,768],[390,844]]) await checked(`Populated Squad composition: ${width}×${height}`,async()=>{
+      try {
       await page.setViewportSize({width,height});
       await navigate('squads');
       await page.locator('[data-ne="squads"]').first().click();
@@ -2303,6 +2316,9 @@ async function main() {
       }
       if(height>=1080) assert(g.bodyScroll<=g.bodyClient+1,'Normal populated squad must fit desktop without scrolling');
       return g;
+      } finally {
+        await page.evaluate(() => document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()));
+      }
     });
 
     assert.equal(report.javascriptErrors.length,0,'В браузере возникли JavaScript ошибки.');
