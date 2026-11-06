@@ -379,10 +379,10 @@ async function main() {
       for(const [width,height] of [[1920,1080],[390,844]]){
         await page.setViewportSize({width,height});
         await navigate('squads');
-        const search=page.locator('[data-squad-search]');
+        const search=page.locator('#view .squad-directory-toolbar:visible [data-squad-search]');
         const card=page.locator('[data-squad-card="'+squad.id+'"]');
-        const clear=page.locator('[data-squad-search-clear]');
-        const empty=page.locator('[data-squad-search-empty]');
+        const clear=page.locator('#view .squad-directory-toolbar:visible [data-squad-search-clear]');
+        const empty=page.locator('#view .squad-directory [data-squad-search-empty]');
         await search.waitFor({state:'visible'});
         assert(await card.isVisible(),'Squad must be initially visible');
         const before=await page.locator('.squad-card-grid .squad-card:visible').count();
@@ -444,7 +444,7 @@ async function main() {
           const style=getComputedStyle(el);
           const gap=parseFloat(style.columnGap)||0;
           const fontSize=parseFloat(getComputedStyle(document.documentElement).fontSize)||16;
-          const minCardWidth=Math.min(rect.width,20*fontSize);
+          const minCardWidth=Math.min(rect.width,17*fontSize);
           return{left:rect.left,right:rect.right,viewport:innerWidth,
             columns:style.gridTemplateColumns.split(' ').length,
             expectedColumns:Math.max(1,Math.floor((rect.width+gap+.01)/(minCardWidth+gap)))};
