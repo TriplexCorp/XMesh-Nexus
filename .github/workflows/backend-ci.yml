@@ -273,6 +273,7 @@ jobs:
           XMESH_BROWSER_OUTPUT: browser-results
           XMESH_UI_DISPOSABLE: "1"
         run: |
+          node scripts/test-templates-browser.cjs
           node scripts/test-statistics-chart-hit-targets.cjs
           node scripts/test-ui-browser.cjs
           node scripts/test-appearance-materials.cjs

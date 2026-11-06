@@ -57,6 +57,7 @@ const section={
 };
 const root={
  addEventListener:(name,callback)=>callbacks[name]=callback,
+ querySelectorAll:()=>[],
  querySelector:selector=>selector==='[data-template-section="tpls"]'?section:null
 };
 const chooser={value:'',events:[],dispatchEvent(event){this.events.push(event.type)}};
@@ -81,7 +82,9 @@ const render=factory(api,DB,icon,escape,[
  assert.doesNotMatch(html,/data-ui-layout="table"/);
  assert.match(html,/SUBSCRIPTION STUDIO/);
  mount();
- assert.equal(counter.textContent,'Всего: 2');
+ assert.equal(counter.textContent,'');
+ assert.match(html,/role="tablist"/);
+ assert.doesNotMatch(html,/templates-kicker|templates-heading-actions/);
  queryInput.value='Премиум';
  callbacks.input({target:{closest:selector=>selector==='[data-template-search]'?queryInput:null}});
  assert.equal(cards[0].hidden,false);
