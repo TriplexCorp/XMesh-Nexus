@@ -959,7 +959,7 @@ pub async fn admin_client_json(
         .as_str();
     let proxies = collect_user_outbounds(&state, &user, device, false).await?;
     let setting = crate::read_settings(&state.pool).await?;
-    let profile = crate::subscription_json::build_feed(proxies, &setting)
+    let profile = crate::subscription_json::build_feed(proxies, &crate::client_routing::scoped_settings(&setting, &user))
         .map_err(|detail| ApiError::new(StatusCode::BAD_REQUEST, detail))?;
     Ok(Json(profile))
 }
@@ -1075,7 +1075,7 @@ pub async fn serve(
     let settings = crate::read_settings(&state.pool).await?;
     // Native Xray JSON is the only supported subscription format.
     // A disabled SMART selector changes routing, never the wire representation.
-    let json = crate::subscription_json::build_feed(outbounds, &settings).map_err(|message| {
+    let json = crate::subscription_json::build_feed(outbounds, &crate::client_routing::scoped_settings(&settings, &user)).map_err(|message| {
         tracing::warn!(user_id=id, error=%message,"Subscription JSON could not be generated");
         ApiError::new(StatusCode::SERVICE_UNAVAILABLE, message)
     })?;
