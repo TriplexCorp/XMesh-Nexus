@@ -41,9 +41,9 @@ assert.match(engine,/fn smart_is_an_optional_additional_profile\(\)/);
 // while allowing per-user routing without mutating the shared configuration.
 const subscriptionBase=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 const routing=fs.readFileSync('backend/src/client_routing.rs','utf8');
-assert.match(subscriptionBase,/subscription_json::build_feed\(\s*outbounds\s*,\s*&crate::client_routing::scoped_settings\(\s*&settings\s*,\s*&user\s*\)\s*\)/,
+assert.match(subscriptionBase,/subscription_json::build_feed\(\s*outbounds\s*,\s*&crate::client_routing::scoped_settings\(\s*&settings\s*,\s*&user\s*\)\s*,?\s*\)/,
  'Public client JSON must retain global balancers with per-user routing');
-assert.match(subscriptionBase,/subscription_json::build_feed\(\s*proxies\s*,\s*&crate::client_routing::scoped_settings\(\s*&setting\s*,\s*&user\s*\)\s*\)/,
+assert.match(subscriptionBase,/subscription_json::build_feed\(\s*proxies\s*,\s*&crate::client_routing::scoped_settings\(\s*&setting\s*,\s*&user\s*\)\s*,?\s*\)/,
  'Admin preview must use the same scoped settings as the public feed');
 assert.match(routing,/let mut scoped = settings\.clone\(\)/,
  'A user override must not mutate global panel settings');
