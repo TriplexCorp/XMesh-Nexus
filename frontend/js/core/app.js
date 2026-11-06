@@ -1189,11 +1189,13 @@ const statsDetailedChart=(points,chartWidth=1000)=>{
     '<circle class="stats-detail-point-ring" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="10"/>'+
     '<circle class="stats-detail-point-core" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+speedUnitMbps())+'</title></circle></g>';
   }).join('');
-  return '<path class="stats-detail-area '+cls+'" d="'+area+'"/><path class="stats-detail-line '+cls+'" d="'+d+'"/>'+dots;
+  return {paths:'<path class="stats-detail-area '+cls+'" d="'+area+'"/><path class="stats-detail-line '+cls+'" d="'+d+'"/>',dots};
  };
+ // Paint every decorative series before the interactive point layer.
+ const series=metrics.map(line);
  const grid=[0,.25,.5,.75,1].map(f=>'<line class="stats-detail-grid" x1="'+left+'" x2="'+(w-right)+'" y1="'+y(max*f)+'" y2="'+y(max*f)+'"/><text class="stats-detail-label" x="'+(left-12)+'" y="'+(y(max*f)+4)+'" text-anchor="end">'+esc(fmt(max*f,2))+'</text>').join('');
  const ticks=[0,Math.floor((samples.length-1)/2),samples.length-1].filter((v,i,a)=>a.indexOf(v)===i).map(i=>'<text class="stats-detail-label" x="'+x(i)+'" y="'+(h-15)+'" text-anchor="'+(i===0?'start':i===samples.length-1?'end':'middle')+'">'+esc(new Date(Number(samples[i].bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</text>').join('');
- return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="История RX и TX, Мбит/с. Наведите на точки для значений"><text class="stats-detail-axis" x="17" y="'+(top+ph/2)+'" transform="rotate(-90 17 '+(top+ph/2)+')" text-anchor="middle">Мбит/с</text>'+grid+line('rxBytesPerSec')+line('txBytesPerSec')+ticks+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> RX · принято нодами</span><span><i class="tx"></i> TX · отправлено нодами</span><small>Наведите на точку для времени и скорости. Пропуски не интерполируются.</small></div>';
+ return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="История RX и TX, Мбит/с. Наведите на точки для значений"><text class="stats-detail-axis" x="17" y="'+(top+ph/2)+'" transform="rotate(-90 17 '+(top+ph/2)+')" text-anchor="middle">Мбит/с</text>'+grid+series.map(s=>s.paths).join('')+series.map(s=>s.dots).join('')+ticks+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> RX · принято нодами</span><span><i class="tx"></i> TX · отправлено нодами</span><small>Наведите на точку для времени и скорости. Пропуски не интерполируются.</small></div>';
 };
 // SVG coordinates are resized horizontally, not scaled as a whole.
 // Match the viewBox width to the *actual* CSS viewport ratio so labels and

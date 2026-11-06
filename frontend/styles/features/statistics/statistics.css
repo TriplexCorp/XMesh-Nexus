@@ -1488,3 +1488,6 @@ dialog.user-modal .user-stats-refresh:hover {
   min-width:0;
   height:auto;
 }
+
+/* Decorative series must never intercept another series' point targets. */
+.stats-detail-area,.stats-detail-line,.stats-detail-grid,.stats-detail-label,.stats-detail-axis{pointer-events:none}
