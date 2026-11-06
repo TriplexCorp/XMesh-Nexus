@@ -908,11 +908,11 @@ async function main() {
       assert.equal(g.paneScrolls,0,'Only the shared body may scroll');
       if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Content must fit without scrolling when viewport height is sufficient');
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
-      for(const key of ['acc','traffic','dev','ov']){
+      for(const key of ['acc','routing','traffic','dev','ov']){
         await page.locator(`[data-user-editor-tab="${key}"]`).click();
         const bounds=await page.locator('#dlg').boundingBox();
         assert(Math.abs(bounds.height-g.dialog.height)<=1&&Math.abs(bounds.y-g.dialog.y)<=1,'User task switching must not shift the dialog');
-        assert.equal(await page.locator('[data-user-editor-pane][inert]').count(),3);
+        assert.equal(await page.locator('[data-user-editor-pane][inert]').count(),4);
         if(key==='acc') assert.equal(await page.locator('.user-pane-access .user-heading-with-icon > svg.ic').count(),2,'Access and subscription must keep semantic Nexus icons');
         if(key==='traffic') assert.equal(await page.locator('.user-pane-insights .user-heading-with-icon > svg.ic').count(),1,'Traffic heading must use the shared SVG icon');
         if(key==='ov') assert.equal(await page.locator('.user-pane-settings .user-card-title > svg.ic').count(),3,'Settings cards must retain their semantic icons');
@@ -956,7 +956,7 @@ async function main() {
       await page.evaluate(()=>{sessionUser.role='viewer';document.documentElement.dataset.accessRole='viewer'});
       try{
         await page.locator(`tr[data-id="${user.id}"]`).click();
-        for(const key of ['ov','acc','traffic','dev']){
+        for(const key of ['ov','acc','routing','traffic','dev']){
           const tab=page.locator(`[data-user-editor-tab="${key}"]`);
           assert(await tab.isEnabled());await tab.click();
           assert.equal(await tab.getAttribute('aria-selected'),'true');
@@ -996,10 +996,10 @@ async function main() {
       });
       assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.right<=width+1,'Mobile dialog must fit viewport');
       assert.equal(g.scrollTop,0);
-      assert.equal(g.panes.length,4,'All task panels must stay mounted');
+      assert.equal(g.panes.length,5,'All task panels must stay mounted');
       assert.equal(await page.locator('[data-user-editor-pane][data-active=true]').count(),1);
-      assert.equal(await page.locator('[data-user-editor-pane][inert]').count(),3);
-      for(const key of ['acc','traffic','dev','ov']){
+      assert.equal(await page.locator('[data-user-editor-pane][inert]').count(),4);
+      for(const key of ['acc','routing','traffic','dev','ov']){
         await page.locator(`[data-user-editor-tab="${key}"]`).click();
         assert(await page.locator(`[data-user-editor-pane="${key}"]`).isVisible());
         const bounds=await page.locator('#dlg').boundingBox();
