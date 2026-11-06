@@ -231,6 +231,30 @@ const marked=renderTraffic({servers:[
 ]});
 matches(marked,/Архивная нода #111/);
 matches(marked,/Активная нода/);
+
+matches(marked,/<b data-no-translate title="Архивная нода #111">Архивная нода #111<\/b>/);
+matches(marked,/<span translate="no">Активная нода<\/span>/);
+const renderTrafficEnglish=new Function('registerUserNodeColors','userServerColor','userServerSegments',
+  'userTrafficBytes','fmt','ic','esc','panelIsEnglish','window',
+  app.slice(trafficMarkupStart,trafficMarkupEnd)+'return userTrafficDonutsMarkup;')(
+    ()=>{},()=> '#aabbcc',()=> 'conic-gradient(red 0% 100%)',
+    x=>x+' B',(n,d=0)=>Number(n).toFixed(d),()=>'<i></i>',x=>String(x),
+    ()=>true,{XMeshI18n:{getLocale:()=> 'en-US'}});
+const english=renderTraffic({servers:[
+ {nodeId:111,name:'Архивная нода #111',nodeArchived:true,uplinkBytes:10,downlinkBytes:20,updatedAtMs:0},
+ {nodeId:5,name:'Польша',nodeArchived:false,uplinkBytes:5,downlinkBytes:15,updatedAtMs:0}
+]});
+const englishMarked=renderTrafficEnglish({servers:[
+ {nodeId:111,name:'Архивная нода #111',nodeArchived:true,uplinkBytes:10,downlinkBytes:20,updatedAtMs:0},
+ {nodeId:5,name:'Польша',nodeArchived:false,uplinkBytes:5,downlinkBytes:15,updatedAtMs:0}
+]});
+matches(englishMarked,/<b data-no-translate title="Archived node #111">Archived node #111<\/b>/);
+matches(englishMarked,/<b data-no-translate title="Польша">Польша<\/b>/);
+matches(englishMarked,/<span translate="no">Польша<\/span>/);
+matches(english,/<b data-no-translate title="Польша">Польша<\/b>/);
+matches(app,/data-stats-history-user=".*?<span translate="no">/);
+matches(app,/<span translate="no">.*?localizedTrafficNodeName\(item\.name/);
+
 matches(marked,/user-server-archive-note/);
 matches(marked,/Всего/);
 matches(marked,/50 B/,'Archived signed bytes must remain in lifetime total');
