@@ -108,6 +108,8 @@ jobs:
         run: node scripts/check-appearance-surfaces.js
       - name: Enforce unified panel UI builder and material contract
         run: node scripts/check-ui-system.js
+      - name: Verify premium template cards, search and user preset creation
+        run: node scripts/check-templates-workspace.cjs
       - name: Check New Node button rendering and handler
         run: node scripts/check-node-create-action.js
       - name: Check optional node hosting and local flags in notifications
