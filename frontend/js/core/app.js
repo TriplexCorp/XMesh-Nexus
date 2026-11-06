@@ -1065,7 +1065,7 @@ const balancersP=async()=>{
   });
  }];
 };
-const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',squadsP],hosts:['Хосты',hostsP],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',async()=>{
+const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',squadsP],hosts:['Хосты',hostsP],nodes:['Узлы',nodesP],templates:['Шаблоны',templatesP],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',async()=>{
     // Do not assume the editor asset was loaded by an older cached index.html.
     // A failed optional script must not crash the whole workspace.
     if(typeof window.XMeshClientRouting?.create!=='function'){
@@ -3143,6 +3143,166 @@ async function hostsP(){
       hostSearchQuery='';input.value='';applyHostSearch(root);input.focus();
     });
     applyHostSearch(root);
+  }];
+}
+
+/* Templates share the canonical CRUD forms and PostgreSQL collections.
+ * No duplicate template store or fake "apply subscription" action. */
+let templateFilters={tpls:'',subs:''};
+async function templatesP(){
+  const [users,subscriptions]=await Promise.all([
+    api.list('tpls',{sort:'id'}),api.list('subs',{sort:'id'})
+  ]);
+  const text=value=>esc(String(value??''));
+  const itemId=item=>text(item.id);
+  const metric=(icon,label,value)=>'<div class="template-metric">'+
+    '<span class="template-metric-label">'+ic(icon)+text(label)+'</span>'+
+    '<strong data-no-translate>'+text(value)+'</strong></div>';
+  const actions=(kind,item)=>'<div class="template-card-footer">'+
+    '<button type="button" class="gh sm template-configure" data-ne="'+kind+':'+itemId(item)+'">'+ic('sliders')+' Настроить</button>'+
+    (kind==='tpls'
+      ?'<button type="button" class="gh sm template-use" data-template-create-user="'+itemId(item)+'">'+ic('userPlus')+' Создать пользователя</button>'
+      :'<a class="gh sm template-studio-link" href="#subscription">'+ic('globe')+' SUBSCRIPTION STUDIO</a>')+
+    '<details class="template-more"><summary aria-label="Действия с шаблоном" title="Дополнительные действия">'+ic('more')+'</summary>'+
+      '<div class="template-more-menu">'+
+        '<button type="button" data-template-duplicate="'+kind+':'+itemId(item)+'">'+ic('copy')+' Дублировать</button>'+
+        '<button type="button" class="is-danger" data-del="'+kind+':'+itemId(item)+'">'+ic('trash')+' Удалить</button>'+
+      '</div></details></div>';
+  const templateCard=item=>{
+    const squads=Array.isArray(item.squads)?item.squads:[];
+    const squadNames=squads.map(id=>DB.squads.find(s=>String(s.id)===String(id))?.name).filter(Boolean);
+    const searchText=[item.name,item.limit,item.days,item.hwid,item.strategy,...squadNames].join(' ');
+    const reset=STRAT.find(option=>option[0]===item.strategy)?.[1]||'Не сбрасывать';
+    const traffic=Number(item.limit)>0?text(item.limit)+' ГБ':'∞';
+    const period=Number(item.days)>0?text(item.days)+' дн':'∞';
+    const count=Number(item.hwid)||0;
+    return '<article class="template-card" data-template-card="tpls:'+itemId(item)+'" data-template-search-text="'+text(searchText)+'">'+
+      '<header class="template-card-header"><span class="template-card-emblem">'+ic('users')+'</span>'+
+        '<div class="template-card-title"><span class="template-card-eyebrow">Шаблон пользователя</span>'+
+          '<button type="button" class="template-card-name" data-ne="tpls:'+itemId(item)+'" data-no-translate title="'+text(item.name)+'">'+text(item.name)+'</button></div>'+
+        '<span class="template-status '+(item.hold?'is-hold':'')+'">'+(item.hold?'С первого подключения':'Обычный')+'</span></header>'+
+      '<div class="template-metrics">'+
+        metric('activity','Трафик',traffic)+metric('calendar','Срок',period)+
+        metric('monitor','Устройства',count)+metric('repeat','Сброс',reset)+
+      '</div>'+
+      '<div class="template-card-access">'+
+        '<span class="template-access-label">'+ic('layers')+' Сквады <b>'+squads.length+'</b></span>'+
+        '<div class="template-access-chips" data-no-translate>'+(squadNames.length
+          ?squadNames.slice(0,2).map(name=>'<span class="template-squad-chip" title="'+text(name)+'">'+text(name)+'</span>').join('')+
+            (squadNames.length>2?'<span class="template-squad-chip">+'+(squadNames.length-2)+'</span>':'')
+          :'<span class="template-access-none">Не назначены</span>')+'</div>'+
+      '</div>'+actions('tpls',item)+'</article>';
+  };
+  const subscriptionCard=item=>{
+    const format=String(item.fmt||'XRAY_JSON').toUpperCase();
+    const length=String(item.content||'').length;
+    return '<article class="template-card template-subscription-card" data-template-card="subs:'+itemId(item)+'" data-template-search-text="'+text([item.name,format].join(' '))+'">'+
+      '<header class="template-card-header"><span class="template-card-emblem">'+ic('fileCode')+'</span>'+
+        '<div class="template-card-title"><span class="template-card-eyebrow">Заготовка конфигурации</span>'+
+          '<button type="button" class="template-card-name" data-ne="subs:'+itemId(item)+'" data-no-translate title="'+text(item.name)+'">'+text(item.name)+'</button></div>'+
+        '<span class="template-status">Черновик</span></header>'+
+      '<div class="template-metrics">'+
+        metric('code','Формат',format)+metric('fileText','Размер',length+' симв.')+
+      '</div>'+
+      '<p class="template-card-note">'+ic('info')+' Сохранённая заготовка. Не применяется к подпискам автоматически.</p>'+
+      actions('subs',item)+'</article>';
+  };
+  const section=(kind,items,title,description,icon,renderItem)=>{
+    const count=items.length;
+    const filter=templateFilters[kind]||'';
+    return '<section class="template-section" data-template-section="'+kind+'">'+
+      '<div class="template-section-head"><div class="template-section-heading">'+
+        '<span class="template-section-icon">'+ic(icon)+'</span><div>'+
+          '<h2>'+title+' <span class="template-section-count">'+count+'</span></h2>'+
+          '<p>'+description+'</p></div></div>'+
+        '<button type="button" class="btn sm" data-ne="'+kind+'">'+ic('plus')+' Новый шаблон</button></div>'+
+      (count?'<div class="template-section-tools"><div class="nx-directory-search template-search">'+ic('search')+
+          '<input type="search" data-template-search="'+kind+'" aria-label="Поиск шаблонов" placeholder="Найти шаблон…" autocomplete="off" value="'+text(filter)+'">'+
+          '<button type="button" class="nx-directory-search-clear" data-template-clear="'+kind+'" aria-label="Очистить поиск" '+(filter?'':'hidden')+'>'+ic('x')+'</button></div>'+
+          '<span class="template-filter-count" data-template-count="'+kind+'" aria-live="polite"></span></div>'+
+          '<div class="template-grid" data-ui-layout="cards">'+items.map(renderItem).join('')+'</div>'+
+          '<p class="template-no-matches" data-template-no-results="'+kind+'" hidden>'+ic('search')+' Ничего не найдено. Измените запрос.</p>'
+        :'<div class="template-empty">'+
+           '<span class="template-empty-icon">'+ic(kind==='tpls'?'users':'fileCode')+'</span>'+
+           '<div><strong>'+(kind==='tpls'?'Пока нет шаблонов пользователей':'Шаблонов подписки пока нет')+'</strong>'+
+             '<p>'+(kind==='tpls'?'Создайте готовый тарифный пресет: срок, трафик, устройства и сквады.':
+              'Это хранилище заготовок; реальная выдача настраивается в SUBSCRIPTION STUDIO.')+'</p></div>'+
+           '<button type="button" class="gh sm" data-ne="'+kind+'">'+ic('plus')+' Создать шаблон</button>'+
+         '</div>')+'</section>';
+  };
+  const html='<div class="templates-workspace" data-ui-page="templates">'+
+    '<header class="templates-heading"><div><span class="templates-kicker">Управление пресетами</span>'+
+      '<h2>Шаблоны</h2><p>Готовые параметры для пользователей и сохранённые заготовки конфигураций.</p></div>'+
+      '<div class="templates-heading-actions"><button type="button" class="gh sm" data-ne="subs">'+ic('fileCode')+' Шаблон подписки</button>'+
+        '<button type="button" class="btn sm" data-ne="tpls">'+ic('plus')+' Шаблон пользователя</button></div></header>'+
+    section('tpls',users.items,'Шаблоны пользователей','Лимиты, срок и доступ для новых пользователей.','users',templateCard)+
+    section('subs',subscriptions.items,'Шаблоны подписки','Сохранённые заготовки. Выдачей управляет SUBSCRIPTION STUDIO.','fileCode',subscriptionCard)+
+    '</div>';
+  return [html,()=>{
+    const root=document.querySelector('.templates-workspace');
+    if(!root)return;
+    function applyFilter(kind){
+      const section=root.querySelector('[data-template-section="'+kind+'"]');
+      const input=section?.querySelector('[data-template-search]');
+      if(!section||!input)return;
+      const query=String(input.value||'').normalize('NFKC').toLocaleLowerCase().trim();
+      const cards=[...section.querySelectorAll('[data-template-card]')];
+      let visible=0;
+      for(const card of cards){
+        const searchable=String(card.dataset.templateSearchText||'').normalize('NFKC').toLocaleLowerCase();
+        card.hidden=!!query&&!searchable.includes(query);
+        if(!card.hidden)visible++;
+      }
+      section.querySelector('[data-template-clear]').hidden=!query;
+      section.querySelector('[data-template-no-results]').hidden=visible!==0;
+      section.querySelector('[data-template-count]').textContent=query?visible+' / '+cards.length:'Всего: '+cards.length;
+    }
+    for(const kind of ['tpls','subs'])applyFilter(kind);
+    root.addEventListener('input',event=>{
+      const input=event.target.closest('[data-template-search]');
+      if(!input)return;
+      const kind=input.dataset.templateSearch;
+      if(!['tpls','subs'].includes(kind))return;
+      templateFilters[kind]=input.value;
+      applyFilter(kind);
+    });
+    root.addEventListener('keydown',event=>{
+      const input=event.target.closest('[data-template-search]');
+      if(!input||event.key!=='Escape'||!input.value)return;
+      event.preventDefault();
+      input.value='';
+      templateFilters[input.dataset.templateSearch]='';
+      applyFilter(input.dataset.templateSearch);
+    });
+    root.addEventListener('click',event=>{
+      const clear=event.target.closest('[data-template-clear]');
+      if(clear){
+        const kind=clear.dataset.templateClear,input=root.querySelector('[data-template-search="'+kind+'"]');
+        if(input){input.value='';templateFilters[kind]='';applyFilter(kind);input.focus();}
+        return;
+      }
+      const duplicate=event.target.closest('[data-template-duplicate]');
+      if(duplicate){
+        const [kind,id]=duplicate.dataset.templateDuplicate.split(':');
+        if(!['tpls','subs'].includes(kind))return;
+        const source=DB[kind].find(item=>String(item.id)===id);
+        if(!source)return;
+        const {id:originalId,...copy}=source;
+        entForm(kind,null,{...copy,name:String(copy.name||'Шаблон')+' · копия'});
+        return;
+      }
+      const create=event.target.closest('[data-template-create-user]');
+      if(create){
+        const id=create.dataset.templateCreateUser;
+        if(!DB.tpls.some(item=>String(item.id)===id))return;
+        userNew();
+        const select=document.querySelector('#tplsel');
+        if(select){
+          select.value=id;
+          select.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+      }
+    });
   }];
 }
 
