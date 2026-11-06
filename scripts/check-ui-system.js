@@ -101,6 +101,8 @@ assert.match(app,/data-squad-search-clear/,
 
 assert.match(squadCards,/\.squad-card-grid\{[\s\S]*align-items:stretch/,
  'Squad cards must stretch inside each grid row');
+assert.match(squadCards,/grid-template-columns:repeat\(auto-fill,minmax\(min\(100%,24rem\),1fr\)\)/,
+ 'Squad cards must reserve enough width for the title and both header actions');
 assert.match(squadCards,/@supports \(grid-template-rows:subgrid\)/,
  'Squad cards must share semantic section tracks on modern browsers');
 assert.match(squadCards,/grid-row:span 5;grid-template-rows:subgrid/,

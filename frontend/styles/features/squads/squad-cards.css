@@ -1,12 +1,14 @@
 /* Squad list anatomy only; appearance materials come from the shared system. */
 .squad-directory{display:grid;gap:var(--nx-page-gap);min-width:0}
 .squad-card[hidden]{display:none}
-/* Size tracks by available workspace width, not browser viewport.
- * auto-fill preserves compact 17rem tracks and four-up wide-desktop layout
- * even if there are only one or two squads. */
+/* Track width must fit the *entire* header: emblem, readable squad title,
+ * direct Edit button and overflow menu. A 17rem minimum squeezed the title
+ * to 2-4 letters at desktop widths / browser zoom, despite unused space.
+ * Auto-fill keeps a stable, left-aligned catalog without stretching one card
+ * across the whole panel when only a few squads exist. */
 .squad-card-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr));
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,24rem),1fr));
   align-items:stretch;
   gap:var(--nx-page-gap);
   min-width:0;
