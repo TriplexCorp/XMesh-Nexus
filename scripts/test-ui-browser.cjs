@@ -676,7 +676,8 @@ async function main() {
           const g=await geometry(page);assert(g.scrollWidth<=width+1,'Populated routing rows must not overflow');
           assert.equal(g.outside.length,0,'Routing controls must stay inside the viewport');
           assert((await page.locator('.crx-assigned-source').innerText()).includes(node.name),'Assigned node name must be readable');
-          assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-assigned-source svg rect[fill="#dc143c"]').count(),1,'Explicit Polish flag must override the Moscow fixture name');
+          assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-assigned-source img.crx-flag[src="/flags/pl.svg"]').count(),1,'Explicit Polish flag must override the Moscow fixture name');
+          assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-assigned-source .crx-globe').count(),0,'Known Polish country must never fall back to the globe');
           if(width>=1920){const card=await page.locator('[data-cr-profile="ui-route-main"]').boundingBox();assert(card.width<900,'Routing cards must keep a readable width');assert(card.height<650,'Three rules and an assignment must remain compact');const scope=await page.locator('[data-cr-profile="ui-route-main"] .crx-card-flags').boundingBox();const rules=await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').boundingBox();assert(rules.y>=scope.y+scope.height,'Assignments must precede ordered rules inside each card');}
           assert.equal(await page.locator('[data-cr-profile="ui-route-main"] .crx-rule-chip').count(),3,'All three rules must be visible in the overview');
           assert((await page.locator('[data-cr-profile="ui-route-main"] .crx-card-rules').innerText()).includes('ads.example.invalid'),'The third rule must not be silently omitted');
