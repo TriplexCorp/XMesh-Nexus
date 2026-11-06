@@ -262,7 +262,7 @@ async function main() {
         const variants=[
           ['TLS', 'Длинное описание группы доступа к подключениям Xray', ['hysteria-main','masque-main','shadowsocks-main','trojan-main','vless-main']],
           ['Vless', 'Группа доступа', ['vless-main']],
-          ['hysteria', 'Ещё одно описание группы доступа', ['hysteria-main']]
+          ['shadowsocks', 'Ещё одно описание группы доступа', ['hysteria-main']]
         ];
         const cards=[original];
         variants.forEach(([name,description,tags],i)=>{
@@ -286,18 +286,34 @@ async function main() {
           return{
             top:box.top,bottom:box.bottom,
             starts:sectionNames.map(selector=>card.querySelector(selector).getBoundingClientRect().top),
-            tagsVisible:card.querySelector('.squad-card-tags').scrollHeight<=card.querySelector('.squad-card-tags').clientHeight+1
+            tagsVisible:card.querySelector('.squad-card-tags').scrollHeight<=card.querySelector('.squad-card-tags').clientHeight+1,
+            title:card.querySelector('.squad-card-name').textContent,
+            titleFragments:(()=>{
+              const range=document.createRange();
+              range.selectNodeContents(card.querySelector('.squad-card-name'));
+              return range.getClientRects().length;
+            })()
           };
         });
       });
       assert(positions.every(item=>item.tagsVisible),'All squad inbound tags must remain visible');
-      const first=positions[0];
       assert(positions.length>=4,'Need multiple squad cards for alignment test');
-      for(const card of positions.slice(1)){
-        assert(Math.abs(card.top-first.top)<2,'Squad cards must share the same row');
-        assert(Math.abs(card.bottom-first.bottom)<2,'Squad cards must end at the same height');
+      assert.equal(positions.find(card=>card.title==='shadowsocks')?.titleFragments,1,
+        'Readable Squad titles must fit without breaking ordinary protocol names');
+      // Compare alignment only within the same grid row. Larger accessible
+      // card widths legitimately move the fourth fixture to the next row.
+      const rows=[];
+      for(const card of positions){
+        let row=rows.find(group=>Math.abs(group[0].top-card.top)<2);
+        if(!row){row=[];rows.push(row)}
+        row.push(card);
+      }
+      assert(rows.some(row=>row.length>=2),'At least two Squad cards must share a row');
+      for(const row of rows)for(const card of row.slice(1)){
+        const first=row[0];
+        assert(Math.abs(card.bottom-first.bottom)<2,'Squad cards in the same row must end at the same height');
         card.starts.forEach((top,i)=>{
-          assert(Math.abs(top-first.starts[i])<2,'Squad section '+i+' must align across cards');
+          assert(Math.abs(top-first.starts[i])<2,'Squad section '+i+' must align within each row');
         });
       }
     });
@@ -452,14 +468,14 @@ async function main() {
           const style=getComputedStyle(el);
           const gap=parseFloat(style.columnGap)||0;
           const fontSize=parseFloat(getComputedStyle(document.documentElement).fontSize)||16;
-          const minCardWidth=Math.min(rect.width,17*fontSize);
+          const minCardWidth=Math.min(rect.width,24*fontSize);
           return{left:rect.left,right:rect.right,viewport:innerWidth,
             columns:style.gridTemplateColumns.split(' ').length,
             expectedColumns:Math.max(1,Math.floor((rect.width+gap+.01)/(minCardWidth+gap)))};
         });
         assert(g.left>=0&&g.right<=g.viewport+1,'Cards must fit horizontally');
         assert.equal(g.columns,g.expectedColumns,'Squad grid columns must follow the available workspace width');
-        if(width===1920)assert(g.columns>=4,'Wide desktop must show at least four compact squad cards');
+        if(width===1920)assert(g.columns>=3,'Desktop squad cards must keep readable titles instead of overfilling the row');
         if(width===390)assert.equal(g.columns,1,'Mobile must show one squad card per row');
         await screenshot(page,`squad-cards-${width}x${height}`);
         const edit=card.locator('.squad-card-edit');
