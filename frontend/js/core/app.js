@@ -3150,6 +3150,7 @@ async function hostsP(){
  * No duplicate template store or fake "apply subscription" action. */
 let templateFilters={tpls:'',subs:''};
 async function templatesP(){
+  const english=typeof panelIsEnglish==='function'&&panelIsEnglish();
   const [users,subscriptions]=await Promise.all([
     api.list('tpls',{sort:'id'}),api.list('subs',{sort:'id'})
   ]);
@@ -3173,8 +3174,8 @@ async function templatesP(){
     const squadNames=squads.map(id=>DB.squads.find(s=>String(s.id)===String(id))?.name).filter(Boolean);
     const searchText=[item.name,item.limit,item.days,item.hwid,item.strategy,...squadNames].join(' ');
     const reset=STRAT.find(option=>option[0]===item.strategy)?.[1]||'Не сбрасывать';
-    const traffic=Number(item.limit)>0?text(item.limit)+' ГБ':'∞';
-    const period=Number(item.days)>0?text(item.days)+' дн':'∞';
+    const traffic=Number(item.limit)>0?text(item.limit)+(english?' GB':' ГБ'):'∞';
+    const period=Number(item.days)>0?text(item.days)+(english?' days':' дн'):'∞';
     const count=Number(item.hwid)||0;
     return '<article class="template-card" data-template-card="tpls:'+itemId(item)+'" data-template-search-text="'+text(searchText)+'">'+
       '<header class="template-card-header"><span class="template-card-emblem">'+ic('users')+'</span>'+
@@ -3202,7 +3203,7 @@ async function templatesP(){
           '<button type="button" class="template-card-name" data-ne="subs:'+itemId(item)+'" data-no-translate title="'+text(item.name)+'">'+text(item.name)+'</button></div>'+
         '<span class="template-status">Черновик</span></header>'+
       '<div class="template-metrics">'+
-        metric('code','Формат',format)+metric('file','Размер',length+' симв.')+
+        metric('code','Формат',format)+metric('file','Размер',length+(english?' chars':' симв.'))+
       '</div>'+
       '<p class="template-card-note">'+ic('info')+' Сохранённая заготовка. Не применяется к подпискам автоматически.</p>'+
       actions('subs',item)+'</article>';
