@@ -405,6 +405,54 @@ mod tests {
         assert_eq!(c["routing"]["rules"].as_array().unwrap().len(), 3);
     }
     #[test]
+    fn personal_youtube_routes_precede_global_rules_without_affecting_other_users() {
+        let source = proxy("host:20", "NL");
+        let ru = proxy("host:30", "PL");
+        let gb = proxy("host:31", "GB");
+        let all = vec![source.clone(), ru, gb];
+        let ivan = json!({"clientRouting":{"mode":"custom","rules":[
+            {"match":"geosite","value":"youtube","action":"server","server":"host:30"}
+        ]}});
+        let sempatin = json!({"clientRouting":{"mode":"custom","rules":[
+            {"match":"geosite","value":"youtube","action":"server","server":"host:31"}
+        ]}});
+        let ivan_config = build_server(source.clone(), &all, &scoped_settings(&settings(), &ivan)).unwrap();
+        let sempatin_config = build_server(source.clone(), &all, &scoped_settings(&settings(), &sempatin)).unwrap();
+        let regular = build_server(source, &all, &settings()).unwrap();
+        assert_eq!(ivan_config["routing"]["rules"][2]["domain"], json!(["geosite:youtube"]));
+        assert_eq!(sempatin_config["routing"]["rules"][2]["domain"], json!(["geosite:youtube"]));
+        assert_eq!(ivan_config["routing"]["rules"][2]["outboundTag"], ivan_config["outbounds"][1]["tag"]);
+        assert_eq!(sempatin_config["routing"]["rules"][2]["outboundTag"], sempatin_config["outbounds"][1]["tag"]);
+        assert_eq!(ivan_config["routing"]["rules"][3]["domain"], json!(["geosite:category-ru"]));
+        assert_eq!(sempatin_config["routing"]["rules"][3]["domain"], json!(["geosite:category-ru"]));
+        assert_eq!(regular["routing"]["rules"][2]["domain"], json!(["geosite:category-ru"]));
+        assert_ne!(ivan_config["outbounds"][1]["tag"], sempatin_config["outbounds"][1]["tag"]);
+        let inherited = scoped_settings(&settings(), &json!({"clientRouting":{"mode":"inherit","rules":[
+            {"match":"geosite","value":"youtube","action":"block"}
+        ]}}));
+        assert_eq!(build_server(all[0].clone(), &all, &inherited).unwrap()["routing"]["rules"][2]["domain"], json!(["geosite:category-ru"]));
+    }
+
+    #[test]
+    fn personal_target_is_restricted_to_authorized_subscription_endpoints() {
+        let source = proxy("host:20","NL");
+        let user = json!({"clientRouting":{"mode":"custom","rules":[
+            {"match":"geosite","value":"youtube","action":"server","server":"host:31"}
+        ]}});
+        let config=build_server(source.clone(), &[source], &scoped_settings(&json!({}), &user)).unwrap();
+        assert_eq!(config["routing"]["rules"][2]["outboundTag"], "block");
+        assert_eq!(config["outbounds"].as_array().unwrap().len(), 3);
+        assert!(!config.to_string().contains("xmeshUserClientRouting"));
+        assert!(validate_user_override(&json!({"mode":"custom","rules":[
+            {"match":"geosite","value":"youtube","action":"server","server":"direct"}
+        ]})).is_err());
+        assert!(validate_user_override(&json!({"mode":"custom","rules":[],"admin":true})).is_err());
+        assert!(validate_user_override(&json!({"mode":"custom","rules":[
+            {"match":"geosite","value":"youtube\ninvalid","action":"direct"}
+        ]})).is_err());
+    }
+
+    #[test]
     fn validation_rejects_injections_conflicts_and_dangling_targets() {
         let mut bad = settings();
         bad["clientRoutingProfiles"][0]["rules"][0]["value"] = json!("ru\\n injection");
