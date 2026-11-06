@@ -2235,7 +2235,7 @@ function userDrawer(id,tab){
       ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,usageRatio*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,usageRatio*100)))}"><i></i></div>`:''}
       <div class="user-identity-row">${ic("key")}<span>Xray ID</span>${viewerMode() ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
     </div>
-    <nav class="user-editor-tabs" role="tablist" aria-label="Настройки пользователя">${[['ov','Настройки','sliders'],['acc','Доступ и подписка','globe'],['traffic','Трафик','activity'],['dev','Устройства','monitor']].map(([key,title,icon],index)=>`<button type="button" role="tab" id="user-tab-${key}" aria-controls="user-panel-${key}" aria-selected="${index===0}" tabindex="${index===0?0:-1}" data-user-editor-tab="${key}">${ic(icon)}<span>${title}</span></button>`).join('')}</nav>
+    <nav class="user-editor-tabs" role="tablist" aria-label="Настройки пользователя">${[['ov','Настройки','sliders'],['acc','Доступ и подписка','globe'],['routing','Маршрутизация','route'],['traffic','Трафик','activity'],['dev','Устройства','monitor']].map(([key,title,icon],index)=>`<button type="button" role="tab" id="user-tab-${key}" aria-controls="user-panel-${key}" aria-selected="${index===0}" tabindex="${index===0?0:-1}" data-user-editor-tab="${key}">${ic(icon)}<span>${title}</span></button>`).join('')}</nav>
     <div class="user-canvas-grid">
       <section class="user-pane user-pane-settings" data-user-editor-pane="ov" data-active="true" role="tabpanel" id="user-panel-ov" aria-labelledby="user-tab-ov" tabindex="0" aria-hidden="false">
         <form id="user-edit-form" data-k="uedit" data-id="${u.id}" method="dialog" class="user-inline-editor">
@@ -2273,6 +2273,9 @@ function userDrawer(id,tab){
         <div class="user-subscription-state" data-user-sub-state="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем ссылку…</span></div>
         <a class="user-inline-link" href="#subscription" data-x>${ic('globe')} SUBSCRIPTION STUDIO</a></div>
       </section>
+      <section class="user-pane user-pane-routing" data-user-editor-pane="routing" data-active="false" role="tabpanel" id="user-panel-routing" aria-labelledby="user-tab-routing" tabindex="0" inert aria-hidden="true">
+        <div data-user-client-routing-root></div>
+      </section>
       <section class="user-pane user-pane-insights" data-user-editor-pane="traffic" data-active="false" role="tabpanel" id="user-panel-traffic" aria-labelledby="user-tab-traffic" tabindex="0" inert aria-hidden="true">
         <div class="user-pane-heading"><div class="user-heading-with-icon">${ic("server")}<div><h3>По серверам</h3><p>Персональный трафик Xray</p></div></div><button type="button" class="ia user-stats-refresh" data-user-traffic-refresh="${u.id}" title="Обновить статистику" aria-label="Обновить статистику">${ic('redo')}</button></div>
         <div class="user-traffic-stats" data-user-traffic-id="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем данные…</span></div>
@@ -2286,6 +2289,7 @@ function userDrawer(id,tab){
     <footer class="user-canvas-foot"><span>${ic("calendar")} Создан ${new Date(u.created).toLocaleDateString(window.XMeshI18n?.getLocale?.()||'ru-RU')}</span><span>${ic("users")} Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
   </div>`,'user-modal');
   window.XMeshUserDevices.mount(dlg.querySelector('[data-user-inline-devices]'),u.id);
+  window.XMeshUserClientRouting?.mount(dlg.querySelector('.user-canvas'),u,DB);
   window.XMeshUserTabs.select(dlg.querySelector('.user-canvas'),tab==='sub'?'acc':tab||'ov');
   // Native dialog/select focus must not leave a reused workspace scrolled.
   const workspace=dlg.querySelector('.user-canvas-grid');
