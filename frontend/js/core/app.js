@@ -463,6 +463,7 @@ const countrySearchMatches=query=>{
  }).filter(row=>Number.isFinite(row.rank)).sort((a,b)=>a.rank-b.rank).map(row=>row.country);
 };
 const countryFlag=code=>String.fromCodePoint(...code.toUpperCase().split('').map(c=>127397+c.charCodeAt(0)));
+const gbRussianWords=COUNTRY_ALIASES.GB.match(/[\\p{Script=Cyrillic}]+/gu)||[];
 const COUNTRIES=COUNTRY_CODES.map((code,index)=>{
  const name=code==='GB'?'Великобритания (UK)':code==='XK'?'Косово':COUNTRY_NAMES.of(code);
  const enName=code==='GB'?'United Kingdom (UK)':code==='XK'?'Kosovo':COUNTRY_NAMES_EN.of(code);
@@ -470,7 +471,7 @@ const COUNTRIES=COUNTRY_CODES.map((code,index)=>{
  const terms=countrySearchForms([
   code,iso3,name,enName,...COUNTRY_REGION_NAMES.map(display=>display.of(code)),
   ...(COUNTRY_EXTRA_ALIASES[code]||'').split('|'),COUNTRY_ALIASES[code]||'',
-  ...(code==='GB'?['UK','Англия','England','Великобритания','Great Britain','Britain','Британия','Соединённое Королевство']:[])
+  ...(code==='GB'?['UK','England','Great Britain','Britain',...gbRussianWords,gbRussianWords.slice(-2).join(' ')]:[])
  ]);
  return {code,iso3,flag:countryFlag(code),name,enName,searchTerms:terms};
 }).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
