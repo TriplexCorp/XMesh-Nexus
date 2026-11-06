@@ -36,8 +36,19 @@ assert.match(engine,/pub(?:\(crate\))?\s+fn\s+build_feed\(\s*proxies:\s*Vec<Valu
 assert.match(engine,/Ok\(Value::Array\(entries\)\)/);
 assert.match(engine,/fn feed_exposes_one_full_json_profile_per_server\(\)/);
 assert.match(engine,/fn smart_is_an_optional_additional_profile\(\)/);
-assert.match(subscriptions,/subscription_json::build_feed\(\s*outbounds\s*,\s*&settings\s*\)/);
-assert.match(subscriptions,/subscription_json::build_feed\(\s*proxies\s*,\s*&setting\s*\)/);
+// Feed generation is still native JSON; each request uses a copy of the global
+// settings scoped to its authenticated user. This preserves opt-in balancers
+// while allowing per-user routing without mutating the shared configuration.
+const subscriptionBase=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
+const routing=fs.readFileSync('backend/src/client_routing.rs','utf8');
+assert.match(subscriptionBase,/subscription_json::build_feed\(\s*outbounds\s*,\s*&crate::client_routing::scoped_settings\(\s*&settings\s*,\s*&user\s*\)\s*\)/,
+ 'Public client JSON must retain global balancers with per-user routing');
+assert.match(subscriptionBase,/subscription_json::build_feed\(\s*proxies\s*,\s*&crate::client_routing::scoped_settings\(\s*&setting\s*,\s*&user\s*\)\s*\)/,
+ 'Admin preview must use the same scoped settings as the public feed');
+assert.match(routing,/let mut scoped = settings\.clone\(\)/,
+ 'A user override must not mutate global panel settings');
+assert.match(routing,/scoped\["xmeshUserClientRouting"\] = override_value\.clone\(\)/,
+ 'Per-user rules must be isolated in the scoped settings clone');
 assert.match(engine,/fn validate_client_balancers\(/);
 assert.match(engine,/settings\.get\("clientBalancers"\)/);
 assert.match(engine,/xmeshSourceKey/);
