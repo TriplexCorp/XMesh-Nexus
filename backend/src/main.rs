@@ -3988,7 +3988,7 @@ mod subscription_host_protocol_tests {
     }
 }
 
-async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
+fn validate_host_client_overrides(host: &Value) -> Result<(), ApiError> {
     for key in [
         "clientXhttpSettings",
         "clientHeaders",
@@ -4005,6 +4005,39 @@ async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiErr
             ));
         }
     }
+    Ok(())
+}
+
+#[cfg(test)]
+mod host_client_override_validation_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_objects_null_and_absent_overrides() {
+        assert!(validate_host_client_overrides(&json!({})).is_ok());
+        assert!(validate_host_client_overrides(&json!({"clientHeaders":null})).is_ok());
+        assert!(validate_host_client_overrides(&json!({"clientHeaders":{}})).is_ok());
+    }
+
+    #[test]
+    fn rejects_non_objects_for_every_client_override() {
+        for key in [
+            "clientXhttpSettings",
+            "clientHeaders",
+            "clientTlsSettings",
+            "clientMasqueSettings",
+        ] {
+            for value in [json!([]), json!(true), json!(42), json!("{}")] {
+                let mut host = json!({});
+                host[key] = value;
+                assert!(validate_host_client_overrides(&host).is_err());
+            }
+        }
+    }
+}
+
+async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
+    validate_host_client_overrides(host)?;
     // Disabled hosts are allowed to remain drafts and can always be switched off.
     // Re-enabling them validates the full runtime profile/node relationship.
     if host.get("disabled").and_then(Value::as_bool) == Some(true) {
