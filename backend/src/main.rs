@@ -2823,15 +2823,18 @@ async fn persist_inbound_traffic(
         .fetch_optional(&mut *conn)
         .await?
         .unwrap_or_else(|| json!({}));
-        let settings = sqlx::query_scalar::<_, Value>(
-            "SELECT value FROM app_settings WHERE key='panel'",
-        )
-        .fetch_optional(&mut *conn)
-        .await?
-        .unwrap_or_else(|| json!({}));
-        let inbound_tags = inbound_samples.iter().map(|sample| sample.inbound_tag.clone()).collect::<Vec<_>>();
+        let settings =
+            sqlx::query_scalar::<_, Value>("SELECT value FROM app_settings WHERE key='panel'")
+                .fetch_optional(&mut *conn)
+                .await?
+                .unwrap_or_else(|| json!({}));
+        let inbound_tags = inbound_samples
+            .iter()
+            .map(|sample| sample.inbound_tag.clone())
+            .collect::<Vec<_>>();
         let charged_tags = cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?
-            .into_iter().collect::<Vec<_>>();
+            .into_iter()
+            .collect::<Vec<_>>();
         sqlx::query(
             "INSERT INTO user_inbound_traffic_monthly AS monthly (
                 month_start,node_id,user_id,inbound_tag,
