@@ -167,3 +167,26 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 .subscription-public .subscription-public-overview:has(>.subscription-public-info-panel[hidden]){grid-template-columns:minmax(0,1fr)}
 .subscription-public .subscription-preview-meta:has(>[data-subscription-traffic][hidden]),.subscription-public .subscription-preview-meta:has(>[data-subscription-expiry][hidden]),.subscription-public .subscription-preview-meta:has(>div:only-child){grid-template-columns:minmax(0,1fr)}
 .subscription-public .subscription-preview-apps[data-client-layout=list]>div{grid-template-columns:minmax(0,1fr)}
+/* Single-page setup: install an app, then add the link directly below it. */
+.subscription-public .subscription-public-shell{max-width:960px}
+.subscription-public .subscription-public-overview{padding:28px 0;gap:28px}
+.subscription-public .subscription-preview-hero :is(h1,h3){font-size:32px}
+.subscription-public .subscription-public-brand-copy>small{display:none}
+.subscription-public .subscription-public-workspace{display:grid;gap:32px}
+.subscription-public [data-setup-section]{min-width:0;animation:cabinetReveal .2s ease-out both}
+.subscription-public .subscription-cabinet-section-heading{margin-bottom:18px}
+.subscription-public .subscription-cabinet-section-heading h2{font-size:24px}
+.subscription-public .subscription-cabinet-connect-grid{display:block}
+.subscription-public .subscription-public-access-panel{padding:28px}
+.subscription-public .subscription-public-primary-action{justify-items:start}
+.subscription-public .subscription-preview-cta{min-width:min(100%,280px)}
+.subscription-public .subscription-public-secondary-surfaces:empty{display:none}
+.subscription-public .subscription-public-device-card,.subscription-public .subscription-cabinet-support-card{padding:0;border:0;background:none;min-height:0}
+.subscription-public [data-setup-section=devices] .subscription-cabinet-section-heading p,.subscription-public [data-setup-section=support] .subscription-cabinet-section-heading p{display:none}
+.subscription-public [data-setup-section=devices] .subscription-cabinet-device-card{padding:0;border:0;background:none;min-height:0}
+.subscription-public .subscription-preview-app{min-height:76px;padding:16px}
+@container cabinet (max-width:560px){.subscription-public .subscription-public-overview{gap:20px}.subscription-public .subscription-public-access-panel{padding:22px}.subscription-public .subscription-preview-cta{width:100%}.subscription-public .subscription-public-primary-action{justify-items:stretch}.subscription-public .subscription-preview-apps>div{grid-template-columns:repeat(2,minmax(0,1fr))}.subscription-public .subscription-preview-app{display:grid;gap:8px}.subscription-public .subscription-preview-app>span{display:none}}
+
+.subscription-public #copy-link,.subscription-public [data-subscription-copy],.subscription-public [data-subscription-devices]{display:none!important}
+.subscription-public .subscription-public-action-status:empty,.subscription-public .subscription-public-secondary-surfaces:not(:has(>:not([hidden]))){display:none}
+.subscription-public [data-setup-section=devices]>.subscription-cabinet-section-heading{display:none}
