@@ -259,6 +259,13 @@ for(const cls of [
 }
 assert.match(view,/data-subscription-preview-frame/,
   'The studio preview must be container-responsive, not a separate mock');
+assert.match(template,/class="subscription-public-overview"/,'Public page must expose the new status-first overview');
+assert.match(view,/class="subscription-public-overview"/,'Studio preview must share the real overview layout');
+assert.match(view,/data-preview-link-card hidden/,'Studio must preview a private URL hidden by default');
+assert.match(view,/data-subscription-reveal/,'Studio preview must offer the explicit reveal action');
+assert.match(src,/quick\.hidden=false/,'Link reveal must stay available when other quick actions are disabled');
+assert.match(portalCss,/\.subscription-studio-preview \.subscription-public-shell/,'Studio must receive container-sized portal styling');
+
 
 assert.match(fs.readFileSync('backend/src/user_subscriptions.rs','utf8'),/include_str!\("subscription_template\.html"\)/,'Backend must use shared portal template');
 assert.match(css,/\.subscription-studio-layout/);
