@@ -310,8 +310,9 @@ Downloading the feed, opening the portal or showing its QR code does not
 start the countdown.
 
 The backend starts the duration only on **accepted, authenticated, positive,
-per-user Xray traffic deltas**. The first counter observation establishes a
-baseline; an unchanged counter, stale/replayed report, disabled account or
+per-user Xray traffic evidence**. A newly created waiting account can start
+on its first nonzero signed observation; a zero-only baseline, unchanged counter,
+stale/replayed report, disabled account or
 exhausted quota does not activate an account. The transition is atomic and
 one-shot: `hold=false`, `firstConnectedAt` and `expireAt` are written
 together from the verified timestamp. Further updates never reset this
