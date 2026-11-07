@@ -9,6 +9,7 @@ import struct
 import time
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 BASE = os.getenv("XMESH_TEST_URL", "http://127.0.0.1:8080").rstrip("/")
 USER = os.getenv("ADMIN_USERNAME", "admin")
@@ -245,6 +246,30 @@ def main():
         print("PASS:", label)
 
     assert_client_hosts(1, "enabled Host publishes one client server")
+    # Same bearer URL, real API: HTML for browsers, native JSON for VPN apps.
+    # Keep the request on the disposable local API, never the configured public domain.
+    subscription_path = urlsplit(new_sub["url"]).path
+    agents = ["Happ/26.7.28 (iPhone; iOS 18)", "v2rayNG/1.10 Android",
+              "v2rayN/7.7 Windows", "Hiddify/2.0", "NekoBox/1.0 Android",
+              "Shadowrocket/2.2", "Streisand/1.0", "Incy/1.0", "v2rayTun/3.0"]
+    for agent in ["Mozilla/5.0 (iPhone) AppleWebKit Safari/605.1"] + agents:
+        browser = agent.startswith("Mozilla")
+        req = Request(BASE + subscription_path,
+                      headers={"User-Agent": agent, "Accept": "text/html"})
+        with urlopen(req, timeout=30) as response:
+            check(response.status, 200, "subscription content negotiation")
+            content_type = response.headers.get("Content-Type", "")
+            body = response.read()
+            if browser:
+                assert content_type.startswith("text/html")
+                assert b"subscription-experience.js" in body
+                assert changed["xrayId"].encode() not in body
+            else:
+                assert content_type.startswith("application/json")
+                assert isinstance(json.loads(body), list)
+                assert len(json.loads(body)) == 1
+    print("PASS: HTML/client content negotiation for browser and nine VPN agents")
+
     check(api("PATCH", f"/collections/hosts/{host['id']}",
               {"disabled": True}, admin_cookie)[0], 200,
           "disable Host while Node remains enabled")

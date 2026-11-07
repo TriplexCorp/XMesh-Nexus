@@ -228,4 +228,27 @@ mod tests {
         let unknown = detect(&headers("unhappy/1.2", "*/*"));
         assert!(!unknown.known_app);
     }
+    #[test]
+    fn browser_and_client_accept_matrix_stays_separate() {
+        let options = HashMap::new();
+        for ua in [
+            "Happ/26.7.28",
+            "v2rayNG/1.10 Android",
+            "v2rayN/7.7 Windows",
+            "Hiddify/2.0",
+            "NekoBox/1.0",
+            "Shadowrocket/2.2",
+            "Streisand/1.0",
+        ] {
+            for accept in ["text/html", "application/json", "*/*"] {
+                assert!(wants_feed(&headers(ua, accept), &options).unwrap());
+            }
+        }
+        for ua in [
+            "Mozilla/5.0 (iPhone) Safari/605.1",
+            "Mozilla/5.0 Windows Chrome/130",
+        ] {
+            assert!(!wants_feed(&headers(ua, "text/html"), &options).unwrap());
+        }
+    }
 }

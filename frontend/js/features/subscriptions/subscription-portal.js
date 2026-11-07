@@ -19,7 +19,7 @@
         linkLabel:'Your subscription link',
         linkNote:'Paste this link into your connection app. Keep it private.',
         endpointLabel:'Connect',
-        endpointNote:'In your VPN app, choose “Add subscription” or scan the QR code.',
+        endpointNote:'Set up your app once. After that, connect directly from the app.',
         statusLabel:'Subscription status',
         statusNote:'Traffic, expiry and service availability.',
         copied:'Copied',
@@ -34,7 +34,7 @@
         linkLabel:'Ссылка на подписку',
         linkNote:'Добавьте ссылку в приложение для подключения. Не передавайте её посторонним.',
         endpointLabel:'Подключение',
-        endpointNote:'В VPN-приложении выберите «Добавить подписку» или отсканируйте QR-код.',
+        endpointNote:'Настройте приложение один раз. Дальше подключайтесь прямо из него.',
         statusLabel:'Статус подписки',
         statusNote:'Трафик, срок действия и доступность сервиса.',
         copied:'Скопировано',
@@ -73,9 +73,11 @@
   Object.entries(dashboard).forEach(([id,text])=>{const el=document.getElementById(id);if(el)el.textContent=text});
 
   document.querySelectorAll('[data-subscription-traffic]').forEach(metric=>{
+    const used=Number(metric.dataset.usedGib),limit=Number(metric.dataset.limitGib);
+    if(!metric.hasAttribute('data-used-gib')||!metric.hasAttribute('data-limit-gib')||!Number.isFinite(used)||!Number.isFinite(limit)||used<0||limit<0)return;
     let servers=[];
     try{servers=JSON.parse(metric.dataset.trafficServers||'[]')}catch{ /* Keep factual total if breakdown is unavailable. */ }
-    window.XMeshSubscriptionTraffic?.mount(metric,{used:Number(metric.dataset.usedGib)||0,limit:Number(metric.dataset.limitGib)||0,servers,language});
+    window.XMeshSubscriptionTraffic?.mount(metric,{used,limit,servers,language});
   });
   document.getElementById('toggle-link')?.remove();
   document.getElementById('subscription-link-card')?.remove();
@@ -222,6 +224,7 @@
   });
   search?.addEventListener('input',searchApps);
 
+  window.XMeshSubscriptionExperience?.describe(previewRoot,language);
   if (!input) return;
 
   function absoluteSubscriptionUrl() {
@@ -294,8 +297,9 @@
       temporary.setAttribute('aria-hidden', 'true');
       document.body.append(temporary);
       temporary.select();
-      copied = document.execCommand('copy');
-      temporary.remove();
+      try { copied = document.execCommand('copy'); }
+      catch { copied = false; }
+      finally { temporary.remove(); }
     }
     const message = copied ? copy.copied : copy.copyUnavailable;
     flashButton(button, message);
@@ -370,4 +374,5 @@
     document.querySelector('[data-setup-section="devices"]')?.scrollIntoView({block:'nearest'});
     event.currentTarget.setAttribute('aria-expanded','true');
   });
+  window.XMeshSubscriptionExperience?.mount(previewRoot,{language,url:subscriptionUrl,startLabel:['Copy','Копировать','Скопировать ссылку','Copy subscription link'].includes(primaryCopy?.textContent.trim())?'':primaryCopy?.textContent,copyButton:primaryCopy,copy:()=>copySubscription(primaryCopy)});
 })();
