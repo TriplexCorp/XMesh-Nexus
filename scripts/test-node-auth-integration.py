@@ -249,6 +249,12 @@ def main():
             cookie=cookie,origin=BASE)
         assert_status(code,201,"create on-hold first-connection subscriber")
         pending_id=pending_user["id"]
+        code, first_sample_user, _ = request("POST", "/collections/users",
+            {"username":"ci_first_nonzero_hold","squads":[squad_id],
+             "hold":True,"holdDays":1,"expireAt":None,"limit":0,"used":0.0},
+            cookie=cookie,origin=BASE)
+        assert_status(code,201,"create waiting account for first-positive-sample case")
+        initial_id=first_sample_user["id"]
         code, secret, _ = request("GET",f"/users/{pending_id}/subscription",cookie=cookie)
         assert_status(code,200,"read pending user's subscription token")
         token=secret["token"]
@@ -287,6 +293,9 @@ def main():
             "A waiting account must exist in signed Xray runtime to allow first traffic")
         assert any(u["xrayId"]==pending_user["xrayId"] for u in policy["users"]), (
             "A waiting account needs a signed node policy, not just an HTTP feed")
+        assert any(u["xrayId"]==first_sample_user["xrayId"] and
+                   u["offlineBudgetBytes"]==0 for u in policy["users"]), (
+            "First-connection users cannot receive a disconnected spending lease")
         serialized=json.dumps(desired["config"],sort_keys=True,
                               separators=(",",":"),ensure_ascii=False).encode()
         assert policy["configSha256"]==hashlib.sha256(serialized).hexdigest()
@@ -309,7 +318,8 @@ def main():
         # Distinct actual source snapshots must have strictly increasing sample times,
         # even when the test sends multiple requests within one millisecond.
         source_clock_ms = int(time.time() * 1000)
-        def report_signed(inbound_a, inbound_b, sampled_at_ms=None, pending_counter=None):
+        def report_signed(inbound_a, inbound_b, sampled_at_ms=None,
+                          pending_counter=None, initial_counter=None):
             nonlocal source_clock_ms
             source_clock_ms = max(source_clock_ms + 1, int(time.time() * 1000))
             sample={
@@ -331,6 +341,11 @@ def main():
                     "userId":pending_id,
                     "uplinkBytes":pending_counter[0],
                     "downlinkBytes":pending_counter[1]})
+            if initial_counter is not None:
+                sample["userTraffic"].append({
+                    "userId":initial_id,
+                    "uplinkBytes":initial_counter[0],
+                    "downlinkBytes":initial_counter[1]})
             raw=json.dumps(sample,separators=(",",":")).encode()
             stamp=int(time.time())
             unique=os.urandom(16).hex()
@@ -343,8 +358,16 @@ def main():
                  "X-XMesh-Signature":sig.hex()}
             return request("POST","/metrics/ingest",sample,headers=hdr)
 
-        assert_status(report_signed((50,90),(25,35),pending_counter=(0,0))[0],
-                      201,"first Xray sample establishes pending baseline only")
+        first_sample_earliest=int(time.time()*1000)-5000
+        assert_status(report_signed((50,90),(25,35),
+                      pending_counter=(0,0),initial_counter=(19,25))[0],
+                      201,"fresh signed nonzero counter activates first-contact subscription")
+        first_sample_latest=int(time.time()*1000)+5000
+        code,users,_=request("GET","/collections/users",cookie=cookie)
+        first_active=next(item for item in users["items"] if item["id"]==initial_id)
+        assert first_active["hold"] is False
+        assert first_sample_earliest <= first_active["firstConnectedAt"] <= first_sample_latest
+        assert first_sample_earliest+86400000 <= first_active["expireAt"] <= first_sample_latest+86400000
         code,users,_=request("GET","/collections/users",cookie=cookie)
         before=next(item for item in users["items"] if item["id"]==pending_id)
         assert before["hold"] is True and before.get("expireAt") is None, (
@@ -438,6 +461,9 @@ def main():
         code,presence,_=request("GET","/users/presence",cookie=cookie)
         assert next(item["onlineAt"] for item in presence["items"] if item["id"]==user_id)==previous_online
 
+        code,_,_=request("DELETE",f"/collections/users/{initial_id}",
+                         cookie=cookie,origin=BASE)
+        assert_status(code,200,"clean up first-positive-sample subscriber")
         code,_,_=request("DELETE",f"/collections/users/{pending_id}",
                          cookie=cookie,origin=BASE)
         assert_status(code,200,"clean up first-connection user")
