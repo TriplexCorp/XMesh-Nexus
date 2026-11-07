@@ -87,13 +87,12 @@ function verifyPage(g, route) {
   assert.equal(g.outside.length, 0, `Элементы управления выходят за окно: ${JSON.stringify(g.outside.slice(0,4))}`);
   assert(g.view.x >= 0 && g.view.right <= g.viewport.width + 1, 'Рабочая область выходит за окно.');
   if (route === 'set') {
-    assert.equal(g.columns.length, 2, 'Settings должна содержать два явных стека карточек.');
+    assert([1,2].includes(g.columns.length), 'Settings должна показывать только выбранный раздел, в одной или двух колонках.');
     for(const panel of g.settingsUpdates)assert(panel.message.y-panel.actions.bottom>=8,'Update actions and status must have a visible gap');
     assert(g.columns.every(c => c.display !== 'contents'), 'Стек Settings потерял собственную геометрию.');
-    const sideBySide=Math.abs(g.columns[0].x-g.columns[1].x)>100;
-    if(g.viewport.width>=1500)assert(sideBySide,'На широком desktop Settings превратилась в одну длинную колонку.');
-    if(sideBySide)assert(g.columns.every(c => c.width >= 360), 'Settings превратилась в узкие вертикальные башни.');
-    else assert(g.columns.every(c => c.width >= Math.min(720,g.view.width*.72)), 'Адаптивный стек Settings стал неоправданно узким.');
+    const sideBySide=g.columns.length===2&&Math.abs(g.columns[0].x-g.columns[1].x)>100;
+    if(sideBySide)assert(g.columns.every(c => c.width >= 330), 'Settings превратилась в узкие вертикальные башни.');
+    else assert(g.columns.every(c => c.width >= Math.min(720,g.view.width*.66)), 'Адаптивный стек Settings стал неоправданно узким.');
     for (const column of g.columns) for (let i=1;i<column.cards.length;i++) {
       const gap = column.cards[i].y - column.cards[i-1].bottom;
       assert(gap >= -1 && gap <= 48, `Искусственный вертикальный разрыв между карточками: ${gap}px.`);
@@ -174,8 +173,38 @@ async function main() {
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
+    await checked('Settings: deep links show one category, survive reload and preserve browser navigation',async()=>{
+      await page.setViewportSize({width:1440,height:900});
+      const content={
+        general:'#brand-panel',
+        colors:'#palette-apply',
+        layout:'#content-width',
+        typography:'#ts',
+        integrations:'[data-hk]',
+        system:'#core-panel',
+        data:'#gx'
+      };
+      for(const [category,selector] of Object.entries(content)){
+        await navigate('set/'+category);
+        assert.equal(await page.locator('.settings-center-link[aria-current="page"]').count(),1,'Exactly one settings subpage must be active');
+        assert(await page.locator(selector).count()>0,'Missing settings control '+category);
+        assert.equal(await page.locator('[data-settings-group]').count(),category==='colors'||category==='layout'||category==='typography'||category==='integrations'?2:category==='system'?2:1);
+        assert.equal(await page.locator('[data-settings-group]:not([data-settings-group="'+category+'"])').count(),0,'Inactive settings must not remain mounted');
+      }
+      await navigate('set/colors');
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.locator('#palette-apply').waitFor({state:'visible'});
+      assert.equal(new URL(page.url()).hash,'#set/colors','Direct settings link must survive reload');
+      await page.locator('a[href="#set/layout"]').click();
+      await page.locator('#content-width').waitFor({state:'visible'});
+      await page.goBack({waitUntil:'domcontentloaded'});
+      await page.locator('#palette-apply').waitFor({state:'visible'});
+      assert.equal(new URL(page.url()).hash,'#set/colors','Browser Back must restore selected subpage');
+      await screenshot(page,'settings-colors-subpage-1440');
+    });
+
     await checked('Global search: user notes, Ctrl+K and command activation',async()=>{
-      await navigate('set');
+      await navigate('set/colors');
       await page.locator('#pal').click();
       const query=page.locator('#dlg #pq');
       await query.waitFor({state:'visible'});
@@ -1103,7 +1132,7 @@ async function main() {
 
     await checked('Настройки: 100% масштаб и ширина 3000 px работают буквально',async()=>{
       await page.setViewportSize({width:3840,height:2160});
-      await navigate('set');
+      await navigate('set/layout');
       const rootFont=parseFloat(await page.locator('html').evaluate(el=>getComputedStyle(el).fontSize));
       assert(rootFont>=17.9&&rootFont<=18.1,`100% должен давать комфортный базовый размер около 18px, получено ${rootFont}px.`);
       const widthSlider=page.locator('#content-width');
@@ -1119,7 +1148,7 @@ async function main() {
 
     await checked('Настройки: точное числовое поле имеет одну рамку',async()=>{
       await page.setViewportSize({width:1920,height:1080});
-      await navigate('set');
+      await navigate('set/layout');
       const chrome=await page.locator('#content-width-value').evaluate(input=>{
         const own=getComputedStyle(input),outer=getComputedStyle(input.parentElement);
         return{border:own.borderTopWidth,background:own.backgroundColor,shadow:own.boxShadow,outerBorder:outer.borderTopWidth};
@@ -1132,7 +1161,7 @@ async function main() {
     });
 
     const setScale=async value=>{
-      await navigate('set');
+      await navigate('set/typography');
       await page.locator('#ts').evaluate((el,next)=>{el.value=String(next);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))},value);
       await page.waitForTimeout(100);
     };
@@ -1271,9 +1300,11 @@ async function main() {
       ['dark','raised','compact','compact','emerald'],
     ];
     for (const [theme,surface,sidebar,density,accent] of appearances) await checked(`Оформление: ${theme}/${surface}/${sidebar}/${density}`, async () => {
-      await navigate('set');
+      await navigate('set/colors');
       await page.locator(`[data-th="${theme}"]`).click();
+      await navigate('set/layout');
       for (const [key,value] of [['surface',surface],['sidebar',sidebar],['density',density]]) await page.locator(`[data-ui="${key}"][data-value="${value}"]`).click();
+      await navigate('set/colors');
       const palette=page.locator(`[data-ac="${accent}"]`);
       assert.equal(await palette.count(),1, `Палитра ${accent} отсутствует.`);
       await palette.click();
@@ -1298,8 +1329,9 @@ async function main() {
       }
     });
 
-    await navigate('set');
+    await navigate('set/layout');
     for (const [key,value] of [['surface','solid'],['sidebar','standard'],['density','comfortable']]) await page.locator(`[data-ui="${key}"][data-value="${value}"]`).click();
+    await navigate('set/colors');
     await page.locator('[data-th="dark"]').click();
     for(const [width,height] of [[1920,1080],[768,1024],[390,844]]) for(const route of ['balancers','clientrouting']) await checked(`Populated editor audit: ${route} · ${width}`,async()=>{
       await page.setViewportSize({width,height});
@@ -1320,10 +1352,11 @@ async function main() {
 
     await checked('Settings: long update feedback stays inside mobile workspace',async()=>{
       await page.setViewportSize({width:390,height:844});
-      await navigate('set');
+      await navigate('set/system');
       await page.locator('#core-message').evaluate(el=>{el.textContent='Update request failed: https://example.invalid/releases/'+('abcdef0123456789'.repeat(40))});
       const g=await geometry(page);
       assert(g.scrollWidth<=391,'Long updater feedback must wrap without expanding the document');
+      await navigate('set/integrations');
       const hooks=await page.locator('[data-hk]').evaluateAll(inputs=>inputs.map(input=>{
         const row=input.closest('.rowi'),text=row.firstElementChild.getBoundingClientRect(),toggle=input.closest('.sw').getBoundingClientRect();
         return {name:input.dataset.hk,textRight:text.right,toggleLeft:toggle.left,wrapped:row.firstElementChild.scrollWidth<=row.firstElementChild.clientWidth+1};
@@ -1907,7 +1940,7 @@ async function main() {
     await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',port:443,profileId:profile.id});
     await checked('Two nodes: bounded cards/actions and global radius on ultrawide',async()=>{
       await page.setViewportSize({width:3440,height:1440});
-      await navigate('set');
+      await navigate('set/layout');
       await page.locator('#content-width').evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
       await page.reload({waitUntil:'domcontentloaded'});
       await navigate('nodes');
@@ -1935,13 +1968,13 @@ async function main() {
       await page.locator('[data-node-grid-mode="compact"]').click();
       const radii=[];
       for(const radius of [6,28]){
-        await navigate('set');
+        await navigate('set/layout');
         await page.locator('#radius').evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))},radius);
         await navigate('nodes');
         const actual=await page.locator('.nc').first().evaluate(card=>({card:parseFloat(getComputedStyle(card).borderTopLeftRadius),button:parseFloat(getComputedStyle(card.querySelector('.acts>button')).borderTopLeftRadius)}));
         assert.equal(actual.card,radius);assert.equal(actual.button,radius);radii.push(actual);
       }
-      await navigate('set');
+      await navigate('set/layout');
       await page.locator('#radius').evaluate(el=>{el.value='16';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
       await page.locator('#content-width').evaluate(el=>{el.value='1920';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
       await navigate('nodes');
@@ -2072,7 +2105,7 @@ async function main() {
           await page.evaluate(previous=>{if(previous===undefined)delete document.documentElement.dataset.motion;else document.documentElement.dataset.motion=previous},previous);
         }
       });
-      await navigate('set');
+      await navigate('set/layout');
       await page.locator('#content-width').evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
       for(const [mode,width,height] of [['compact',1920,1080],['compact',2560,1440],['compact',3440,1440],['standard',3440,1440],['spacious',3440,1440],['compact',390,844]])await checked(`Equal Node heights: ${mode} ${width}×${height}`,async()=>{
         await page.setViewportSize({width,height});
@@ -2140,7 +2173,7 @@ async function main() {
       await page.unroute(runtimePattern,runtimeFixture);
       await page.unroute(metricsPattern,metricsFixture);
       await page.setViewportSize({width:1920,height:1080});
-      await navigate('set');
+      await navigate('set/layout');
       await page.locator('#content-width').evaluate(el=>{el.value='1920';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
       await navigate('nodes');
       await page.locator('[data-node-grid-mode="standard"]').click();
@@ -2245,7 +2278,7 @@ async function main() {
       try{
         for(const surface of ['solid','glass','raised'])for(const language of ['ru','en'])await checked(`Host module: ${surface} · ${language}`,async()=>{
           await page.setViewportSize(language==='en'?{width:390,height:844}:{width:1920,height:1080});
-          await navigate('set');
+          await navigate('set/layout');
           await page.evaluate(language=>XMeshI18n.setLanguage(language),language);
           await page.locator(`[data-ui="surface"][data-value="${surface}"]`).click();
           await navigate('hosts');await page.locator('[data-ne="hosts"]').first().click();
