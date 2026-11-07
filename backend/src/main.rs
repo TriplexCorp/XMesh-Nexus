@@ -2617,80 +2617,80 @@ async fn activate_waiting_users_on_traffic(
     sampled_at: i64,
     source_ms: i64,
 ) -> Result<(), ApiError> {
-        // Only authenticated, accepted, positive per-user traffic starts the
-        // timer. Imports and zero-only initial counter baselines cannot.
-        // A conditional update ensures idempotence across parallel nodes.
-        let activated = sqlx::query(
-            "WITH genuine_delta AS (
-                SELECT DISTINCT sample.user_id,
-                    (previous.user_id IS NULL) AS first_observation
-                FROM jsonb_to_recordset($2::jsonb)
-                    AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-                LEFT JOIN user_node_traffic_totals AS previous
-                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
-                WHERE (
-                    previous.user_id IS NOT NULL
-                    AND sample.uplink_bytes >= previous.last_uplink_bytes
-                    AND sample.downlink_bytes >= previous.last_downlink_bytes
-                    AND (sample.uplink_bytes > previous.last_uplink_bytes
-                         OR sample.downlink_bytes > previous.last_downlink_bytes)
-                ) OR (
-                    previous.user_id IS NULL
-                    AND (sample.uplink_bytes > 0 OR sample.downlink_bytes > 0)
-                )
-             ), eligible AS (
-                SELECT u.id,
-                    CASE WHEN (u.data->>'holdDays') ~ '^[0-9]{1,4}$'
-                         THEN (u.data->>'holdDays')::BIGINT ELSE 0 END AS days,
-                    CASE WHEN (u.data->>'expireAt') ~ '^-?[0-9]{1,16}$'
-                         THEN (u.data->>'expireAt')::BIGINT ELSE 0 END AS expiry,
-                    CASE WHEN jsonb_typeof(u.data->'limit')='number'
-                         THEN (u.data->>'limit')::NUMERIC ELSE 0 END AS quota,
-                    CASE WHEN jsonb_typeof(u.data->'used')='number'
-                         THEN (u.data->>'used')::NUMERIC ELSE 0 END AS consumed
-                FROM panel_records AS u
-                JOIN genuine_delta AS sample ON sample.user_id=u.id
-                WHERE u.collection='users'
-                  AND u.data->>'hold'='true'
-                  AND u.data->>'disabled' IS DISTINCT FROM 'true'
-                  AND (
-                     NOT sample.first_observation
-                     OR (
-                       u.data->>'firstConnectedAt' IS NULL
-                       AND COALESCE(u.data->>'onlineAt','0')='0'
-                     )
-                  )
-             )
-             UPDATE panel_records AS u
-             SET data=u.data || jsonb_build_object(
-                 'hold',false,
-                 'firstConnectedAt',LEAST($3::BIGINT,$4::BIGINT),
-                 'onlineAt',LEAST($3::BIGINT,$4::BIGINT),
-                 'expireAt',LEAST($3::BIGINT,$4::BIGINT)
-                       + eligible.days * 86400000::BIGINT),
-                 updated_at=NOW()
-             FROM eligible
-             WHERE u.collection='users' AND u.id=eligible.id
-               AND eligible.days BETWEEN 1 AND 3650
-               AND (eligible.quota<=0 OR eligible.consumed<eligible.quota)
-               AND (eligible.expiry<=0 OR eligible.expiry>=$3::BIGINT)
-               AND u.data->>'hold'='true'
-               AND u.data->>'firstConnectedAt' IS NULL
-             RETURNING u.id",
-        )
-        .bind(node_id)
-        .bind(samples)
-        .bind(sampled_at)
-        .bind(source_ms)
-        .fetch_all(&mut *conn)
-        .await?;
-        for row in activated {
-            let user_id: i64 = row.try_get("id")?;
-            tracing::info!(
-                user_id,
-                "First verified VPN traffic activated waiting subscription"
-            );
-        }
+    // Only authenticated, accepted, positive per-user traffic starts the
+    // timer. Imports and zero-only initial counter baselines cannot.
+    // A conditional update ensures idempotence across parallel nodes.
+    let activated = sqlx::query(
+        "WITH genuine_delta AS (
+            SELECT DISTINCT sample.user_id,
+                (previous.user_id IS NULL) AS first_observation
+            FROM jsonb_to_recordset($2::jsonb)
+                AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+            LEFT JOIN user_node_traffic_totals AS previous
+              ON previous.node_id=$1 AND previous.user_id=sample.user_id
+            WHERE (
+                previous.user_id IS NOT NULL
+                AND sample.uplink_bytes >= previous.last_uplink_bytes
+                AND sample.downlink_bytes >= previous.last_downlink_bytes
+                AND (sample.uplink_bytes > previous.last_uplink_bytes
+                     OR sample.downlink_bytes > previous.last_downlink_bytes)
+            ) OR (
+                previous.user_id IS NULL
+                AND (sample.uplink_bytes > 0 OR sample.downlink_bytes > 0)
+            )
+         ), eligible AS (
+            SELECT u.id,
+                CASE WHEN (u.data->>'holdDays') ~ '^[0-9]{1,4}$'
+                     THEN (u.data->>'holdDays')::BIGINT ELSE 0 END AS days,
+                CASE WHEN (u.data->>'expireAt') ~ '^-?[0-9]{1,16}$'
+                     THEN (u.data->>'expireAt')::BIGINT ELSE 0 END AS expiry,
+                CASE WHEN jsonb_typeof(u.data->'limit')='number'
+                     THEN (u.data->>'limit')::NUMERIC ELSE 0 END AS quota,
+                CASE WHEN jsonb_typeof(u.data->'used')='number'
+                     THEN (u.data->>'used')::NUMERIC ELSE 0 END AS consumed
+            FROM panel_records AS u
+            JOIN genuine_delta AS sample ON sample.user_id=u.id
+            WHERE u.collection='users'
+              AND u.data->>'hold'='true'
+              AND u.data->>'disabled' IS DISTINCT FROM 'true'
+              AND (
+                 NOT sample.first_observation
+                 OR (
+                   u.data->>'firstConnectedAt' IS NULL
+                   AND COALESCE(u.data->>'onlineAt','0')='0'
+                 )
+              )
+         )
+         UPDATE panel_records AS u
+         SET data=u.data || jsonb_build_object(
+             'hold',false,
+             'firstConnectedAt',LEAST($3::BIGINT,$4::BIGINT),
+             'onlineAt',LEAST($3::BIGINT,$4::BIGINT),
+             'expireAt',LEAST($3::BIGINT,$4::BIGINT)
+                   + eligible.days * 86400000::BIGINT),
+             updated_at=NOW()
+         FROM eligible
+         WHERE u.collection='users' AND u.id=eligible.id
+           AND eligible.days BETWEEN 1 AND 3650
+           AND (eligible.quota<=0 OR eligible.consumed<eligible.quota)
+           AND (eligible.expiry<=0 OR eligible.expiry>=$3::BIGINT)
+           AND u.data->>'hold'='true'
+           AND u.data->>'firstConnectedAt' IS NULL
+         RETURNING u.id",
+    )
+    .bind(node_id)
+    .bind(samples)
+    .bind(sampled_at)
+    .bind(source_ms)
+    .fetch_all(&mut *conn)
+    .await?;
+    for row in activated {
+        let user_id: i64 = row.try_get("id")?;
+        tracing::info!(
+            user_id,
+            "First verified VPN traffic activated waiting subscription"
+        );
+    }
     Ok(())
 }
 
