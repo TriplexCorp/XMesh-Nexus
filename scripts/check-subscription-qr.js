@@ -23,7 +23,7 @@ assert.match(portal,/brandNote:'Secure access workspace'/,'English enterprise he
 assert.match(portal,/brandNote:'Центр безопасного подключения'/,'Russian enterprise header note must be localized');
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
 const publicCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
-assert.match(template,/subscription-portal\\.js\\?v=[a-f0-9]{12}/,'Public portal behavior must use a content fingerprint');
+assert.match(template,/subscription-portal\.js\?v=[a-f0-9]{12}/,'Public portal behavior must use a content fingerprint');
 assert.match(template,/subscription-public\.css\?v=[a-f0-9]{12}/,'Public portal must use a content fingerprint for its production stylesheet');
 assert.match(template,/id="subscription-link-card"/,'Public portal must expose the enterprise subscription link surface');
 assert.match(template,/id="subscription-brand-note"/,'Public portal must expose the localized product-header note');
@@ -35,7 +35,7 @@ assert.match(portal,/getElementById\('toggle-link'\)/,'Revealing a personal URL 
 assert.match(publicCss,/grid-template-columns:minmax\(0,\.92fr\) minmax\(0,1\.08fr\)/,'Connection and app catalog must share the desktop work area');
 assert.match(template,/class="subscription-public-brand-identity"/,'Public portal must expose a product-header identity group');
 assert.match(template,/class="subscription-public-status-stack"/,'Public portal status must be grouped as an operational rail');
-assert.match(publicCss,/grid-template-columns:minmax\\(0,\\.88fr\\) minmax\\(0,1\\.12fr\\)/,'Subscription overview must balance its headline with status information');
+assert.match(publicCss,/grid-template-columns:minmax\(0,\.88fr\) minmax\(0,1\.12fr\)/,'Subscription overview must balance its headline with status information');
 assert.match(publicCss,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,235px\),1fr\)\)/,'Client catalog must use readable responsive columns across the available width');
 assert.doesNotMatch(template,/>01<|>02</,'Enterprise portal must not expose decorative numbered panels');
 console.log('Subscription absolute URL / QR / enterprise workspace contract: OK');
