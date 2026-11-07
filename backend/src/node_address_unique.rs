@@ -9,7 +9,7 @@ use sqlx::{Postgres, Row, Transaction};
 use crate::ApiError;
 
 /// Canonicalize IP spellings (especially IPv6) and case-insensitive DNS names.
-pub(crate) fn address_key(data: &Value) -> Option<String> {
+pub fn address_key(data: &Value) -> Option<String> {
     let address = data.get("addr")?.as_str()?;
     Some(
         address
@@ -19,9 +19,9 @@ pub(crate) fn address_key(data: &Value) -> Option<String> {
 }
 
 /// Must be called inside the *same* transaction as INSERT or UPDATE, after
-/// validate_node_address. For updates, skip this check when the address has
+/// `validate_node_address`. For updates, skip this check when the address has
 /// not actually changed, so legacy duplicates can still be edited or removed.
-pub(crate) async fn reject_duplicate(
+pub async fn reject_duplicate(
     tx: &mut Transaction<'_, Postgres>,
     data: &Value,
     current_id: i64,
@@ -56,14 +56,16 @@ pub(crate) async fn reject_duplicate(
             .or_else(|| existing.get("remark"))
             .and_then(Value::as_str)
             .filter(|value| !value.trim().is_empty())
-            .map(|value| {
-                value
-                    .chars()
-                    .filter(|character| !character.is_control())
-                    .take(80)
-                    .collect::<String>()
-            })
-            .unwrap_or_else(|| format!("Узел #{id}"));
+            .map_or_else(
+                || format!("Узел #{id}"),
+                |value| {
+                    value
+                        .chars()
+                        .filter(|character| !character.is_control())
+                        .take(80)
+                        .collect::<String>()
+                },
+            );
         let message = if address.parse::<IpAddr>().is_ok() {
             format!(
                 "Узел с IP-адресом {address} уже существует: «{name}» (ID {id}). Откройте существующий узел вместо повторного добавления."
