@@ -384,6 +384,13 @@ window.XMeshI18n=(()=>{
     'Пользователь':'User','Пользователей':'Users','Узел':'Node','Узлов':'Nodes',
     'Нет активных пользователей':'No active users',
     'Введите значение':'Enter a value','Необязательно':'Optional',
+    // Deep-linked settings navigation.
+    'Общие':'General',
+    'Разделы настроек':'Settings sections',
+    'Текст и эффекты':'Typography and effects',
+    'Размер и начертание текста':'Text sizing and font weight',
+    'Интеграции':'Integrations',
+    'Ядро и обновления':'Core and updates',
     // General Settings (all major subsections)
     'Цвет и тема':'Colors and theme',
     'Основная палитра интерфейса и брендовые акценты':'Primary interface palette and brand accents',
