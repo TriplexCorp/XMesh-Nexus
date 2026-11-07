@@ -2376,8 +2376,8 @@ function userDrawer(id,tab){
     <div class="user-overview-band">
       <div class="user-usage-line">${ic("activity")}<span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Сбросить трафик пользователя">${ic('redo')} Сбросить трафик</button><span class="user-expiry-summary" data-user-expiry-summary >${ic('calendar')} <span>Осталось</span> <strong>${userRemainingLabel(u.expireAt)}</strong></span></div>
       ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,usageRatio*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,usageRatio*100)))}"><i></i></div>`:''}
-      ${Array.isArray(DB.set.cdnInboundTags)&&DB.set.cdnInboundTags.length?
-        `<div class="user-usage-line"><span>CDN / Белые списки</span><strong>${(Number(u.cdnUsedBytes||0)/1073741824).toFixed(2)} ГиБ</strong><small>${Number(u.cdnLimitGb||0)>0?'из '+Number(u.cdnLimitGb)+' ГиБ':'без лимита'}</small></div>`:''}
+      ${(Array.isArray(DB.set.cdnInboundTags)&&DB.set.cdnInboundTags.length)||DB.nodes.some(n=>n.cdnMode&&n.cdnMode!=='standard')?
+        `<div class="user-usage-line"><span>LTE / Белые списки${DB.set.cdnResetPeriod==='monthly'?' · текущий месяц':''}</span><strong>${(Number(u.cdnUsedBytes||0)/1073741824).toFixed(2)} ГиБ</strong><small>${Number(u.cdnLimitGb||0)>0?'из '+Number(u.cdnLimitGb)+' ГиБ':'без лимита'}</small></div>`:''}
       <div class="user-identity-row">${ic("key")}<span>Xray ID</span>${viewerMode() ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
     </div>
     <nav class="user-editor-tabs" role="tablist" aria-label="Настройки пользователя">${[['ov','Настройки','sliders'],['acc','Доступ и подписка','globe'],['routing','Маршрутизация','route'],['traffic','Трафик','activity'],['dev','Устройства','monitor']].map(([key,title,icon],index)=>`<button type="button" role="tab" id="user-tab-${key}" aria-controls="user-panel-${key}" aria-selected="${index===0}" tabindex="${index===0?0:-1}" data-user-editor-tab="${key}">${ic(icon)}<span>${title}</span></button>`).join('')}</nav>
@@ -4669,12 +4669,16 @@ async function setP(){
   const cdnSelection=new Set(Array.isArray(DB.set.cdnInboundTags)?DB.set.cdnInboundTags:[]);
   const cdnSettingsMarkup=`<section class="card" data-settings-group="traffic">
     <div class="hd"><div><h3>CDN / Белые списки</h3><p>Единый лимит трафика по выбранным inbound на всех нодах</p></div></div>
-    <p class="note">Основные подключения остаются без ограничений CDN. Лимит назначается каждому пользователю и применяется при следующей синхронизации конфигурации ноды.</p>
+    <p class="note">В одной подписке могут быть безлимитные обычные узлы и отдельные LTE-узлы с квотой пользователя. LTE-узел отмечается на вкладке «Трафик» его настроек; старый выбор inbound ниже сохранён для совместимости.</p>
+    <label class="f"><span>Период квоты LTE</span><select name="cdnResetPeriod" ${sessionUser?.role!=='owner'?'disabled':''}>
+      <option value="lifetime" ${DB.set.cdnResetPeriod!=='monthly'?'selected':''}>Накопительный · без автоматического сброса</option>
+      <option value="monthly" ${DB.set.cdnResetPeriod==='monthly'?'selected':''}>Каждый календарный месяц · UTC</option>
+    </select><small>При выборе месячного режима новый период начинается 1-го числа в 00:00 UTC. Учитываются только подтверждённые приращения счётчиков с момента установки этого обновления.</small></label>
     <div class="f"><span>Inbound, входящие в CDN-группу</span>
       <div class="ms" role="group" aria-label="CDN inbound">
         ${cdnTagChoices.map(tag=>`<label class="ck"><input type="checkbox" name="cdnInboundTags" value="${esc(tag)}" ${cdnSelection.has(tag)?'checked':''} ${sessionUser?.role!=='owner'?'disabled':''}><span>${esc(tag)}</span></label>`).join('')||'<span class="mu">В профилях XRAY STUDIO пока нет inbound.</span>'}
       </div>
-      <small>Подсчёт: подтверждённые upload + download конкретного пользователя. Счётчик без периодического сброса; ручной сброс трафика пользователя обнуляет и расход CDN.</small>
+      <small>Эта глобальная группа — для существующих правил. Новые LTE-узлы удобнее отмечать в карточке узла. Подсчитывается подтверждённый входящий + исходящий трафик пользователя.</small>
     </div>
     <div class="act"><button type="button" class="btn" data-cdn-tags-save ${sessionUser?.role!=='owner'?'disabled':''}>${ic('check')} Сохранить CDN-группу</button></div>
   </section>`;
@@ -4778,8 +4782,9 @@ document.addEventListener('click',async e=>{
     if(sessionUser?.role!=='owner')return;
     const panel=b.closest('[data-settings-group="traffic"]');
     const chosen=[...panel.querySelectorAll('[name="cdnInboundTags"]:checked')].map(input=>input.value);
+    const period=panel.querySelector('[name="cdnResetPeriod"]')?.value||'lifetime';
     b.disabled=true;
-    try{await api.saveSettings({cdnInboundTags:chosen});toast('CDN-группа сохранена. Новые правила применятся при синхронизации нод.')}
+    try{await api.saveSettings({cdnInboundTags:chosen,cdnResetPeriod:period});toast('Политика LTE сохранена. Доступ изменится при синхронизации нод.')}
     catch(error){toast('Ошибка сохранения CDN-группы: '+(error.message||'API'))}
     finally{b.disabled=false}
     return;
