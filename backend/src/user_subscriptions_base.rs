@@ -1367,23 +1367,23 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
                 duration
             );
         } else {
-        let _ = write!(
-            metrics,
-            "<div data-subscription-expiry><small>{}</small><b data-expiry=\"{}\">{}</b></div>",
-            if en {
-                "Expires"
-            } else {
-                "Действует до"
-            },
-            expiry,
-            if expiry > 0 {
-                "—"
-            } else if en {
-                "Unlimited"
-            } else {
-                "Бессрочно"
-            }
-        );
+            let _ = write!(
+                metrics,
+                "<div data-subscription-expiry><small>{}</small><b data-expiry=\"{}\">{}</b></div>",
+                if en {
+                    "Expires"
+                } else {
+                    "Действует до"
+                },
+                expiry,
+                if expiry > 0 {
+                    "—"
+                } else if en {
+                    "Unlimited"
+                } else {
+                    "Бессрочно"
+                }
+            );
         }
     }
     if !metrics.is_empty() {
@@ -1579,7 +1579,11 @@ fn portal_decoration(settings: &Value, en: bool, active: bool, waiting: bool) ->
                 "#ef8888"
             },
             if waiting {
-                if en { "Awaiting connection" } else { "Ожидает подключения" }
+                if en {
+                    "Awaiting connection"
+                } else {
+                    "Ожидает подключения"
+                }
             } else if active {
                 if en { "Active" } else { "Активна" }
             } else if en {
