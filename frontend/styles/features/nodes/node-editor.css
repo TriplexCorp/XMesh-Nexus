@@ -1218,6 +1218,21 @@ dialog.node-wide .node-tls-setup-feedback[data-ready=no] { color:var(--er); }
   dialog.node-wide .node-editor-tabs [role=tab] { padding:.6rem .65rem;font-size:.8rem; }
 }
 @media(max-width:440px) {
+  /* Four accessible task tabs must fit in the viewport without horizontally
+     scrolling the whole dialog when focus moves to the last tab. */
+  dialog.node-wide .node-editor-tabs {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:.25rem;
+    min-width:0;
+  }
+  dialog.node-wide .node-editor-tabs [role=tab] {
+    width:100%;
+    min-width:0;
+    padding:.5rem .35rem;
+    justify-content:center;
+    white-space:nowrap;
+  }
   dialog.node-wide :is(.node-form-grid,.node-billing-fields) { grid-template-columns:minmax(0,1fr); }
   dialog.node-wide .node-address-port { grid-template-columns:minmax(0,1fr) 5rem; }
   dialog.node-wide .node-tls-method-option { gap:.6rem;padding:.7rem .5rem; }

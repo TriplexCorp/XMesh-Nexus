@@ -225,7 +225,10 @@
   search?.addEventListener('input',searchApps);
 
   window.XMeshSubscriptionExperience?.describe(previewRoot,language);
-  if (!input) return;
+  if (!input) {
+    window.XMeshSubscriptionExperience?.mount(previewRoot,{language,url:''});
+    return;
+  }
 
   function absoluteSubscriptionUrl() {
     const raw = String(input.value || '').trim();
