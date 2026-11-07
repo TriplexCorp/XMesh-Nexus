@@ -116,11 +116,11 @@ dialog[open]:not(#dlg)::backdrop{opacity:1}
  * default in users.css, so a three-zone editor can never be squeezed into a
  * small action-dialog width. */
 #dlg.host-wide{
-  --dialog-width:72rem;
+  --dialog-width:80rem;
   width:min(var(--dialog-width),calc(100vw - 2rem));
   inline-size:min(var(--dialog-width),calc(100vw - 2rem));
-  min-width:min(72rem,calc(100vw - 2rem));
-  min-inline-size:min(72rem,calc(100vw - 2rem));
+  min-width:min(80rem,calc(100vw - 2rem));
+  min-inline-size:min(80rem,calc(100vw - 2rem));
   max-width:calc(100vw - 2rem);
   max-inline-size:calc(100vw - 2rem);
   min-height:0;
