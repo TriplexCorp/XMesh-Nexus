@@ -19,7 +19,7 @@ fn bad_request(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, message)
 }
 
-pub(crate) fn validate_settings(value: &Value) -> Result<(), ApiError> {
+pub(super) fn validate_settings(value: &Value) -> Result<(), ApiError> {
     if let Some(tags) = value.get("cdnInboundTags") {
         let tags = tags
             .as_array()
@@ -48,7 +48,7 @@ pub(crate) fn validate_settings(value: &Value) -> Result<(), ApiError> {
     Ok(())
 }
 
-pub(crate) fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
+pub(super) fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
     validate_settings(settings)?;
     Ok(settings
         .get("cdnInboundTags")
@@ -63,7 +63,7 @@ pub(crate) fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
         .unwrap_or_default())
 }
 
-pub(crate) fn validate_user(user: &Value) -> Result<(), ApiError> {
+pub(super) fn validate_user(user: &Value) -> Result<(), ApiError> {
     if user.get("cdnUsedBytes").is_some() {
         return Err(bad_request(
             "CDN: расход вычисляется сервером и не может быть изменён вручную.",
@@ -82,7 +82,7 @@ pub(crate) fn validate_user(user: &Value) -> Result<(), ApiError> {
 
 /// Attach a server-calculated value, never trusting user-submitted or
 /// node-aggregated traffic. The same inbound tag on multiple nodes is summed.
-pub(crate) async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(), ApiError> {
+pub(super) async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(), ApiError> {
     if users.is_empty() {
         return Ok(());
     }
@@ -119,7 +119,7 @@ pub(crate) async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(
 
 /// A missing server-derived meter fails closed for a quota-enabled user.
 /// Zero means unlimited CDN access; unrelated inbound tags stay unaffected.
-pub(crate) fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<String>) -> bool {
+pub(super) fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<String>) -> bool {
     if !cdn_tags.contains(inbound_tag) {
         return false;
     }
@@ -130,7 +130,7 @@ pub(crate) fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<Stri
     if limit <= 0.0 {
         return false;
     }
-    let Some(used) = user.get("cdnUsedBytes").and_then(Value::as_i64) else {
+    let Some(consumed_bytes) = user.get("cdnUsedBytes").and_then(Value::as_i64) else {
         return true;
     };
     // The panel validates saved quota values. Any invalid legacy quota must
@@ -138,7 +138,7 @@ pub(crate) fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<Stri
     if !limit.is_finite() || limit > MAX_GIB {
         return true;
     }
-    (used.max(0) as f64) >= (limit * GIB).floor()
+    crate::numeric_i64_to_f64(consumed_bytes.max(0)) >= (limit * GIB).floor()
 }
 
 #[cfg(test)]
