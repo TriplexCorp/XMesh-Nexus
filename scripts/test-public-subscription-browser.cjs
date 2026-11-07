@@ -32,6 +32,12 @@ function fixture(url){
  if(url.searchParams.get('empty')==='1')data.METRICS=data.METRICS.replace('data-used-gib="34.5"','data-used-gib="0"').replace(/data-traffic-servers="[^"]*"/,'data-traffic-servers="[]"');
  return read('backend/src/subscription_template.html').toString().replace('class="subscription-preview"','class="subscription-preview" data-subscription-state="'+state+'"').replace(/\{\{([A-Z_]+)\}\}/g,(_,key)=>{assert(key in data,'Missing fixture '+key);return data[key]});
 }
+async function dismissDialog(page,dialog,opener){
+ await dialog.evaluate(d=>{d._testClosed=false;d.addEventListener('close',()=>{d._testClosed=true},{once:true});});
+ await page.keyboard.press('Escape');
+ await page.waitForFunction(d=>d._testClosed&&!d.open,await dialog.elementHandle());
+ assert(await opener.evaluate(b=>b.getRootNode().activeElement===b),'Dialog close restores focus to its opener');
+}
 (async()=>{
  fs.mkdirSync(out,{recursive:true});
  const server=http.createServer((req,res)=>{const u=new URL(req.url,'http://localhost');if(assets[u.pathname]){res.setHeader('Content-Type',u.pathname.endsWith('.js')?'text/javascript':'text/css');res.end(read(assets[u.pathname]));return;}if(u.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(fixture(u));return;}res.statusCode=404;res.end();});
@@ -70,14 +76,14 @@ function fixture(url){
    assert(await page.locator('.experience-install').isVisible());
    assert.equal(await page.locator('.experience-instructions li').count(),3);
    if(width===390||width===1440)await page.screenshot({path:path.join(out,'portal-guide-'+width+'-'+lang+'.png'),animations:'disabled'});
-   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>document.activeElement.className),'experience-start');
+   await dismissDialog(page,page.locator('.experience-guide'),page.locator('.experience-start'));
 
    await page.locator('#connect-link').click();
    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),base+'/s/disposable-test-token-0123456789abcdef');
    assert.equal(await page.locator('#subscription-action-status').innerText(),'');assert.equal(await page.locator('#connect-link').innerText(),lang==='en'?'Copied':'Скопировано');assert.equal(await page.locator('.portal-quickstart').count(),0);
    await page.locator('#toggle-qr').click();assert.equal(await page.locator('#subscription-qr svg').count(),1);assert.equal(await page.locator('#subscription-qr').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');assert.equal(await page.locator('.subscription-preview-languages').getAttribute('aria-label'),lang==='en'?'Language':'Язык');assert.equal(await page.locator('#subscription-qr svg').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');
 
-   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr');
+   await dismissDialog(page,page.locator('.experience-qr'),page.locator('#toggle-qr'));
    await page.locator('#connect-link').focus();
    const focusBefore=await page.evaluate(()=>({tag:document.activeElement.tagName,id:document.activeElement.id,dialogs:[...document.querySelectorAll('dialog')].map(d=>({open:d.open,modal:d.matches(':modal')}))}));
    await page.keyboard.press('Tab');
@@ -125,8 +131,8 @@ function fixture(url){
   assert.match(await studio.locator('.portal-donut-center b').innerText(),/^12.4 /);
   assert(!/[А-Яа-яЁё]/.test(await studio.innerText()),'Studio English preview has untranslated copy');
   assert(await studio.locator('.portal-app-disclosure').evaluate(el=>!el.open));
-  await studio.locator('.experience-start').click();assert(await studio.locator('.experience-guide').evaluate(el=>el.open));await page.keyboard.press('Escape');
-  await studio.locator('[data-subscription-qr]').click();await studio.locator('.experience-qr').waitFor({state:'visible'});assert(await studio.locator('.experience-qr').evaluate(el=>el.open));assert.equal(await studio.locator('.experience-qr svg').count(),1);await page.keyboard.press('Escape');assert(await studio.locator('[data-preview-qr]').isHidden());
+  await studio.locator('.experience-start').click();assert(await studio.locator('.experience-guide').evaluate(el=>el.open));await dismissDialog(page,studio.locator('.experience-guide'),studio.locator('.experience-start'));
+  await studio.locator('[data-subscription-qr]').click();await studio.locator('.experience-qr').waitFor({state:'visible'});assert(await studio.locator('.experience-qr').evaluate(el=>el.open));assert.equal(await studio.locator('.experience-qr svg').count(),1);await dismissDialog(page,studio.locator('.experience-qr'),studio.locator('[data-subscription-qr]'));assert(await studio.locator('[data-preview-qr]').isHidden());
 
   await studio.locator('[data-portal-language="ru"]').click();
   assert.match(await studio.locator('.portal-donut-center b').innerText(),/^12,4 /);
