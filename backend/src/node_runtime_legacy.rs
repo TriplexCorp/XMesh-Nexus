@@ -2395,15 +2395,26 @@ mod provision_tests {
             "cdnLimitGb":1.0,"cdnUsedBytes":1_073_741_824_i64
         })];
         let squads = vec![json!({"id":4,"inb":["MAIN_DE","CDN_DE","CDN_UK"]})];
-        let tags = std::collections::HashSet::from([
-            "CDN_DE".to_owned(), "CDN_UK".to_owned()
-        ]);
+        let tags = std::collections::HashSet::from(["CDN_DE".to_owned(), "CDN_UK".to_owned()]);
         provision_proxy_users(&mut config, &users, &squads, 1_800_000_000_000, &tags).unwrap();
         let inbounds = config["inbounds"].as_array().unwrap();
-        assert_eq!(inbounds[0]["settings"]["clients"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            inbounds[0]["settings"]["clients"].as_array().unwrap().len(),
+            1
+        );
         assert_eq!(inbounds[0]["settings"]["clients"][0]["id"], uuid);
-        assert!(inbounds[1]["settings"]["clients"].as_array().unwrap().is_empty());
-        assert!(inbounds[2]["settings"]["clients"].as_array().unwrap().is_empty());
+        assert!(
+            inbounds[1]["settings"]["clients"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            inbounds[2]["settings"]["clients"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
         // No synthetic client is provisioned; the authorization boundary is
         // the real client list produced by the signed desired configuration.
     }
@@ -2476,7 +2487,14 @@ mod provision_tests {
         let users =
             vec![json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]})];
         let squads = vec![json!({"id":4,"inb":["CDN NL"]})];
-        provision_proxy_users(&mut config, &users, &squads, 1_800_000_000_000, &Default::default()).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &users,
+            &squads,
+            1_800_000_000_000,
+            &Default::default(),
+        )
+        .unwrap();
         assert_eq!(
             config["inbounds"][0]["settings"]["clients"][0]["email"],
             "xmesh-u7--CDN%20NL"
@@ -2518,7 +2536,14 @@ mod provision_tests {
         let blocked = json!({"id":8,"xrayId":"550e8400-e29b-41d4-a716-446655440001",
             "squads":[4],"disabled":true});
         let squads = vec![json!({"id":4,"inb":["VM","TR","SS","SS22","HY","MQ"]})];
-        provision_proxy_users(&mut config, &[active, blocked], &squads, 1_800_000_000_000, &Default::default()).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &[active, blocked],
+            &squads,
+            1_800_000_000_000,
+            &Default::default(),
+        )
+        .unwrap();
         for (i, expected) in ["id", "password", "password", "password", "auth", "pass"]
             .iter()
             .enumerate()
@@ -2548,7 +2573,14 @@ mod provision_tests {
         let users =
             vec![json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4,5]})];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["NL"]})];
-        provision_proxy_users(&mut config, &users, &squads, 1_800_000_000_000, &Default::default()).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &users,
+            &squads,
+            1_800_000_000_000,
+            &Default::default(),
+        )
+        .unwrap();
         assert_eq!(
             config["inbounds"][0]["settings"]["clients"]
                 .as_array()
