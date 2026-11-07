@@ -316,7 +316,7 @@ body.subscription-public{
 .subscription-public .subscription-preview-apps{
   margin:0;
   padding:clamp(20px,2.3vw,30px);
-  display:grid;gap:18px;
+  display:grid;grid-template-columns:minmax(0,1fr);gap:18px;
   border:1px solid var(--portal-border);
   border-radius:max(17px,var(--portal-radius));
   background:linear-gradient(150deg,color-mix(in srgb,var(--portal-surface) 96%,transparent),color-mix(in srgb,var(--portal-bg) 91%,transparent));
@@ -359,6 +359,8 @@ body.subscription-public{
 .subscription-public .subscription-preview-app b{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
 .subscription-public .subscription-preview-app small{font-size:11.5px;line-height:1.45;color:var(--portal-muted);overflow-wrap:anywhere}
 
+.subscription-public .subscription-preview-apps[data-client-layout=list]>div{grid-template-columns:minmax(0,1fr)}
+.subscription-public .subscription-preview-apps[data-client-layout=list] .subscription-preview-app{min-height:64px}
 /* Footer */
 .subscription-public .subscription-preview footer{
   padding:17px clamp(24px,3.2vw,48px) 20px;
@@ -428,7 +430,7 @@ body.subscription-public{
 
 /* The Studio renders the actual public markup in a container, not a separate
  * miniature widget. Rules below are scoped to this preview only. */
-.subscription-studio-preview.subscription-public{width:100%;min-width:0;background:transparent}
+.subscription-studio-preview.subscription-public{width:100%;min-width:0;background:transparent;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 .subscription-studio-preview .subscription-public-shell{width:100%;margin:0;padding:0;min-height:0;display:block;container:subscription-preview-container/inline-size}
 .subscription-studio-preview .subscription-preview{width:100%;margin:0;min-height:0;box-shadow:none}
 .subscription-studio-preview .subscription-preview-brand{min-height:58px;padding:12px 16px}
