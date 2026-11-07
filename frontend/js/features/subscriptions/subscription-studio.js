@@ -243,22 +243,110 @@ window.XMeshSubscriptionStudio = (() => {
       '<main class="subscription-public-shell"><div class="subscription-preview" data-subscription-preview>',
       '<header class="subscription-preview-brand"><div class="subscription-public-brand-identity"><span data-subscription-logo-symbol>✦</span><img data-subscription-logo alt="" hidden><div class="subscription-public-brand-copy"><b data-subscription-brand></b><small data-subscription-brand-note></small></div></div>',
       '<div class="subscription-preview-languages" role="group" aria-label="Language / Язык"><button type="button" data-portal-language="ru" aria-pressed="true" lang="ru">RU</button><button type="button" data-portal-language="en" aria-pressed="false" lang="en">EN</button></div></header>',
-      '<div class="subscription-public-overview">',
-      '<section class="subscription-preview-hero"><div class="subscription-preview-hero-copy"><span class="subscription-preview-ok" data-subscription-ok>● Активна</span><h3 data-subscription-active></h3><p data-subscription-description></p></div></section>',
-      '<aside class="subscription-public-info-panel"><header class="subscription-public-panel-title"><span class="subscription-public-panel-icon is-status" aria-hidden="true"></span><div><b data-preview-status-label></b><small data-preview-status-note></small></div></header>',
-      '<div class="subscription-public-status-stack"><div class="subscription-preview-meta" data-subscription-metrics>',
-      '<div data-subscription-traffic><small data-subscription-traffic-label></small><b>12.4 / 100 ГБ</b><div class="subscription-preview-progress"><i></i></div></div>',
-      '<div data-subscription-expiry><small data-subscription-expiry-label></small><b>31.12.2026</b></div>',
-      '</div><span class="subscription-preview-support" data-subscription-support></span></div></aside></div>',
-      '<div class="subscription-public-workspace"><div class="subscription-public-grid">',
-      '<section class="subscription-public-access-panel">',
-      '<header class="subscription-public-panel-title"><span class="subscription-public-panel-icon is-access" aria-hidden="true"></span><div><b data-preview-endpoint-label></b><small data-preview-endpoint-note></small></div></header>',
-      '<div class="subscription-public-primary-action"><div class="subscription-preview-cta" data-subscription-connect></div></div>',
-      '<div class="subscription-preview-quick" data-subscription-quick><button type="button" data-subscription-copy>Копировать ссылку</button><button type="button" data-subscription-qr>QR</button><button type="button" data-subscription-reveal aria-expanded="false">Показать ссылку</button><button type="button" data-subscription-devices>Устройства</button></div>',
-      '<section class="subscription-public-link-card" data-preview-link-card hidden><div class="subscription-public-link-card-head"><div><b data-preview-link-label></b><small data-preview-link-note></small></div><em>HTTPS</em></div><code data-preview-demo-link></code></section>',
-      '</section>',
-      '<div class="subscription-public-catalog"><section class="subscription-preview-apps" data-subscription-apps><header data-subscription-apps-title>Приложения для подключения</header><div data-subscription-app-list></div></section></div>',
-      '</div></div><footer data-subscription-footer></footer></div></main></div>',
+      "<div class=\"subscription-public-overview\">",
+      "<section class=\"subscription-preview-hero\">",
+      "<div class=\"subscription-preview-hero-copy\">",
+      "<span class=\"subscription-cabinet-kicker\" id=\"cabinet-kicker\">МОЙ КАБИНЕТ <span aria-hidden=\"true\">/</span> VPN ACCESS</span>",
+      "<span class=\"subscription-preview-ok\" data-subscription-ok>● Активна</span>",
+      "<h3 data-subscription-active>Подписка активна</h3>",
+      "<p data-subscription-description>Настройки подключения</p>",
+      "</div>",
+      "</section>",
+      "<aside class=\"subscription-public-info-panel\">",
+      "<header class=\"subscription-public-panel-title\">",
+      "<span class=\"subscription-public-panel-icon is-status\" aria-hidden=\"true\"></span>",
+      "<div><b data-preview-status-label></b><small data-preview-status-note></small></div>",
+      "</header>",
+      "<div class=\"subscription-public-status-stack\"><div class=\"subscription-preview-meta\" data-subscription-metrics><div data-subscription-traffic><small data-subscription-traffic-label>Трафик</small><b>12.4 / 100 ГБ</b><div class=\"subscription-preview-progress\"><i style=\"width:12.4%\"></i></div></div><div data-subscription-expiry><small data-subscription-expiry-label>Действует до</small><b>31.12.2026</b></div></div></div>",
+      "</aside>",
+      "</div>",
+      "<div class=\"subscription-public-workspace\">",
+      "<nav class=\"subscription-cabinet-tabs\" role=\"tablist\" aria-label=\"Разделы личного кабинета\" id=\"cabinet-tabs\">",
+      "<button type=\"button\" class=\"subscription-cabinet-tab\" role=\"tab\" id=\"cabinet-tab-overview\" aria-controls=\"cabinet-panel-overview\" aria-selected=\"true\" tabindex=\"0\" data-cabinet-tab=\"overview\"><span aria-hidden=\"true\" class=\"cabinet-tab-glyph\">◈</span><span id=\"cabinet-tab-overview-label\">Обзор</span></button>",
+      "<button type=\"button\" class=\"subscription-cabinet-tab\" role=\"tab\" id=\"cabinet-tab-connect\" aria-controls=\"cabinet-panel-connect\" aria-selected=\"false\" tabindex=\"-1\" data-cabinet-tab=\"connect\"><span aria-hidden=\"true\" class=\"cabinet-tab-glyph\">↗</span><span id=\"cabinet-tab-connect-label\">Подключение</span></button>",
+      "<button type=\"button\" class=\"subscription-cabinet-tab\" role=\"tab\" id=\"cabinet-tab-apps\" aria-controls=\"cabinet-panel-apps\" aria-selected=\"false\" tabindex=\"-1\" data-cabinet-tab=\"apps\"><span aria-hidden=\"true\" class=\"cabinet-tab-glyph\">▦</span><span id=\"cabinet-tab-apps-label\">Приложения</span></button>",
+      "<button type=\"button\" class=\"subscription-cabinet-tab\" role=\"tab\" id=\"cabinet-tab-devices\" aria-controls=\"cabinet-panel-devices\" aria-selected=\"false\" tabindex=\"-1\" data-cabinet-tab=\"devices\"><span aria-hidden=\"true\" class=\"cabinet-tab-glyph\">▣</span><span id=\"cabinet-tab-devices-label\">Устройства</span></button>",
+      "<button type=\"button\" class=\"subscription-cabinet-tab\" role=\"tab\" id=\"cabinet-tab-support\" aria-controls=\"cabinet-panel-support\" aria-selected=\"false\" tabindex=\"-1\" data-cabinet-tab=\"support\"><span aria-hidden=\"true\" class=\"cabinet-tab-glyph\">?</span><span id=\"cabinet-tab-support-label\">Поддержка</span></button>",
+      "</nav>",
+      "<section class=\"subscription-cabinet-panel\" role=\"tabpanel\" id=\"cabinet-panel-overview\" aria-labelledby=\"cabinet-tab-overview\" data-cabinet-panel=\"overview\">",
+      "<div class=\"subscription-public-grid\">",
+      "<article class=\"subscription-cabinet-feature\">",
+      "<div class=\"subscription-cabinet-feature-art\" aria-hidden=\"true\">",
+      "<div class=\"cabinet-signal-rings\"><span></span><span></span><span></span><i></i></div>",
+      "<div class=\"cabinet-signal-mark\">S / ACCESS</div>",
+      "</div>",
+      "<div class=\"subscription-cabinet-feature-copy\">",
+      "<span class=\"cabinet-eyebrow\" id=\"cabinet-feature-eyebrow\">ВАШ ДОСТУП</span>",
+      "<h2 id=\"cabinet-feature-heading\">Простое подключение. Полный контроль.</h2>",
+      "<p id=\"cabinet-feature-note\">Ваши параметры и приложения собраны в одном месте.</p>",
+      "<div class=\"cabinet-feature-actions\">",
+      "<button type=\"button\" class=\"cabinet-action-primary\" data-cabinet-open=\"connect\" id=\"cabinet-start\">Настроить подключение <span aria-hidden=\"true\">↗</span></button>",
+      "<button type=\"button\" class=\"cabinet-action-secondary\" data-cabinet-open=\"apps\" id=\"cabinet-find-app\">Выбрать приложение</button>",
+      "</div>",
+      "</div>",
+      "</article>",
+      "<article class=\"subscription-cabinet-checklist\">",
+      "<header><span class=\"cabinet-eyebrow\" id=\"cabinet-steps-eyebrow\">КАК НАЧАТЬ</span><span class=\"cabinet-steps-count\">01 — 03</span></header>",
+      "<ol>",
+      "<li><span>1</span><div><b id=\"cabinet-step-one\">Выберите приложение</b><small id=\"cabinet-step-one-note\">Подходящий клиент для вашего устройства</small></div></li>",
+      "<li><span>2</span><div><b id=\"cabinet-step-two\">Добавьте подписку</b><small id=\"cabinet-step-two-note\">По ссылке или QR-коду</small></div></li>",
+      "<li><span>3</span><div><b id=\"cabinet-step-three\">Запустите подключение</b><small id=\"cabinet-step-three-note\">Управляйте доступом в приложении</small></div></li>",
+      "</ol>",
+      "</article>",
+      "</div>",
+      "</section>",
+      "<section class=\"subscription-cabinet-panel\" role=\"tabpanel\" id=\"cabinet-panel-connect\" aria-labelledby=\"cabinet-tab-connect\" data-cabinet-panel=\"connect\" hidden>",
+      "<div class=\"subscription-cabinet-connect-grid\">",
+      "<section class=\"subscription-public-access-panel\">",
+      "<header class=\"subscription-public-panel-title\">",
+      "<span class=\"subscription-public-panel-icon is-access\" aria-hidden=\"true\"></span>",
+      "<div><b data-preview-endpoint-label></b><small data-preview-endpoint-note></small></div>",
+      "</header>",
+      "<div class=\"subscription-public-primary-action\"><div class=\"subscription-preview-cta\" data-subscription-connect>Подключиться</div></div>",
+      "<div class=\"subscription-preview-quick\" data-subscription-quick><button type=\"button\" data-subscription-copy>Копировать ссылку</button><button type=\"button\" data-subscription-qr aria-expanded=\"false\">QR</button><button type=\"button\" data-subscription-reveal aria-expanded=\"false\">Показать ссылку</button><button type=\"button\" data-subscription-devices>Устройства</button></div>",
+      "<section class=\"subscription-public-link-card\" data-preview-link-card hidden>",
+      "<div class=\"subscription-public-link-card-head\">",
+      "<div><b data-preview-link-label></b><small data-preview-link-note></small></div>",
+      "<em>HTTPS</em>",
+      "</div>",
+      "<code data-preview-demo-link></code>",
+      "</section>",
+      "<p class=\"subscription-public-action-status\" id=\"subscription-action-status\" aria-live=\"polite\"></p>",
+      "</section>",
+      "<aside class=\"subscription-cabinet-guide\">",
+      "<div class=\"cabinet-guide-heading\"><span class=\"cabinet-guide-glyph\" aria-hidden=\"true\">⌘</span><div><h3 id=\"cabinet-guide-title\">Быстрое подключение</h3><p id=\"cabinet-guide-description\">Откройте приложение и импортируйте ваш доступ.</p></div></div>",
+      "<div class=\"subscription-public-secondary-surfaces\"><div class=\"subscription-preview-qr\" data-preview-qr hidden></div></div>",
+      "<div class=\"cabinet-guide-hint\" id=\"cabinet-guide-hint\">Приватная ссылка — ключ к вашей подписке. Не передавайте её посторонним.</div>",
+      "</aside>",
+      "</div>",
+      "</section>",
+      "<section class=\"subscription-cabinet-panel\" role=\"tabpanel\" id=\"cabinet-panel-apps\" aria-labelledby=\"cabinet-tab-apps\" data-cabinet-panel=\"apps\" hidden>",
+      "<header class=\"subscription-cabinet-section-heading\"><div><span class=\"cabinet-eyebrow\" id=\"cabinet-apps-kicker\">КАТАЛОГ</span><h2 id=\"cabinet-apps-heading\">Приложения для подключения</h2><p id=\"cabinet-apps-note\">Выберите клиент для своей платформы.</p></div></header>",
+      "<div class=\"subscription-cabinet-app-tools\">",
+      "<label class=\"subscription-cabinet-search\"><span aria-hidden=\"true\">⌕</span><input type=\"search\" data-preview-app-search autocomplete=\"off\" placeholder=\"Найти приложение…\" aria-label=\"Поиск приложений\"></label>",
+      "<div class=\"subscription-cabinet-filters\" role=\"group\" aria-label=\"Фильтр платформ\" data-preview-platform-filters>",
+      "<button type=\"button\" data-app-filter=\"all\" aria-pressed=\"true\">Все</button>",
+      "<button type=\"button\" data-app-filter=\"ios\" aria-pressed=\"false\">iOS</button>",
+      "<button type=\"button\" data-app-filter=\"android\" aria-pressed=\"false\">Android</button>",
+      "<button type=\"button\" data-app-filter=\"windows\" aria-pressed=\"false\">Windows</button>",
+      "<button type=\"button\" data-app-filter=\"macos\" aria-pressed=\"false\">macOS</button>",
+      "<button type=\"button\" data-app-filter=\"linux\" aria-pressed=\"false\">Linux</button>",
+      "</div>",
+      "</div>",
+      "<div class=\"subscription-public-catalog\"><section class=\"subscription-preview-apps\" data-subscription-apps><header data-subscription-apps-title>Приложения для подключения</header><div data-subscription-app-list></div></section></div>",
+      "<p class=\"subscription-cabinet-no-apps\" id=\"cabinet-apps-empty\" hidden>По вашему запросу приложений не найдено.</p>",
+      "</section>",
+      "<section class=\"subscription-cabinet-panel\" role=\"tabpanel\" id=\"cabinet-panel-devices\" aria-labelledby=\"cabinet-tab-devices\" data-cabinet-panel=\"devices\" hidden>",
+      "<header class=\"subscription-cabinet-section-heading\"><div><span class=\"cabinet-eyebrow\" id=\"cabinet-devices-kicker\">ВАШИ УСТРОЙСТВА</span><h2 id=\"cabinet-devices-heading\">Управление подключениями</h2><p id=\"cabinet-devices-note\">Число привязанных устройств и доступный лимит.</p></div></header>",
+      "<div class=\"subscription-cabinet-device-card\"><span class=\"cabinet-device-emblem\" aria-hidden=\"true\">▣</span><div class=\"subscription-public-devices\" data-preview-devices hidden>Подключённые устройства: 2 · Лимит: 5</div></div>",
+      "</section>",
+      "<section class=\"subscription-cabinet-panel\" role=\"tabpanel\" id=\"cabinet-panel-support\" aria-labelledby=\"cabinet-tab-support\" data-cabinet-panel=\"support\" hidden>",
+      "<header class=\"subscription-cabinet-section-heading\"><div><span class=\"cabinet-eyebrow\" id=\"cabinet-support-kicker\">ПОМОЩЬ</span><h2 id=\"cabinet-support-heading\">Мы рядом, когда нужна помощь</h2><p id=\"cabinet-support-note\">Свяжитесь со службой поддержки по указанному каналу.</p></div></header>",
+      "<div class=\"subscription-cabinet-support-card\"><span class=\"cabinet-support-emblem\" aria-hidden=\"true\">✳</span><span class=\"subscription-preview-support\" data-subscription-support>Поддержка</span></div>",
+      "</section>",
+      "</div>",
+      "<footer><span data-subscription-footer></span></footer>",
+      "</div></main></div>",
       '<div class="subscription-studio-stats"><div><small>Пользователей</small><b>'+esc(counts.users)+'</b></div><div><small>Узлов</small><b>'+esc(counts.nodes)+'</b></div></div>',
       '</aside></form></div>'
     ].join('');
@@ -276,7 +364,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=6fc2d828fd52',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=9061fbee5fb9'
+        '/subscription-public.css?v=56ef92e0add0'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
@@ -365,6 +453,49 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionClientLinks:Object.fromEntries(clientCatalog.map(([id])=>[id,input(form,'subClientLink_'+id).value.trim()]).filter(([,url])=>url))
       });
       let previewLanguage=data.subscriptionLanguage;
+      let previewTab='overview',previewPlatform='all';
+      const previewTabs=()=>[...previewShadow.querySelectorAll('[data-cabinet-tab]')];
+      const panelFor=name=>previewShadow.querySelector('[data-cabinet-panel="'+name+'"]');
+      const previewAvailable={
+        overview:()=>true,
+        connect:()=>true,
+        apps:()=>!previewShadow.querySelector('[data-subscription-apps]')?.hidden,
+        devices:()=>!!input(form,'subscriptionShowDevices')?.checked,
+        support:()=>!!input(form,'subscriptionShowSupport')?.checked
+      };
+      const switchPreviewTab=(name,focus=false)=>{
+        previewTab=previewAvailable[name]?.()?name:'overview';
+        for(const button of previewTabs()){
+          const kind=button.dataset.cabinetTab;
+          button.hidden=!previewAvailable[kind]?.();
+          const active=kind===previewTab;
+          button.setAttribute('aria-selected',String(active));
+          button.tabIndex=active?0:-1;
+          if(active&&focus)button.focus();
+        }
+        previewShadow.querySelectorAll('[data-cabinet-panel]').forEach(panel=>{
+          panel.hidden=panel.dataset.cabinetPanel!==previewTab;
+        });
+        previewShadow.querySelectorAll('[data-cabinet-open]').forEach(button=>{
+          button.hidden=!previewAvailable[button.dataset.cabinetOpen]?.();
+        });
+        const devices=previewShadow.querySelector('[data-preview-devices]');
+        if(devices&&previewTab==='devices')devices.hidden=false;
+      };
+      const applyPreviewFilter=()=>{
+        const needle=(previewShadow.querySelector('[data-preview-app-search]')?.value||'').trim().toLocaleLowerCase(previewLanguage);
+        let count=0;
+        previewShadow.querySelectorAll('.subscription-preview-app').forEach(tile=>{
+          const platform=tile.querySelector('small')?.textContent?.toLocaleLowerCase('en')||'';
+          const name=tile.querySelector('b')?.textContent?.toLocaleLowerCase(previewLanguage)||'';
+          const match=(previewPlatform==='all'||platform.includes(previewPlatform))&&
+            (!needle||name.includes(needle)||platform.includes(needle));
+          tile.hidden=!match;
+          if(match)count++;
+        });
+        const empty=previewShadow.querySelector('#cabinet-apps-empty');
+        if(empty)empty.hidden=count>0;
+      };
       const draw = () => {
         applyPanelTheme();
         const d=read();
@@ -372,6 +503,66 @@ window.XMeshSubscriptionStudio = (() => {
         const lang=previewLanguage,english=lang==='en',copy=locale[lang];
         const previewRoot=$('[data-subscription-preview]');
         previewRoot.lang=lang;
+        const local=english?{
+          tabs:['Overview','Connect','Applications','Devices','Support'],
+          kicker:'MY ACCOUNT / VPN ACCESS',featureEyebrow:'YOUR ACCESS',
+          featureHeading:'Everything you need, in one place.',
+          featureNote:'Your connection and compatible apps are always close at hand.',
+          start:'Set up connection',findApp:'Choose an app',stepsEyebrow:'GET STARTED',
+          steps:['Choose your app','Add your subscription','Enable the connection'],
+          notes:['A compatible client for your device','Using your link or QR code','Connect inside your app'],
+          guideTitle:'Quick setup',guideDescription:'Open your app and import your access.',
+          guideHint:'Your personal link grants access to the subscription. Never share it.',
+          appsKicker:'CLIENT LIBRARY',appsNote:'Find a compatible client for your platform.',
+          appsSearch:'Search applications…',appsEmpty:'No applications match these filters.',
+          devicesKicker:'YOUR DEVICES',devicesHeading:'Connected devices',
+          devicesNote:'Your registered device count and allowance.',
+          supportKicker:'HELP CENTER',supportHeading:'Need a hand?',
+          supportNote:'Contact support using the configured channel.',all:'All',
+          devicesSample:'Connected devices: 2 · Limit: 5'
+        }:{
+          tabs:['Обзор','Подключение','Приложения','Устройства','Поддержка'],
+          kicker:'МОЙ КАБИНЕТ / VPN ACCESS',featureEyebrow:'ВАШ ДОСТУП',
+          featureHeading:'Всё для подключения. В одном месте.',
+          featureNote:'Личные настройки и приложения всегда под рукой.',
+          start:'Настроить подключение',findApp:'Выбрать приложение',stepsEyebrow:'КАК НАЧАТЬ',
+          steps:['Выберите приложение','Добавьте подписку','Включите подключение'],
+          notes:['Совместимый клиент для вашего устройства','По личной ссылке или QR-коду','Активируйте доступ в приложении'],
+          guideTitle:'Быстрое подключение',
+          guideDescription:'Откройте приложение и импортируйте ваш доступ.',
+          guideHint:'Персональная ссылка открывает доступ к подписке. Не передавайте её посторонним.',
+          appsKicker:'КАТАЛОГ',appsNote:'Выберите клиент для своей платформы.',
+          appsSearch:'Найти приложение…',appsEmpty:'По вашему запросу приложений не найдено.',
+          devicesKicker:'ВАШИ УСТРОЙСТВА',devicesHeading:'Подключённые устройства',
+          devicesNote:'Количество зарегистрированных устройств и лимит.',
+          supportKicker:'ПОМОЩЬ',supportHeading:'Нужна помощь?',
+          supportNote:'Свяжитесь с поддержкой по указанному каналу.',all:'Все',
+          devicesSample:'Подключённые устройства: 2 · Лимит: 5'
+        };
+        const setText=(id,text)=>{const node=previewShadow.getElementById(id);if(node)node.textContent=text;};
+        ['overview','connect','apps','devices','support'].forEach((key,i)=>setText('cabinet-tab-'+key+'-label',local.tabs[i]));
+        const keys={
+          'cabinet-kicker':'kicker','cabinet-feature-eyebrow':'featureEyebrow',
+          'cabinet-feature-heading':'featureHeading','cabinet-feature-note':'featureNote',
+          'cabinet-start':'start','cabinet-find-app':'findApp',
+          'cabinet-steps-eyebrow':'stepsEyebrow','cabinet-guide-title':'guideTitle',
+          'cabinet-guide-description':'guideDescription','cabinet-guide-hint':'guideHint',
+          'cabinet-apps-kicker':'appsKicker','cabinet-apps-note':'appsNote',
+          'cabinet-apps-empty':'appsEmpty','cabinet-devices-kicker':'devicesKicker',
+          'cabinet-devices-heading':'devicesHeading','cabinet-devices-note':'devicesNote',
+          'cabinet-support-kicker':'supportKicker','cabinet-support-heading':'supportHeading',
+          'cabinet-support-note':'supportNote'
+        };
+        Object.entries(keys).forEach(([id,key])=>setText(id,local[key]));
+        local.steps.forEach((v,i)=>setText(['cabinet-step-one','cabinet-step-two','cabinet-step-three'][i],v));
+        local.notes.forEach((v,i)=>setText(['cabinet-step-one-note','cabinet-step-two-note','cabinet-step-three-note'][i],v));
+        const findApps=previewShadow.querySelector('[data-preview-app-search]');
+        if(findApps){findApps.placeholder=local.appsSearch;findApps.setAttribute('aria-label',local.appsSearch)}
+        setText('cabinet-apps-heading',(english?d.subscriptionAppsTitleEn:d.subscriptionAppsTitle)||appsHeading(lang));
+        const allFilter=previewShadow.querySelector('[data-app-filter="all"]');
+        if(allFilter)allFilter.textContent=local.all;
+        const deviceSample=previewShadow.querySelector('[data-preview-devices]');
+        if(deviceSample)deviceSample.textContent=local.devicesSample;
         previewShadow.querySelectorAll('[data-portal-language]').forEach(button=>{
           const active=button.dataset.portalLanguage===lang;
           button.setAttribute('aria-pressed',String(active));
@@ -445,9 +636,12 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-app-list]').innerHTML=allEnabled.map(([id,label,platform])=>
           '<div class="subscription-preview-app"><span>'+esc(label.slice(0,2))+'</span><div><b>'+esc(label)+'</b><small>'+esc(platform)+'</small></div></div>'
         ).join('');
+        switchPreviewTab(previewTab);
+        applyPreviewFilter();
         const support=$('[data-subscription-support]');
         support.textContent=(english?d.subscriptionSupportLabelEn:d.subscriptionSupportLabel)||(english?'Support':'Поддержка');
         support.hidden=!d.subscriptionShowSupport;
+        switchPreviewTab(previewTab);
         const labels={a:'Панель',b:'',c:''};
         labels[d.subscriptionPlacement]+=(labels[d.subscriptionPlacement]?' + ':'')+'Подписки';
         labels[d.nodePlacement]+=(labels[d.nodePlacement]?' + ':'')+'VPN-ноды';
@@ -457,6 +651,45 @@ window.XMeshSubscriptionStudio = (() => {
         ).join('');
       };
       previewShadow.addEventListener('click',event=>{
+        const tab=event.target.closest('[data-cabinet-tab],[data-cabinet-open]');
+        if(tab&&previewShadow.contains(tab)){
+          switchPreviewTab(tab.dataset.cabinetTab||tab.dataset.cabinetOpen,true);
+          return;
+        }
+        const filter=event.target.closest('[data-app-filter]');
+        if(filter&&previewShadow.contains(filter)){
+          previewPlatform=filter.dataset.appFilter;
+          previewShadow.querySelectorAll('[data-app-filter]').forEach(button=>{
+            button.setAttribute('aria-pressed',String(button===filter));
+          });
+          applyPreviewFilter();
+          return;
+        }
+        const devices=event.target.closest('[data-subscription-devices]');
+        if(devices&&previewShadow.contains(devices)){switchPreviewTab('devices',true);return}
+        const qrButton=event.target.closest('[data-subscription-qr]');
+        if(qrButton&&previewShadow.contains(qrButton)){
+          const target=previewShadow.querySelector('[data-preview-qr]');
+          if(!target)return;
+          target.hidden=!target.hidden;
+          qrButton.setAttribute('aria-expanded',String(!target.hidden));
+          if(!target.hidden&&!target.firstChild){
+            const url=previewShadow.querySelector('[data-preview-demo-link]')?.textContent||'https://sub.example.com/s/example-token';
+            const Qr=window.qrcodegen?.QrCode;
+            if(Qr){
+              const qr=Qr.encodeText(url,Qr.Ecc.MEDIUM),quiet=4;
+              const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
+              svg.setAttribute('viewBox','0 0 '+(qr.size+quiet*2)+' '+(qr.size+quiet*2));
+              svg.setAttribute('aria-label','Sample QR');
+              const bg=document.createElementNS(ns,'rect');bg.setAttribute('width','100%');bg.setAttribute('height','100%');bg.setAttribute('fill','#fff');svg.append(bg);
+              let data='';
+              for(let y=0;y<qr.size;y++)for(let x=0;x<qr.size;x++)if(qr.getModule(x,y))data+='M'+(x+quiet)+','+(y+quiet)+'h1v1h-1z';
+              const path=document.createElementNS(ns,'path');path.setAttribute('d',data);path.setAttribute('fill','#101923');svg.append(path);
+              target.replaceChildren(svg);
+            }
+          }
+          return;
+        }
         const reveal=event.target.closest('[data-subscription-reveal]');
         if(reveal&&previewShadow.contains(reveal)){
           const card=previewShadow.querySelector('[data-preview-link-card]');
@@ -472,6 +705,17 @@ window.XMeshSubscriptionStudio = (() => {
         previewLanguage=next;
         draw();
       });
+      previewShadow.addEventListener('keydown',event=>{
+        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+        const tabs=previewTabs().filter(button=>!button.hidden);
+        const current=tabs.indexOf(previewShadow.activeElement);
+        if(current<0)return;
+        event.preventDefault();
+        const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:
+          (current+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+        switchPreviewTab(tabs[next].dataset.cabinetTab,true);
+      });
+      previewShadow.querySelector('[data-preview-app-search]')?.addEventListener('input',applyPreviewFilter);
       form.addEventListener('input',draw);
       form.addEventListener('change',event=>{
         if(event.target.name==='subscriptionLanguage' && ['ru','en'].includes(event.target.value))previewLanguage=event.target.value;

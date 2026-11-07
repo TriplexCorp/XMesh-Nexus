@@ -86,6 +86,8 @@ jobs:
         run: node scripts/check-english-coverage.js
       - name: Check subscription studio and independent deployment blueprint
         run: node scripts/check-subscription-studio.js
+      - name: Enforce compact personal cabinet tabs and preview parity
+        run: node scripts/check-subscription-cabinet.js
       - name: Verify real admin RBAC, authentication boundaries and CSP
         run: node scripts/check-admin-security.js
       - name: Enforce observer least-privilege API and UI security contracts
