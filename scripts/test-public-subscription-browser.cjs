@@ -52,6 +52,7 @@ async function dismissDialog(page,dialog,opener){
    assert.equal(await page.locator('#subscription-link-card,#toggle-link').count(),0,'No link reveal UI');
    const g=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth,body:innerWidth,title:parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),minTap:Math.min(...[...document.querySelectorAll('.subscription-cabinet-tab:not([hidden]),.subscription-preview-languages a,.subscription-preview-cta')].map(el=>el.getBoundingClientRect().height))}));
    assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=30,'Readable heading');assert(g.minTap>=44,'Touch target too small');
+   assert.equal(await page.locator('.experience-shortcuts strong').count(),4,'Available shortcuts have visible labels');assert.equal(await page.locator('.experience-quick-platforms button').count(),6);assert.equal(await page.locator('.experience-server-panel h2').innerText(),lang==='en'?'Usage by server':'Трафик по серверам');
    assert.equal(await page.locator('[role="tab"]').count(),0,'No tab navigation');assert(await page.locator('.experience-start').isVisible());assert(await page.locator('[data-setup-section="connect"]').isVisible());assert.equal(await page.locator('#copy-link').count(),0,'Only one copy button');
    assert.equal(await page.locator('.portal-donut-server').count(),2);
    const server=page.locator('.portal-donut-server').first();await server.click();
@@ -91,9 +92,19 @@ async function dismissDialog(page,dialog,opener){
    assert.equal(focusAfter.id,'toggle-qr','Keyboard order follows setup: '+width+'px '+lang+' '+JSON.stringify({before:focusBefore,after:focusAfter}));
    if(lang==='en')assert(!/[А-Яа-яЁё]/.test(await page.locator('body').innerText()),'English portal has untranslated copy');checks++;
   }
+  await page.goto(base+'/?lang=en');await page.waitForSelector('.experience-quick-platforms');
+  await page.locator('.experience-quick-platforms button').filter({hasText:'iOS'}).click();
+  assert.equal(await page.locator('.experience-quick-platforms [aria-pressed=true]').innerText(),'iOS');
+  await page.locator('.experience-quick-open').click();assert.equal(await page.locator('.experience-platforms [aria-pressed=true]').innerText(),'iOS / iPadOS');
+  await dismissDialog(page,page.locator('.experience-guide'),page.locator('.experience-quick-open'));
+  const deviceShortcut=page.locator('.experience-shortcuts button').filter({hasText:/^Devices/});
+  await deviceShortcut.click();await page.locator('.experience-devices').waitFor({state:'visible'});assert.equal(await page.locator('.experience-device-value').innerText(),'Registered devices: 2 · Limit: 5');
+  await dismissDialog(page,page.locator('.experience-devices'),deviceShortcut);
+  await page.locator('.experience-shortcuts button').filter({hasText:'By server'}).click();assert(await page.locator('.experience-server-panel').evaluate(el=>document.activeElement===el));
+  assert.equal(await page.locator('[role=progressbar]').getAttribute('aria-valuenow'),'34.5');checks++;
   for(const [state,title]of [['EXPIRED','Your subscription has expired'],['LIMITED','Data allowance reached'],['DISABLED','Subscription paused'],['ON_HOLD','Ready for your first connection']]){
    await page.goto(base+'/?lang=en&state='+state);await page.waitForFunction(()=>document.querySelector('h1').textContent!=='Subscription active');assert.equal(await page.locator('h1').innerText(),title);
-   if(state!=='ON_HOLD')assert(await page.locator('[data-setup-section="connect"]').isHidden());
+   if(state!=='ON_HOLD'){assert(await page.locator('[data-setup-section="connect"]').isHidden());assert(await page.locator('.experience-start').isHidden());assert(await page.locator('.experience-shortcuts').isHidden());assert.equal(await page.locator('.experience-dashboard').count(),1);}
    checks++;
   }
   await page.goto(base+'/?lang=en');await page.waitForSelector('#connect-link');
@@ -115,7 +126,7 @@ async function dismissDialog(page,dialog,opener){
   await page.goto(base+'/?lang=en&accent=dark');await page.waitForSelector('#connect-link');assert.equal(await page.locator('.experience-start').evaluate(el=>getComputedStyle(el).color),'rgb(255, 255, 255)','Dark custom accent needs contrasting button text');checks++;
   await page.goto(base+'/?lang=en&apps=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="apps"]').hidden);assert(await page.locator('#connect-link').isVisible());checks++;
   await page.goto(base+'/?lang=en&metrics=0');await page.waitForFunction(()=>document.querySelector('.subscription-public-info-panel').hidden);checks++;
-  await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[role="meter"]').count(),0);assert.equal(((await page.locator('[data-subscription-traffic]').innerText()).match(/Unlimited/g)||[]).length,1);await page.screenshot({path:path.join(out,'portal-unlimited-1920-en.png'),fullPage:true,animations:'disabled'});checks++;
+  await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[role="meter"],[role="progressbar"]').count(),0);assert.equal(((await page.locator('[data-subscription-traffic]').innerText()).match(/Unlimited/g)||[]).length,1);await page.screenshot({path:path.join(out,'portal-unlimited-1920-en.png'),fullPage:true,animations:'disabled'});checks++;
   await page.goto(base+'/?lang=en&active=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="connect"]').hidden);assert(await page.locator('[data-setup-section="apps"]').isHidden());assert(await page.locator('[data-setup-section="support"]').isVisible());checks++;
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto(base+'/?lang=en');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[data-setup-section="connect"]').evaluate(el=>getComputedStyle(el).animationName),'none');checks++;
   await page.goto(base+'/?lang=en');

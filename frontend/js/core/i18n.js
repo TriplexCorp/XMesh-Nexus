@@ -15,6 +15,23 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Подключение, устройства и расход — в одном месте.":"Connection, devices and data usage in one place.",
+    "Быстрая настройка":"Quick setup",
+    "Выберите устройство, чтобы открыть инструкцию.":"Choose your device to open the setup guide.",
+    "Ваше устройство":"Your device",
+    "Инструкция для":"Set up",
+    "Установите приложение":"Install an app",
+    "Включите VPN":"Turn on VPN",
+    "Трафик по серверам":"Usage by server",
+    "Распределение учтённого расхода.":"Distribution of measured data usage.",
+    "Быстрые действия":"Quick actions",
+    "Инструкции":"Instructions",
+    "Для ваших устройств":"For your devices",
+    "Ваши устройства":"Your devices",
+    "Это зарегистрированные устройства, а не число активных VPN-соединений.":"This is the number of registered devices, not live VPN connections.",
+    "Распределение трафика":"Data usage breakdown",
+    "Помощь с подключением":"Connection help",
+    "Использовано лимита":"Data allowance used",
     "Поиск балансировщиков":"Search balancers",
     "Найти балансировщик…":"Find a balancer…",
     "Ожидает подключения":"Awaiting connection",
