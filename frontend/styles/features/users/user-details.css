@@ -1444,7 +1444,7 @@ dialog.user-modal .user-pane {
   border-color:color-mix(in srgb,var(--a) 40%,var(--nx-border));
 }
 #dlg.user-modal .user-pane-settings .user-settings-cards{gap:.85rem;align-items:start}
-#dlg.user-modal :is(.user-detail-card,.user-access-column,.user-subscription-column,.user-pane-insights,.user-inline-devices .xm-device-picker,.user-inline-devices .xm-device-inspector,#user-inline-xm-assessment-panel){
+#dlg.user-modal :is(.user-detail-card,.user-access-column,.user-subscription-column,.user-pane-insights,.user-inline-devices .xm-device-picker,.user-inline-devices .xm-device-inspector,#user-inline-xm-activity-panel){
   box-sizing:border-box;min-width:0;padding:1.1rem 1.2rem;
   border:1px solid var(--nx-border);border-radius:var(--ui-radius);
   background:var(--nx-section-bg);

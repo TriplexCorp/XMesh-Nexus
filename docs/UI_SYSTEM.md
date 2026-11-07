@@ -278,6 +278,29 @@ Review every user-tab screenshot alongside surrounding Nexus pages in Classic,
 Glass, Raised and both themes; adjust feature spacing, not global palette,
 shadows or action-button anatomy.
 
+### Devices and factual activity
+
+The Devices and Activity dialog is **content-sized**. A fixed-position native
+`dialog` inherits `inset:0` from Nexus; using `height:auto` here stretches
+the outer frame to the viewport. Keep both `height` and `block-size` explicitly
+`fit-content`, a viewport maximum, and **one** scroll owner on the body.
+Never add a fixed/minimum height to fill space beneath two device rows.
+
+Client-side activity **is not an anti-sharing verdict**. Traffic volume,
+switching Xray servers, installing the app on multiple devices and growth in
+registered HWIDs are observations, not proof that a subscription was shared.
+Do not turn them into a synthetic 0–100 suspicion score, heat badge, automatic
+warning banner or implied ban. Only display measured Xray traffic, distinct
+nodes and registered-device timestamps; show unavailable history as unknown,
+not zero. Enforcement of HWID limits belongs to the backend.
+
+The Users directory shows a quiet Activity entry point; opening it fetches
+history on demand rather than requesting seven-day samples for every table
+row. The native dialog and embedded User Details surface share one feature
+implementation and the global Classic / Glass / Raised, radius, density,
+motion and focus contracts. Browser coverage must assert the content-height
+boundary and the absence of speculative risk controls.
+
 ### Tables / Users / Squads / Hosts
 
 Short tables are short surfaces. They do not reserve fleet-scale height. Empty page background below real content is preferable to artificial stretching.
