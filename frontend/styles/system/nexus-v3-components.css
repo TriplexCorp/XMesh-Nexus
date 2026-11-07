@@ -252,6 +252,9 @@ dialog.xm-action-confirm{--dialog-width:28rem;border:1px solid var(--nx-border-s
 }
 
 
+/* Existing Hosts and Squads directories consume the same framed toolbar as Nodes. */
+.nx-directory-toolbar{padding:var(--nx-section-pad);border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);background:var(--nx-panel-bg)}
+
 /* Unified catalog action grammar: one toolbar, one add control, one grid picker. */
 .nx-workspace-toolbar{
  padding:var(--nx-section-pad);border:1px solid var(--nx-border);
