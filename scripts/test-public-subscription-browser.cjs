@@ -78,7 +78,7 @@ function fixture(url){
    await page.locator('#toggle-qr').click();assert.equal(await page.locator('#subscription-qr svg').count(),1);assert.equal(await page.locator('#subscription-qr').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');assert.equal(await page.locator('.subscription-preview-languages').getAttribute('aria-label'),lang==='en'?'Language':'Язык');assert.equal(await page.locator('#subscription-qr svg').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');
 
    await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr');
-   await page.locator('#connect-link').focus();await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr','Keyboard order follows setup');
+   await page.locator('#connect-link').focus();await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr','Keyboard order follows setup: '+width+'px '+lang);
    if(lang==='en')assert(!/[А-Яа-яЁё]/.test(await page.locator('body').innerText()),'English portal has untranslated copy');checks++;
   }
   for(const [state,title]of [['EXPIRED','Your subscription has expired'],['LIMITED','Data allowance reached'],['DISABLED','Subscription paused'],['ON_HOLD','Ready for your first connection']]){
