@@ -63,6 +63,153 @@
   if (endpointLabel) endpointLabel.textContent = copy.endpointLabel;
   if (endpointNote) endpointNote.textContent = copy.endpointNote;
 
+  // One navigation contract for all visitor pages. Missing optional capabilities
+  // never appear as dead tabs; inactive subscriptions keep an overview.
+  const cabinetText = language === 'en' ? {
+    kicker:'MY ACCOUNT / VPN ACCESS',
+    tabs:['Overview','Connect','Applications','Devices','Support'],
+    featureEyebrow:'YOUR ACCESS',featureHeading:'Everything you need, in one place.',
+    featureNote:'Your connection and compatible apps are always close at hand.',
+    start:'Set up connection',findApp:'Choose an app',
+    stepsEyebrow:'GET STARTED',
+    steps:['Choose your app','Add your subscription','Enable the connection'],
+    notes:['A compatible client for your device','Using your link or QR code','Connect inside your app'],
+    guideTitle:'Quick setup',guideDescription:'Open your app and import your access.',
+    guideHint:'Your personal link grants access to the subscription. Never share it.',
+    appsKicker:'CLIENT LIBRARY',appsHeading:'Connection apps',
+    appsNote:'Find a compatible client for your platform.',
+    appsSearch:'Search applications…',appsEmpty:'No applications match these filters.',
+    devicesKicker:'YOUR DEVICES',devicesHeading:'Connected devices',
+    devicesNote:'Your registered device count and allowance.',
+    supportKicker:'HELP CENTER',supportHeading:'Need a hand?',
+    supportNote:'Contact support using the configured channel.',
+    all:'All',navLabel:'Account sections',platformLabel:'Filter by platform'
+  } : {
+    kicker:'МОЙ КАБИНЕТ / VPN ACCESS',
+    tabs:['Обзор','Подключение','Приложения','Устройства','Поддержка'],
+    featureEyebrow:'ВАШ ДОСТУП',featureHeading:'Всё для подключения. В одном месте.',
+    featureNote:'Личные настройки и приложения всегда под рукой.',
+    start:'Настроить подключение',findApp:'Выбрать приложение',
+    stepsEyebrow:'КАК НАЧАТЬ',
+    steps:['Выберите приложение','Добавьте подписку','Включите подключение'],
+    notes:['Совместимый клиент для вашего устройства','По личной ссылке или QR-коду','Активируйте доступ в приложении'],
+    guideTitle:'Быстрое подключение',guideDescription:'Откройте приложение и импортируйте ваш доступ.',
+    guideHint:'Персональная ссылка открывает доступ к подписке. Не передавайте её посторонним.',
+    appsKicker:'КАТАЛОГ',appsHeading:'Приложения для подключения',
+    appsNote:'Выберите клиент для своей платформы.',
+    appsSearch:'Найти приложение…',appsEmpty:'По вашему запросу приложений не найдено.',
+    devicesKicker:'ВАШИ УСТРОЙСТВА',devicesHeading:'Подключённые устройства',
+    devicesNote:'Количество зарегистрированных устройств и лимит.',
+    supportKicker:'ПОМОЩЬ',supportHeading:'Нужна помощь?',
+    supportNote:'Свяжитесь с поддержкой по указанному каналу.',
+    all:'Все',navLabel:'Разделы личного кабинета',platformLabel:'Фильтр платформ'
+  };
+  const setCabinetCopy = (id, value) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  };
+  setCabinetCopy('cabinet-kicker',cabinetText.kicker);
+  ['overview','connect','apps','devices','support'].forEach((key,i) =>
+    setCabinetCopy('cabinet-tab-'+key+'-label',cabinetText.tabs[i])
+  );
+  const phrases={
+    'cabinet-feature-eyebrow':'featureEyebrow','cabinet-feature-heading':'featureHeading',
+    'cabinet-feature-note':'featureNote','cabinet-start':'start','cabinet-find-app':'findApp',
+    'cabinet-steps-eyebrow':'stepsEyebrow','cabinet-guide-title':'guideTitle',
+    'cabinet-guide-description':'guideDescription','cabinet-guide-hint':'guideHint',
+    'cabinet-apps-kicker':'appsKicker','cabinet-apps-heading':'appsHeading',
+    'cabinet-apps-note':'appsNote','cabinet-apps-empty':'appsEmpty',
+    'cabinet-devices-kicker':'devicesKicker','cabinet-devices-heading':'devicesHeading',
+    'cabinet-devices-note':'devicesNote','cabinet-support-kicker':'supportKicker',
+    'cabinet-support-heading':'supportHeading','cabinet-support-note':'supportNote'
+  };
+  Object.entries(phrases).forEach(([id,key])=>setCabinetCopy(id,cabinetText[key]));
+  cabinetText.steps.forEach((v,i)=>setCabinetCopy(['cabinet-step-one','cabinet-step-two','cabinet-step-three'][i],v));
+  cabinetText.notes.forEach((v,i)=>setCabinetCopy(['cabinet-step-one-note','cabinet-step-two-note','cabinet-step-three-note'][i],v));
+  const appHeading = document.querySelector('.subscription-preview-apps>header');
+  if (appHeading) setCabinetCopy('cabinet-apps-heading',appHeading.textContent);
+  const search = document.getElementById('cabinet-app-search');
+  if (search) {search.placeholder=cabinetText.appsSearch;search.setAttribute('aria-label',cabinetText.appsSearch)}
+  setCabinetCopy('cabinet-apps-empty',cabinetText.appsEmpty);
+  const allFilter=document.querySelector('[data-app-filter="all"]');
+  if (allFilter) allFilter.textContent=cabinetText.all;
+  document.getElementById('cabinet-platform-filters')?.setAttribute('aria-label',cabinetText.platformLabel);
+  document.getElementById('cabinet-tabs')?.setAttribute('aria-label',cabinetText.navLabel);
+
+  const tabButtons=[...document.querySelectorAll('[data-cabinet-tab]')];
+  const tabPanels=[...document.querySelectorAll('[data-cabinet-panel]')];
+  const available={
+    overview:true,
+    connect:!!input,
+    apps:!!document.querySelector('.subscription-preview-app'),
+    devices:!!document.getElementById('subscription-devices'),
+    support:!!document.querySelector('.subscription-preview-support')
+  };
+  for(const button of tabButtons)button.hidden=!available[button.dataset.cabinetTab];
+  for(const button of document.querySelectorAll('[data-cabinet-open]')) {
+    button.hidden=!available[button.dataset.cabinetOpen];
+  }
+  function selectCabinetTab(key,{focus=false}={}) {
+    const name=available[key]?key:'overview';
+    tabButtons.forEach(button=>{
+      const selected=button.dataset.cabinetTab===name;
+      button.setAttribute('aria-selected',String(selected));
+      button.tabIndex=selected?0:-1;
+      if(selected&&focus)button.focus();
+    });
+    tabPanels.forEach(panel=>{panel.hidden=panel.dataset.cabinetPanel!==name});
+    if(name==='devices'){
+      const deviceSummary=document.getElementById('subscription-devices');
+      if(deviceSummary)deviceSummary.hidden=false;
+    }
+  }
+  const tabList=document.getElementById('cabinet-tabs');
+  tabList?.addEventListener('click',event=>{
+    const button=event.target.closest('[data-cabinet-tab]');
+    if(button&&!button.hidden)selectCabinetTab(button.dataset.cabinetTab);
+  });
+  tabList?.addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    const visible=tabButtons.filter(button=>!button.hidden);
+    const index=visible.indexOf(document.activeElement);
+    if(index<0)return;
+    event.preventDefault();
+    const next=event.key==='Home'?0:event.key==='End'?visible.length-1:
+      (index+(event.key==='ArrowRight'?1:-1)+visible.length)%visible.length;
+    selectCabinetTab(visible[next].dataset.cabinetTab,{focus:true});
+  });
+  document.querySelectorAll('[data-cabinet-open]').forEach(button=>{
+    button.addEventListener('click',()=>selectCabinetTab(button.dataset.cabinetOpen,{focus:true}));
+  });
+  selectCabinetTab('overview');
+
+  let selectedPlatform='all';
+  const appTiles=[...document.querySelectorAll('.subscription-preview-app')];
+  const searchApps=()=>{
+    const needle=(search?.value||'').trim().toLocaleLowerCase(language);
+    let count=0;
+    appTiles.forEach(tile=>{
+      const platform=tile.querySelector('small')?.textContent?.toLocaleLowerCase('en')||'';
+      const name=tile.querySelector('b')?.textContent?.toLocaleLowerCase(language)||'';
+      const matchesPlatform=selectedPlatform==='all'||platform.includes(selectedPlatform);
+      const visible=matchesPlatform&&(!needle||name.includes(needle)||platform.includes(needle));
+      tile.hidden=!visible;
+      if(visible)count++;
+    });
+    const empty=document.getElementById('cabinet-apps-empty');
+    if(empty)empty.hidden=count>0;
+  };
+  document.getElementById('cabinet-platform-filters')?.addEventListener('click',event=>{
+    const button=event.target.closest('[data-app-filter]');
+    if(!button)return;
+    selectedPlatform=button.dataset.appFilter;
+    document.querySelectorAll('[data-app-filter]').forEach(item=>{
+      item.setAttribute('aria-pressed',String(item===button));
+    });
+    searchApps();
+  });
+  search?.addEventListener('input',searchApps);
+
   if (!input) return;
 
   function absoluteSubscriptionUrl() {
@@ -206,9 +353,7 @@
   });
 
   document.getElementById('toggle-devices')?.addEventListener('click', event => {
-    const target = document.getElementById('subscription-devices');
-    if (!target) return;
-    target.hidden = !target.hidden;
-    event.currentTarget.setAttribute('aria-expanded', String(!target.hidden));
+    selectCabinetTab('devices',{focus:true});
+    event.currentTarget.setAttribute('aria-expanded','true');
   });
 })();
