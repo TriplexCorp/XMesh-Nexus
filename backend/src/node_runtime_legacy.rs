@@ -2425,14 +2425,18 @@ mod provision_tests {
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]})];
         provision_proxy_users(&mut config, &users, &squads, now).unwrap();
-        let clients = config["inbounds"][0]["settings"]["clients"].as_array().unwrap();
+        let clients = config["inbounds"][0]["settings"]["clients"]
+            .as_array()
+            .unwrap();
         assert_eq!(clients.len(), 1);
         assert_eq!(clients[0]["email"], "xmesh-u1--NL");
         let policy = build_offline_policy(&config, &users, 5, now, &"a".repeat(64), 1);
         let allowed = policy["users"].as_array().unwrap();
         assert_eq!(allowed.len(), 1);
-        assert_eq!(allowed[0]["offlineBudgetBytes"], 0,
-            "Waiting users may not consume an unlimited disconnected lease");
+        assert_eq!(
+            allowed[0]["offlineBudgetBytes"], 0,
+            "Waiting users may not consume an unlimited disconnected lease"
+        );
     }
 
     #[test]
