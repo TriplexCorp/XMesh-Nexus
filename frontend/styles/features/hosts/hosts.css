@@ -197,3 +197,9 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:2.6
 .host-client-settings>summary{font-weight:500;color:var(--mu)}
 
 @media (max-width:560px){.host-advanced-actions{grid-template-columns:minmax(0,1fr)}.host-advanced-actions>[data-host-clear-overrides]{justify-self:start;max-width:100%}}
+
+
+/* Same three catalog density choices as Nodes and Squads. */
+.host-card-grid[data-grid-mode=compact]{grid-template-columns:repeat(auto-fill,minmax(min(100%,21rem),1fr));gap:var(--nx-space-3)}
+.host-card-grid[data-grid-mode=compact]>.host-card{padding:var(--nx-space-4);gap:var(--nx-space-3)}
+.host-card-grid[data-grid-mode=spacious]{grid-template-columns:repeat(auto-fill,minmax(min(100%,40rem),1fr))}
