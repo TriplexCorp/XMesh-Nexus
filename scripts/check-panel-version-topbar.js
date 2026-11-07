@@ -60,6 +60,7 @@ assert.match(docker,/sh \/source\/scripts\/resolve-panel-build-revision[.]sh/);
 assert.match(docker,/sh \/source\/scripts\/resolve-panel-build-revision[.]sh[^\n]* > \/build\/PANEL_BUILD_REVISION/);
 assert.match(docker,/PANEL_BUILD_REVISION="\$\(cat \/build\/PANEL_BUILD_REVISION\)" cargo build --release/,
  'Resolved SHA must be supplied to rustc instead of the unknown default');
+assert.match(resolver,/GIT_OPTIONAL_LOCKS=0/,'Read-only BuildKit mount must not write Git index');
 assert.match(resolver,/status --porcelain --untracked-files=normal/,
  'Build revision must not impersonate a clean upstream commit for dirty sources');
 assert.match(resolver,/diff --quiet HEAD/,
