@@ -1220,7 +1220,11 @@ fn app_catalog(settings: &Value, language: &str) -> String {
             .and_then(|v| v.get(id))
             .and_then(Value::as_str)
             .unwrap_or("");
-        apps.push_str(&app_item(label, platform, url));
+        apps.push_str(&app_item(label, platform, url).replacen(
+            "class=\"subscription-preview-app\"",
+            &format!("class=\"subscription-preview-app\" data-client-id=\"{id}\""),
+            1,
+        ));
     }
     if let Some(custom) = settings
         .get("subscriptionCustomClients")
@@ -1348,43 +1352,7 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
         );
     }
     if studio_enabled(settings, "subscriptionShowExpiry", true) {
-        let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
-        let pending_days = if user.get("hold").and_then(Value::as_bool) == Some(true) {
-            crate::number(user, "holdDays").filter(|days| (1..=3650).contains(days))
-        } else {
-            None
-        };
-        if let Some(days) = pending_days {
-            let duration = if en {
-                format!("{days} days after first connection")
-            } else {
-                format!("{days} дн. с первого подключения")
-            };
-            let _ = write!(
-                metrics,
-                "<div data-subscription-expiry><small>{}</small><b>{}</b></div>",
-                if en { "Term" } else { "Срок" },
-                duration
-            );
-        } else {
-            let _ = write!(
-                metrics,
-                "<div data-subscription-expiry><small>{}</small><b data-expiry=\"{}\">{}</b></div>",
-                if en {
-                    "Expires"
-                } else {
-                    "Действует до"
-                },
-                expiry,
-                if expiry > 0 {
-                    "—"
-                } else if en {
-                    "Unlimited"
-                } else {
-                    "Бессрочно"
-                }
-            );
-        }
+        metrics.push_str(&portal_expiry(user, en));
     }
     if !metrics.is_empty() {
         metrics = format!(
@@ -1392,6 +1360,48 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
         );
     }
     metrics
+}
+
+fn portal_expiry(user: &Value, en: bool) -> String {
+    let expiry = crate::number(user, "expireAt");
+    let days = user.get("holdDays").and_then(Value::as_i64).unwrap_or(0);
+    if user.get("hold").and_then(Value::as_bool) == Some(true) && (1..=3650).contains(&days) {
+        let term = if en {
+            format!("{days} days after first connection")
+        } else {
+            format!("{days} дн. с первого подключения")
+        };
+        return format!(
+            "<div data-subscription-expiry><small>{}</small><b>{term}</b></div>",
+            if en { "Term" } else { "Срок" }
+        );
+    }
+    let label = if en {
+        "Expires"
+    } else {
+        "Действует до"
+    };
+    let value = match expiry {
+        Some(n) if n > 0 => "—",
+        Some(0) => {
+            if en {
+                "Unlimited"
+            } else {
+                "Бессрочно"
+            }
+        }
+        _ => {
+            if en {
+                "Not specified"
+            } else {
+                "Не указан"
+            }
+        }
+    };
+    let timestamp = expiry.filter(|n| *n > 0).unwrap_or(0);
+    format!(
+        "<div data-subscription-expiry><small>{label}</small><b data-expiry=\"{timestamp}\">{value}</b></div>"
+    )
 }
 
 struct PortalControls {
@@ -1407,13 +1417,24 @@ fn portal_device_summary(user: &Value, en: bool) -> String {
     let connected_devices = user
         .get("devices")
         .and_then(Value::as_array)
-        .map_or(0, Vec::len);
+        .map(Vec::len)
+        .map_or_else(
+            || {
+                if en {
+                    "Not tracked"
+                } else {
+                    "Не отслеживаются"
+                }
+                .to_owned()
+            },
+            |count| count.to_string(),
+        );
     format!(
         "<div id=\"subscription-devices\" class=\"subscription-public-devices\" hidden>{}: {} · {}: {}</div>",
         if en {
-            "Connected devices"
+            "Registered devices"
         } else {
-            "Подключённые устройства"
+            "Зарегистрировано устройств"
         },
         connected_devices,
         if en { "Limit" } else { "Лимит" },
@@ -1811,10 +1832,16 @@ fn portal_html(
 
 // Bearer access is resolved to one user before reading counters. No addresses,
 // inbound configuration or other users' measurements enter the public document.
-async fn portal_server_traffic(state: &AppState, user_id: i64) -> Result<String, ApiError> {
+async fn portal_server_traffic(
+    state: &AppState,
+    user_id: i64,
+    en: bool,
+) -> Result<String, ApiError> {
     let rows = sqlx::query(
         "SELECT COALESCE(NULLIF(n.data->>'remark',''), NULLIF(n.data->>'name',''), h.display_name) AS name,
-                t.node_id, (t.uplink_bytes::DOUBLE PRECISION + t.downlink_bytes::DOUBLE PRECISION)
+                t.node_id, t.uplink_bytes::DOUBLE PRECISION / 1073741824.0 AS upload,
+                t.downlink_bytes::DOUBLE PRECISION / 1073741824.0 AS download,
+                (t.uplink_bytes::DOUBLE PRECISION + t.downlink_bytes::DOUBLE PRECISION)
                     / 1073741824.0 AS gib
          FROM user_node_traffic_totals t
          LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
@@ -1826,11 +1853,15 @@ async fn portal_server_traffic(state: &AppState, user_id: i64) -> Result<String,
     .fetch_all(&state.pool)
     .await?;
     let mut servers = Vec::with_capacity(rows.len());
-    for row in rows {
-        let id: i64 = row.try_get("node_id")?;
+    for (index, row) in rows.into_iter().enumerate() {
         let name: Option<String> = row.try_get("name")?;
+        let fallback = format!("{} {}", if en { "Server" } else { "Сервер" }, index + 1);
         let gib: f64 = row.try_get("gib")?;
-        servers.push(json!({"name": name.unwrap_or_else(|| format!("#{id}")), "gib": gib}));
+        servers.push(json!({
+            "name": name.unwrap_or(fallback), "gib": gib,
+            "upload": row.try_get::<f64, _>("upload")?,
+            "download": row.try_get::<f64, _>("download")?
+        }));
     }
     Ok(escape_html(&Value::Array(servers).to_string()))
 }
@@ -1841,16 +1872,57 @@ pub async fn portal(
     headers: HeaderMap,
     Query(options): Query<HashMap<String, String>>,
 ) -> Result<Response, ApiError> {
+    if crate::subscription_user_agent::wants_feed(&headers, &options).map_err(bad)? {
+        return serve(State(state), Path(token), headers, Query(options)).await;
+    }
+    let en = match options.get("lang").map(String::as_str) {
+        Some("en") => true,
+        Some("ru") => false,
+        _ => headers
+            .get(header::ACCEPT_LANGUAGE)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.to_ascii_lowercase().starts_with("en")),
+    };
+    match portal_browser(State(state), Path(token), Query(options)).await {
+        Err(error) if error.status.is_server_error() => {
+            let (title, note, retry) = if en {
+                (
+                    "Subscription unavailable",
+                    "We could not load your data. Please try again.",
+                    "Try again",
+                )
+            } else {
+                (
+                    "Подписка недоступна",
+                    "Не удалось загрузить данные. Попробуйте ещё раз.",
+                    "Повторить",
+                )
+            };
+            let html = format!(
+                "<!doctype html><html lang=\"{}\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"referrer\" content=\"no-referrer\"><title>{title}</title><body style=\"margin:0;background:#080b11;color:#f3f5f9;font:18px/1.6 system-ui;padding:32px\"><main style=\"max-width:640px;margin:15vh auto\"><h1>{title}</h1><p>{note}</p><a href=\"\" style=\"display:inline-block;padding:12px 24px;background:#ff9788;color:#10151f;border-radius:12px\">{retry}</a></main></body></html>",
+                if en { "en" } else { "ru" }
+            );
+            Ok((
+                StatusCode::SERVICE_UNAVAILABLE,
+                [(header::CACHE_CONTROL, "private, no-store")],
+                Html(html),
+            )
+                .into_response())
+        }
+        result => result,
+    }
+}
+
+async fn portal_browser(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+    Query(options): Query<HashMap<String, String>>,
+) -> Result<Response, ApiError> {
     if !valid_token(&token) {
         return Err(ApiError::new(
             StatusCode::NOT_FOUND,
             "Subscription not found",
         ));
-    }
-    // A single permanent HTTPS URL is a portal for browsers and a
-    // negotiated JSON/VLESS subscription for the VPN client's User-Agent.
-    if crate::subscription_user_agent::wants_feed(&headers, &options).map_err(bad)? {
-        return serve(State(state), Path(token), headers, Query(options)).await;
     }
     let hash = token_hash(&token);
     let row = sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
@@ -1879,7 +1951,7 @@ pub async fn portal(
     };
     let en = lang == "en";
     let metrics = if studio_enabled(&settings, "subscriptionShowTraffic", true) {
-        let servers = portal_server_traffic(&state, user_id).await?;
+        let servers = portal_server_traffic(&state, user_id, en).await?;
         portal_metrics(&user, &settings, en).replacen(
             "data-subscription-traffic",
             &format!("data-subscription-traffic data-traffic-servers=\"{servers}\""),
@@ -1893,7 +1965,18 @@ pub async fn portal(
     let raw_link = studio_url(&settings, &token);
     let controls = portal_controls(&user, &settings, lang, en, active, &raw_link);
     let decoration = portal_decoration(&settings, en, active, waiting);
-    let html = portal_html(&settings, lang, en, metrics, controls, decoration);
+    let html = portal_html(&settings, lang, en, metrics, controls, decoration).replacen(
+        "class=\"subscription-preview\"",
+        &format!(
+            "class=\"subscription-preview\" data-subscription-state=\"{}\"",
+            if !active && crate::user_status(&user, now) == "ON_HOLD" {
+                "DISABLED"
+            } else {
+                crate::user_status(&user, now)
+            }
+        ),
+        1,
+    );
     let mut response = Html(html).into_response();
     response
         .headers_mut()
@@ -1904,6 +1987,17 @@ pub async fn portal(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn portal_expiry_distinguishes_missing_unlimited_and_waiting() {
+        assert!(portal_expiry(&json!({}), true).contains("Not specified"));
+        assert!(portal_expiry(&json!({"expireAt":0}), true).contains("Unlimited"));
+        assert!(portal_expiry(&json!({"expireAt":1000}), true).contains("data-expiry=\"1000\""));
+        assert!(
+            portal_expiry(&json!({"hold":true,"holdDays":30}), true)
+                .contains("30 days after first connection")
+        );
+    }
+
     #[test]
     fn secret_format() {
         assert!(valid_token(&"a".repeat(64)));

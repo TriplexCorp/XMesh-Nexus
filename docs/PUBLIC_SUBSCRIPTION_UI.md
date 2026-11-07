@@ -1,29 +1,106 @@
-# Public subscription account
+# Public subscription experience 2.0
 
-The single page prioritizes four account blocks: identity/status, actual usage,
-expiry, and access management. On desktop they form a two-column dashboard;
-on phones, copy and QR follow the status immediately. A single import hint lives beside the copy/QR actions; there is no repeated step guide. The application catalog is a native collapsed disclosure,
-with automatic platform detection and manual filters. There are no section tabs.
+The primary task is connecting a device. The account header keeps status and expiry
+visible, followed by a wide connection panel and a smaller analytics rail. Phones
+show connection before expiry and traffic. Branding, colors, fonts, radius,
+materials, application visibility, custom clients and configured URLs remain owned
+by Subscription Studio. The authenticated panel remains isolated from public CSS.
 
-Used/remaining values come from numeric server-rendered GiB attributes. Remaining
-quota is clamped at zero, and finite-plan percentages at 100. Unlimited plans show
-no invented percentage or expiry progress. The combined server-rendered usage
-label remains a fallback when JavaScript is unavailable.
+The browser uses the existing server-rendered template; there is no new SPA or
+public data API. Studio and the public portal share `subscription-experience.js`,
+`subscription-traffic.js` and the public stylesheet. Configured CTA text belongs to
+the primary setup action; the secondary action always describes copying.
 
-One copy action and QR share the canonical URL; revealing the private URL requires
-an explicit action. Inactive subscriptions hide setup and the import guide.
-Optional traffic, expiry, applications, devices and support respect Studio settings.
-Studio previews the same composition and stylesheet, including owner-selected
-branding, colors, fonts, radius and materials. Motion respects reduced-motion.
+## Connection flow
 
-`node scripts/test-public-subscription-browser.cjs` checks the real template and
-assets with disposable data at 320/390/768/1440/1920 px in RU/EN and dark/light,
-including ordering, collapsed apps, usage, copy/QR, keyboard and visibility states.
+Connect VPN opens a native dialog with an automatically suggested platform, a
+manual platform override and the configured application catalog. Selecting an app
+shows its installation/import actions before detailed instructions. Platform
+instructions explain the relevant system permission, without claiming that the
+website can establish or detect the VPN connection itself.
 
-Traffic now uses a shared SVG donut in the live portal and Studio. Bearer resolution
-precedes a user-scoped SQL read of authenticated per-node counters; only display
-names and GiB enter an HTML-escaped data attribute. No admin API is exposed.
-Hover/focus previews a server; click/Enter selects it; Escape or All servers resets.
-Touch users can choose the matching legend button. Empty counters show no segments;
-legacy unassigned consumption is explicitly unattributed. Link reveal is removed
-from the live UI; copy and QR still share the canonical bearer URL.
+Only the documented Happ `happ://add/<url>` action is offered for the current native
+Xray feed. Other applications keep a manual import route and an explicit format
+compatibility note. Configured install URLs take precedence; verified publisher
+pages are fallbacks for built-in Happ, v2rayN, v2rayNG and Hiddify. Custom names do
+not acquire a built-in URI scheme merely by resembling a known app name.
+
+The browser cannot reliably detect whether an application is installed. The page
+therefore never reports a successful app launch: install and copy alternatives
+remain visible. Native dialog support falls back to inline content on older
+browsers. Dialogs have accessible names, Escape handling, visible focus, focus
+restoration and locally generated QR codes with a four-module quiet zone.
+
+## Data and states
+
+Bearer resolution precedes the user-scoped SQL read of authenticated Xray counters.
+Only display names and measured GiB enter an HTML-escaped attribute. Names are
+rendered with textContent. Missing aliases use public ordinals, not internal IDs.
+The donut shows distribution by server, never the percentage of a quota consumed.
+Unattributed historical consumption remains explicitly unattributed. Upload and
+download appear only when both directions are measured; they are labeled as
+measured server traffic if a legacy unassigned baseline also exists.
+
+Unlimited plans show an amount and an unlimited label, with server distribution
+behind a disclosure. Finite plans show the real allowance and remaining amount.
+No history, speed, plan name or statistics period is invented. Device counts are
+registered slots, not a count of live VPN connections; absent tracking is distinct
+from zero. Missing/invalid expiry is distinct from an explicit zero (unlimited).
+
+Expired, quota-exhausted, disabled and waiting subscriptions have distinct copy.
+Backend access decisions remain authoritative. A waiting account that cannot
+connect never gets a misleading ready message. HTML backend failures return HTTP
+503 with retry and no fake zero usage; client feed errors retain JSON behavior.
+Server rendering supplies real initial values, so there is no artificial loading
+delay or client fetch requiring a decorative skeleton.
+
+## Content negotiation and security
+
+`subscription_user_agent.rs` still determines HTML versus native Xray JSON. Feed
+serialization, content types, signed credentials, device enforcement, transport
+projection and subscription URLs are unchanged. No Clash/sing-box/link exporter
+is added or implied. Browser and app User-Agent matrices are exercised in Rust and
+against the real disposable API. The native client supports only what the existing
+exporters and selected app versions support; an import URI is not compatibility
+proof for every mobile app version.
+
+Copy and QR use the same canonical bearer URL. No external QR or redirect service,
+analytics, link shortener or launch-detection tracking is used. Clipboard denial
+and fallback exceptions clean up temporary DOM fields and report failure safely.
+
+## Validation and limits
+
+- Browser suite: 36 viewport/locale/state cases at 320, 375, 390, 430, 768, 1024, 1440 and 1920 px; RU/EN; dark/light;
+  copy, QR, focus, platform/app selection, terminal/waiting states, unlimited,
+  empty traffic, hidden capabilities and reduced motion.
+- Rust: missing/unlimited/waiting expiry and browser/client Accept matrices, plus
+  the existing native feed and authorization tests.
+- Real API regression: browser HTML and nine VPN User-Agent JSON responses from
+  the same disposable bearer URL.
+- Real data plane: `scripts/test-subscription-loopback.cjs` validates generated
+  client JSON with pinned Xray v26.10.31, transfers HTTP through VLESS/TLS, then
+  proves that stopping the server breaks the tunnel. The temporary server permits
+  only the local test destination, and pins its ephemeral leaf certificate.
+  Endpoint/routing substitutions are confined to the isolated test.
+
+Physical iOS/Android devices and installed third-party GUI apps are not present in
+this environment. Browser emulation and a real Xray tunnel do not claim to test
+those apps' OS prompts or every protocol/transport combination. No production node,
+agent or user credentials are used for testing.
+
+## Research references
+
+- [Remnawave subscription page](https://github.com/remnawave/subscription-page),
+  [panel documentation](https://docs.rw/learn-en/quick-start/): configurable
+  applications and separation of browser presentation from client delivery.
+- [Orion](https://github.com/legiz-ru/Orion): platform selection and progressive
+  installation instructions. Its MIT license and Remnawave's AGPL were inspected;
+  no implementation code or assets were copied.
+- [Happ setup documentation](https://www.happ.su/main/faq/adding-configuration-subscription)
+  and [Remnawave's Happ template](https://github.com/remnawave/templates/blob/main/by-unknown/subscription-page/happ-only.json)
+  document import/clipboard/QR behavior and the Happ URI shape.
+- [Hiddify URI documentation](https://hiddify.com/app/URL-Scheme/): the existence of
+  an import scheme alone does not establish support for this repository's feed.
+- [Linear](https://linear.app), [Vercel](https://vercel.com),
+  [Stripe](https://stripe.com): visual references for hierarchy, restraint and
+  numerical clarity, not sources of copied branding or layout code.

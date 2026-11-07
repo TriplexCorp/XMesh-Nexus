@@ -310,7 +310,7 @@ window.XMeshSubscriptionStudio = (() => {
       '</div>',
       '<div data-subscription-expiry="">',
       '<small data-subscription-expiry-label="">Действует до</small>',
-      '<b>31.12.2026</b>',
+      '<b data-expiry="1798675200000">31.12.2026</b>',
       '</div>',
       '</div>',
       '</div>',
@@ -393,7 +393,7 @@ window.XMeshSubscriptionStudio = (() => {
       '</header>',
       '<div class="subscription-cabinet-device-card">',
       '<span class="cabinet-device-emblem" aria-hidden="true">▣</span>',
-      '<div class="subscription-public-devices" data-preview-devices="" hidden="">Подключённые устройства: 2 · Лимит: 5</div>',
+      '<div class="subscription-public-devices" data-preview-devices="" hidden="">Зарегистрировано устройств: 2 · Лимит: 5</div>',
       '</div>',
       '</section>',
       '<section class="subscription-cabinet-panel" id="cabinet-panel-support" data-setup-section="support">',
@@ -433,7 +433,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=6fc2d828fd52',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=13d7a119f4ac'
+        '/subscription-public.css?v=6a55fffe32d1'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
@@ -570,7 +570,7 @@ window.XMeshSubscriptionStudio = (() => {
           devicesNote:'Your registered device count and allowance.',
           supportKicker:'HELP CENTER',supportHeading:'Need a hand?',
           supportNote:'If something isn’t working, contact support. They can help you get connected.',nextNote:'Install an app, then return to this page.',next:'Next: add subscription',all:'All',
-          devicesSample:'Connected devices: 2 · Limit: 5'
+          devicesSample:'Registered devices: 2 · Limit: 5'
         }:{
           tabs:['Обзор','Подключение','Приложения','Устройства','Поддержка'],
           kicker:'МОЙ КАБИНЕТ / VPN ACCESS',featureEyebrow:'ВАШ ДОСТУП',
@@ -588,7 +588,7 @@ window.XMeshSubscriptionStudio = (() => {
           devicesNote:'Количество зарегистрированных устройств и лимит.',
           supportKicker:'ПОМОЩЬ',supportHeading:'Нужна помощь?',
           supportNote:'Если что-то не получается, напишите в поддержку. Вам помогут подключиться.',nextNote:'Установите приложение и вернитесь на эту страницу.',next:'Далее: добавить подписку',all:'Все',
-          devicesSample:'Подключённые устройства: 2 · Лимит: 5'
+          devicesSample:'Зарегистрировано устройств: 2 · Лимит: 5'
         };
         const setText=(id,text)=>{const node=previewShadow.getElementById(id);if(node)node.textContent=text;};
         ['overview','connect','apps','devices','support'].forEach((key,i)=>setText('cabinet-tab-'+key+'-label',local.tabs[i]));
@@ -681,7 +681,7 @@ window.XMeshSubscriptionStudio = (() => {
         const sampleUsage=$('[data-subscription-traffic] b');
         const sampleDate=$('[data-subscription-expiry] b');
         if(sampleUsage)sampleUsage.textContent=english?'12.4%':'12,4%';
-        window.XMeshSubscriptionTraffic?.mount($('[data-subscription-traffic]'),{used:12.4,limit:100,servers:[{name:english?'Server 1':'Сервер 1',gib:8},{name:english?'Server 2':'Сервер 2',gib:4.4}],language:lang});
+        window.XMeshSubscriptionTraffic?.mount($('[data-subscription-traffic]'),{used:12.4,limit:100,servers:[{name:english?'Server 1':'Сервер 1',gib:8,upload:2,download:6},{name:english?'Server 2':'Сервер 2',gib:4.4,upload:1,download:3.4}],language:lang});
         if(sampleDate)sampleDate.textContent=english?'Dec 31, 2026':'31.12.2026';
         $('[data-subscription-connect]').textContent=(english?d.subscriptionCtaEn:d.subscriptionCta)||copy[3];
         if(['Connect','Подключиться'].includes($('[data-subscription-connect]').textContent.trim()))$('[data-subscription-connect]').textContent=english?'Copy':'Копировать';
@@ -709,10 +709,12 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-apps-title]').textContent=(english?d.subscriptionAppsTitleEn:d.subscriptionAppsTitle)||appsHeading(lang);
         apps.dataset.clientLayout=d.subscriptionClientLayout;
         $('[data-subscription-app-list]').innerHTML=allEnabled.map(([id,label,platform])=>
-          '<div class="subscription-preview-app"><span>'+esc(label.slice(0,2))+'</span><div><b>'+esc(label)+'</b><small>'+esc(platform)+'</small></div></div>'
+          '<div class="subscription-preview-app" data-client-id="'+esc(id)+'" data-install-url="'+esc(customEnabled.find(client=>client.id===id)?.url||d.subscriptionClientLinks[id]||'')+'"><span>'+esc(label.slice(0,2))+'</span><div><b>'+esc(label)+'</b><small>'+esc(platform)+'</small></div></div>'
         ).join('');
         syncPreviewSections();
         applyPreviewFilter();
+        window.XMeshSubscriptionExperience?.mount(previewRoot,{language:lang,startLabel:english?d.subscriptionCtaEn:d.subscriptionCta,url:$('[data-preview-demo-link]').textContent,copyButton:$('[data-subscription-connect]'),copy:async()=>{}});
+
         const support=$('[data-subscription-support]');
         support.textContent=(english?d.subscriptionSupportLabelEn:d.subscriptionSupportLabel)||(english?'Support':'Поддержка');
         support.hidden=!d.subscriptionShowSupport;
@@ -733,6 +735,8 @@ window.XMeshSubscriptionStudio = (() => {
             button.setAttribute('aria-pressed',String(button===filter));
           });
           applyPreviewFilter();
+
+
           return;
         }
         const qrButton=event.target.closest('[data-subscription-qr]');
