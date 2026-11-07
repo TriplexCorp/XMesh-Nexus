@@ -216,7 +216,7 @@ fn vless_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         return None;
     }
     let stream_check = inbound.get("streamSettings")?;
-    let security_check = nonempty(stream_check, "security").unwrap_or("none");
+    let security_check = crate::subscription_transport::client_security(stream_check, host)?;
     let network_check = nonempty(stream_check, "method")
         .or_else(|| nonempty(stream_check, "network"))
         .unwrap_or("tcp");

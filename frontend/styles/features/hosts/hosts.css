@@ -25,7 +25,7 @@ dialog.host-wide .node-form-section-title{display:flex;align-items:center;gap:.6
 .host-public-fields>.f>span:first-child,.host-advanced-fields>.f>span:first-child{min-block-size:2.8em}
 .host-assignment-panel{grid-area:assignment;padding-top:14px;border-top:1px solid var(--nx-border)}
 .host-assignment-fields{grid-template-columns:minmax(0,1fr) minmax(13rem,.3fr)}
-.host-editor-layout .host-assignment-panel .ms{grid-template-columns:repeat(4,minmax(0,1fr))}
+.host-editor-layout .host-assignment-panel .ms{grid-template-columns:repeat(3,minmax(0,1fr))}
 .host-assignment-fields>.f:last-child{padding-left:16px;border-left:1px solid var(--nx-border)}
 .host-assignment-fields>.f:last-child>span:first-child{flex:1}
 .host-editor-layout .ms{display:grid;align-items:stretch;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;min-width:0}
@@ -33,13 +33,13 @@ dialog.host-wide .node-form-section-title{display:flex;align-items:center;gap:.6
 .host-editor-layout .ms label>input{margin-top:.1rem}
 .host-editor-layout .ms label>span{min-width:0;overflow-wrap:anywhere}
 .host-editor-layout [data-host-count]{font-size:.73rem;line-height:1.4;color:var(--mu)}
-.host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:1/-1}
+.host-advanced-fields .f:has([name="publicKey"]){grid-column:1/-1}
 .host-advanced-fields .f:has([name="publicKey"])>span,.host-advanced-fields .f:has([name="clientEncryption"])>span{min-block-size:0}
 .host-advanced-heading{display:grid;gap:6px}
 .host-advanced-actions{display:flex;justify-content:flex-start;padding-top:12px;border-top:1px solid var(--nx-border)}
 .host-editor-layout .node-ip-hint{margin:0;font-size:.75rem;line-height:1.45;color:var(--mu);overflow-wrap:anywhere}
 .host-resolved{display:grid;min-width:0}
-.host-resolved-line{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:12px;align-items:center;padding:.45rem 0;border-bottom:1px solid var(--nx-border);min-width:0;font-size:.76rem;line-height:1.4}
+.host-resolved-line{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:12px;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--nx-border);min-width:0;font-size:.76rem;line-height:1.4}
 .host-resolved-line:last-child{border:0}
 .host-resolved-line>span{color:var(--mu);min-width:0}
 .host-resolved-line>b{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:.78rem;min-width:0;font-weight:650}
@@ -182,3 +182,8 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36p
 .host-client-settings>summary{cursor:pointer;color:var(--tx);font-size:.73rem;font-weight:650;line-height:1.3;padding:.55rem .65rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg)}
 .host-client-settings .f{margin-top:.65rem}
 .host-client-settings textarea{font-family:var(--font-mono,monospace);min-height:7rem;resize:vertical}
+/* Ordinary host controls stay compact; raw client metadata is expert-only. */
+.host-advanced-fields>.f>span:first-child{min-block-size:1.4em}
+.host-field-help{display:inline-block;color:var(--mu);font-size:.8rem;cursor:help;margin-left:.25rem;font-weight:400}
+.host-field-help:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px;border-radius:50%}
+.host-client-settings>summary{font-weight:500;color:var(--mu)}

@@ -2117,6 +2117,13 @@ async function main() {
       assert(focus.offset<=0,'Focus must stay inside the control without a detached double contour');
       assert.equal(focus.shadow,'none','Text fields must not add a second focus shadow');
       await screenshot(page,`audit-focus-host-${width}`);
+      for(const [name,value] of [['xhttpMode','packet-up'],['tlsVerification','insecure']]){
+        await page.locator(`[name="${name}"]`).evaluate((input,next)=>{input.value=next;input.dispatchEvent(new Event('change',{bubbles:true}))},value);
+      }
+      assert.equal(JSON.parse(await page.locator('[name="clientXhttpSettings"]').inputValue()).mode,'packet-up','XHTTP dropdown must update the persisted client configuration');
+      assert.equal(JSON.parse(await page.locator('[name="clientTlsSettings"]').inputValue()).allowInsecure,true,'Certificate control must update the persisted TLS settings');
+      assert.equal(await page.locator('[name="alpn"]').evaluate(el=>el.tagName),'SELECT','ALPN must be a normal selection control');
+      assert(!(await page.locator('[name="clientTlsSettings"]').isVisible()),'Raw JSON must remain hidden in the expert disclosure');
       await page.locator('[name="sni"]').fill('override.example.invalid');
       await page.locator('[name="sni"]').dispatchEvent('change');
       assert((await page.locator('[data-host-resolved]').innerText()).includes('override.example.invalid'),'Live preview must reflect SNI override');
@@ -2144,7 +2151,7 @@ async function main() {
         assert(g.choices.length>=5,'Fixture must show a real node fleet');
         assert(g.assignment.y>=Math.max(g.primary.bottom,g.advanced.bottom),'Assignments must follow editable fields without waiting for preview height');
         assert(Math.abs(g.assignment.x-g.primary.x)<=2&&Math.abs(g.assignment.right-g.advanced.right)<=2,'Assignments must span the editable workspace beside preview');
-        assert(g.bodyScroll<=g.bodyClient+1,'Populated TLS/XHTTP Host editor must fit desktop without workspace scrolling');
+        assert(g.bodyScroll<=g.bodyClient+1,'Populated TLS/XHTTP Host editor must fit desktop without workspace scrolling: '+JSON.stringify(g));
         assert(g.copyValues.includes('/host-preview/'+('long-segment-'.repeat(24))),'Full long path must remain available to copy');
       }else assert(g.assignment.y>=g.primary.bottom&&g.advanced.y>=g.assignment.bottom&&g.preview.y>=g.advanced.bottom,'Mobile sections must not overlap');
       return g;

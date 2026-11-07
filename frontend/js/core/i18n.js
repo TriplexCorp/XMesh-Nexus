@@ -15,6 +15,21 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Если перед нодой стоит промежуточный сервер, выберите защиту публичного подключения.":"If a proxy sits in front of the node, select the security layer used by the public endpoint.",
+    "Проверка сертификата применяется только к TLS-подключению клиента.":"Certificate verification applies only to the client TLS connection.",
+    "Путь транспорта":"Transport path",
+    "Защита подключения":"Security layer",
+    "Из inbound":"Inbound default",
+    "Из профиля":"Profile default",
+    "Проверка сертификата":"Certificate verification",
+    "Проверять":"Verify",
+    "Не проверять":"Skip verification",
+    "Режим XHTTP":"XHTTP mode",
+    "Использовать SNI как Host":"Use SNI as Host",
+    "Экспертные настройки JSON":"Expert JSON settings",
+    "Некорректный режим защиты":"Invalid security layer",
+    "Для REALITY используется защита inbound":"REALITY requires the inbound security layer",
+
     "Настройки клиента":"Client settings",
     "JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.":"JSON object. Leave blank to inherit profile settings. Applies only to client configurations.",
     "Укажите JSON-объект:":"Enter a JSON object:",

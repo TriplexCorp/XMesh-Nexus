@@ -43,7 +43,13 @@ window.XMeshHostEditor=(() => {
       const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
       const basic=['remark','address','port','countryCode'].map(k=>field(f(k),o[k])).join('');
       const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
-      const advanced=['sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'].map(k=>field(f(k),o[k]??'')).join('');
+      const advanced=['sni','host','path','securityLayer','alpn','fp','xhttpMode','tlsVerification','useSniAsHost','serviceName','publicKey','shortId','spiderX','clientEncryption'].filter(k=>f(k)).map(k=>{
+        const value=k==='tlsVerification'?(o.clientTlsSettings?.allowInsecure===true?'insecure':o.clientTlsSettings?.allowInsecure===false?'verify':''):k==='xhttpMode'?(o.clientXhttpSettings?.mode||''):o[k]??'';
+        const spec=k==='alpn'&&value&&!f(k).o.some(([key])=>key===value)?{...f(k),o:[...f(k).o,[value,value]]}:k==='clientEncryption'?{...f(k),l:'VLESS Encryption'}:f(k);
+        const hint=k==='securityLayer'?'Если перед нодой стоит промежуточный сервер, выберите защиту публичного подключения.':k==='tlsVerification'?'Проверка сертификата применяется только к TLS-подключению клиента.':'';
+        const markup=field(spec,value);
+        return hint?markup.replace('<span>'+spec.l+'</span>','<span>'+spec.l+' <span class="host-field-help" tabindex="0" role="img" title="'+esc(hint)+'" aria-label="'+esc(hint)+'">ⓘ</span></span>'):markup;
+      }).join('');
       const clientFields=['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].filter(k=>f(k)).map(k=>field(f(k),typeof o[k]==='object'&&o[k]!==null?JSON.stringify(o[k],null,2):o[k]||'')).join('');
       // Three permanent, side-by-side editing zones. Keep all input names and
       // actions unchanged so the existing save and live-preview logic still work.
@@ -62,7 +68,7 @@ window.XMeshHostEditor=(() => {
         '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
         '<div class="host-advanced-fields">'+advanced+'</div>'+
         '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button>'+
-        '<details class="host-client-settings"><summary>Настройки клиента</summary><p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details></div></section>'+
+        '<details class="host-client-settings"><summary>Экспертные настройки JSON</summary><p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details></div></section>'+
         '<section class="host-editor-side" aria-label="Клиентское подключение">'+
         '<div class="node-form-section-title">'+ic('globe')+'<span>Клиентское подключение</span></div>'+
         '<p class="node-ip-hint">Предпросмотр из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+

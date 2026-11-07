@@ -1,6 +1,14 @@
 # Host client overrides
 
-Open **Hosts → Edit → Advanced overrides → Client settings**. These objects
+The normal host editor provides security-layer selection (inbound default,
+TLS or None), ALPN presets, Use SNI as Host, certificate verification and XHTTP
+mode selectors. A custom previously saved ALPN value remains available.
+TLS and XHTTP selectors update their corresponding metadata objects, preserving
+other expert properties. Clearing a selector removes its explicit override.
+Security-layer overrides are rejected for REALITY; the inbound mode is required.
+
+Open **Hosts → Edit → Advanced overrides → Expert JSON settings** for additional
+client parameters. These objects
 change generated client configurations, not the node's inbound or TLS certificate.
 Only controls relevant to the selected transport/security are shown. Other values
 are preserved when switching profiles so they can be edited again later.

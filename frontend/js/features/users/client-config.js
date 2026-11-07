@@ -38,7 +38,8 @@
   ]}};
  }
  function stream(inbound,host){
-  const source=obj(inbound.streamSettings),security=nonempty(source.security)||'none';
+  const source=obj(inbound.streamSettings),security=nonempty(host.securityLayer)||nonempty(source.security)||'none';
+  if(nonempty(source.security)==='reality'&&nonempty(host.securityLayer))throw new Error('REALITY requires the inbound security layer');
   let network=nonempty(source.network)||'tcp';
   if(network==='splithttp')network='xhttp';
   if(network==='ws')network='ws';
@@ -49,7 +50,7 @@
   const map={xhttp:'xhttpSettings',grpc:'grpcSettings',ws:'wsSettings',
    websocket:'wsSettings',httpupgrade:'httpupgradeSettings',raw:'rawSettings',tcp:'tcpSettings'};
   if(map[network]&&sourceSettings[network])result[map[network]]=copy(sourceSettings[network]);
-  const domain=nonempty(host.sni)||nonempty(host.externalSNI)||nonempty(source.realitySettings?.serverNames?.[0])||nonempty(source.tlsSettings?.serverName);
+  const domain=nonempty(host.sni)||nonempty(host.externalSNI)||(security==='reality'?nonempty(source.realitySettings?.serverNames?.[0]):nonempty(source.tlsSettings?.serverName));
   if(security==='reality'){
    const reality=obj(source.realitySettings);
    // Server config normally contains privateKey, not publicKey. Never expose it
@@ -78,8 +79,9 @@
    const target=result[map[network]]||={};target.headers=copy(metadata('clientHeaders'));
   }
   if(security==='tls'){
-   if(nonempty(host.alpn))result.tlsSettings.alpn=host.alpn.split(',').map(v=>v.trim()).filter(Boolean);
    merge(result.tlsSettings,metadata('clientTlsSettings'),['verifyPeerCertByName','allowInsecure','alpn','fingerprint','pinnedPeerCertSha256','useSystemCA','disableSystemRoot','enableSessionResumption','echConfigList','echSockopt','minVersion','maxVersion','cipherSuites','curvePreferences']);
+   if(nonempty(host.alpn))result.tlsSettings.alpn=host.alpn.split(',').map(v=>v.trim()).filter(Boolean);
+   if(nonempty(host.fp)||nonempty(host.fingerprint))result.tlsSettings.fingerprint=nonempty(host.fp)||nonempty(host.fingerprint);
   }
   if(network==='grpc'&&nonempty(host.serviceName))(result.grpcSettings||={}).serviceName=host.serviceName;
   if(network==='masque'){
@@ -88,13 +90,13 @@
    if(nonempty(host.host))result.masqueSettings.host=host.host;
    if(nonempty(host.path))result.masqueSettings.path=host.path;
   }
-  const clientHost=nonempty(host.host)||nonempty(host.externalHost);
+  const clientHost=host.useSniAsHost?(domain||nonempty(host.address)):nonempty(host.host)||nonempty(host.externalHost);
   const path=nonempty(host.path);
   for(const prop of ['xhttpSettings','wsSettings','httpupgradeSettings']){
    if(!result[prop])continue;
    if(path)result[prop].path=path;
    if(clientHost){
-    if(prop==='wsSettings')result[prop].headers={...obj(result[prop].headers),Host:clientHost};
+    if(prop==='wsSettings'){const headers={...obj(result[prop].headers)};for(const key of Object.keys(headers))if(key.toLowerCase()==='host')delete headers[key];result[prop].headers={...headers,Host:clientHost};result[prop].host=clientHost;}
     else result[prop].host=clientHost;
    }
   }
@@ -130,7 +132,7 @@
     ||nonempty(user.vlessEncryption)||nonempty(inbound.xmesh?.clientEncryption)||'none';
    const decryption=nonempty(inbound.settings?.decryption)||'none';
    if(decryption!=='none'&&encryption==='none')throw new Error('VLESS Encryption активен на сервере, но в хосте не указан клиентский encryption.');
-   if(obj(inbound.streamSettings).security==='none'&&!encryption.startsWith('mlkem768x25519plus.'))
+   if((nonempty(host.securityLayer)||obj(inbound.streamSettings).security)==='none'&&!encryption.startsWith('mlkem768x25519plus.'))
     throw new Error('VLESS без TLS/REALITY требует VLESS Encryption.');
    const userEntry={id:user.xrayId,encryption};
    const flow=nonempty(inbound.settings?.flow);

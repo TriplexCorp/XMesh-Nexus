@@ -142,6 +142,49 @@ fn client_metadata<'a>(inbound: &'a Value, host: &'a Value, key: &str) -> Option
         .filter(|value| !value.is_null())
         .or_else(|| inbound.get("xmesh").and_then(|v| v.get(key)))
 }
+pub fn client_security<'a>(stream: &'a Value, host: &'a Value) -> Option<&'a str> {
+    let inherited = field(stream, "security").unwrap_or("none");
+    match field(host, "securityLayer") {
+        None => Some(inherited),
+        Some("tls" | "none") if inherited != "reality" => field(host, "securityLayer"),
+        _ => None,
+    }
+}
+
+fn client_hostname<'a>(stream: &'a Value, host: &'a Value) -> Option<&'a str> {
+    if host.get("useSniAsHost").and_then(Value::as_bool) == Some(true) {
+        let inherited = if client_security(stream, host) == Some("reality") {
+            stream
+                .get("realitySettings")
+                .and_then(|reality| reality.get("serverNames"))
+                .and_then(Value::as_array)
+                .and_then(|names| names.first())
+                .and_then(Value::as_str)
+        } else {
+            stream
+                .get("tlsSettings")
+                .and_then(|tls| field(tls, "serverName"))
+        };
+        return field(host, "sni")
+            .or(inherited)
+            .or_else(|| field(host, "address"));
+    }
+    field(host, "host").or_else(|| field(host, "externalHost"))
+}
+
+fn set_client_hostname(transport: &mut Value, network: &str, hostname: &str) {
+    transport["host"] = json!(hostname);
+    if ["ws", "websocket"].contains(&network) {
+        let mut headers = transport["headers"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        headers.retain(|key, _| !key.eq_ignore_ascii_case("host"));
+        headers.insert("Host".into(), json!(hostname));
+        transport["headers"] = Value::Object(headers);
+    }
+}
+
 fn client_transport(
     stream: &Value,
     inbound: &Value,
@@ -223,10 +266,10 @@ fn client_transport(
     {
         transport["path"] = json!(path);
     }
-    if let Some(hostname) = field(host, "host").or_else(|| field(host, "externalHost"))
+    if let Some(hostname) = client_hostname(stream, host)
         && ["xhttp", "ws", "websocket", "httpupgrade"].contains(&network)
     {
-        transport["host"] = json!(hostname);
+        set_client_hostname(&mut transport, network, hostname);
     }
     if network == "grpc"
         && let Some(service) = field(host, "serviceName")
@@ -237,7 +280,7 @@ fn client_transport(
         if let Some(extra) = client_metadata(inbound, host, "clientMasqueSettings") {
             merge_allowed(&mut transport, extra, &["host", "headers", "xmux"]);
         }
-        if let Some(hostname) = field(host, "host").or_else(|| field(host, "externalHost")) {
+        if let Some(hostname) = client_hostname(stream, host) {
             transport["host"] = json!(hostname);
         }
     }
@@ -302,24 +345,6 @@ fn client_tls_settings(inbound: &Value, host: &Value, stream: &Value) -> Option<
         ],
     );
     tls["serverName"] = json!(sni);
-    if let Some(override_alpn) = field(host, "alpn") {
-        let alpn: Vec<&str> = override_alpn
-            .split(',')
-            .map(str::trim)
-            .filter(|s| {
-                !s.is_empty()
-                    && s.len() <= 32
-                    && s.bytes()
-                        .all(|b| b.is_ascii_alphanumeric() || b"/.-_".contains(&b))
-            })
-            .collect();
-        if !alpn.is_empty() {
-            tls["alpn"] = json!(alpn);
-        }
-    }
-    if let Some(fp) = field(host, "fp").or_else(|| field(host, "fingerprint")) {
-        tls["fingerprint"] = json!(fp);
-    }
     // Certificate chains, private keys, server ECH keys, OCSP stapling,
     // rejectUnknownSni, and all inbound trust material never leave the server.
     if let Some(client) = client_metadata(inbound, host, "clientTlsSettings") {
@@ -344,12 +369,30 @@ fn client_tls_settings(inbound: &Value, host: &Value, stream: &Value) -> Option<
             ],
         );
     }
+    if let Some(override_alpn) = field(host, "alpn") {
+        let alpn: Vec<&str> = override_alpn
+            .split(',')
+            .map(str::trim)
+            .filter(|s| {
+                !s.is_empty()
+                    && s.len() <= 32
+                    && s.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"/.-_".contains(&b))
+            })
+            .collect();
+        if !alpn.is_empty() {
+            tls["alpn"] = json!(alpn);
+        }
+    }
+    if let Some(fp) = field(host, "fp").or_else(|| field(host, "fingerprint")) {
+        tls["fingerprint"] = json!(fp);
+    }
     Some(tls)
 }
 
 pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     let stream = inbound.get("streamSettings")?;
-    let security = field(stream, "security").unwrap_or("none");
+    let security = client_security(stream, host)?;
     let network = field(stream, "method")
         .or_else(|| field(stream, "network"))
         .unwrap_or("raw");
@@ -430,6 +473,21 @@ pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Valu
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn security_layer_and_sni_host_are_client_overrides() {
+        let inbound = json!({"protocol":"vmess","streamSettings":{
+            "network":"ws","security":"tls","tlsSettings":{"serverName":"origin.example"}
+        }});
+        let host = json!({"securityLayer":"none","sni":"edge.example","useSniAsHost":true});
+        let out = client_stream(&inbound, &host, "").unwrap();
+        assert_eq!(out["security"], "none");
+        assert!(out.get("tlsSettings").is_none());
+        assert_eq!(out["wsSettings"]["host"], "edge.example");
+        let reality = json!({"security":"reality"});
+        assert!(client_security(&reality, &host).is_none());
+        assert_eq!(client_security(&reality, &json!({})), Some("reality"));
+    }
+
     #[test]
     fn cleared_host_metadata_inherits_profile_metadata() {
         let inbound = serde_json::json!({"xmesh":{"clientHeaders":{"Host":"profile.example"}}});
