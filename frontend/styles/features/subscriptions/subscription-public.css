@@ -227,3 +227,24 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 .subscription-public .portal-app-disclosure[open]::details-content{block-size:auto}
 .subscription-public .portal-app-disclosure[open]>.subscription-public-catalog{animation:cabinetReveal .25s ease-out}
 @media(prefers-reduced-motion:reduce){.subscription-public *,.subscription-public *::before,.subscription-public *::after,.subscription-public details::details-content{animation:none!important;transition:none!important}}
+/* Factual per-server distribution; quota is a label, not a fabricated ring. */
+.subscription-public .subscription-preview-meta>[data-subscription-traffic]{display:block;min-width:0}
+.subscription-public [data-subscription-traffic]>small{display:block;margin-bottom:12px}
+.subscription-public .portal-donut{display:grid;grid-template-columns:minmax(140px,.9fr) minmax(0,1.1fr);gap:16px;align-items:center}
+.subscription-public .portal-donut-chart{position:relative;min-width:0;aspect-ratio:1;max-width:240px;width:100%;justify-self:center}
+.subscription-public .portal-donut-chart svg{display:block;width:100%;height:100%;overflow:visible}
+.subscription-public .portal-donut-chart circle[role=button]{cursor:pointer;transition:opacity .2s ease,stroke-width .2s ease;outline:none}
+.subscription-public .portal-donut-chart circle:focus-visible{stroke-width:27;filter:drop-shadow(0 0 3px var(--portal-text))}
+.subscription-public .portal-donut-center{position:absolute;inset:29% 22%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none;gap:6px;overflow:hidden}
+.subscription-public .portal-donut-center small{font-size:12px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}
+.subscription-public .portal-donut-center b{font-size:clamp(17px,2vw,25px);line-height:1.3;overflow-wrap:anywhere}
+.subscription-public .portal-donut-legend{display:grid;gap:6px;max-height:240px;overflow:auto;min-width:0;padding:4px}
+.subscription-public .portal-donut-server{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;min-height:44px;background:transparent;color:var(--cabinet-ink);border:1px solid transparent;border-radius:calc(var(--portal-radius)*.5);font-size:14px;text-align:start;transition:background .18s,border-color .18s}
+.subscription-public .portal-donut-server span{min-width:0;overflow-wrap:anywhere;border-inline-start:3px solid var(--server-color);padding-inline-start:9px}
+.subscription-public .portal-donut-server b{font-size:14px;white-space:nowrap}
+.subscription-public .portal-donut-server:hover,.subscription-public .portal-donut-server[aria-pressed=true]{background:var(--cabinet-wash);border-color:var(--cabinet-line)}
+.subscription-public .portal-donut-reset{justify-self:start;background:transparent;border:0;color:var(--cabinet-muted);font-size:13px;padding:10px;min-height:44px}
+.subscription-public .portal-donut-legend p{font-size:14px;color:var(--cabinet-muted);margin:0}
+.subscription-public .portal-donut-allowance{grid-column:1/-1;font-size:14px;color:var(--cabinet-muted);margin:0}
+@container cabinet (max-width:900px){.subscription-public .portal-donut{grid-template-columns:1fr}.subscription-public .portal-donut-chart{max-width:180px}}
+@media(prefers-reduced-motion:reduce){.subscription-public .portal-donut *{transition:none!important;animation:none!important}}

@@ -433,7 +433,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=6fc2d828fd52',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=c1d8861af844'
+        '/subscription-public.css?v=13d7a119f4ac'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
@@ -666,6 +666,7 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-preview-status-label]').textContent=english?'Subscription status':'Статус подписки';
         $('[data-preview-status-note]').textContent=english?'Traffic and validity':'Трафик и срок действия';
         $('[data-subscription-ok]').textContent=english?'● Active':'● Активна';
+        $('[data-subscription-reveal]').hidden=true;
         $('[data-subscription-reveal]').textContent=$('[data-preview-link-card]').hidden ? (english?'Show private link':'Показать ссылку') : (english?'Hide private link':'Скрыть ссылку');
         $('[data-preview-link-label]').textContent=english?'Your subscription link':'Ссылка на подписку';
         $('[data-preview-link-note]').textContent=english?'Sample URL — not a real access token':'Демонстрационный адрес, без настоящего токена';
@@ -680,6 +681,7 @@ window.XMeshSubscriptionStudio = (() => {
         const sampleUsage=$('[data-subscription-traffic] b');
         const sampleDate=$('[data-subscription-expiry] b');
         if(sampleUsage)sampleUsage.textContent=english?'12.4%':'12,4%';
+        window.XMeshSubscriptionTraffic?.mount($('[data-subscription-traffic]'),{used:12.4,limit:100,servers:[{name:english?'Server 1':'Сервер 1',gib:8},{name:english?'Server 2':'Сервер 2',gib:4.4}],language:lang});
         if(sampleDate)sampleDate.textContent=english?'Dec 31, 2026':'31.12.2026';
         $('[data-subscription-connect]').textContent=(english?d.subscriptionCtaEn:d.subscriptionCta)||copy[3];
         if(['Connect','Подключиться'].includes($('[data-subscription-connect]').textContent.trim()))$('[data-subscription-connect]').textContent=english?'Copy':'Копировать';

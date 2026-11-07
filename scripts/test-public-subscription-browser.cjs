@@ -8,6 +8,7 @@ const assets={
  '/subscription-studio.css':'frontend/styles/features/subscriptions/subscription-studio.css',
  '/subscription-surface.css':'frontend/styles/features/subscriptions/subscription-surface.css',
  '/subscription-public.css':'frontend/styles/features/subscriptions/subscription-public.css',
+ '/subscription-traffic.js':'frontend/js/features/subscriptions/subscription-traffic.js',
  '/subscription-portal.js':'frontend/js/features/subscriptions/subscription-portal.js',
  '/qr-code.js':'frontend/js/core/qr-code.js'
 };
@@ -19,12 +20,13 @@ function fixture(url){
  RU_SELECTED:en?'':'on',EN_SELECTED:en?'on':'',RU_CURRENT:en?'false':'page',EN_CURRENT:en?'page':'false',
  STATUS_DOT:'<span class="subscription-preview-ok">● '+text(active?'Активна':'Неактивна',active?'Active':'Inactive')+'</span>',
  HERO:text(active?'Подписка активна':'Подписка неактивна',active?'Subscription active':'Subscription inactive'),DESCRIPTION:text('Ваш доступ к интернету. Всё необходимое для подключения.','Your internet access. Everything you need to get connected.'),
- METRICS:url.searchParams.get('metrics')==='0'?'':'<div class="subscription-preview-meta" data-subscription-metrics><div data-subscription-traffic data-used-gib="34.5" data-limit-gib="'+(unlimited?0:100)+'"><small>'+text('Трафик','Data usage')+'</small><b>'+text(unlimited?'34,5 ГБ / Без лимита':'34,5 / 100 ГБ',unlimited?'34.5 GB / Unlimited':'34.5 / 100 GB')+'</b><div class="subscription-preview-progress"><i style="width:'+(unlimited?'0':'34.5')+'%"></i></div></div><div data-subscription-expiry><small>'+text('Действует до','Expires')+'</small><b data-expiry="1796688000000"></b></div></div>',
+ METRICS:url.searchParams.get('metrics')==='0'?'':'<div class="subscription-preview-meta" data-subscription-metrics><div data-subscription-traffic data-traffic-servers="[{&quot;name&quot;:&quot;Poland&quot;,&quot;gib&quot;:20},{&quot;name&quot;:&quot;Germany&quot;,&quot;gib&quot;:14.5}]" data-used-gib="34.5" data-limit-gib="'+(unlimited?0:100)+'"><small>'+text('Трафик','Data usage')+'</small><b>'+text(unlimited?'34,5 ГБ / Без лимита':'34,5 / 100 ГБ',unlimited?'34.5 GB / Unlimited':'34.5 / 100 GB')+'</b><div class="subscription-preview-progress"><i style="width:'+(unlimited?'0':'34.5')+'%"></i></div></div><div data-subscription-expiry><small>'+text('Действует до','Expires')+'</small><b data-expiry="1796688000000"></b></div></div>',
  CTA:active?'<button type="button" class="subscription-preview-cta" id="connect-link">'+text('Подключиться','Connect')+'</button><input type="hidden" id="subscription-link" value="/s/disposable-test-token-0123456789abcdef">':'<div class="subscription-preview-cta" aria-disabled="true">'+text('Подписка неактивна','Subscription inactive')+'</div>',
  QUICK_ACTIONS:active?'<div class="subscription-preview-quick"><button type="button" id="copy-link">'+text('Скопировать ссылку','Copy link')+'</button><button type="button" id="toggle-qr" aria-expanded="false">QR</button><button type="button" id="toggle-link" aria-expanded="false">'+text('Показать ссылку','Show private link')+'</button><button type="button" id="toggle-devices">'+text('Устройства','Devices')+'</button></div>':'',
  QR:active?'<div id="subscription-qr" class="subscription-preview-qr" hidden></div>':'',DEVICE_INFO:active?'<div id="subscription-devices" class="subscription-public-devices" hidden>'+text('Подключённые устройства: 2 · Лимит: 5','Connected devices: 2 · Limit: 5')+'</div>':'',
  APPS:active&&url.searchParams.get('apps')!=='0'?'<section class="subscription-preview-apps"><header>'+text('Приложения для подключения','Connection apps')+'</header><div>'+[['Happ','iOS · Android · Windows · macOS'],['v2rayNG','Android'],['v2rayN','Windows · Linux'],['Streisand','iOS']].map(([n,p])=>'<a class="subscription-preview-app" href="https://example.invalid/'+n+'" target="_blank" rel="noopener noreferrer"><span>'+n.slice(0,2)+'</span><div><b>'+n+'</b><small>'+p+'</small></div></a>').join('')+'</div></section>':'',
  SUPPORT:'<a class="subscription-preview-support" href="https://support.example.invalid" rel="noopener noreferrer">'+text('Написать в поддержку','Contact support')+'</a>',FOOTER:''};
+ if(url.searchParams.get('empty')==='1')data.METRICS=data.METRICS.replace('data-used-gib="34.5"','data-used-gib="0"').replace(/data-traffic-servers="[^"]*"/,'data-traffic-servers="[]"');
  return read('backend/src/subscription_template.html').toString().replace(/\{\{([A-Z_]+)\}\}/g,(_,key)=>{assert(key in data,'Missing fixture '+key);return data[key]});
 }
 (async()=>{
@@ -37,13 +39,18 @@ function fixture(url){
   const context=await browser.newContext({permissions:['clipboard-read','clipboard-write']});
   await context.route('https://fonts.googleapis.com/**',r=>r.abort());const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   for(const [width,height] of [[320,780],[390,844],[768,1024],[1440,1000],[1920,1080]])for(const lang of ['ru','en']){
-   await page.setViewportSize({width,height});await page.goto(base+'/?lang='+lang+'&theme='+(lang==='en'?'light':'dark'));await page.waitForFunction(()=>!!document.querySelector('[role="meter"]'));
-   assert(await page.locator('#subscription-link-card').isHidden(),'Personal link must start hidden');
+   await page.setViewportSize({width,height});await page.goto(base+'/?lang='+lang+'&theme='+(lang==='en'?'light':'dark'));await page.waitForSelector('.portal-donut');
+   assert.equal(await page.locator('#subscription-link-card,#toggle-link').count(),0,'No link reveal UI');
    const g=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth,body:innerWidth,title:parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),minTap:Math.min(...[...document.querySelectorAll('.subscription-cabinet-tab:not([hidden]),.subscription-preview-languages a,.subscription-preview-cta')].map(el=>el.getBoundingClientRect().height))}));
    assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=30,'Readable heading');assert(g.minTap>=44,'Touch target too small');
    assert.equal(await page.locator('[role="tab"]').count(),0,'No tab navigation');assert(await page.locator('[data-setup-section="apps"]').isVisible());assert(await page.locator('[data-setup-section="connect"]').isVisible());assert.equal(await page.locator('#copy-link').count(),0,'Only one copy button');
-   assert.equal(await page.locator('[role="meter"]').getAttribute('aria-valuenow'),'34.5');
-   assert.deepEqual(await page.locator('.portal-usage-breakdown b').allTextContents(),lang==='en'?['34.5 GB','65.5 GB']:['34,5 ГБ','65,5 ГБ']);
+   assert.equal(await page.locator('.portal-donut-server').count(),2);
+   const server=page.locator('.portal-donut-server').first();await server.click();
+   assert.equal(await page.locator('.portal-donut-center small').innerText(),'Poland');
+   assert.match(await page.locator('.portal-donut-center b').innerText(),/^20 /);
+   const arc=page.locator('.portal-donut-chart [role="button"]').first();await arc.focus();await page.keyboard.press('Enter');assert.equal(await arc.getAttribute('aria-pressed'),'false');await page.keyboard.press('Enter');assert.equal(await arc.getAttribute('aria-pressed'),'true');
+   await page.locator('.portal-donut-reset').click();
+   assert.match(await page.locator('.portal-donut-center b').innerText(),/^34[.,]5 /);
    const layout=await page.evaluate(()=>{
      const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {top:r.top,left:r.left,right:r.right,bottom:r.bottom}};
      return {copy:rect('#connect-link'),qr:rect('#toggle-qr'),apps:rect('[data-setup-section="apps"]'),usage:rect('[data-subscription-traffic]')};
@@ -60,17 +67,19 @@ function fixture(url){
    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),base+'/s/disposable-test-token-0123456789abcdef');
    assert.equal(await page.locator('#subscription-action-status').innerText(),'');assert.equal(await page.locator('#connect-link').innerText(),lang==='en'?'Copied':'Скопировано');assert.equal(await page.locator('.portal-quickstart').count(),0);
    await page.locator('#toggle-qr').click();assert.equal(await page.locator('#subscription-qr svg').count(),1);assert.equal(await page.locator('#subscription-qr').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');assert.equal(await page.locator('.subscription-preview-languages').getAttribute('aria-label'),lang==='en'?'Language':'Язык');assert.equal(await page.locator('#subscription-qr svg').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');
-   await page.locator('#toggle-link').click();assert(await page.locator('#subscription-link-card').isVisible());await page.locator('#toggle-link').click();assert(await page.locator('#subscription-link-card').isHidden());
+
    await page.locator('#connect-link').focus();await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr','Keyboard order follows setup');
    if(lang==='en')assert(!/[А-Яа-яЁё]/.test(await page.locator('body').innerText()),'English portal has untranslated copy');checks++;
   }
+  await page.goto(base+'/?lang=en&empty=1');await page.waitForSelector('.portal-donut');assert.equal(await page.locator('.portal-donut-server').count(),0);assert.equal(await page.locator('.portal-donut-center b').innerText(),'0 GB');checks++;
   await page.goto(base+'/?lang=en&accent=dark');await page.waitForSelector('#connect-link');assert.equal(await page.locator('#connect-link').evaluate(el=>getComputedStyle(el).color),'rgb(255, 255, 255)','Dark custom accent needs contrasting button text');checks++;
   await page.goto(base+'/?lang=en&apps=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="apps"]').hidden);assert(await page.locator('#connect-link').isVisible());checks++;
   await page.goto(base+'/?lang=en&metrics=0');await page.waitForFunction(()=>document.querySelector('.subscription-public-info-panel').hidden);checks++;
-  await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#connect-link');assert(await page.locator('.subscription-preview-progress').isHidden(),'Unlimited usage must not imply a percentage');assert.equal(await page.locator('.portal-usage-breakdown>div').count(),1,'Unlimited plans have no remaining-quota block');assert.equal(((await page.locator('[data-subscription-traffic]').innerText()).match(/Unlimited/g)||[]).length,1,'Do not repeat unlimited labels');await page.screenshot({path:path.join(out,'portal-unlimited-1920-en.png'),fullPage:true});checks++;
+  await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[role="meter"]').count(),0);assert.equal(((await page.locator('[data-subscription-traffic]').innerText()).match(/Unlimited/g)||[]).length,1);checks++;
   await page.goto(base+'/?lang=en&active=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="connect"]').hidden);assert(await page.locator('[data-setup-section="apps"]').isHidden());assert(await page.locator('[data-setup-section="support"]').isVisible());checks++;
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto(base+'/?lang=en');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[data-setup-section="connect"]').evaluate(el=>getComputedStyle(el).animationName),'none');checks++;
   await page.goto(base+'/?lang=en');
+  await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-traffic.js').toString()});
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-studio.js').toString()});
   await page.evaluate(()=>{
     const [markup,mount]=window.XMeshSubscriptionStudio.create({subscriptionLanguage:'en',subscriptionSyncPanelTheme:false,subscriptionShowDevices:true,subscriptionShowSupport:true},async()=>{},()=>{},{users:2,nodes:1});
@@ -78,11 +87,11 @@ function fixture(url){
   });
   const studio=page.locator('[data-subscription-preview-frame]');
   assert.equal(await studio.locator('.subscription-preview').getAttribute('lang'),'en');
-  assert.equal(await studio.locator('[data-preview-used]').innerText(),'12.4 GB');
+  assert.match(await studio.locator('.portal-donut-center b').innerText(),/^12.4 /);
   assert(!/[А-Яа-яЁё]/.test(await studio.innerText()),'Studio English preview has untranslated copy');
   assert(await studio.locator('.portal-app-disclosure').evaluate(el=>!el.open));
   await studio.locator('[data-portal-language="ru"]').click();
-  assert.equal(await studio.locator('[data-preview-used]').innerText(),'12,4 ГБ');
+  assert.match(await studio.locator('.portal-donut-center b').innerText(),/^12,4 /);
   await page.locator('[name="subscriptionShowTraffic"]').uncheck();
   assert(await studio.locator('[data-subscription-traffic]').isHidden());
   await page.locator('[name="subscriptionShowExpiry"]').uncheck();

@@ -1809,6 +1809,32 @@ fn portal_html(
     html
 }
 
+// Bearer access is resolved to one user before reading counters. No addresses,
+// inbound configuration or other users' measurements enter the public document.
+async fn portal_server_traffic(state: &AppState, user_id: i64) -> Result<String, ApiError> {
+    let rows = sqlx::query(
+        "SELECT COALESCE(NULLIF(n.data->>'remark',''), NULLIF(n.data->>'name',''), h.display_name) AS name,
+                t.node_id, (t.uplink_bytes::DOUBLE PRECISION + t.downlink_bytes::DOUBLE PRECISION)
+                    / 1073741824.0 AS gib
+         FROM user_node_traffic_totals t
+         LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
+         LEFT JOIN node_traffic_name_history h ON h.node_id=t.node_id
+         WHERE t.user_id=$1 AND (t.uplink_bytes>0 OR t.downlink_bytes>0)
+         ORDER BY gib DESC, t.node_id",
+    )
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut servers = Vec::with_capacity(rows.len());
+    for row in rows {
+        let id: i64 = row.try_get("node_id")?;
+        let name: Option<String> = row.try_get("name")?;
+        let gib: f64 = row.try_get("gib")?;
+        servers.push(json!({"name": name.unwrap_or_else(|| format!("#{id}")), "gib": gib}));
+    }
+    Ok(escape_html(&Value::Array(servers).to_string()))
+}
+
 pub async fn portal(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -1852,7 +1878,16 @@ pub async fn portal(
         studio_string(&settings, "subscriptionLanguage", "ru")
     };
     let en = lang == "en";
-    let metrics = portal_metrics(&user, &settings, en);
+    let metrics = if studio_enabled(&settings, "subscriptionShowTraffic", true) {
+        let servers = portal_server_traffic(&state, user_id).await?;
+        portal_metrics(&user, &settings, en).replacen(
+            "data-subscription-traffic",
+            &format!("data-subscription-traffic data-traffic-servers=\"{servers}\""),
+            1,
+        )
+    } else {
+        portal_metrics(&user, &settings, en)
+    };
     // Show/copy one canonical HTTPS subscription URL. The requesting app's
     // User-Agent decides the JSON/link format and device profile.
     let raw_link = studio_url(&settings, &token);
