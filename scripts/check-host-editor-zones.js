@@ -19,7 +19,7 @@ const DB={
 };
 const field=(f,value)=>'<label class="f"><span>'+f.l+'</span><input name="'+f.k+'" value="'+String(value??'')+'"></label>';
 const names=['profileId','tag','nodes','disabled','remark','address','port','countryCode',
- 'sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'];
+ 'securityLayer','tlsVerification','xhttpMode','useSniAsHost','sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'];
 const fspec=names.map(k=>({k,l:k}));
 const countries=[{code:'NL',flag:'🇳🇱'},{code:'PL',flag:'🇵🇱'},{code:'DE',flag:'🇩🇪'}];
 const flag=code=>String.fromCodePoint(...code.split('').map(c=>127397+c.charCodeAt(0)));
@@ -73,9 +73,10 @@ const html=editor({profileId:1,tag:'vless-main-2',remark:'🇳🇱',
 const sections=[...html.matchAll(/<section class="([^"]+)"/g)].map(x=>x[1]);
 assert.deepEqual(sections,[
  'host-editor-main host-primary-panel',
+ 'host-assignment-panel',
  'host-advanced host-advanced-panel',
  'host-editor-side'
-],'The modal must have exactly three adjacent, permanent zones.');
+],'Each task must preserve its semantic editing sections.');
 for(const key of names){
  const occurrences=html.split('name="'+key+'"').length-1;
  assert.equal(occurrences,1,'Input '+key+' must occur exactly once');
@@ -97,34 +98,26 @@ assert(updated.includes('name="profileId" value="2"'),'The factory must not reta
 assert.equal(JSON.stringify(DB),snapshot,'Rendering must not mutate application collections');
 
 
-// Host geometry is feature-owned inside the canonical panel graph. Desktop keeps
-// three permanent zones on one row; smaller viewports deliberately reflow them.
-assert.match(css,/\.host-editor-layout\s*\{[\s\S]*?display:grid[\s\S]*?grid-template-columns:minmax\(0,1\.15fr\) minmax\(0,1fr\) minmax\(0,\.95fr\)[\s\S]*?grid-template-areas:"primary overrides preview" "assignment assignment preview"/,
- 'Host editor must keep the three-zone desktop grid');
-const desktopEnd=css.indexOf('@media (max-width:1260px)',css.indexOf('.host-editor-layout {'));
-assert(desktopEnd>0,'Host editor must define a 1260px responsive boundary');
-const desktopCss=css.slice(css.indexOf('.host-editor-layout {'),desktopEnd);
-assert(!desktopCss.includes('"overrides overrides"'),'No separate overrides row on desktop');
-
-// The real outer workspace must outrank generic small-dialog fallbacks. Static
-// checks previously validated only the inner three-column grid, which allowed a
-// valid grid to be rendered inside a 30rem shell.
-assert.match(css,/#dlg\.host-wide\s*\{[\s\S]*?width:min\(var\(--dialog-width\),calc\(100vw - 2rem\)\)[\s\S]*?min-inline-size:min\(72rem,calc\(100vw - 2rem\)\)/,
- 'Host editor must own a workstation-sized outer dialog');
-assert.match(css,/#dlg\.host-wide>form\.box\s*\{[\s\S]*?display:grid[\s\S]*?grid-template-rows:auto minmax\(0,1fr\) auto auto[\s\S]*?overflow:hidden/,
- 'Host dialog shell must reserve a shrinkable body between header and footer');
-assert.match(css,/#dlg\.host-wide>form\.box>\.host-editor-layout\s*\{[\s\S]*?min-height:0[\s\S]*?overflow:auto/,
- 'Host editor workspace must own vertical scrolling instead of the whole form');
-assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[\s\S]*?position:static[\s\S]*?z-index:auto/,
- 'Host editor footer must stay in normal flow and never cover fields');
-assert.doesNotMatch(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*!important/,
- 'Host editor footer must not rely on specificity escalation');
-assert.match(css,/@media \(max-width:1260px\)[\s\S]*?grid-template-areas:"primary preview" "assignment preview" "overrides overrides"/,
- 'Medium viewports must reflow the three zones without overlap');
-assert.match(css,/@media \(max-width:760px\)[\s\S]*?grid-template-areas:"primary" "assignment" "overrides" "preview"/,
- 'Small screens must stack all three zones');
-assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields[^{}]*\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
- 'Phone layout must keep host fields usable');
+// Host tasks deliberately replace the old three-column desktop presentation.
+assert.equal((html.match(/role="tab" /g)||[]).length,3,'Hosts need exactly three task tabs');
+for(const key of ['connection','client','preview']){
+ assert(html.includes('aria-controls="host-panel-'+key+'"'),'Tab must identify its panel');
+ assert(html.includes('aria-labelledby="host-tab-'+key+'"'),'Panel must identify its tab');
+}
+assert.equal((html.match(/aria-selected="true"/g)||[]).length,1,'Only one task may be selected');
+assert.equal((html.match(/ aria-hidden="true" inert/g)||[]).length,2,'Inactive tasks must be inaccessible');
+assert.match(feature,/form.addEventListener\('invalid'/,'Native errors must reveal their task before focus');
+assert.match(feature,/ArrowLeft.*ArrowRight.*Home.*End/,'Tabs need standard keyboard navigation');
+assert.match(app,/bindHostEditor\(form\)/,'The real form must install task interactions');
+assert.match(css,/\.host-editor-panes\s*\{[^}]*display:grid[^}]*overflow:auto/,'The task frame must own scrolling');
+assert.match(css,/\[data-host-editor-pane\]\s*\{[^}]*grid-area:1\/1/,'All tasks must share one intrinsic frame');
+assert.match(css,/\[data-host-editor-pane\]\[data-active=false\][^}]*visibility:hidden;pointer-events:none;max-height:100%;overflow:clip/,'Inactive tasks must reserve geometry without extending the scroll area');
+assert.match(css,/#dlg\.host-wide\s*\{[^}]*--dialog-width:72rem/,'Hosts must use a readable dialog width');
+assert.match(css,/#dlg\.host-wide>form\.box\s*\{[\s\S]*?grid-template-rows:auto minmax\(0,1fr\) auto auto[\s\S]*?overflow:hidden/,'The shell must reserve a shrinkable body and visible footer');
+assert.match(css,/#dlg\.host-wide>form\.box>\.host-editor-layout\s*\{[^}]*overflow:hidden/,'The tab rail must stay outside the scrolling task frame');
+assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*position:static[^}]*z-index:auto/,'Footer must not cover fields');
+assert.match(css,/@media \(max-width:900px\)[\s\S]*?\.host-connection-workspace,\.host-preview-workspace\{grid-template-columns:minmax\(0,1fr\)/,'Narrow task workspaces must stack');
+assert.match(css,/@media \(max-width:560px\)[\s\S]*?\.host-connect-fields,\.host-public-fields,\.host-advanced-fields\{grid-template-columns:minmax\(0,1fr\)/,'Phone fields must keep usable widths');
 
 // User Details is deliberately wider than a form dialog and must have only one
 // material shell. The canonical selector intentionally matches the legacy
@@ -145,4 +138,4 @@ assert.match(css,/#dlg\.user-modal \.user-canvas-foot\s*\{[\s\S]*?flex:0 0 auto[
  'User details footer must remain metadata, not render as a second material strip');
 assert.match(css,/html\[data-motion=off\] #dlg\.user-modal[\s\S]*?transition:none!important/,
  'User details premium motion must respect the animation setting');
-console.log('Workspace dialogs: host shell and taller horizontal user details OK');
+console.log('Workspace dialogs: accessible Host tasks, stable frame and User details OK');

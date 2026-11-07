@@ -7,7 +7,7 @@ TLS and XHTTP selectors update their corresponding metadata objects, preserving
 other expert properties. Clearing a selector removes its explicit override.
 Security-layer overrides are rejected for REALITY; the inbound mode is required.
 
-Open **Hosts → Edit → Advanced overrides → Expert JSON settings** for additional
+Open **Hosts → Edit → Client settings → Expert JSON settings** for additional
 client parameters. These objects
 change generated client configurations, not the node's inbound or TLS certificate.
 Only controls relevant to the selected transport/security are shown. Other values
