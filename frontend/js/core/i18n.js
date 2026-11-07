@@ -411,6 +411,10 @@ window.XMeshI18n=(()=>{
     'CDN-группа сохранена. Новые правила применятся при синхронизации нод.':'CDN group saved. New rules apply after node synchronization.',
     'Ошибка сохранения CDN-группы: ':'Failed to save CDN group: ',
     // Node-scoped LTE traffic and monthly per-user quota.
+    '· текущий месяц':'· current month',
+    'CDN: режим сброса должен быть lifetime или monthly.':'CDN: reset period must be lifetime or monthly.',
+    'CDN: неизвестный режим трафика узла.':'CDN: unknown node traffic policy.',
+    'CDN: выберите хотя бы один inbound этого узла.':'CDN: select at least one inbound on this node.',
     'Политика трафика':'Traffic policy',
     'Обычный · вне LTE-лимита':'Regular · outside LTE quota',
     'LTE · все inbound узла':'LTE · all node inbounds',
