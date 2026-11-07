@@ -21,15 +21,17 @@ fn bad_request(message: &str) -> ApiError {
 
 pub(crate) fn validate_settings(value: &Value) -> Result<(), ApiError> {
     if let Some(tags) = value.get("cdnInboundTags") {
-        let tags = tags.as_array().ok_or_else(|| {
-            bad_request("CDN: список inbound должен быть массивом тегов.")
-        })?;
+        let tags = tags
+            .as_array()
+            .ok_or_else(|| bad_request("CDN: список inbound должен быть массивом тегов."))?;
         if tags.len() > MAX_TAGS {
             return Err(bad_request("CDN: не более 128 inbound в одной группе."));
         }
         let mut seen = HashSet::new();
         for item in tags {
-            let tag = item.as_str().ok_or_else(|| bad_request("CDN: теги должны быть строками."))?;
+            let tag = item
+                .as_str()
+                .ok_or_else(|| bad_request("CDN: теги должны быть строками."))?;
             if tag.is_empty()
                 || tag.len() > 128
                 || tag.trim() != tag
@@ -37,7 +39,9 @@ pub(crate) fn validate_settings(value: &Value) -> Result<(), ApiError> {
                 || tag == "xmesh_stats_in"
                 || !seen.insert(tag)
             {
-                return Err(bad_request("CDN: некорректный или повторяющийся inbound tag."));
+                return Err(bad_request(
+                    "CDN: некорректный или повторяющийся inbound tag.",
+                ));
             }
         }
     }
@@ -49,16 +53,26 @@ pub(crate) fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
     Ok(settings
         .get("cdnInboundTags")
         .and_then(Value::as_array)
-        .map(|values| values.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
         .unwrap_or_default())
 }
 
 pub(crate) fn validate_user(user: &Value) -> Result<(), ApiError> {
     if user.get("cdnUsedBytes").is_some() {
-        return Err(bad_request("CDN: расход вычисляется сервером и не может быть изменён вручную."));
+        return Err(bad_request(
+            "CDN: расход вычисляется сервером и не может быть изменён вручную.",
+        ));
     }
     if let Some(limit) = user.get("cdnLimitGb") {
-        let limit = limit.as_f64().ok_or_else(|| bad_request("CDN: лимит должен быть числом."))?;
+        let limit = limit
+            .as_f64()
+            .ok_or_else(|| bad_request("CDN: лимит должен быть числом."))?;
         if !limit.is_finite() || !(0.0..=MAX_GIB).contains(&limit) {
             return Err(bad_request("CDN: лимит должен быть от 0 до 1000000 ГиБ."));
         }
@@ -94,7 +108,10 @@ pub(crate) async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(
     for user in users {
         let id = user.get("id").and_then(Value::as_i64).unwrap_or(0);
         if let Some(data) = user.as_object_mut() {
-            data.insert("cdnUsedBytes".into(), json!(usage.get(&id).copied().unwrap_or(0).max(0)));
+            data.insert(
+                "cdnUsedBytes".into(),
+                json!(usage.get(&id).copied().unwrap_or(0).max(0)),
+            );
         }
     }
     Ok(())
@@ -106,7 +123,10 @@ pub(crate) fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<Stri
     if !cdn_tags.contains(inbound_tag) {
         return false;
     }
-    let limit = user.get("cdnLimitGb").and_then(Value::as_f64).unwrap_or(0.0);
+    let limit = user
+        .get("cdnLimitGb")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
     if limit <= 0.0 {
         return false;
     }
@@ -142,14 +162,19 @@ mod tests {
         assert!(exhausted(&user, "CDN_DE", &tags));
         assert!(exhausted(&user, "CDN_UK", &tags));
         assert!(!exhausted(&user, "MAIN_DE", &tags));
-        assert!(!exhausted(&json!({"cdnLimitGb":0,"cdnUsedBytes":999_999_i64}), "CDN_DE", &tags));
+        assert!(!exhausted(
+            &json!({"cdnLimitGb":0,"cdnUsedBytes":999_999_i64}),
+            "CDN_DE",
+            &tags
+        ));
         assert!(exhausted(&json!({"cdnLimitGb":1.0}), "CDN_DE", &tags));
     }
 
     #[test]
     fn quota_is_independent_of_total_account_meter() {
         let tags = HashSet::from(["CDN_DE".to_owned()]);
-        let user = json!({"limit":0,"used":10_000.0,"cdnLimitGb":3.0,"cdnUsedBytes":1_073_741_824_i64});
+        let user =
+            json!({"limit":0,"used":10_000.0,"cdnLimitGb":3.0,"cdnUsedBytes":1_073_741_824_i64});
         assert!(!exhausted(&user, "CDN_DE", &tags));
         assert!(!exhausted(&user, "MAIN_DE", &tags));
         assert!(validate_user(&json!({"cdnLimitGb":3.0})).is_ok());
