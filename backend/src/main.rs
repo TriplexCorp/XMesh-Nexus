@@ -4544,6 +4544,25 @@ fn user_status(user: &Value, now_ms: i64) -> &'static str {
     "ACTIVE"
 }
 
+/// A waiting user must be able to import a feed and authenticate to Xray,
+/// otherwise a first-connection timer can never start. This does not grant
+/// access to disabled, expired or quota-exhausted accounts.
+pub(crate) fn user_can_connect(user: &Value, now_ms: i64) -> bool {
+    match user_status(user, now_ms) {
+        "ACTIVE" => true,
+        "ON_HOLD" => {
+            let days = number(user, "holdDays").unwrap_or(0);
+            let limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
+            let consumed = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
+            let expiry = number(user, "expireAt").unwrap_or(0);
+            (1..=3650).contains(&days)
+                && (limit <= 0.0 || consumed < limit)
+                && (expiry <= 0 || expiry >= now_ms)
+        }
+        _ => false,
+    }
+}
+
 fn number(value: &Value, key: &str) -> Option<i64> {
     value.get(key).and_then(Value::as_i64).or_else(|| {
         value
@@ -4589,6 +4608,22 @@ mod tests {
         assert_eq!(user_status(&json!({"limit":10,"used":10}), now), "LIMITED");
         assert_eq!(user_status(&json!({"expireAt":now-1}), now), "EXPIRED");
         assert_eq!(user_status(&json!({"limit":0,"used":500}), now), "ACTIVE");
+    }
+
+    #[test]
+    fn waiting_user_can_fetch_and_provision_without_starting_the_clock() {
+        let now = 1_800_000_000_000_i64;
+        let waiting = json!({"hold":true,"holdDays":30,"expireAt":null,"limit":1.0,"used":0.0});
+        assert_eq!(user_status(&waiting, now), "ON_HOLD");
+        assert!(super::user_can_connect(&waiting, now));
+        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":0}), now));
+        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":5000}), now));
+        assert!(!super::user_can_connect(&json!({"hold":true}), now));
+        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":30,"disabled":true}), now));
+        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":30,"limit":1.0,"used":1.0}), now));
+        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":30,"expireAt":now-1}), now));
+        assert!(!super::user_can_connect(&json!({"expireAt":now-1}), now));
+        assert!(super::user_can_connect(&json!({"hold":false,"expireAt":now+1}), now));
     }
 
     #[test]
