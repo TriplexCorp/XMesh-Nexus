@@ -15,6 +15,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Показать ссылку":"Show private link",
+    "Скрыть ссылку":"Hide private link",
+    "● Активна":"● Active",
+    "Неактивна":"Inactive",
     "Предпросмотр публичной страницы":"Public page preview",
     "Адаптивный вид · демоданные":"Responsive preview · sample data",
     "Личный HTTPS-адрес подписки":"Personal HTTPS subscription URL",
