@@ -385,6 +385,16 @@ window.XMeshI18n=(()=>{
     'Нет активных пользователей':'No active users',
     'Введите значение':'Enter a value','Необязательно':'Optional',
     // CDN inbound quota pool and user limits.
+    'ГиБ':'GiB',
+    'Ошибка сохранения CDN-группы:':'Failed to save CDN group:',
+    'CDN: список inbound должен быть массивом тегов.':'CDN: inbounds must be an array of tags.',
+    'CDN: не более 128 inbound в одной группе.':'CDN: no more than 128 inbounds per group.',
+    'CDN: теги должны быть строками.':'CDN: tags must be strings.',
+    'CDN: некорректный или повторяющийся inbound tag.':'CDN: invalid or duplicate inbound tag.',
+    'CDN: расход вычисляется сервером и не может быть изменён вручную.':'CDN: usage is calculated by the server and cannot be edited.',
+    'CDN: лимит должен быть числом.':'CDN: quota must be a number.',
+    'CDN: лимит должен быть от 0 до 1000000 ГиБ.':'CDN: quota must be between 0 and 1000000 GiB.',
+
     'Лимиты CDN':'CDN traffic limits',
     'Общая группа ограниченных inbound для пользователей':'Shared group of limited inbounds for users',
     'Лимит CDN, ГиБ':'CDN limit, GiB',
