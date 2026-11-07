@@ -264,7 +264,24 @@ window.XMeshSubscriptionStudio = (() => {
     const mount = () => {
       const form=document.getElementById('subscription-studio-form');
       if(!form)return;
-      const $ = s=>form.querySelector(s);
+      // The visitor portal stylesheet is deliberately forbidden in the panel's
+      // global CSS graph. Mount the real public markup inside a ShadowRoot,
+      // then load the production CSS only there: no auth-panel style leakage.
+      const previewHost=form.querySelector('[data-subscription-preview-frame]');
+      const previewShadow=previewHost.attachShadow({mode:'open'});
+      const previewBody=document.createElement('div');
+      previewBody.className='subscription-studio-preview subscription-public';
+      while(previewHost.firstChild)previewBody.appendChild(previewHost.firstChild);
+      for(const href of [
+        '/subscription-studio.css?v=6fc2d828fd52',
+        '/subscription-surface.css?v=0a79377d5733',
+        '/subscription-public.css?v=a07af0ce990d'
+      ]){
+        const link=document.createElement('link');
+        link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
+      }
+      previewShadow.appendChild(previewBody);
+      const $=s=>form.querySelector(s)||previewShadow.querySelector(s);
       const customRows=()=>[...form.querySelectorAll('[data-custom-client-row]')];
       const readCustomClients=()=>customRows().map(row=>({
         id:row.dataset.customClientId,
@@ -354,7 +371,7 @@ window.XMeshSubscriptionStudio = (() => {
         const lang=previewLanguage,english=lang==='en',copy=locale[lang];
         const previewRoot=$('[data-subscription-preview]');
         previewRoot.lang=lang;
-        form.querySelectorAll('[data-portal-language]').forEach(button=>{
+        previewShadow.querySelectorAll('[data-portal-language]').forEach(button=>{
           const active=button.dataset.portalLanguage===lang;
           button.setAttribute('aria-pressed',String(active));
           button.classList.toggle('on',active);
@@ -435,9 +452,9 @@ window.XMeshSubscriptionStudio = (() => {
           '<div class="subscription-topology-item"><span>'+esc('SERVER '+id.toUpperCase())+'</span><b>'+esc(labels[id])+'</b><small>'+esc(names[id])+'</small></div>'
         ).join('');
       };
-      form.addEventListener('click',event=>{
+      previewShadow.addEventListener('click',event=>{
         const button=event.target.closest('[data-portal-language]');
-        if(!button || !form.contains(button))return;
+        if(!button || !previewShadow.contains(button))return;
         const next=button.dataset.portalLanguage;
         if(next!=='ru'&&next!=='en')return;
         previewLanguage=next;
