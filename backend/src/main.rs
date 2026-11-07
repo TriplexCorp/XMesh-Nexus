@@ -10,6 +10,7 @@ mod node_policy;
 mod node_rotation;
 mod node_routing;
 mod node_runtime;
+mod panel_version;
 
 mod protocol_credentials;
 mod security;
@@ -430,6 +431,8 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/core", get(get_core_status))
         .route("/core/releases", get(get_core_releases))
         .route("/core/update", post(update_core))
+        .route("/panel/version", get(panel_version::installed))
+        .route("/panel/version/check", get(panel_version::check))
         .route(
             "/panel/update",
             post(request_panel_update).get(get_panel_update_status),
