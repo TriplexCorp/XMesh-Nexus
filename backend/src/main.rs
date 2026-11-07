@@ -1189,6 +1189,10 @@ async fn reset_node_network_traffic(
     })))
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Atomic record edits enforce node address uniqueness alongside existing account and quota invariants"
+)]
 async fn update_record(
     State(state): State<AppState>,
     Extension(actor): Extension<auth::AuthUser>,
