@@ -12,6 +12,7 @@
   const previewRoot=document.querySelector('.subscription-preview');
   if(previewRoot)previewRoot.style.setProperty('--portal-action-ink',actionInk(getComputedStyle(previewRoot).getPropertyValue('--portal-accent')));
   const language = document.documentElement.lang === 'en' ? 'en' : 'ru';
+  document.querySelector('.subscription-preview-languages')?.setAttribute('aria-label',language==='en'?'Language':'Язык');
   const copy = language === 'en'
     ? {
         brandNote:'Your subscription',copyAction:'Copy subscription link',trafficLabel:'Data used',
@@ -368,6 +369,7 @@
     path.setAttribute('fill', '#101923');
     path.setAttribute('d', pathData);
     svg.append(path);
+    target.setAttribute('aria-label',copy.qrLabel);
     target.replaceChildren(svg);
     target.dataset.ready = 'yes';
   }

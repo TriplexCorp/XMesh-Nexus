@@ -1940,6 +1940,7 @@ window.XMeshI18n=(()=>{
   "Подключать GeoSite/GeoIP к Xray на этой ноде": "Enable GeoSite/GeoIP for Xray on this node",
   "Подключена · ждёт профиль": "Connected · awaiting profile",
   "Написать в поддержку": "Contact support",
+  "Язык": "Language",
   "Ваша подписка": "Your subscription",
   "Использовано трафика": "Data used",
   "Ссылка на подписку": "Your subscription link",

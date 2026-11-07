@@ -501,6 +501,7 @@ window.XMeshSubscriptionStudio = (() => {
         const lang=previewLanguage,english=lang==='en',copy=locale[lang];
         const previewRoot=$('[data-subscription-preview]');
         previewRoot.lang=lang;
+        previewShadow.querySelector('.subscription-preview-languages').setAttribute('aria-label',english?'Language':'Язык');
         const local=english?{
           tabs:['Overview','Connect','Applications','Devices','Support'],
           kicker:'MY ACCOUNT / VPN ACCESS',featureEyebrow:'YOUR ACCESS',
