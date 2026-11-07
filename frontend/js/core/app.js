@@ -4628,7 +4628,7 @@ async function setP(){
         <a href="#subscription">${ic('link')} SUBSCRIPTION STUDIO</a>
       </div>
     </aside>
-    <div class="settings-center-main" id="settings-subpage">
+    <div class="settings-center-main" id="settings-subpage" data-settings-section="${settingsPage}" data-single="${selected.length===1}">
       <header class="settings-center-heading"><div><h2>${title}</h2><p>${description}</p></div></header>
       <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${selected.length===1}">
         <div class="appearance-column workspace-stack">${columns[0].join('')}</div>
