@@ -243,21 +243,22 @@ window.XMeshSubscriptionStudio = (() => {
       '<main class="subscription-public-shell"><div class="subscription-preview" data-subscription-preview>',
       '<header class="subscription-preview-brand"><div class="subscription-public-brand-identity"><span data-subscription-logo-symbol>✦</span><img data-subscription-logo alt="" hidden><div class="subscription-public-brand-copy"><b data-subscription-brand></b><small data-subscription-brand-note></small></div></div>',
       '<div class="subscription-preview-languages" role="group" aria-label="Language / Язык"><button type="button" data-portal-language="ru" aria-pressed="true" lang="ru">RU</button><button type="button" data-portal-language="en" aria-pressed="false" lang="en">EN</button></div></header>',
-      '<section class="subscription-preview-hero"><div class="subscription-preview-hero-copy"><span class="subscription-preview-ok" data-subscription-ok>●</span><h3 data-subscription-active></h3><p data-subscription-description></p></div><div class="subscription-public-hero-accent" aria-hidden="true"><i></i><i></i><i></i></div></section>',
-      '<div class="subscription-public-workspace"><div class="subscription-public-grid">',
-      '<section class="subscription-public-access-panel">',
-      '<header class="subscription-public-panel-title"><span class="subscription-public-panel-icon is-access" aria-hidden="true"></span><div><b data-preview-endpoint-label></b><small data-preview-endpoint-note></small></div></header>',
-      '<div class="subscription-public-primary-action"><div class="subscription-preview-cta" data-subscription-connect></div></div>',
-      '<section class="subscription-public-link-card" data-preview-link-card><div class="subscription-public-link-card-head"><div><b data-preview-link-label></b><small data-preview-link-note></small></div><em>HTTPS</em></div><code data-preview-demo-link></code></section>',
-      '<div class="subscription-preview-quick" data-subscription-quick><button type="button" data-subscription-copy>Копировать ссылку</button><button type="button" data-subscription-qr>QR</button><button type="button" data-subscription-devices>Устройства</button></div>',
-      '</section>',
+      '<div class="subscription-public-overview">',
+      '<section class="subscription-preview-hero"><div class="subscription-preview-hero-copy"><span class="subscription-preview-ok" data-subscription-ok>● Активна</span><h3 data-subscription-active></h3><p data-subscription-description></p></div></section>',
       '<aside class="subscription-public-info-panel"><header class="subscription-public-panel-title"><span class="subscription-public-panel-icon is-status" aria-hidden="true"></span><div><b data-preview-status-label></b><small data-preview-status-note></small></div></header>',
       '<div class="subscription-public-status-stack"><div class="subscription-preview-meta" data-subscription-metrics>',
       '<div data-subscription-traffic><small data-subscription-traffic-label></small><b>12.4 / 100 ГБ</b><div class="subscription-preview-progress"><i></i></div></div>',
       '<div data-subscription-expiry><small data-subscription-expiry-label></small><b>31.12.2026</b></div>',
       '</div><span class="subscription-preview-support" data-subscription-support></span></div></aside></div>',
+      '<div class="subscription-public-workspace"><div class="subscription-public-grid">',
+      '<section class="subscription-public-access-panel">',
+      '<header class="subscription-public-panel-title"><span class="subscription-public-panel-icon is-access" aria-hidden="true"></span><div><b data-preview-endpoint-label></b><small data-preview-endpoint-note></small></div></header>',
+      '<div class="subscription-public-primary-action"><div class="subscription-preview-cta" data-subscription-connect></div></div>',
+      '<div class="subscription-preview-quick" data-subscription-quick><button type="button" data-subscription-copy>Копировать ссылку</button><button type="button" data-subscription-qr>QR</button><button type="button" data-subscription-reveal aria-expanded="false">Показать ссылку</button><button type="button" data-subscription-devices>Устройства</button></div>',
+      '<section class="subscription-public-link-card" data-preview-link-card hidden><div class="subscription-public-link-card-head"><div><b data-preview-link-label></b><small data-preview-link-note></small></div><em>HTTPS</em></div><code data-preview-demo-link></code></section>',
+      '</section>',
       '<div class="subscription-public-catalog"><section class="subscription-preview-apps" data-subscription-apps><header data-subscription-apps-title>Приложения для подключения</header><div data-subscription-app-list></div></section></div>',
-      '</div><footer data-subscription-footer></footer></div></main></div>',
+      '</div></div><footer data-subscription-footer></footer></div></main></div>',
       '<div class="subscription-studio-stats"><div><small>Пользователей</small><b>'+esc(counts.users)+'</b></div><div><small>Узлов</small><b>'+esc(counts.nodes)+'</b></div></div>',
       '</aside></form></div>'
     ].join('');
@@ -404,6 +405,8 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-preview-endpoint-note]').textContent=english?'Personal HTTPS access':'Личный HTTPS-адрес подписки';
         $('[data-preview-status-label]').textContent=english?'Subscription status':'Статус подписки';
         $('[data-preview-status-note]').textContent=english?'Traffic and validity':'Трафик и срок действия';
+        $('[data-subscription-ok]').textContent=english?'● Active':'● Активна';
+        $('[data-subscription-reveal]').textContent=english?'Show private link':'Показать ссылку';
         $('[data-preview-link-label]').textContent=english?'Personal HTTPS link':'Персональная HTTPS-ссылка';
         $('[data-preview-link-note]').textContent=english?'Sample URL — not a real access token':'Демонстрационный адрес, без настоящего токена';
         $('[data-preview-demo-link]').textContent=d.subscriptionDomain && pathOK(d.subscriptionPath)
@@ -453,6 +456,13 @@ window.XMeshSubscriptionStudio = (() => {
         ).join('');
       };
       previewShadow.addEventListener('click',event=>{
+        const reveal=event.target.closest('[data-subscription-reveal]');
+        if(reveal&&previewShadow.contains(reveal)){
+          const card=previewShadow.querySelector('[data-preview-link-card]');
+          card.hidden=!card.hidden;
+          reveal.setAttribute('aria-expanded',String(!card.hidden));
+          return;
+        }
         const button=event.target.closest('[data-portal-language]');
         if(!button || !previewShadow.contains(button))return;
         const next=button.dataset.portalLanguage;
