@@ -985,7 +985,24 @@ const balancersP=async()=>{
  const options=[['leastPing','Наименьшая задержка'],['roundRobin','По очереди'],['random','Случайный сервер']];
  const field=(label,name,value,placeholder='',max=160)=>
   '<label class="f"><span>'+label+'</span><input data-balancer-field="'+name+'" maxlength="'+max+'" value="'+esc(value||'')+'" placeholder="'+esc(placeholder)+'"></label>';
- const view=()=>{
+ const applyFilter=()=>{
+ const root=$('#balancers-list');
+ if(!root)return;
+ const query=String($('#balancer-search')?.value||'').normalize('NFKC').toLocaleLowerCase().trim();
+ const state=$('#balancer-state-filter')?.value||'all';
+ let visible=0;
+ for(const card of root.querySelectorAll('.balancer-card')){
+  const matched=(!query||card.dataset.balancerSearchText.normalize('NFKC').toLocaleLowerCase().includes(query))&&
+    (state==='all'||(state==='enabled')===(card.dataset.balancerEnabled==='true'));
+  card.hidden=!matched;
+  if(matched)visible++;
+ }
+ const count=$('#balancers-count');
+ if(count)count.textContent=(query||state!=='all'?visible+' / ':'')+draft.length+' групп';
+ const empty=$('#balancers-search-empty');
+ if(empty)empty.hidden=visible!==0||!draft.length;
+};
+const view=()=>{
   const root=$('#balancers-list');
   if(!root)return;
   root.innerHTML=draft.length?draft.map((item,index)=>{
@@ -1001,9 +1018,14 @@ const balancersP=async()=>{
       '<label class="balancer-source"><input type="checkbox" data-balancer-source="'+esc(c.key)+'"'+(selected.has(c.key)?' checked':'')+'>'+
       '<span><strong>'+esc(c.label)+'</strong><small>'+esc(c.meta)+'</small></span></label>').join(''):
       '<p class="note">Добавьте хосты или узлы и назначьте им профиль XRAY STUDIO.</p>');
-   return '<section class="card balancer-editor" data-balancer-index="'+index+'">'+
-    '<div class="balancer-editor-head"><div><span class="balancer-seq">#'+(index+1)+'</span><strong>'+esc(item.remark||'Новый балансировщик')+'</strong></div>'+
-    '<button type="button" class="gh sm" data-balancer-delete="'+index+'">'+ic('trash')+'Удалить</button></div>'+
+   return '<article class="card balancer-editor balancer-card" data-balancer-index="'+index+'" data-balancer-enabled="'+(item.enabled!==false)+'" data-balancer-search-text="'+esc([item.remark,item.tag,item.serverDescription,...sourceChoices.map(c=>c.label)].join(' '))+'">'+
+    '<header class="balancer-card-head"><span class="balancer-card-emblem">'+ic('layers')+'</span><div class="balancer-card-identity"><strong class="balancer-card-title"'+(item.remark&&item.remark!=='Новый балансировщик'?' data-no-translate':'')+'>'+esc(item.remark||'Новый балансировщик')+'</strong><span class="balancer-card-tag">'+esc(item.tag||'—')+'</span></div>'+
+    '<span class="balancer-card-state" data-active="'+(item.enabled!==false)+'">'+(item.enabled!==false?'Включён':'Отключён')+'</span>'+
+    '<button type="button" class="gh sm balancer-card-delete" data-balancer-delete="'+index+'" title="Удалить" aria-label="Удалить">'+ic('trash')+'</button></header>'+
+    '<div class="balancer-card-metrics"><div><span>'+ic('server')+' Серверы</span><strong>'+selected.size+'</strong></div>'+
+    '<div><span>'+ic('activity')+' Стратегия</span><strong>'+esc(options.find(([key])=>key===item.strategy)?.[1]||options[0][1])+'</strong></div></div>'+
+    '<p class="balancer-card-description">'+esc(item.serverDescription||'Группы серверов для JSON-подписок.')+'</p>'+
+    '<details class="balancer-card-details"'+(item._expanded?' open':'')+'><summary>'+ic('sliders')+' Настроить</summary><div class="balancer-card-form">'+
     '<div class="balancer-edit-grid">'+field('Remark','remark',item.remark,'🇩🇪 Лучший — Германия {STATUS_EMOJI}',120)+
        field('Tag (уникальный)','tag',item.tag,'DE_BEST',64)+
        field('Описание','serverDescription',item.serverDescription,'Самый быстрый сервер',240)+
@@ -1021,9 +1043,9 @@ const balancersP=async()=>{
       field('Проверочный HTTPS URL','probeURL',obs.probeURL||'https://www.gstatic.com/generate_204','https://...',256)+
       field('Проверка связности','connectivity',obs.connectivity||'http://cp.cloudflare.com/generate_204','https://...',256)+
       '</div><p class="note">Xray поддерживает probeInterval и probeUrl. Таймаут, выборка и связность сохраняются как настройки группы, но не передаются в неподдерживаемые поля Xray.</p></details>'+
-   '</section>';
+   '</div></details></article>';
   }).join(''):'<div class="balancer-empty"><strong>Балансировщиков пока нет</strong><p>Добавьте любую комбинацию серверов. Одиночные подключения работают независимо.</p></div>';
-  $('#balancers-count').textContent=draft.length+' групп';
+  applyFilter();
  };
  const read=()=>[...$$('.balancer-editor')].map((row,i)=>{
   const get=name=>row.querySelector('[data-balancer-field="'+name+'"]');
@@ -1032,28 +1054,47 @@ const balancersP=async()=>{
    sampling:Number(get('sampling').value),probeURL:get('probeURL').value.trim(),connectivity:get('connectivity').value.trim()};
   return {tag:get('tag').value.trim(),remark:get('remark').value.trim(),serverDescription:get('serverDescription').value.trim(),
    strategy:get('strategy').value,enabled:get('enabled').checked,hideSelectedInbounds:get('hideSelectedInbounds').checked,
-   selector:source,observatory:obs};
+   selector:source,observatory:obs,_expanded:row.querySelector('.balancer-card-details')?.open||false};
  });
- const markup='<section class="balancer-workspace"><div class="balancer-intro"><div>'+
-  '<p>Группы серверов для JSON-подписок.</p>'+
-  '</div><div class="balancer-toolbar"><span id="balancers-count"></span><button class="btn" type="button" id="balancer-add">'+ic('plus')+'Новый балансировщик</button></div></div>'+
-  '<div id="balancers-list" class="balancer-list"></div>'+
+ const markup='<section class="balancer-workspace"><div class="nx-workspace-toolbar balancer-toolbar" data-ui-toolbar="filters">'+
+  '<div class="nx-directory-search balancer-directory-search">'+ic('search')+'<input id="balancer-search" type="search" aria-label="Поиск балансировщиков" placeholder="Найти балансировщик…" autocomplete="off">'+
+  '<button type="button" class="nx-directory-search-clear" id="balancer-search-clear" aria-label="Очистить поиск" hidden>'+ic('x')+'</button></div>'+
+  '<label class="nx-workspace-filter"><span>Состояние</span><select id="balancer-state-filter"><option value="all">Все</option><option value="enabled">Активные</option><option value="disabled">Отключены</option></select></label>'+
+  '<span class="node-result-count" id="balancers-count"></span><div class="nx-workspace-actions">'+workspaceGridControls('balancers')+workspaceCreateButton('balancers','Новый балансировщик','balancer-add')+'</div></div>'+
+  '<div id="balancers-list" class="balancer-list" data-ui-layout="cards" data-workspace-grid="balancers" data-grid-mode="'+workspaceGridMode('balancers')+'"></div>'+
+  '<div class="nx-directory-search-empty" id="balancers-search-empty" hidden>'+ic('search')+'<b>Совпадений не найдено</b><span>Попробуйте другой запрос или очистите поиск.</span></div>'+
   '<div class="balancer-savebar"><p>Изменения применятся после сохранения.</p>'+
   '<button type="button" class="btn" id="balancer-save">'+ic('save')+'Сохранить изменения</button></div></section>';
  return [markup,()=>{
   const list=$('#balancers-list');
   if(!list)return;
   view();
-  $('#balancer-add').addEventListener('click',()=>{
+  mountWorkspaceGrid($('.balancer-workspace'));
+   const search=$('#balancer-search'),clear=$('#balancer-search-clear');
+   search.addEventListener('input',()=>{clear.hidden=!search.value;applyFilter()});
+   clear.addEventListener('click',()=>{search.value='';clear.hidden=true;applyFilter();search.focus()});
+   search.addEventListener('keydown',event=>{if(event.key==='Escape'&&search.value){event.preventDefault();clear.click()}});
+   $('#balancer-state-filter').addEventListener('change',applyFilter);
+   list.addEventListener('change',event=>{
+    if(!event.target.matches('[data-balancer-field="enabled"]'))return;
+    const card=event.target.closest('.balancer-card');
+    card.dataset.balancerEnabled=String(event.target.checked);
+    card.querySelector('.balancer-card-state').dataset.active=String(event.target.checked);
+    card.querySelector('.balancer-card-state').textContent=event.target.checked?'Включён':'Отключён';
+    applyFilter();
+   });
+   $('#balancer-add').addEventListener('click',()=>{
    draft=read();
    let next=1;
    while(draft.some(item=>item.tag==='AUTO_'+next))next++;
-   draft.push({tag:'AUTO_'+next,remark:'Новый балансировщик',serverDescription:'',
+   draft.push({tag:'AUTO_'+next,remark:'Новый балансировщик',serverDescription:'',_expanded:true,
     enabled:true,strategy:'leastPing',selector:[],hideSelectedInbounds:false,
     observatory:{probeInterval:'20s',probeTimeout:'2s',sampling:5,
     probeURL:'https://www.gstatic.com/generate_204',connectivity:'http://cp.cloudflare.com/generate_204'}});
    view();
-   list.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
+   search.value='';clear.hidden=true;$('#balancer-state-filter').value='all';applyFilter();
+    list.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
+    list.lastElementChild?.querySelector('[data-balancer-field="remark"]')?.focus();
   });
   list.addEventListener('click',event=>{
    const button=event.target.closest('[data-balancer-delete]');
@@ -1064,7 +1105,7 @@ const balancersP=async()=>{
   });
   const save=$('#balancer-save');
   save.addEventListener('click',async()=>{
-   const rows=read();
+   const rows=read().map(({_expanded,...row})=>row);
    for(const row of rows){
     if(!row.tag||!row.remark||!row.selector.length){
      toast('Укажите tag, название и хотя бы один сервер для каждого балансировщика');return;
@@ -3026,9 +3067,9 @@ async function squadsP(){
     '<button type="button" class="nx-directory-search-clear" data-squad-search-clear aria-label="Очистить поиск" title="Очистить поиск" '+(squadSearchQuery?'':'hidden')+'>'+ic('x')+'</button></div>';
   const html='<section class="squad-directory"><div class="nx-directory-toolbar squad-directory-toolbar">'+search+
     '<p class="nx-directory-toolbar-note">Доступ пользователей к подключениям Xray.</p>'+
-    '<button type="button" class="btn sm" data-ne="squads">'+ic('plus')+' Сквад</button></div>'+
+    workspaceGridControls('squads')+workspaceCreateButton('squads','Сквад')+'</div>'+
     (items.length?'<p class="nx-directory-search-count" data-squad-search-count hidden><span>Найдено:</span> <b data-squad-search-count-value></b></p>'+
-    '<div class="squad-card-grid" data-ui-layout="cards">'+cards+'</div>'+
+    '<div class="squad-card-grid" data-ui-layout="cards" data-workspace-grid="squads" data-grid-mode="'+workspaceGridMode('squads')+'">'+cards+'</div>'+
     '<div class="nx-directory-search-empty" data-squad-search-empty hidden>'+ic('search')+
     '<b>Совпадений не найдено</b><span>Попробуйте другой запрос или очистите поиск.</span></div>'+
     '<p class="squad-directory-note">'+ic('shield')+' Трафик берётся только из подтверждённых персональных счётчиков Xray за 24 часа. Пользователь в нескольких сквадах учитывается в каждом из них.</p>':
@@ -3036,6 +3077,7 @@ async function squadsP(){
     '</section>';
   return [html,()=>{
     const root=$('.squad-directory');
+   mountWorkspaceGrid(root);
     if(!root||!items.length)return;
     const input=root.querySelector('[data-squad-search]');
     input?.addEventListener('input',()=>{squadSearchQuery=input.value;applySquadSearch(root)});
@@ -3140,18 +3182,19 @@ async function hostsP(){
     '<div class="host-summary-metric is-active"><span>'+ic('check')+'Активных</span><strong>'+active+'</strong></div>'+
     '<div class="host-summary-metric"><span>'+ic('minus')+'Отключённых</span><strong>'+(items.length-active)+'</strong></div>'+
     '</div>';
-  const body=items.length?'<div class="host-card-grid" data-ui-layout="cards">'+items.map((host,i)=>hostCard(host,i,items.length)).join('')+'</div>':
+  const body=items.length?'<div class="host-card-grid" data-ui-layout="cards" data-workspace-grid="hosts" data-grid-mode="'+workspaceGridMode('hosts')+'">'+items.map((host,i)=>hostCard(host,i,items.length)).join('')+'</div>':
     '<div class="card empty"><b>Хостов пока нет</b><span>Добавьте адреса подключения, которые должны видеть клиенты.</span>'+
     '<button type="button" class="gh sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>';
   const html='<section class="host-directory"><div class="nx-directory-toolbar host-directory-toolbar">'+search+
     '<p class="nx-directory-toolbar-note">'+ENT.hosts.n+'</p>'+
-    '<button type="button" class="btn sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>'+summary+
+    workspaceGridControls('hosts')+workspaceCreateButton('hosts','Хост')+'</div>'+summary+
     (items.length?'<p class="nx-directory-search-count" data-host-search-count hidden><span>Найдено:</span> <b data-host-search-count-value></b></p>':'')+
     body+
     (items.length?'<div class="nx-directory-search-empty" data-host-search-empty hidden>'+ic('search')+
     '<b>Совпадений не найдено</b><span>Попробуйте другой запрос или очистите поиск.</span></div>':'')+'</section>';
   return [html,()=>{
     const root=$('.host-directory');
+   mountWorkspaceGrid(root);
     if(!root||!items.length)return;
     const input=root.querySelector('[data-host-search]');
     input?.addEventListener('input',()=>{hostSearchQuery=input.value;applyHostSearch(root)});
@@ -3168,6 +3211,41 @@ async function hostsP(){
 
 /* Templates share the canonical CRUD forms and PostgreSQL collections.
  * No duplicate template store or fake "apply subscription" action. */
+/* Shared catalog controls. Density changes presentation, never saved records. */
+const WORKSPACE_GRID_MODES=['compact','standard','spacious'];
+function workspaceGridMode(kind){
+ try{const mode=localStorage.getItem('xmeshNexusCollectionView:'+kind);return WORKSPACE_GRID_MODES.includes(mode)?mode:'standard'}
+ catch(_){return 'standard'}
+}
+function workspaceGridControls(kind){
+ const active=workspaceGridMode(kind);
+ return '<div class="nx-workspace-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки">'+
+  [['compact','Плотно'],['standard','Стандарт'],['spacious','Крупно']].map(([mode,label])=>
+   '<button type="button" data-workspace-grid-mode="'+kind+':'+mode+'" aria-pressed="'+(active===mode)+'" class="'+(active===mode?'on':'')+'">'+label+'</button>').join('')+'</div></div>';
+}
+function workspaceCreateButton(kind,label,id=''){
+ return '<button type="button" class="nx-workspace-create" '+(id?'id="'+id+'"':'data-ne="'+kind+'"')+'>'+
+  '<span class="nx-workspace-create-icon" aria-hidden="true">'+ic('plus')+'</span><span>'+label+'</span></button>';
+}
+function mountWorkspaceGrid(root){
+ root?.addEventListener('click',event=>{
+  const button=event.target.closest('[data-workspace-grid-mode]');
+  if(!button||!root.contains(button))return;
+  const [kind,mode]=button.dataset.workspaceGridMode.split(':');
+  if(!WORKSPACE_GRID_MODES.includes(mode))return;
+  const grid=root.querySelector('[data-workspace-grid="'+kind+'"]');
+  if(!grid)return;
+  grid.dataset.gridMode=mode;
+  try{localStorage.setItem('xmeshNexusCollectionView:'+kind,mode)}catch(_){}
+  root.querySelectorAll('[data-workspace-grid-mode]').forEach(control=>{
+   if(!control.dataset.workspaceGridMode.startsWith(kind+':'))return;
+   const selected=control.dataset.workspaceGridMode===kind+':'+mode;
+   control.classList.toggle('on',selected);
+   control.setAttribute('aria-pressed',String(selected));
+  });
+ });
+}
+
 let templateFilters={tpls:'',subs:''};
 let templateTab='tpls';
 async function templatesP(){
@@ -3232,11 +3310,11 @@ async function templatesP(){
   const section=(kind,items,renderItem)=>{
     const filter=templateFilters[kind]||'';
     return '<section class="template-section" role="tabpanel" id="templates-panel-'+kind+'" aria-labelledby="templates-tab-'+kind+'" data-template-section="'+kind+'" '+(templateTab===kind?'':'hidden inert')+'>'+
-      '<div class="template-section-tools">'+(items.length?'<div class="nx-directory-search template-search">'+ic('search')+
+      '<div class="template-section-tools nx-workspace-toolbar" data-ui-toolbar="filters">'+(items.length?'<div class="nx-directory-search template-search">'+ic('search')+
         '<input type="search" data-template-search="'+kind+'" aria-label="Поиск шаблонов" placeholder="Найти шаблон…" autocomplete="off" value="'+text(filter)+'">'+
         '<button type="button" class="nx-directory-search-clear" data-template-clear="'+kind+'" aria-label="Очистить поиск" '+(filter?'':'hidden')+'>'+ic('x')+'</button></div><span class="template-filter-count" data-template-count="'+kind+'" aria-live="polite"></span>':'')+
-        '<button type="button" class="btn sm" data-ne="'+kind+'">'+ic('plus')+' Новый шаблон</button></div>'+
-      (items.length?'<div class="template-grid" data-ui-layout="cards">'+items.map(renderItem).join('')+'</div>'+
+        '<div class="nx-workspace-actions">'+workspaceGridControls(kind)+workspaceCreateButton(kind,'Новый шаблон')+'</div></div>'+
+      (items.length?'<div class="template-grid" data-ui-layout="cards" data-workspace-grid="'+kind+'" data-grid-mode="'+workspaceGridMode(kind)+'">'+items.map(renderItem).join('')+'</div>'+
         '<p class="template-no-matches" data-template-no-results="'+kind+'" hidden>'+ic('search')+' Ничего не найдено. Измените запрос.</p>':
         '<div class="template-empty"><span class="template-empty-icon">'+ic(kind==='tpls'?'users':'code')+'</span><div><strong>'+(kind==='tpls'?'Пока нет шаблонов пользователей':'Шаблонов подписки пока нет')+'</strong><p>'+(kind==='tpls'?'Сохраните тарифные параметры для повторного использования.':'Сохранённые заготовки. Выдачей управляет SUBSCRIPTION STUDIO.')+'</p></div></div>')+'</section>';
   };
@@ -3246,6 +3324,7 @@ async function templatesP(){
     section('tpls',users.items,templateCard)+section('subs',subscriptions.items,subscriptionCard)+'</div>';
   return [html,()=>{
     const root=document.querySelector('.templates-workspace');
+     mountWorkspaceGrid(root);
     if(!root)return;
     function selectTab(kind,focus=false){
       templateTab=kind;
@@ -4291,14 +4370,14 @@ async function nodesP(){
   nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,profilesById.get(String(n.profileId)),null,hostsByNode.get(String(n.id))||[],!!latestMetrics.get(Number(n.id)))),cards:cardById,page:1,runtimeQueue:[],runtimePending:new Set(),runtimeActive:0,runtimeCache:new Map()};
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
-  return [`<section class="nodes-page"><div class="nodes-toolbar" data-ui-toolbar="filters" role="search" aria-label="Поиск и фильтры узлов">
+  return [`<section class="nodes-page"><div class="nodes-toolbar nx-workspace-toolbar" data-ui-toolbar="filters" role="search" aria-label="Поиск и фильтры узлов">
   ${r.items.length?`<label class="node-explorer-search"><span>Поиск по нодам</span><input type="search" data-node-search autocomplete="off" placeholder="Название, IP, домен, хостинг, профиль, ID…" aria-label="Поиск по названию, IP, домену, хостингу и профилю"></label>
    <label><span>Состояние</span><select data-node-state><option value="all">Все</option><option value="enabled">Активные</option><option value="disabled">Отключены</option><option value="monitored">Есть телеметрия</option><option value="unmonitored">Нет свежей телеметрии</option></select></label>
    <label><span>Сортировка</span><select data-node-sort><option value="name">Название А–Я</option><option value="name-desc">Название Я–А</option><option value="ip">IP / адрес</option><option value="hosting">Хостинг</option><option value="status">Состояние</option><option value="id-desc">Новые сначала</option><option value="id-asc">Старые сначала</option></select></label>
    <label class="node-explorer-hosting"><input type="checkbox" data-node-hosting-only> Только с хостингом</label>
    <button type="button" class="gh node-explorer-reset" data-node-search-clear data-action-icon="done">${ic("redo")}<span>Сбросить</span></button>
 <span class="node-result-count" data-node-search-count aria-live="polite"></span>`:''}
-  <div class="node-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки"><button type="button" data-node-grid-mode="compact" aria-pressed="${gridMode==='compact'?'true':'false'}" class="${gridMode==='compact'?'on':''}">Плотно</button><button type="button" data-node-grid-mode="standard" aria-pressed="${gridMode==='standard'?'true':'false'}" class="${gridMode==='standard'?'on':''}">Стандарт</button><button type="button" data-node-grid-mode="spacious" aria-pressed="${gridMode==='spacious'?'true':'false'}" class="${gridMode==='spacious'?'on':''}">Крупно</button></div></div><button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">${ic('plus')}</span><span class="node-create-label">Новый узел</span></button>
+  <div class="node-grid-controls nx-workspace-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки"><button type="button" data-node-grid-mode="compact" aria-pressed="${gridMode==='compact'?'true':'false'}" class="${gridMode==='compact'?'on':''}">Плотно</button><button type="button" data-node-grid-mode="standard" aria-pressed="${gridMode==='standard'?'true':'false'}" class="${gridMode==='standard'?'on':''}">Стандарт</button><button type="button" data-node-grid-mode="spacious" aria-pressed="${gridMode==='spacious'?'true':'false'}" class="${gridMode==='spacious'?'on':''}">Крупно</button></div></div><button type="button" class="node-create-action nx-workspace-create" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon nx-workspace-create-icon" aria-hidden="true">${ic('plus')}</span><span class="node-create-label">Новый узел</span></button>
   ${r.items.length?`<div class="node-explorer-pages" aria-label="Навигация по страницам" hidden><button type="button" class="gh sm node-explorer-page-button" data-node-prev data-action-icon="done" aria-label="Предыдущая страница">${ic("arrowLeft")}</button><span data-node-search-page aria-live="polite"></span><button type="button" class="gh sm node-explorer-page-button" data-node-next data-action-icon="done" aria-label="Следующая страница">${ic("arrowRight")}</button></div>`:''}
   </div>
   ${r.items.length?`<div class="node-explorer-empty empty" data-ui-layout="empty" data-node-search-empty hidden>Ничего не найдено. Измените запрос или сбросьте фильтры.</div>

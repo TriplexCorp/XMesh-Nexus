@@ -118,3 +118,15 @@
  .template-card-footer>.template-use{flex:1 1 auto}
 }
 .template-card-footer>.template-more{margin-left:0}
+
+
+/* Templates use the same toolbar hierarchy and density control as other catalogs. */
+.template-section-tools{gap:.65rem;flex-wrap:wrap}
+.template-section-tools>.nx-workspace-actions{margin-left:auto}
+.template-search{flex:1 1 19rem;max-width:32rem}
+.template-grid[data-grid-mode=compact]{grid-template-columns:repeat(auto-fill,minmax(min(100%,17.5rem),1fr));gap:var(--nx-space-3)}
+.template-grid[data-grid-mode=compact]>.template-card{padding:var(--nx-space-4);gap:var(--nx-space-3)}
+.template-grid[data-grid-mode=spacious]{grid-template-columns:repeat(auto-fill,minmax(min(100%,37rem),1fr))}
+@media(max-width:680px){
+ .template-section-tools>.nx-workspace-actions{margin-left:0;width:100%;justify-content:space-between}
+}

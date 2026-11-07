@@ -387,13 +387,17 @@ async function main() {
         assert(await card.isVisible(),'Escape must restore all Hosts');
         const g=await page.locator('.host-directory-toolbar').evaluate(el=>{
           const toolbar=el.getBoundingClientRect();
+          const style=getComputedStyle(el);
+          const contentLeft=toolbar.left+parseFloat(style.borderLeftWidth)+parseFloat(style.paddingLeft);
           const search=el.querySelector('[data-host-search]').getBoundingClientRect();
           const create=el.querySelector('[data-ne="hosts"]').getBoundingClientRect();
-          return{left:toolbar.left,right:toolbar.right,searchLeft:search.left,searchRight:search.right,
+          return{left:toolbar.left,right:toolbar.right,contentLeft,searchLeft:search.left,
+            searchRight:search.right,searchMid:(search.top+search.bottom)/2,createMid:(create.top+create.bottom)/2,
             createLeft:create.left,createRight:create.right,viewport:window.innerWidth};
         });
         assert(g.left>=0&&g.right<=g.viewport+1,'Hosts toolbar must stay inside viewport');
-        assert(Math.abs(g.searchLeft-g.left)<2,'Hosts search must be the first leftmost toolbar control');
+        assert(Math.abs(g.searchLeft-g.contentLeft)<2,'Hosts search must align with the left content edge, including designed padding');
+        assert(Math.abs(g.searchMid-g.createMid)<3,'Hosts search and creation must share the leading toolbar row');
         assert(g.searchRight<g.createLeft,'Hosts creation must stay to the right of search');
         assert(g.createRight<=g.right+1,'Hosts create must stay inside toolbar');
       }
@@ -433,14 +437,18 @@ async function main() {
         assert(await card.isVisible(),'Escape must restore squad cards');
         const layout=await page.locator('.squad-directory-toolbar').evaluate(el=>{
           const bounds=el.getBoundingClientRect();
+          const style=getComputedStyle(el);
+          const contentLeft=bounds.left+parseFloat(style.borderLeftWidth)+parseFloat(style.paddingLeft);
           const input=el.querySelector('[data-squad-search]').getBoundingClientRect();
           const create=el.querySelector('[data-ne="squads"]').getBoundingClientRect();
-          return {bounds:{left:bounds.left,right:bounds.right},
-            input:{left:input.left,right:input.right},create:{left:create.left,right:create.right},
+          return {bounds:{left:bounds.left,right:bounds.right},contentLeft,
+            input:{left:input.left,right:input.right,mid:(input.top+input.bottom)/2},
+            create:{left:create.left,right:create.right,mid:(create.top+create.bottom)/2},
             viewport:window.innerWidth};
         });
         assert(layout.bounds.left>=0&&layout.bounds.right<=layout.viewport+1,'Squad toolbar must fit viewport');
-        assert(Math.abs(layout.input.left-layout.bounds.left)<2,'Squads search must be the leftmost toolbar control');
+        assert(Math.abs(layout.input.left-layout.contentLeft)<2,'Squads search must align with the left content edge, including designed padding');
+        assert(Math.abs(layout.input.mid-layout.create.mid)<3,'Squads search and creation must share the leading toolbar row');
         assert(layout.input.right<layout.create.left,'Squads create must remain to the right of search');
         assert(layout.create.right<=layout.bounds.right+1,'Squads create must remain inside toolbar');
       }
