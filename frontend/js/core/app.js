@@ -3933,10 +3933,10 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const billingFields=e.fs.filter(f=>f.k.startsWith('billing')&&!['billingProviderUrl','billingNote'].includes(f.k)).map(billingField).join('');
   const providerFields=e.fs.filter(f=>['billingProviderUrl','billingNote'].includes(f.k)).map(billingField).join('');
   const nodeTrafficFields=e.fs.filter(f=>['mult','limit','resetDay'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
-  const nodeCdnModeField=field(e.fs.find(f=>f.k==='cdnMode'),o.cdnMode||'standard');
+  const nodeCdnModeField=k==='nodes'?field(e.fs.find(f=>f.k==='cdnMode'),o.cdnMode||'standard'):'';
   const nodeCdnProfile=DB.profiles.find(p=>String(p.id)===String(o.profileId));
   const nodeCdnChoices=[...new Set(inbs(nodeCdnProfile).map(i=>i.tag))];
-  const nodeCdnChoiceField=field({...e.fs.find(f=>f.k==='cdnInboundTags'),o:nodeCdnChoices.map(tag=>[tag,tag])},o.cdnInboundTags||[]);
+  const nodeCdnChoiceField=k==='nodes'?field({...e.fs.find(f=>f.k==='cdnInboundTags'),o:nodeCdnChoices.map(tag=>[tag,tag])},o.cdnInboundTags||[]):'';
   const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!f.k.startsWith('geo')&&!['rotationEnabled','rotationIntervalHours','rotationIps','cdnMode','cdnInboundTags'].includes(f.k));
   // GeoData belongs to its own node service dialog, never the general editor.
   // Keep the connection fields in a deliberate keyboard and reading order.
