@@ -3313,7 +3313,7 @@ async function templatesP(){
       '<div class="template-section-tools nx-workspace-toolbar" data-ui-toolbar="filters">'+(items.length?'<div class="nx-directory-search template-search">'+ic('search')+
         '<input type="search" data-template-search="'+kind+'" aria-label="Поиск шаблонов" placeholder="Найти шаблон…" autocomplete="off" value="'+text(filter)+'">'+
         '<button type="button" class="nx-directory-search-clear" data-template-clear="'+kind+'" aria-label="Очистить поиск" '+(filter?'':'hidden')+'>'+ic('x')+'</button></div><span class="template-filter-count" data-template-count="'+kind+'" aria-live="polite"></span>':'')+
-        '<div class="nx-workspace-actions">'+workspaceGridControls(kind)+workspaceCreateButton(kind,'Новый шаблон')+'</div></div>'+
+        '<div class="nx-workspace-actions">'+workspaceGridControls(kind)+workspaceCreateButton(kind,'Шаблон')+'</div></div>'+
       (items.length?'<div class="template-grid" data-ui-layout="cards" data-workspace-grid="'+kind+'" data-grid-mode="'+workspaceGridMode(kind)+'">'+items.map(renderItem).join('')+'</div>'+
         '<p class="template-no-matches" data-template-no-results="'+kind+'" hidden>'+ic('search')+' Ничего не найдено. Измените запрос.</p>':
         '<div class="template-empty"><span class="template-empty-icon">'+ic(kind==='tpls'?'users':'code')+'</span><div><strong>'+(kind==='tpls'?'Пока нет шаблонов пользователей':'Шаблонов подписки пока нет')+'</strong><p>'+(kind==='tpls'?'Сохраните тарифные параметры для повторного использования.':'Сохранённые заготовки. Выдачей управляет SUBSCRIPTION STUDIO.')+'</p></div></div>')+'</section>';
