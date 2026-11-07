@@ -276,7 +276,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=6fc2d828fd52',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=a07af0ce990d'
+        '/subscription-public.css?v=bcac7d0983f4'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
@@ -406,7 +406,7 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-preview-status-label]').textContent=english?'Subscription status':'Статус подписки';
         $('[data-preview-status-note]').textContent=english?'Traffic and validity':'Трафик и срок действия';
         $('[data-subscription-ok]').textContent=english?'● Active':'● Активна';
-        $('[data-subscription-reveal]').textContent=english?'Show private link':'Показать ссылку';
+        $('[data-subscription-reveal]').textContent=$('[data-preview-link-card]').hidden ? (english?'Show private link':'Показать ссылку') : (english?'Hide private link':'Скрыть ссылку');
         $('[data-preview-link-label]').textContent=english?'Personal HTTPS link':'Персональная HTTPS-ссылка';
         $('[data-preview-link-note]').textContent=english?'Sample URL — not a real access token':'Демонстрационный адрес, без настоящего токена';
         $('[data-preview-demo-link]').textContent=d.subscriptionDomain && pathOK(d.subscriptionPath)
@@ -432,7 +432,8 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-copy]').hidden=!d.subscriptionShowCopy;
         $('[data-subscription-qr]').hidden=!d.subscriptionShowQr;
         $('[data-subscription-devices]').hidden=!d.subscriptionShowDevices;
-        quick.hidden=!(d.subscriptionShowCopy||d.subscriptionShowQr||d.subscriptionShowDevices);
+        // Revealing the personal address is a separate, always-available action.
+        quick.hidden=false;
         const enabled=clientCatalog.filter(([id])=>d.subscriptionClients[id]);
         const customEnabled=d.subscriptionCustomClients.filter(client=>client.enabled&&client.name);
         const allEnabled=[...enabled,...customEnabled.map(client=>[client.id,client.name,client.platforms])];
@@ -461,6 +462,7 @@ window.XMeshSubscriptionStudio = (() => {
           const card=previewShadow.querySelector('[data-preview-link-card]');
           card.hidden=!card.hidden;
           reveal.setAttribute('aria-expanded',String(!card.hidden));
+          reveal.textContent=card.hidden?(previewLanguage==='en'?'Show private link':'Показать ссылку'):(previewLanguage==='en'?'Hide private link':'Скрыть ссылку');
           return;
         }
         const button=event.target.closest('[data-portal-language]');
