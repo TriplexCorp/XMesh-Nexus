@@ -162,7 +162,7 @@ def main():
     check(status, 201, "admin creates valid XRAY profile")
     profile_id = profile["id"]
     status, node, _ = api("POST", "/collections/nodes",
-                          {"name": "CI auth host node", "addr": "127.0.0.1",
+                          {"name": "CI auth host node", "addr": "192.0.2.251",
                            "profileId": profile_id}, admin_cookie)
     check(status, 201, "admin creates profile-bound node")
     node_id = node["id"]
@@ -170,10 +170,10 @@ def main():
     # The form and direct API share this server-side validation. A 409 must
     # identify the existing node instead of silently creating a second entry.
     status, duplicate, _ = api("POST", "/collections/nodes",
-                               {"name": "CI accidental duplicate", "addr": "127.0.0.1"},
+                               {"name": "CI accidental duplicate", "addr": "192.0.2.251"},
                                admin_cookie)
     check(status, 409, "duplicate Node IPv4 is rejected")
-    assert "127.0.0.1" in duplicate["error"] and str(node_id) in duplicate["error"], duplicate
+    assert "192.0.2.251" in duplicate["error"] and str(node_id) in duplicate["error"], duplicate
     assert "CI auth host node" in duplicate["error"], duplicate
 
     status, another, _ = api("POST", "/collections/nodes",
@@ -181,9 +181,9 @@ def main():
                              admin_cookie)
     check(status, 201, "a different Node address remains allowed")
     status, duplicate, _ = api("PATCH", f"/collections/nodes/{another['id']}",
-                               {"addr": "127.0.0.1"}, admin_cookie)
+                               {"addr": "192.0.2.251"}, admin_cookie)
     check(status, 409, "editing Node address cannot steal another Node IP")
-    assert "127.0.0.1" in duplicate["error"] and str(node_id) in duplicate["error"], duplicate
+    assert "192.0.2.251" in duplicate["error"] and str(node_id) in duplicate["error"], duplicate
     check(api("PATCH", f"/collections/nodes/{another['id']}",
               {"name": "CI second Node renamed"}, admin_cookie)[0], 200,
           "unrelated Node edits remain allowed")
