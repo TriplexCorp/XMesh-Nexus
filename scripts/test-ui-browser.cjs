@@ -215,6 +215,9 @@ async function main() {
       await navigate('set/traffic');
       const save=page.locator('[data-cdn-tags-save]');
       await save.waitFor({state:'visible'});
+      const period=page.locator('[name="cdnResetPeriod"]');
+      const initialPeriod=await period.inputValue();
+      await period.selectOption('monthly');
       const options=page.locator('[name="cdnInboundTags"]');
       const count=await options.count();
       const original=await options.evaluateAll(items=>items.filter(el=>el.checked).map(el=>el.value));
@@ -223,11 +226,20 @@ async function main() {
         await save.click();
         await page.reload({waitUntil:'domcontentloaded'});
         await page.locator('[data-cdn-tags-save]').waitFor({state:'visible'});
+        assert.equal(await page.locator('[name="cdnResetPeriod"]').inputValue(),'monthly','Monthly LTE period must persist through owner settings API');
         assert(await page.locator('[name="cdnInboundTags"]').first().isChecked(),
           'Selected CDN inbound must persist through the owner settings API');
         await page.locator('[name="cdnInboundTags"]').evaluateAll((items,saved)=>{
           for(const item of items)item.checked=saved.includes(item.value);
         },original);
+        await page.locator('[name="cdnResetPeriod"]').selectOption(initialPeriod);
+        await page.locator('[data-cdn-tags-save]').click();
+      }else{
+        await save.click();
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.locator('[data-cdn-tags-save]').waitFor({state:'visible'});
+        assert.equal(await page.locator('[name="cdnResetPeriod"]').inputValue(),'monthly');
+        await page.locator('[name="cdnResetPeriod"]').selectOption(initialPeriod);
         await page.locator('[data-cdn-tags-save]').click();
       }
       assert.equal(new URL(page.url()).hash,'#set/traffic');
@@ -1498,7 +1510,7 @@ async function main() {
         }));
         const originalFrame=await frame();
         await form.locator('[name="hosting"]').fill('Unsaved hosting');
-        for(const key of ['network','billing','connection']){
+        for(const key of ['traffic','network','billing','connection']){
           await form.locator(`[data-node-editor-tab="${key}"]`).click();
           const currentFrame=await frame();
           for(let i=0;i<originalFrame.length;i++)for(const axis of ['x','y','width','height'])assert(Math.abs(currentFrame[i][axis]-originalFrame[i][axis])<=.1,'Task switch must not resize or move '+originalFrame[i].selector+' '+axis+': '+JSON.stringify({originalFrame,currentFrame}));
@@ -1508,7 +1520,7 @@ async function main() {
           });
           assert(scrolling.scroll<=Math.max(scrolling.height,scrolling.content)+2,'Inactive tasks must not leave an empty scroll tail: '+JSON.stringify(scrolling));
           const inactive=form.locator('[data-node-editor-pane][data-active="false"]');
-          assert.equal(await inactive.count(),2);
+          assert.equal(await inactive.count(),3);
           assert(await inactive.evaluateAll(panes=>panes.every(p=>p.inert&&p.getAttribute('aria-hidden')==='true')),'Inactive tasks must not expose controls to focus/accessibility');
           if(width>=1366&&key!=='connection'){
             const workspace=await form.locator(`[data-node-editor-pane="${key}"] .node-task-workspace`).evaluate(el=>{
@@ -1516,6 +1528,13 @@ async function main() {
               return{left:a.left,right:a.right,aside:b.left,width:b.width};
             });
             assert(workspace.right<workspace.aside&&workspace.width>=200,'Desktop tasks must use two readable columns');
+          }
+          if(key==='traffic'){
+            const policy=form.locator('[name="cdnMode"]');
+            await policy.selectOption('selected');
+            assert(await form.locator('[data-node-cdn-inbounds]').isVisible(),'LTE inbound controls must appear in mixed mode');
+            await policy.selectOption('standard');
+            assert(await form.locator('[data-node-cdn-inbounds]').isHidden(),'Regular nodes must not show LTE inbound controls');
           }
           if(key==='network'){
             await form.locator('[name="rotationIps"]').fill('192.0.2.10\n192.0.2.10\n192.0.2.11');
@@ -1540,7 +1559,7 @@ async function main() {
         assert.equal(await form.locator('[name="hosting"]').inputValue(),'Unsaved hosting','Switching tasks must preserve draft inputs');
         const first=form.locator('[data-node-editor-tab="connection"]');
         await first.focus();await page.keyboard.press('ArrowRight');
-        assert.equal(await form.locator('[data-node-editor-tab="network"]').getAttribute('aria-selected'),'true');
+        assert.equal(await form.locator('[data-node-editor-tab="traffic"]').getAttribute('aria-selected'),'true');
         await page.keyboard.press('End');
         assert.equal(await form.locator('[data-node-editor-tab="billing"]').getAttribute('aria-selected'),'true');
         await form.locator('[name="billingPrice"]').fill('-1');
