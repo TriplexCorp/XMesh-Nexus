@@ -347,6 +347,39 @@ is collapsed. Native HTML disclosure semantics, keyboard focus and existing
 Nexus Classic/Glass/Raised tokens apply. Do not change membership or
 persisted Squad data to achieve visual compactness.
 
+### Catalog toolbars and collection actions
+
+**Nodes is the reference composition for catalog controls.** Squads, Hosts,
+Templates and Balancers use the same search-left / actions-right hierarchy and
+the same primary create-button anatomy. Do not rebuild separate add buttons
+in individual feature CSS.
+
+- `workspaceGridControls(kind)`, `workspaceCreateButton(kind,label,id)` and
+  `mountWorkspaceGrid(root)` in `frontend/js/core/app.js` are the shared
+  renderer/interaction contract. Nodes keeps its existing fleet-specific state
+  and buttons but consumes the same visual primitives.
+- `.nx-workspace-toolbar`, `.nx-directory-toolbar`, `.nx-workspace-actions`,
+  `.nx-workspace-create` and `.nx-workspace-grid-controls` consume global
+  material, density, focus, radius and control tokens from the system CSS.
+  Feature CSS may adjust only each collection's card geometry and responsive
+  reflow.
+- All collection toolbars keep the search **first/left** and the create action
+  **last/right**. Create actions use an accent icon tile nested inside a quiet
+  outlined control; no unrelated feature-specific bright button variants.
+- Compact / Standard / Spacious are genuine grid layouts. Their selection is
+  saved per collection (`xmeshNexusCollectionView:<kind>`) and never modifies
+  records, filtering, pagination, sorting, CRUD or backend configuration.
+- Preserve one clearly labelled primary create action per visible catalog,
+  and never use the global header's “new user” action as a substitute.
+- Balancers show compact readable summary cards and a native expandable editor.
+  Saved source selectors, strategy, health probes and SMART opt-in policy
+  remain authoritative. Search/density are view-only and must not change the
+  submitted settings. Newly created groups open their editor for immediate use.
+- Cover English and Russian labels, the 390/768/1920 px breakpoints, browser
+  zoom, all three materials and keyboard focus when changing this contract.
+- After any UI source change, regenerate the content-addressed keys using
+  `node scripts/update-ui-cache.cjs`.
+
 ### Empty states / Templates / Balancers
 
 Empty states stay compact and explicit. They do not become half-screen blank cards.
