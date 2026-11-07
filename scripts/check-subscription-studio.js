@@ -241,8 +241,12 @@ assert.match(portalCss,/\.subscription-public \.subscription-preview-apps\s*\{[^
   'Catalog heading must stack above the application cards');
 assert.match(portalCss,/\.subscription-public \.subscription-preview-apps>div\s*\{[^}]*repeat\(auto-fit,minmax\(min\(100%,235px\),1fr\)\)/,
   'App card tracks must never squeeze regular app names');
-assert.match(panelEntry,/subscription-public\.css\?v=[a-f0-9]{12}/,
-  'Studio must load the same real public styles as the visitor portal');
+assert(!panelEntry.includes('subscription-public.css'),
+  'Public portal CSS must not leak into the authenticated panel');
+assert.match(src,/previewHost\.attachShadow\(\{mode:'open'\}\)/,
+  'Studio must use an isolated ShadowRoot for the production portal preview');
+assert.match(src,/\/subscription-public[.]css[?]v=[a-f0-9]{12}/,
+  'Studio preview must load the real public stylesheet inside its ShadowRoot');
 assert.match(template,/subscription-surface\.css[^"]*"[^>]*>[\s\S]*subscription-public\.css/,
   'Visitor portal must apply public layout after shared surface tokens');
 for(const cls of [
