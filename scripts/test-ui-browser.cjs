@@ -600,14 +600,23 @@ async function main() {
           'Context must explain why these observations do not establish sharing');
         const activityBounds=await dialog.evaluate(d=>{
           const r=d.getBoundingClientRect(),sh=d.querySelector('.xm-sharing-shell').getBoundingClientRect();
-          const body=d.querySelector('.xm-sharing-body');
-          return {height:r.height,shellHeight:sh.height,overflow:body.scrollWidth>body.clientWidth+1};
+          const body=d.querySelector('.xm-sharing-body'),last=d.querySelector('.xm-activity-note');
+          const contentBottom=last?.getBoundingClientRect().bottom??0;
+          const viewportBottom=body.getBoundingClientRect().bottom;
+          return {
+            height:r.height,shellHeight:sh.height,
+            overflow:body.scrollWidth>body.clientWidth+1,
+            bodyScrolls:body.scrollHeight>body.clientHeight+2,
+            trailingGap:viewportBottom-contentBottom
+          };
         });
         assert(activityBounds.height<=activityBounds.shellHeight+5,
           'Activity modal must hug its content instead of filling the screen');
         assert(!activityBounds.overflow,'Activity history must not overflow horizontally');
-        if(height>=650)assert(activityBounds.height<=Math.max(440,height*.78),
-          'Activity history must not leave a full-height empty lower half');
+        if(!activityBounds.bodyScrolls)assert(activityBounds.trailingGap<=32,
+          'Activity history must not leave unused space below its final content');
+        if(width>=760&&height>=650)assert(activityBounds.height<=Math.max(440,height*.78),
+          'Desktop activity history must not inherit an oversized dialog frame');
         if(count){
           await dialog.locator('[data-device-view-devices]').click();
           assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true',
