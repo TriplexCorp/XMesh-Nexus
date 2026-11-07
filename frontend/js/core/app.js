@@ -3067,7 +3067,7 @@ async function squadsP(){
     '<button type="button" class="nx-directory-search-clear" data-squad-search-clear aria-label="Очистить поиск" title="Очистить поиск" '+(squadSearchQuery?'':'hidden')+'>'+ic('x')+'</button></div>';
   const html='<section class="squad-directory"><div class="nx-directory-toolbar squad-directory-toolbar">'+search+
     '<p class="nx-directory-toolbar-note">Доступ пользователей к подключениям Xray.</p>'+
-    '<div class="nx-workspace-actions">'+workspaceGridControls('squads')+workspaceCreateButton('squads','Сквад')+'</div></div>'+
+    workspaceGridControls('squads')+workspaceCreateButton('squads','Сквад')+'</div>'+
     (items.length?'<p class="nx-directory-search-count" data-squad-search-count hidden><span>Найдено:</span> <b data-squad-search-count-value></b></p>'+
     '<div class="squad-card-grid" data-ui-layout="cards" data-workspace-grid="squads" data-grid-mode="'+workspaceGridMode('squads')+'">'+cards+'</div>'+
     '<div class="nx-directory-search-empty" data-squad-search-empty hidden>'+ic('search')+
@@ -3187,7 +3187,7 @@ async function hostsP(){
     '<button type="button" class="gh sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>';
   const html='<section class="host-directory"><div class="nx-directory-toolbar host-directory-toolbar">'+search+
     '<p class="nx-directory-toolbar-note">'+ENT.hosts.n+'</p>'+
-    '<div class="nx-workspace-actions">'+workspaceGridControls('hosts')+workspaceCreateButton('hosts','Хост')+'</div></div>'+summary+
+    workspaceGridControls('hosts')+workspaceCreateButton('hosts','Хост')+'</div>'+summary+
     (items.length?'<p class="nx-directory-search-count" data-host-search-count hidden><span>Найдено:</span> <b data-host-search-count-value></b></p>':'')+
     body+
     (items.length?'<div class="nx-directory-search-empty" data-host-search-empty hidden>'+ic('search')+
