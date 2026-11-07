@@ -31,6 +31,6 @@ assert.match(template,/class="subscription-public-workspace"/,'Public portal mus
 assert.match(template,/class="subscription-public-brand-identity"/,'Public portal must expose a product-header identity group');
 assert.match(template,/class="subscription-public-status-stack"/,'Public portal status must be grouped as an operational rail');
 assert.match(publicCss,/grid-template-columns:minmax\(0,8fr\) minmax\(330px,4fr\)/,'Desktop portal must use an 8/4 enterprise grid');
-assert.match(publicCss,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/,'Desktop client catalog must use four balanced columns');
+assert.match(publicCss,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,235px\),1fr\)\)/,'Client catalog must use readable responsive columns across the available width');
 assert.doesNotMatch(template,/>01<|>02</,'Enterprise portal must not expose decorative numbered panels');
 console.log('Subscription absolute URL / QR / enterprise workspace contract: OK');
