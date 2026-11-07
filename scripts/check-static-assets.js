@@ -36,6 +36,7 @@ const loginCss=read('frontend/styles/auth/login.css');
 const nexusCss=read('frontend/styles/system/nexus-ui-v3.css');
 const userViewport=read('frontend/styles/features/users/user-dialog-viewport.css');
 const subscriptionSurface=read('frontend/styles/features/subscriptions/subscription-surface.css');
+const subscriptionPublic=read('frontend/styles/features/subscriptions/subscription-public.css');
 const subscriptionTemplate=read('backend/src/subscription_template.html');
 const i18nConsistency=read('frontend/js/core/i18n-consistency.js');
 const tlsJs=read('frontend/js/features/xray-studio/xray-studio-tls-dialog.js');
@@ -68,9 +69,16 @@ assert(index.indexOf('/js/core/i18n.js?v=')<index.indexOf('/js/core/i18n-consist
 assert(index.indexOf('/js/core/i18n-consistency.js?v=')<index.indexOf('/js/core/app.js?v='),'Dynamic i18n observer must exist before app routes render');
 assert.match(nexusCss,/subscription-surface\.css\?v=[a-f0-9]{12}/,'Panel preview must import the shared subscription surface');
 assert.match(subscriptionTemplate,/href="\/subscription-surface\.css\?v=[a-f0-9]{12}"/,'Live subscription portal must load the same shared surface');
-for(const selector of ['subscription-preview-brand','subscription-preview-hero','subscription-preview-meta','subscription-preview-cta','subscription-public-grid','subscription-public-catalog']){
+for(const selector of ['subscription-preview-brand','subscription-preview-hero','subscription-preview-meta','subscription-preview-cta']){
   assert(subscriptionSurface.includes('.'+selector),'Shared subscription surface missing '+selector);
 }
+for(const selector of ['subscription-public-grid','subscription-public-catalog','subscription-preview-apps']){
+  assert(subscriptionPublic.includes('.'+selector),'Production portal geometry missing '+selector);
+}
+assert(!subscriptionSurface.includes('.subscription-public .subscription-public-catalog{'),
+  'Shared surface must never override visitor catalog geometry');
+assert.match(nexusCss,/subscription-public\\.css\\?v=[a-f0-9]{12}/,
+  'Studio must import the real portal stylesheet for an accurate preview');
 assert.match(userViewport,/grid-template-rows:auto auto minmax\(0,1fr\) auto/,'User drawer must keep header/overview/body/footer as separate viewport rows');
 assert.match(userViewport,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,21rem\),1fr\)\)/,'User drawer must reflow by available scaled width');
 assert.match(nexusCss,/#stats-user-modal\{[\s\S]*--dialog-width:96rem/,'User Intelligence must remain a workstation-sized dialog');
