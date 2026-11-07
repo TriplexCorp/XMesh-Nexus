@@ -65,17 +65,16 @@ pub(crate) async fn reject_duplicate(
                     .collect::<String>()
             })
             .unwrap_or_else(|| format!("Узел #{id}"));
-        let kind = if address.parse::<IpAddr>().is_ok() {
-            "IP-адресом"
-        } else {
-            "адресом"
-        };
-        return Err(ApiError::new(
-            StatusCode::CONFLICT,
+        let message = if address.parse::<IpAddr>().is_ok() {
             format!(
-                "Узел с {kind} {address} уже существует: «{name}» (ID {id}). Откройте существующий узел вместо повторного добавления."
-            ),
-        ));
+                "Узел с IP-адресом {address} уже существует: «{name}» (ID {id}). Откройте существующий узел вместо повторного добавления."
+            )
+        } else {
+            format!(
+                "Узел с адресом {address} уже существует: «{name}» (ID {id}). Откройте существующий узел вместо повторного добавления."
+            )
+        };
+        return Err(ApiError::new(StatusCode::CONFLICT, message));
     }
     Ok(())
 }
