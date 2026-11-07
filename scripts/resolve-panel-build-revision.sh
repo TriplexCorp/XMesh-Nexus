@@ -3,6 +3,8 @@
 # Explicit trusted SHA wins. For ordinary source builds, accept HEAD only when
 # the complete worktree is clean; otherwise a GitHub comparison would lie.
 set -eu
+# BuildKit mounts the checkout read-only; Git must not refresh/write its index.
+export GIT_OPTIONAL_LOCKS=0
 
 requested=${1:-unknown}
 source_dir=${2:-.}
