@@ -3209,6 +3209,8 @@ async function hostsP(){
   }];
 }
 
+/* Templates share the canonical CRUD forms and PostgreSQL collections.
+ * No duplicate template store or fake "apply subscription" action. */
 /* Shared catalog controls. Density changes presentation, never saved records. */
 const WORKSPACE_GRID_MODES=['compact','standard','spacious'];
 function workspaceGridMode(kind){
@@ -3243,8 +3245,7 @@ function mountWorkspaceGrid(root){
   });
  });
 }
-/* Templates share the canonical CRUD forms and PostgreSQL collections.
- * No duplicate template store or fake "apply subscription" action. */
+
 let templateFilters={tpls:'',subs:''};
 let templateTab='tpls';
 async function templatesP(){
