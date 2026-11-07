@@ -47,7 +47,9 @@ pub fn validate_settings(value: &Value) -> Result<(), ApiError> {
     }
     if let Some(period) = value.get("cdnResetPeriod") {
         if !matches!(period.as_str(), Some("lifetime" | "monthly")) {
-            return Err(bad_request("CDN: режим сброса должен быть lifetime или monthly."));
+            return Err(bad_request(
+                "CDN: режим сброса должен быть lifetime или monthly.",
+            ));
         }
     }
     Ok(())
@@ -72,7 +74,13 @@ pub fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
 /// A marked LTE node can include all inbounds or an explicit subset, so
 /// ordinary inbounds on another node with the same tag never become LTE.
 pub fn validate_node(node: &Value) -> Result<(), ApiError> {
-    let mode = node.get("cdnMode").and_then(Value::as_str).unwrap_or("standard");
+    if node.get("cdnMode").is_some_and(|mode| !mode.is_string()) {
+        return Err(bad_request("CDN: неизвестный режим трафика узла."));
+    }
+    let mode = node
+        .get("cdnMode")
+        .and_then(Value::as_str)
+        .unwrap_or("standard");
     if !matches!(mode, "standard" | "all" | "selected") {
         return Err(bad_request("CDN: неизвестный режим трафика узла."));
     }
@@ -80,9 +88,14 @@ pub fn validate_node(node: &Value) -> Result<(), ApiError> {
         validate_settings(&json!({"cdnInboundTags":value}))?;
     }
     if mode == "selected"
-        && node.get("cdnInboundTags").and_then(Value::as_array).is_none_or(Vec::is_empty)
+        && node
+            .get("cdnInboundTags")
+            .and_then(Value::as_array)
+            .is_none_or(Vec::is_empty)
     {
-        return Err(bad_request("CDN: выберите хотя бы один inbound этого узла."));
+        return Err(bad_request(
+            "CDN: выберите хотя бы один inbound этого узла.",
+        ));
     }
     Ok(())
 }
@@ -94,11 +107,24 @@ pub fn tags_for_node(
 ) -> Result<HashSet<String>, ApiError> {
     validate_node(node)?;
     let mut selected = tags(settings)?;
-    match node.get("cdnMode").and_then(Value::as_str).unwrap_or("standard") {
-        "all" => selected.extend(candidate_tags.iter().cloned().filter(|tag| tag != "xmesh_stats_in")),
+    match node
+        .get("cdnMode")
+        .and_then(Value::as_str)
+        .unwrap_or("standard")
+    {
+        "all" => selected.extend(
+            candidate_tags
+                .iter()
+                .cloned()
+                .filter(|tag| tag != "xmesh_stats_in"),
+        ),
         "selected" => selected.extend(
-            node.get("cdnInboundTags").and_then(Value::as_array).into_iter().flatten()
-                .filter_map(Value::as_str).map(str::to_owned),
+            node.get("cdnInboundTags")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_owned),
         ),
         _ => {}
     }
@@ -107,11 +133,13 @@ pub fn tags_for_node(
 
 pub fn reset_period(settings: &Value) -> Result<&'static str, ApiError> {
     validate_settings(settings)?;
-    Ok(if settings.get("cdnResetPeriod").and_then(Value::as_str) == Some("monthly") {
-        "monthly"
-    } else {
-        "lifetime"
-    })
+    Ok(
+        if settings.get("cdnResetPeriod").and_then(Value::as_str) == Some("monthly") {
+            "monthly"
+        } else {
+            "lifetime"
+        },
+    )
 }
 
 pub fn validate_user(user: &Value) -> Result<(), ApiError> {
@@ -244,9 +272,21 @@ mod tests {
         let mixed = json!({"cdnMode":"selected","cdnInboundTags":["PL_LTE"]});
         let candidates = vec!["PL_LTE".to_owned(), "MAIN_DE".to_owned()];
         assert_eq!(reset_period(&settings).unwrap(), "monthly");
-        assert!(tags_for_node(&settings, &standard, &candidates).unwrap().is_empty());
-        assert!(tags_for_node(&settings, &lte, &candidates).unwrap().contains("PL_LTE"));
-        assert!(!tags_for_node(&settings, &mixed, &candidates).unwrap().contains("MAIN_DE"));
+        assert!(
+            tags_for_node(&settings, &standard, &candidates)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            tags_for_node(&settings, &lte, &candidates)
+                .unwrap()
+                .contains("PL_LTE")
+        );
+        assert!(
+            !tags_for_node(&settings, &mixed, &candidates)
+                .unwrap()
+                .contains("MAIN_DE")
+        );
         assert!(validate_node(&json!({"cdnMode":"selected","cdnInboundTags":[]})).is_err());
         assert!(validate_settings(&json!({"cdnResetPeriod":"weekly"})).is_err());
     }
