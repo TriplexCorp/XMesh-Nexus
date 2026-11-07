@@ -445,6 +445,39 @@ def main():
         assert_status(code,200,"main access resumes without changing user UUID")
         assert any(client["id"]==new_user["xrayId"]
                    for client in desired["config"]["inbounds"][0]["settings"]["clients"])
+        # Node-scoped LTE policy must cut off the specified inbound without
+        # requiring the legacy global tag pool. A regular node is unchanged.
+        code,_,_=request("PATCH",f"/collections/nodes/{node}",
+            {"cdnMode":"selected","cdnInboundTags":["DE_VLESS"]},cookie=cookie,origin=BASE)
+        assert_status(code,200,"mark only DE_VLESS as LTE inbound on this node")
+        code,limited,_=request("GET","/collections/users",cookie=cookie)
+        assert_status(code,200,"refresh node-scoped LTE usage")
+        limited_user=next(u for u in limited["items"] if u["id"]==user_id)
+        assert limited_user["cdnUsedBytes"]==80,("limited node must count signed inbound bytes",limited_user)
+        code,desired,_=signed_post("/node/desired-config",{"node_id":node})
+        assert_status(code,200,"node-scoped LTE cutoff in signed config")
+        assert all(client["id"]!=new_user["xrayId"]
+                   for client in desired["config"]["inbounds"][0]["settings"]["clients"]),(
+                   "Limited node must exclude exhausted user")
+        # Switching to monthly starts a new UTC ledger; no synthetic retroactive
+        # traffic is fabricated from older cumulative readings.
+        code,_,_=request("PATCH","/settings",
+            {"cdnResetPeriod":"monthly"},cookie=cookie,origin=BASE)
+        assert_status(code,200,"enable per-user UTC monthly LTE quota")
+        code,users,_=request("GET","/collections/users",cookie=cookie)
+        assert_status(code,200,"read the new monthly LTE meter")
+        monthly_user=next(u for u in users["items"] if u["id"]==user_id)
+        assert monthly_user["cdnUsedBytes"]==0,("historical totals must not be misclassified into the month",monthly_user)
+        code,desired,_=signed_post("/node/desired-config",{"node_id":node})
+        assert_status(code,200,"monthly budget still permits the user at zero spend")
+        assert any(client["id"]==new_user["xrayId"]
+                   for client in desired["config"]["inbounds"][0]["settings"]["clients"])
+        code,_,_=request("PATCH","/settings",
+            {"cdnResetPeriod":"lifetime"},cookie=cookie,origin=BASE)
+        assert_status(code,200,"restore legacy lifetime accounting")
+        code,_,_=request("PATCH",f"/collections/nodes/{node}",
+            {"cdnMode":"standard","cdnInboundTags":[]},cookie=cookie,origin=BASE)
+        assert_status(code,200,"return test node to ordinary traffic policy")
         code,_,_=request("PATCH",f"/collections/users/{user_id}",
             {"cdnLimitGb":0},cookie=cookie,origin=BASE)
         assert_status(code,200,"reset CDN test user limit without touching global quota")
