@@ -1162,7 +1162,7 @@ function scrollToSettingsTarget(id){
 async function render(soft){
   document.querySelectorAll('body > .xm-period-portal').forEach(menu=>menu.remove());
   document.querySelector('body > .sv-studio-portal')?.remove();
-  T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
+  T.forEach(clearInterval);T=[];const route=location.hash.slice(1);cur=route.startsWith('set/')?'set':route;if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   v.dataset.workspace=PAGE_WORKSPACES[cur];v.dataset.page=cur;
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
@@ -4491,6 +4491,23 @@ function securityP(){
 }
 
 /* ================= НАСТРОЙКИ ================= */
+// Subpages reuse existing inputs and save actions rather than inventing parallel forms.
+const SETTINGS_PAGES=Object.freeze([
+ ['general','Общие','Отдельные названия и домены панели управления и подписки','sliders'],
+ ['colors','Цвет и тема','Основная палитра интерфейса и брендовые акценты','sun'],
+ ['layout','Композиция','Плотность, радиусы и вид карточек','layers'],
+ ['typography','Текст и эффекты','Размер и начертание текста','pen'],
+ ['integrations','Интеграции','События, о которых панель сообщает во внешние сервисы','link'],
+ ['system','Ядро и обновления','Установка и обновление бинарника ядра на сервере панели','server'],
+ ['data','Данные панели','Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.','file']
+]);
+function settingsPageFromHash(){
+ const slug=location.hash.slice(1).split('/')[1];
+ return SETTINGS_PAGES.some(([key])=>key===slug)?slug:'general';
+}
+function settingsPageForTarget(id){
+ return id==='core-panel'||id==='panel-update-card'?'system':'general';
+}
 async function setP(){
   const sw=[
     ['emerald','#74ddb1','#c6e985','Изумруд'],
@@ -4519,39 +4536,40 @@ async function setP(){
     ['tropical','#4ed5bc','#f6c787','Тропики']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}" aria-pressed="${(C[key]||CDEFAULT[key])==v?'true':'false'}">${l}</button>`).join('')}</div>`;
-  const tk=`<section class="card"><div class="hd"><div><h3>API-токены</h3><p>Выдача API-токенов для интеграций ещё не реализована.</p></div></div><p class="note">Не создавайте токены через этот раздел: безопасность доступа к API будет добавлена отдельным этапом.</p></section>`;
+  const tk=`<section class="card" data-settings-group="integrations"><div class="hd"><div><h3>API-токены</h3><p>Выдача API-токенов для интеграций ещё не реализована.</p></div></div><p class="note">Не создавайте токены через этот раздел: безопасность доступа к API будет добавлена отдельным этапом.</p></section>`;
+  const settingsPage=settingsPageFromHash();
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
-  try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
+  if(settingsPage==='system')try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
   const coreLabel=coreView.status=='updating'?'Обновляется':coreView.status=='ready'?'Установлено':coreView.status=='error'?'Ошибка':'Не установлено';
   const ownerUpdates=sessionUser?.role==='owner';
   let panelUpdateView={status:'unavailable'};
-  if(ownerUpdates){
+  if(ownerUpdates&&settingsPage==='system'){
     try{panelUpdateView=await backendRequest('/api/v1/panel/update')}
     catch(error){panelUpdateView={status:'unavailable',error:error.message}}
     if(['queued','running'].includes(panelUpdateView.status))setTimeout(startPanelUpdateWatch,0);
   }
-  return [`<div class="settings-workspace"><div class="appearance-layout" data-ui-columns="paired">
+  const sourceHtml=`<div class="settings-workspace"><div class="appearance-layout" data-ui-columns="paired">
 <div class="appearance-column workspace-stack">
-    <section class="card sg"><div class="settings-appearance-header">
+    <section class="card sg" data-settings-group="colors"><div class="settings-appearance-header">
       <div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
     </div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Введите HEX или настройте цвет ползунками. Палитра изменится только после подтверждения.</small></div><div class="setting-control"><div class="palette-hex-fields"><label class="palette-hex-field"><span>Основной</span><span class="palette-hex-editor"><i id="palette-preview-a" aria-hidden="true" style="--picked:${paletteDraft.a}"></i><input type="text" id="custom-a" value="${paletteDraft.a}" autocomplete="off" spellcheck="false" maxlength="7" aria-label="HEX основного цвета" placeholder="#74DDB1"></span></label><label class="palette-hex-field"><span>Вторичный</span><span class="palette-hex-editor"><i id="palette-preview-b" aria-hidden="true" style="--picked:${paletteDraft.b}"></i><input type="text" id="custom-b" value="${paletteDraft.b}" autocomplete="off" spellcheck="false" maxlength="7" aria-label="HEX вторичного цвета" placeholder="#C6E985"></span></label></div></div></div>
     </section>
-    <section class="card sg"><div class="appearance-card-heading"><h3>Точная настройка цвета</h3><small>Оттенок, насыщенность и яркость собственной палитры</small></div>
+    <section class="card sg" data-settings-group="colors"><div class="appearance-card-heading"><h3>Точная настройка цвета</h3><small>Оттенок, насыщенность и яркость собственной палитры</small></div>
       <div class="color-slider-grid"><label for="hue">Оттенок</label><input type="range" id="hue" min="0" max="360" step="1" value="${paletteDraft.h}"><output id="huev">${paletteDraft.h}°</output></div><div class="color-slider-grid"><label for="sat">Насыщенность</label><input type="range" id="sat" min="0" max="100" step="1" value="${paletteDraft.s}"><output id="satv">${paletteDraft.s}%</output></div><div class="color-slider-grid"><label for="lum">Яркость</label><input type="range" id="lum" min="15" max="85" step="1" value="${paletteDraft.l}"><output id="lumv">${paletteDraft.l}%</output></div>
       <div class="palette-draft-preview" id="palette-draft-preview" style="--x:${paletteDraft.a};--y:${paletteDraft.b}"><span class="palette-draft-samples"><i></i><i></i></span><span><b>Предпросмотр своей палитры</b><small>Цвета не изменятся до подтверждения</small></span></div>
       <div class="palette-draft-actions"><button class="gh sm" type="button" id="palette-cancel">Отмена</button><button class="btn" type="button" id="palette-apply">Применить палитру</button></div>
     </section>
-    <section class="card sg"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
+    <section class="card sg" data-settings-group="typography"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Масштаб интерфейса</b><small>Масштаб текста и элементов вместе: 90–200% с шагом 1%. Для стандартного размера установите 100%.</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="2" step="0.01" value="${C.ts}" aria-label="Масштаб интерфейса"><label class="precision-number"><input type="number" id="tsv" data-appearance-value="ts" min="90" max="200" step="1" value="${Math.round(C.ts*100)}" aria-label="Точный масштаб интерфейса"><span>%</span></label></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Шрифт</b><small>16 вариантов шрифта с поддержкой кириллицы. Выбор применяется ко всей панели и сохраняется в настройках</small></div><div class="setting-control font-choice">${choices('font',[['onest','Manrope'],['inter','Inter'],['golos','Golos Text'],['rubik','Rubik'],['nunito','Nunito Sans'],['plex','IBM Plex Sans'],['roboto','Roboto'],['pt','PT Sans'],['montserrat','Montserrat'],['ubuntu','Ubuntu'],['opensans','Open Sans'],['source','Source Sans 3'],['fira','Fira Sans'],['jost','Jost'],['system','Системный'],['mono','Моно']])}</div></div>
     </section>
-  <div class="card" id="brand-panel"><div class="hd"><div><h3>Бренд и домены</h3><p>Отдельные названия и домены панели управления и подписки</p></div></div><form data-k="brand" method="dialog" class="sg settings-brand-form"><div class="settings-brand-fields">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}${field({k:'subscriptionBrand',l:'Название подписки',ph:'Название вашего сервиса',h:'Название клиентского портала. Если пусто — используется название панели. Изменяется также в SUBSCRIPTION STUDIO.'},DB.set.subscriptionBrand||'')}${field({k:'subscriptionDomain',l:'Домен подписки',ph:'sub.example.com',h:'Независим от домена панели. Оформление и размещение — в SUBSCRIPTION STUDIO.'},DB.set.subscriptionDomain||'')}</div><div class="setting-actions"><button class="btn">Сохранить</button></div></form></div>
-  <div class="card"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
+  <div class="card" id="brand-panel" data-settings-group="general"><div class="hd"><div><h3>Бренд и домены</h3><p>Отдельные названия и домены панели управления и подписки</p></div></div><form data-k="brand" method="dialog" class="sg settings-brand-form"><div class="settings-brand-fields">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}${field({k:'subscriptionBrand',l:'Название подписки',ph:'Название вашего сервиса',h:'Название клиентского портала. Если пусто — используется название панели. Изменяется также в SUBSCRIPTION STUDIO.'},DB.set.subscriptionBrand||'')}${field({k:'subscriptionDomain',l:'Домен подписки',ph:'sub.example.com',h:'Независим от домена панели. Оформление и размещение — в SUBSCRIPTION STUDIO.'},DB.set.subscriptionDomain||'')}</div><div class="setting-actions"><button class="btn">Сохранить</button></div></form></div>
+  <div class="card" data-settings-group="integrations"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
 </div><div class="appearance-column workspace-stack">
-    <section class="card sg"><div class="appearance-card-heading"><h3>Композиция</h3><small>Плотность, радиусы и вид карточек</small></div>
+    <section class="card sg" data-settings-group="layout"><div class="appearance-card-heading"><h3>Композиция</h3><small>Плотность, радиусы и вид карточек</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Плотность</b><small>От компактной таблицы до просторных карточек</small></div><div class="setting-control">${choices('density',[['compact','Компактно'],['comfortable','Стандарт'],['spacious','Свободно']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Стиль карточек</b><small>Классический, стеклянный или объёмный вид</small></div><div class="setting-control">${choices('surface',[['solid','Классика'],['glass','Glass'],['raised','Объём']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Скругление</b><small>От 1 до 36 px с точным шагом 1 независимо от режима остальных ползунков.</small></div><div class="setting-control slider-control"><input type="range" id="radius" min="1" max="36" step="1" value="${C.radius}" aria-label="Скругление углов"><label class="precision-number"><input type="number" id="rv" data-appearance-value="radius" min="1" max="36" step="1" value="${C.radius}" aria-label="Точное скругление углов"><span>px</span></label></div></div>
@@ -4559,19 +4577,19 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Боковая панель</b><small>Компактный режим оставляет в основном только иконки</small></div><div class="setting-control">${choices('sidebar',[['standard','Обычная'],['compact','Компактная']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсказки при наведении</b><small>Показывать названия разделов и кнопок боковой панели. Работает в обычном и компактном режимах.</small></div><label class="sw"><input type="checkbox" id="rail-tips" ${C.railTips?'checked':''} aria-label="Подсказки при наведении"><span></span></label></div>
     </section>
-<section class="card sg">
+<section class="card sg" data-settings-group="layout">
     <div class="appearance-card-heading"><h3>Рабочее пространство</h3><small>Ширина панели и интервалы между разделами</small></div>
     <div class="setting-row"><div class="setting-copy"><b>Точность ползунков</b><small>Шаг 1 или 10 для остальных ползунков. Скругление всегда настраивается по 1 px.</small></div><div class="setting-control"><select id="range-precision" aria-label="Точность ползунков"><option value="1" ${C.rangePrecision===1?'selected':''}>Точно · 1</option><option value="10" ${C.rangePrecision===10?'selected':''}>С привязкой · 10</option></select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области до 3000 px. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><label class="precision-number"><input type="number" id="content-width-value" data-appearance-value="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Точная ширина содержимого"><span>px</span></label></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.01" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><label class="precision-number"><input type="number" id="gap-scale-value" data-appearance-value="gap-scale" min="80" max="140" step="1" value="${Math.round((C.gapScale||1)*100)}" aria-label="Точный интервал между карточками"><span>%</span></label></div></div>
   </section>
-    <section class="card sg"><div class="appearance-card-heading"><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
+    <section class="card sg" data-settings-group="typography"><div class="appearance-card-heading"><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсветка фона</b><small>Мягкое цветное свечение за панелью</small></div><div class="setting-control">${choices('glow',[['off','Выкл.'],['subtle','Мягкая'],['normal','Средняя'],['rich','Яркая']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Анимации</b><small>Отключите движение и переходы, если они отвлекают</small></div><label class="sw"><input type="checkbox" id="mo" ${C.motion?'checked':''} aria-label="Анимации"><span></span></label></div>
       <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления сохраняются в localStorage этого браузера</small></div><button class="gh sm" id="rs">Сбросить оформление</button></div>
     </section>
 
-  <div class="card" id="core-panel"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
+  <div class="card" id="core-panel" data-settings-group="system"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
     <div class="setting-row"><div class="setting-copy"><b>Установленная версия</b><small id="core-installed">${coreView.installed_version?esc(coreView.installed_version):'Ещё не установлена'}</small></div><div class="setting-copy"><b>Архитектура</b><small id="core-architecture">${esc(coreView.architecture||'—')}</small></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Автопроверка статуса</b><small>Проверять Xray-core в фоне, только когда панель открыта и вкладка активна.</small></div><label class="sw"><input type="checkbox" id="auto-core-refresh" ${C.autoCoreRefresh?'checked':''} aria-label="Автоматически проверять статус Xray-core"><span></span></label></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервал проверки</b><small>Как часто опрашивать backend, если автопроверка включена.</small></div><div class="setting-control"><select id="core-refresh-seconds" aria-label="Интервал проверки Xray-core"><option value="15" ${Number(C.coreRefreshSeconds)===15?'selected':''}>Каждые 15 секунд</option><option value="30" ${Number(C.coreRefreshSeconds)===30?'selected':''}>Каждые 30 секунд</option><option value="60" ${Number(C.coreRefreshSeconds)===60?'selected':''}>Каждую минуту</option><option value="120" ${Number(C.coreRefreshSeconds)===120?'selected':''}>Каждые 2 минуты</option></select></div></div>
@@ -4579,13 +4597,44 @@ async function setP(){
     <div class="update-action-row"><button class="gh" type="button" data-core-refresh>Проверить статус</button>${ownerUpdates?'<button class="btn" type="button" data-core-update>Установить / обновить</button>':''}</div>
     <div class="history-placeholder" id="core-message">${esc(coreView.last_error||coreView.progress||'Обновление ядра выполняется отдельно от запуска VPN-трафика.')}</div>
   </div>
-  ${ownerUpdates?`<div class="card" id="panel-update-card">
+  ${ownerUpdates?`<div class="card" id="panel-update-card" data-settings-group="system">
     <div class="hd"><div><h3>Обновление XMesh Nexus</h3><p>Обновление панели из GitHub main с резервной копией PostgreSQL и пересборкой Docker.</p></div><span class="chip">Owner</span></div>
     <p class="note">Во время обновления панель будет временно недоступна.</p>
     <div class="update-action-row"><button type="button" class="gh" data-panel-update-status>Проверить состояние</button><button type="button" class="btn" data-panel-update>Обновить панель</button></div>
     <div class="history-placeholder" id="panel-update-message" role="status" aria-live="polite">${esc(panelUpdateView.error||panelUpdateStatusText(panelUpdateView.status))}</div>
   </div>`:''}
-  <div class="card"><div class="hd"><div><h3>Данные панели</h3><p>Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.</p></div><button class="gh" id="gx">${ic('dl')}Скачать резервную копию</button></div><p class="note">Резервная копия содержит настройки панели. Храните её в безопасном месте.</p></div></div></div>`]
+  <div class="card" data-settings-group="data"><div class="hd"><div><h3>Данные панели</h3><p>Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.</p></div><button class="gh" id="gx">${ic('dl')}Скачать резервную копию</button></div><p class="note">Резервная копия содержит настройки панели. Храните её в безопасном месте.</p></div></div></div>`;
+  // The HTML template is never mounted. Only the active page's original cards
+  // enter the DOM, so duplicate forms, handlers and deep scrolling disappear.
+  const source=document.createElement('template');
+  source.innerHTML=sourceHtml;
+  const selected=[...source.content.querySelectorAll('[data-settings-group]')]
+    .filter(card=>card.dataset.settingsGroup===settingsPage);
+  const columns=[[],[]];
+  selected.forEach((card,index)=>columns[index%2].push(card.outerHTML));
+  const [,title,description]=SETTINGS_PAGES.find(([key])=>key===settingsPage);
+  const navigation=SETTINGS_PAGES.map(([key,label,subtitle,iconName])=>{
+    const active=key===settingsPage;
+    return `<a class="settings-center-link${active?' is-active':''}" href="#set/${key}" ${active?'aria-current="page"':''}>
+      <span class="settings-center-link-icon" aria-hidden="true">${ic(iconName)}</span>
+      <span class="settings-center-link-copy"><strong>${label}</strong><small>${subtitle}</small></span>
+    </a>`;
+  }).join('');
+  return [`<div class="settings-workspace" data-ui-page="settings"><div class="settings-center">
+    <aside class="settings-center-rail" aria-label="Разделы настроек">
+      <nav class="settings-center-nav" aria-label="Разделы настроек">${navigation}</nav>
+      <div class="settings-center-related">
+        <button type="button" data-settings-jump="security">${ic('shield')} Безопасность</button>
+        <a href="#subscription">${ic('link')} SUBSCRIPTION STUDIO</a>
+      </div>
+    </aside>
+    <div class="settings-center-main" id="settings-subpage">
+      <header class="settings-center-heading"><div><h2>${title}</h2><p>${description}</p></div></header>
+      <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${selected.length===1}">
+        <div class="appearance-column workspace-stack">${columns[0].join('')}</div>
+        ${columns[1].length?'<div class="appearance-column workspace-stack">'+columns[1].join('')+'</div>':''}
+      </div>
+    </div></div></div>`];
 }
 
 /* ================= ПАЛИТРА КОМАНД ================= */
@@ -4615,7 +4664,7 @@ function palette(){
 }
 function pdraw(query){
  const q=paletteNormalize(query).trim(),go=k=>()=>{dlg.close();location.hash=k};
- PI=[...FLAT.map(([k,i,l])=>({i,l:'Перейти: '+l,r:go(k)})),{i:'plus',l:'Новый пользователь',r:()=>userNew()},{i:'plus',l:'Новый хост',r:()=>entForm('hosts')},{i:'plus',l:'Новый узел',r:()=>entForm('nodes')},{i:'plus',l:'Новый сквад',r:()=>entForm('squads')},{i:'sun',l:'Сменить тему',r:()=>{dlg.close();$('#theme').click()}},{i:'sliders',l:'Настроить внешний вид',r:go('set')}].filter(x=>paletteNormalize(x.l).includes(q));
+ PI=[...FLAT.map(([k,i,l])=>({i,l:'Перейти: '+l,r:go(k)})),{i:'plus',l:'Новый пользователь',r:()=>userNew()},{i:'plus',l:'Новый хост',r:()=>entForm('hosts')},{i:'plus',l:'Новый узел',r:()=>entForm('nodes')},{i:'plus',l:'Новый сквад',r:()=>entForm('squads')},{i:'sun',l:'Сменить тему',r:()=>{dlg.close();$('#theme').click()}},{i:'sliders',l:'Настроить внешний вид',r:go('set/colors')}].filter(x=>paletteNormalize(x.l).includes(q));
  if(q)PI.push(...paletteUserResults(DB.users,q).map(({user,note})=>({
    i:'users',l:String(user.username||'Пользователь #'+user.id),
    m:note?paletteNoteExcerpt(note,q):STM[st(user)]?.[0]||'',
@@ -4741,15 +4790,17 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(g('.sw')||g('[data-sel]')&&0)return;
+  if(b=g('[data-settings-jump]')){location.hash=b.dataset.settingsJump;return;}
   if(b=g('[data-scroll-target]')){
     e.preventDefault();
     pendingScrollTarget=b.dataset.scrollTarget;
     dlg.close();
-    if(location.hash==='#set'){
+    const targetHash='#set/'+settingsPageForTarget(pendingScrollTarget);
+    if(location.hash===targetHash){
       const target=pendingScrollTarget;
       pendingScrollTarget=null;
       requestAnimationFrame(()=>scrollToSettingsTarget(target));
-    }else location.hash='set';
+    }else location.hash=targetHash;
     return;
   }
   if(b=g('[data-users-refresh]')){
@@ -5770,7 +5821,7 @@ $('#bell').onclick=()=>{
  void updateNotifications();
 };
 dlg.addEventListener('close',()=>{$('#bell')?.setAttribute('aria-expanded','false')});
-$('#restart').onclick=()=>{location.hash='set';setTimeout(()=>document.querySelector('#core-panel')?.scrollIntoView({behavior:'smooth',block:'start'}),100)};
+$('#restart').onclick=()=>{location.hash='set/system';if(cur==='set')requestAnimationFrame(()=>scrollToSettingsTarget('core-panel'))};
 
 document.addEventListener('click',e=>{
   const button=e.target.closest('[data-node-grid-mode]');
