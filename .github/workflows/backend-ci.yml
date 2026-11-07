@@ -33,6 +33,27 @@ jobs:
           bash -n xmeshctl
           bash -n scripts/check-xmeshctl-confirm.sh
           bash scripts/check-xmeshctl-confirm.sh
+  subscription-tunnel:
+    name: Real VLESS TLS client tunnel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Download pinned official Xray and verify archive
+        run: |
+          mkdir -p /tmp/xmesh-xray-test
+          curl --fail --location --silent --show-error https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip -o /tmp/xmesh-xray-test/core.zip
+          echo 'e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214  /tmp/xmesh-xray-test/core.zip' | sha256sum --check
+          unzip -j /tmp/xmesh-xray-test/core.zip xray -d /tmp/xmesh-xray-test
+          chmod +x /tmp/xmesh-xray-test/xray
+      - name: Exercise generated client through a real disposable VLESS TLS tunnel
+        env:
+          XRAY_TEST_BINARY: /tmp/xmesh-xray-test/xray
+        run: node scripts/test-subscription-loopback.cjs
+
   rust:
     runs-on: ubuntu-latest
     steps:

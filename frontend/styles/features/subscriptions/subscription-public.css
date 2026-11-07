@@ -248,3 +248,99 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 .subscription-public .portal-donut-allowance{grid-column:1/-1;font-size:14px;color:var(--cabinet-muted);margin:0}
 @container cabinet (max-width:900px){.subscription-public .portal-donut{grid-template-columns:1fr}.subscription-public .portal-donut-chart{max-width:180px}}
 @media(prefers-reduced-motion:reduce){.subscription-public .portal-donut *{transition:none!important;animation:none!important}}
+/* Experience 2.0: the connection is the focal point; account data is a quiet rail. */
+.subscription-public .subscription-public-shell{width:min(calc(100% - 64px),1440px);padding-top:24px}
+.subscription-public .subscription-public-overview{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);grid-template-rows:auto auto;gap:24px;padding:38px 0 24px}
+.subscription-public .subscription-preview-hero{grid-column:1;grid-row:1;min-height:0;padding:14px 0 24px;border:0;border-radius:0;background:none!important;box-shadow:none!important}
+.subscription-public .subscription-preview-hero-copy{max-width:95%;gap:12px}
+.subscription-public .subscription-preview-hero :is(h1,h3){font-size:clamp(32px,3.2vw,48px);font-weight:650;letter-spacing:-.045em}
+.subscription-public .subscription-preview-hero .portal-orbit{display:none}
+.subscription-public .subscription-preview-ok{padding:0;background:transparent!important;font-size:14px;color:var(--portal-accent-text)}
+.subscription-public .subscription-preview-meta>[data-subscription-expiry]{grid-column:2;grid-row:1;min-height:0;padding:14px 0 24px;background:none!important;border:0;border-radius:0;box-shadow:none!important;gap:4px;justify-content:center}
+.subscription-public .experience-days{font-size:30px;font-weight:650;line-height:1.2;letter-spacing:-.04em}
+.subscription-public .subscription-preview-meta>[data-subscription-expiry]>b{font-size:16px;font-weight:500;color:var(--cabinet-muted)}
+.subscription-public .subscription-preview-meta>[data-subscription-expiry]>small{font-size:14px;color:var(--cabinet-muted)}
+.subscription-public [data-setup-section=connect]{grid-column:1;grid-row:2;align-self:stretch}
+.subscription-public .subscription-public-access-panel{position:relative;padding:38px;gap:22px;border-color:color-mix(in srgb,var(--portal-accent) 26%,var(--cabinet-line));background:linear-gradient(145deg,color-mix(in srgb,var(--portal-accent) 7%,var(--portal-card)),var(--portal-card) 65%);min-height:340px;justify-content:center}
+.subscription-public .subscription-public-panel-title b{font-size:30px;font-weight:650;letter-spacing:-.035em}
+.subscription-public .subscription-public-panel-title small{font-size:17px;max-width:45ch;line-height:1.6}
+.subscription-public .subscription-public-primary-action{display:grid;grid-template-columns:1fr 1fr;margin-top:12px;gap:12px}
+.subscription-public .subscription-public-primary-action>button{font-size:16px;min-height:52px;transform:none}
+.subscription-public .subscription-public-primary-action>.experience-start{grid-column:1/-1;min-height:60px;background:var(--portal-accent);color:var(--portal-action-ink);font-size:18px;border-color:transparent;font-weight:700}
+.subscription-public .subscription-public-primary-action>#connect-link,.subscription-public .subscription-public-primary-action>[data-subscription-connect]{background:transparent;color:var(--cabinet-ink);border:1px solid var(--cabinet-line);min-height:52px;font-size:16px}
+.subscription-public .subscription-preview-meta>[data-subscription-traffic]{grid-column:2;grid-row:2;padding:28px;align-content:start}
+.subscription-public [data-subscription-traffic]>small{font-size:20px;font-weight:600}
+.subscription-public .portal-donut{grid-template-columns:minmax(120px,.8fr) minmax(0,1.2fr);gap:14px}
+.subscription-public .portal-donut-chart{max-width:180px}
+.subscription-public .portal-donut-center b{font-size:22px}
+.subscription-public .portal-donut-server{font-size:14px;padding:9px 5px}
+.subscription-public .portal-donut-server b{font-size:13px}
+.subscription-public [data-experience=ready] [data-setup-section=apps]{display:none}
+.subscription-public .subscription-public-workspace{padding-top:18px;border-top:1px solid var(--cabinet-line);align-items:center}
+.subscription-public .subscription-preview footer{margin-top:24px;padding-top:24px}
+.subscription-public .experience-dialog{color:var(--portal-text);background:var(--portal-card);border:1px solid var(--cabinet-line);border-radius:var(--portal-radius);width:min(calc(100vw - 32px),700px);max-height:calc(100dvh - 40px);padding:28px;box-shadow:0 24px 90px #0005;overflow:auto;animation:cabinetReveal .2s ease-out}
+.subscription-public .experience-dialog::backdrop{background:#03060b99;backdrop-filter:blur(5px)}
+.subscription-public .experience-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:16px}
+.subscription-public .experience-dialog h2{margin:0;font-size:26px;line-height:1.3;letter-spacing:-.03em}
+.subscription-public .experience-dialog h3{font-size:21px;margin:20px 0 14px}
+.subscription-public .experience-close{flex:none;width:44px;height:44px;font-size:24px;border:1px solid var(--cabinet-line);border-radius:50%;background:none;color:var(--portal-text)}
+.subscription-public .experience-intro,.subscription-public .experience-fallback{font-size:16px;line-height:1.6;color:var(--cabinet-muted);margin:0 0 20px}
+.subscription-public .experience-platforms{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}
+.subscription-public .experience-platforms button,.subscription-public .experience-app{min-height:44px;padding:10px 14px;border:1px solid var(--cabinet-line);border-radius:calc(var(--portal-radius)*.6);background:transparent;color:var(--portal-text);font-size:15px;transition:background .18s,border-color .18s}
+.subscription-public .experience-platforms button[aria-pressed=true],.subscription-public .experience-app[aria-pressed=true]{background:var(--cabinet-wash);border-color:var(--portal-accent)}
+.subscription-public .experience-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.subscription-public .experience-app{min-height:66px;font-size:17px;font-weight:600;overflow-wrap:anywhere}
+.subscription-public .experience-instructions{border-top:1px solid var(--cabinet-line);margin-top:24px;padding-top:8px;animation:cabinetReveal .2s ease-out}
+.subscription-public .experience-instructions ol{padding-inline-start:24px;font-size:16px;line-height:1.6;margin-bottom:22px}
+.subscription-public .experience-instructions li{padding:4px 0 4px 8px}
+.subscription-public .experience-dialog :is(.experience-install,.experience-open,.experience-copy){display:inline-flex;align-items:center;justify-content:center;min-height:48px;max-width:100%;padding:12px 16px;margin:0 8px 12px 0;border:1px solid var(--cabinet-line);border-radius:calc(var(--portal-radius)*.6);font-size:16px;background:transparent;color:var(--portal-text);text-decoration:none}
+.subscription-public .experience-dialog .experience-open{background:var(--portal-accent);color:var(--portal-action-ink);border-color:transparent}
+.subscription-public .experience-fallback{font-size:14px;margin-top:12px}
+.subscription-public .experience-qr{width:min(calc(100vw - 32px),440px)}
+.subscription-public .experience-qr .subscription-preview-qr{width:100%;max-width:280px;margin:16px auto 24px;padding:16px}
+.subscription-public .experience-qr .experience-copy{width:100%}
+@container cabinet (max-width:900px){
+ .subscription-public .subscription-public-overview{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px}
+ .subscription-public .subscription-public-access-panel{padding:28px;min-height:310px}
+ .subscription-public .subscription-public-panel-title b{font-size:26px}
+ .subscription-public .portal-donut{grid-template-columns:1fr}
+ .subscription-public .portal-donut-chart{max-width:160px}
+ .subscription-public .subscription-preview-meta>[data-subscription-traffic]{padding:24px}
+}
+@container cabinet (max-width:560px){
+ .subscription-public .subscription-public-overview{display:flex;flex-direction:column;padding:20px 0 24px;gap:18px}
+ .subscription-public .subscription-preview-hero{order:0;padding:8px 0;min-height:0}
+ .subscription-public [data-setup-section=connect]{order:1}
+ .subscription-public .subscription-preview-meta>[data-subscription-expiry]{order:2;padding:12px 0;min-height:0}
+ .subscription-public .subscription-preview-meta>[data-subscription-traffic]{order:3;padding:24px}
+ .subscription-public .subscription-public-access-panel{min-height:0;padding:26px 22px;gap:18px}
+ .subscription-public .subscription-public-panel-title small{font-size:16px}
+ .subscription-public .portal-donut{grid-template-columns:140px minmax(0,1fr);gap:10px}
+ .subscription-public .portal-donut-center b{font-size:20px}
+ .subscription-public .portal-donut-server{flex-direction:column;align-items:start;gap:4px}
+ .subscription-public .experience-days{font-size:26px}
+ .subscription-public .experience-choices{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){.subscription-public .experience-dialog{padding:22px}.subscription-public .experience-dialog h2{font-size:23px}.subscription-public .experience-choices{grid-template-columns:1fr 1fr}}
+@media(prefers-reduced-motion:reduce){.subscription-public .experience-dialog,.subscription-public .experience-dialog *{animation:none!important;transition:none!important}}
+.subscription-public .experience-directions{display:grid;grid-template-columns:1fr 1fr;gap:16px;grid-column:1/-1;padding-top:16px;border-top:1px solid var(--cabinet-line)}
+.subscription-public .experience-directions>div{display:grid;gap:4px}
+.subscription-public .experience-directions small{font-size:13px;color:var(--cabinet-muted)}
+.subscription-public .experience-directions b{font-size:18px!important}
+.subscription-public .experience-directions>small{grid-column:1/-1}
+@media(max-width:600px){.subscription-public .subscription-public-shell{width:calc(100% - 32px)}.subscription-public .portal-donut-center small{font-size:13px}}
+.subscription-public [data-setup-section=support]{grid-column:1/-1;justify-self:stretch}
+.subscription-public .subscription-cabinet-support-card{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.subscription-public .experience-help-title{font-size:17px;font-weight:550}
+.subscription-public .experience-dialog:not([open]){display:none}
+.subscription-public .portal-donut[data-unlimited=true]{display:block}
+.subscription-public .experience-unlimited-summary{display:grid;gap:6px;margin:12px 0 20px}
+.subscription-public .experience-unlimited-summary>b{font-size:40px;line-height:1.2;letter-spacing:-.04em;font-weight:600}
+.subscription-public .experience-unlimited-summary>small,.subscription-public .experience-unlimited-summary p{font-size:15px;color:var(--cabinet-muted);margin:0}
+.subscription-public .experience-server-details>summary{min-height:44px;align-content:center;cursor:pointer;font-size:15px;color:var(--cabinet-muted)}
+.subscription-public .experience-server-details[open]{display:grid;grid-template-columns:minmax(130px,1fr) minmax(0,1fr);gap:12px;margin-bottom:18px}
+.subscription-public .experience-server-details>summary{grid-column:1/-1}
+.subscription-public .portal-donut-center small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.subscription-public .experience-change{display:block;margin:0 0 18px;padding:8px 0;min-height:44px;color:var(--cabinet-muted);background:none;border:0;font-size:15px;text-decoration:underline;text-underline-offset:4px}
+@container cabinet (max-width:560px){.subscription-public .subscription-public-primary-action>button:not(.experience-start){min-height:66px}}
+.subscription-public .experience-dialog .experience-open{text-align:center;font-weight:650}

@@ -2,8 +2,8 @@
 // Shared by the bearer-scoped customer page and Studio's sample preview.
 window.XMeshSubscriptionTraffic={mount(metric,{used,limit,servers=[],language='ru'}){
   metric.querySelector('.portal-donut')?.remove();
-  const en=language==='en',text=en?{total:'Used',other:'Unattributed usage',empty:'No server measurements yet',all:'All servers',limit:'Limit',unlimited:'Unlimited'}:{total:'Использовано',other:'Без привязки к серверу',empty:'Измерений по серверам пока нет',all:'Все серверы',limit:'Лимит',unlimited:'Без лимита'};
-  const fmt=n=>new Intl.NumberFormat(en?'en-GB':'ru-RU',{maximumFractionDigits:2}).format(n)+' '+(en?'GB':'ГБ');
+  const en=language==='en',text=en?{total:'Total',other:'Unattributed usage',empty:'No server measurements yet',all:'All servers',limit:'Limit',remaining:'Remaining',unlimited:'Unlimited'}:{total:'Всего',other:'Без привязки к серверу',empty:'Измерений по серверам пока нет',all:'Все серверы',limit:'Лимит',remaining:'Осталось',unlimited:'Без лимита'};
+  const fmt=n=>{const power=n>=1048576?2:n>=1024?1:0;return new Intl.NumberFormat(en?'en-GB':'ru-RU',{maximumFractionDigits:2}).format(n/(1024**power))+' '+(en?['GB','TB','PB']:['ГБ','ТБ','ПБ'])[power]};
   const items=servers.filter(s=>Number.isFinite(s.gib)&&s.gib>0).map(s=>({name:String(s.name),gib:s.gib}));
   const measured=items.reduce((n,s)=>n+s.gib,0);
   if(used-measured>1e-6)items.push({name:text.other,gib:used-measured});
@@ -29,6 +29,19 @@ window.XMeshSubscriptionTraffic={mount(metric,{used,limit,servers=[],language='r
   const reset=el('button','portal-donut-reset',text.all);reset.type='button';reset.addEventListener('click',()=>{selected=-1;select(-1)});
   if(items.length)legend.append(reset);else legend.append(el('p','',text.empty));
   root.append(chart,legend);metric.append(root);
-  const allowance=el('p','portal-donut-allowance',limit>0?text.limit+': '+fmt(limit):text.unlimited);root.append(allowance);
+  if(limit===0){
+    root.dataset.unlimited='true';const summary=el('div','experience-unlimited-summary');summary.append(el('b','',fmt(total)),el('small','',text.unlimited));root.prepend(summary);
+    if(items.length){const details=el('details','experience-server-details'),heading=el('summary','',en?'By server':'По серверам');details.append(heading,chart,legend);root.append(details)}
+    else{chart.hidden=true;legend.hidden=true;summary.append(el('p','',text.empty))}
+  }
+
+  const allowance=el('p','portal-donut-allowance',limit>0?text.limit+': '+fmt(limit)+' · '+text.remaining+': '+fmt(Math.max(0,limit-total)):text.unlimited);root.append(allowance);if(limit===0)allowance.hidden=true;
+  if(servers.length&&servers.every(s=>Number.isFinite(s.upload)&&Number.isFinite(s.download))){
+    const directions=el('div','experience-directions');
+    for(const [key,title]of [['download',en?'Downloaded':'Скачано'],['upload',en?'Uploaded':'Отправлено']]){const field=el('div');field.append(el('small','',title),el('b','',fmt(servers.reduce((n,s)=>n+s[key],0))));directions.append(field)}
+    if(used-measured>1e-6)directions.append(el('small','',en?'Measured server traffic only':'Только учтённый трафик серверов'));
+    root.append(directions);
+  }
+
   metric.querySelectorAll(':scope > b,:scope > .subscription-preview-progress,:scope > .portal-usage-allowance,:scope > .portal-usage-breakdown').forEach(n=>n.hidden=true);
 }};
