@@ -425,9 +425,34 @@ persisted Squad data to achieve visual compactness.
   signed Agent policy extension with local inbound counters, reconnect
   denial, shared budget allocation, restart handling and fail-closed
   telemetry safeguards. Do not describe it as an exact realtime limit.
-- Periodic (monthly/daily) CDN resets are not implemented. The existing
-  explicit user traffic reset also resets CDN cumulative totals. This stage
-  introduces no new automatic reset schedule or user-supplied lease.
+- **Node-scoped LTE policy:** Nodes → edit → Traffic supports `cdnMode=standard`
+  (no node-specific limit), `all` (every inbound on the node), or `selected`
+  with explicit node `cdnInboundTags`. The legacy global inbound list is
+  additive for backwards compatibility. A regular node with the same inbound
+  tag is not limited merely because a *different* node is marked LTE.
+- **Monthly accounting:** Settings → CDN traffic limits → `cdnResetPeriod=monthly`
+  activates a calendar-month UTC meter. Signed positive per-user/per-node/
+  per-inbound counter deltas are written transactionally during telemetry
+  ingestion to `user_inbound_traffic_monthly`. The timestamp source is the
+  server's accepted observation time, not a user- or node-supplied date.
+  The current month starts at 00:00 UTC on day 1. Historic lifetime totals
+  cannot be reliably split into months and are **not backfilled**. Switching
+  to monthly mode starts with deltas captured after this migration is installed;
+  it does not erase lifetime history. Manually resetting a user's counters also
+  resets their monthly ledger totals while preserving the last signed baselines.
+- **Single-link use case:** German and Norwegian ordinary nodes plus Polish
+  LTE node can share the same subscription, UUID and user: regular user
+  `limit=0`, `cdnLimitGb=5`, monthly mode, and Polish node marked `all`
+  or `selected`. Hosts and squad access must include all desired entries.
+  All limited nodes draw from a shared 5 GiB pool per user; there is no
+  per-node 5 GiB allocation.
+- **No hard real-time guarantee:** node desired-config reconciliation remains
+  asynchronous; an existing Xray connection can outlive reaching the quota.
+  Missing/offline telemetry may delay enforcement. If a counter report spans
+  the UTC month boundary, its positive delta is attributed to the acceptance
+  month; exact within-interval division cannot be reconstructed. Do not
+  advertise immediate on-node disconnects or an exact 5.000 GiB hard cap.
+
 
 ### Catalog toolbars and collection actions
 
