@@ -18,8 +18,8 @@
         brandNote:'Your subscription',copyAction:'Copy subscription link',trafficLabel:'Data used',
         linkLabel:'Your subscription link',
         linkNote:'Paste this link into your connection app. Keep it private.',
-        endpointLabel:'2. Add your subscription',
-        endpointNote:'Copy your link, then open your app and choose “Add subscription” or “Import from clipboard”.',
+        endpointLabel:'Manage access',
+        endpointNote:'Add your subscription to a VPN app using the link or QR code.',
         statusLabel:'Subscription status',
         statusNote:'Traffic, expiry and service availability.',
         copied:'Link copied. You can now paste it into your app.',
@@ -33,8 +33,8 @@
         brandNote:'Ваша подписка',copyAction:'Скопировать ссылку',trafficLabel:'Использовано трафика',
         linkLabel:'Ссылка на подписку',
         linkNote:'Добавьте ссылку в приложение для подключения. Не передавайте её посторонним.',
-        endpointLabel:'2. Добавьте подписку',
-        endpointNote:'Скопируйте ссылку. В приложении выберите «Добавить подписку» или «Импорт из буфера».',
+        endpointLabel:'Управление доступом',
+        endpointNote:'Добавьте подписку в VPN-приложение по ссылке или QR-коду.',
         statusLabel:'Статус подписки',
         statusNote:'Трафик, срок действия и доступность сервиса.',
         copied:'Ссылка скопирована. Теперь добавьте её в приложение.',
@@ -55,11 +55,43 @@
     }
   }
 
+  const dashboard = language === 'en' ? {
+    'portal-quickstart-title':'Connect in three steps',
+    'portal-guide-copy':'Copy your link above',
+    'portal-guide-app':'Open your VPN app',
+    'portal-guide-import':'Import the link',
+    'portal-guide-finish':'Once imported, turn on the connection in your app.',
+    'portal-app-disclosure-label':'Need to install an app?'
+  } : {
+    'portal-quickstart-title':'Подключение в три шага',
+    'portal-guide-copy':'Скопируйте ссылку выше',
+    'portal-guide-app':'Откройте VPN-приложение',
+    'portal-guide-import':'Добавьте подписку по ссылке',
+    'portal-guide-finish':'После добавления включите подключение в приложении.',
+    'portal-app-disclosure-label':'Нужно установить приложение?'
+  };
+  Object.entries(dashboard).forEach(([id,text])=>{const el=document.getElementById(id);if(el)el.textContent=text});
+
   // This meter visualizes the server-provided allowance, never an invented trend.
   document.querySelectorAll('[data-subscription-traffic]').forEach(metric=>{
     const track=metric.querySelector('.subscription-preview-progress');
     if(!track)return;
     const value=metric.querySelector('b')?.textContent||'';
+    const used=Number(metric.dataset.usedGib),limit=Number(metric.dataset.limitGib);
+    if(metric.hasAttribute('data-used-gib')&&Number.isFinite(used)&&Number.isFinite(limit)){
+      const fmt=n=>new Intl.NumberFormat(language==='en'?'en-GB':'ru-RU',{maximumFractionDigits:2}).format(n)+' '+(language==='en'?'GB':'ГБ');
+      const combined=metric.querySelector('b');combined.classList.add('portal-usage-total');combined.hidden=limit<=0;
+      combined.textContent=limit>0?new Intl.NumberFormat(language,{maximumFractionDigits:1}).format(Math.min(100,used/limit*100))+'%':(language==='en'?'Unlimited':'Без лимита');
+      const allowance=document.createElement('p');allowance.className='portal-usage-allowance';
+      allowance.textContent=limit>0?(language==='en'?'Limit: ':'Лимит: ')+fmt(limit):(language==='en'?'Unlimited':'Без лимита');
+      const breakdown=document.createElement('div');breakdown.className='portal-usage-breakdown';
+      const fields=[[language==='en'?'Used':'Использовано',fmt(used)]];
+      if(limit>0)fields.push([language==='en'?'Remaining':'Осталось',fmt(Math.max(0,limit-used))]);
+      for(const [label,amount] of fields){
+        const field=document.createElement('div'),small=document.createElement('small'),bold=document.createElement('b');small.textContent=label;bold.textContent=amount;field.append(small,bold);breakdown.append(field);
+      }
+      metric.append(allowance,breakdown);
+    }
     if(/Unlimited|Без лимита/i.test(value)){track.hidden=true;return;}
     const percent=Number.parseFloat(track.querySelector('i')?.style.width||'');
     if(!Number.isFinite(percent)){track.hidden=true;return;}
@@ -73,7 +105,7 @@
   const primaryCopy=document.getElementById('connect-link');
   if(primaryCopy&&['Connect','Подключиться'].includes(primaryCopy.textContent.trim()))primaryCopy.textContent=copy.copyAction;
   const qrButton=document.getElementById('toggle-qr');
-  if(qrButton)qrButton.textContent=language==='en'?'Show QR code':'Показать QR-код';
+  if(qrButton){qrButton.textContent=language==='en'?'Show QR code':'Показать QR-код';document.querySelector('.subscription-public-primary-action')?.append(qrButton);}
 
   const input = document.getElementById('subscription-link');
   const card = document.getElementById('subscription-link-card');
@@ -106,7 +138,7 @@
     notes:['Install an app for your phone or computer','Copy your link from this page into the app','Tap Connect in the app. You’re ready to go.'],
     guideTitle:'What to do next',guideDescription:'After adding the subscription, choose a server in your app and tap Connect. Return here whenever you need your link.',
     guideHint:'Your personal link grants access to the subscription. Never share it.',
-    appsKicker:'CLIENT LIBRARY',appsHeading:'1. Install an app',
+    appsKicker:'CLIENT LIBRARY',appsHeading:'Choose an app',
     appsNote:'Choose your device. Tap an app to install it.',
     appsSearch:'Search applications…',appsEmpty:'No applications match these filters.',
     devicesKicker:'YOUR DEVICES',devicesHeading:'Connected devices',
@@ -125,7 +157,7 @@
     notes:['Установите приложение на телефон или компьютер','Скопируйте ссылку с этой страницы в приложение','Нажмите кнопку подключения в приложении. Готово!'],
     guideTitle:'Что делать дальше',guideDescription:'После добавления подписки выберите сервер в приложении и включите подключение. Ссылка всегда будет на этой странице.',
     guideHint:'Персональная ссылка открывает доступ к подписке. Не передавайте её посторонним.',
-    appsKicker:'КАТАЛОГ',appsHeading:'1. Установите приложение',
+    appsKicker:'КАТАЛОГ',appsHeading:'Выберите приложение',
     appsNote:'Выберите устройство. Нажмите на приложение, чтобы установить его.',
     appsSearch:'Найти приложение…',appsEmpty:'По вашему запросу приложений не найдено.',
     devicesKicker:'ВАШИ УСТРОЙСТВА',devicesHeading:'Подключённые устройства',
@@ -173,8 +205,8 @@
   document.getElementById('copy-link')?.remove();
   document.getElementById('toggle-devices')?.remove();
   const heading=document.querySelector('.subscription-preview-hero h1');
-  const status=document.querySelector('.subscription-preview-ok');
-  if(status&&/^(Подписка (не)?активна|Subscription (in)?active)$/i.test(heading?.textContent.trim()||''))status.hidden=true;
+  if(heading&&/^(Подписка (не)?активна|Subscription (in)?active)$/i.test(heading.textContent.trim()))heading.textContent=copy.brandNote;
+  const guide=document.querySelector('.portal-quickstart');if(guide)guide.hidden=!available.connect;
   const description=document.querySelector('.subscription-preview-hero p');
   if(description&&['Настройки подключения и информация о подписке.','Connection setup and subscription information.'].includes(description.textContent.trim()))description.hidden=true;
   let selectedPlatform='all';

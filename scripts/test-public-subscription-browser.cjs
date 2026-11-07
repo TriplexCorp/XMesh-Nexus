@@ -19,7 +19,7 @@ function fixture(url){
  RU_SELECTED:en?'':'on',EN_SELECTED:en?'on':'',RU_CURRENT:en?'false':'page',EN_CURRENT:en?'page':'false',
  STATUS_DOT:'<span class="subscription-preview-ok">● '+text(active?'Активна':'Неактивна',active?'Active':'Inactive')+'</span>',
  HERO:text(active?'Подписка активна':'Подписка неактивна',active?'Subscription active':'Subscription inactive'),DESCRIPTION:text('Ваш доступ к интернету. Всё необходимое для подключения.','Your internet access. Everything you need to get connected.'),
- METRICS:url.searchParams.get('metrics')==='0'?'':'<div class="subscription-preview-meta" data-subscription-metrics><div data-subscription-traffic><small>'+text('Трафик','Data usage')+'</small><b>'+text(unlimited?'34,5 ГБ / Без лимита':'34,5 / 100 ГБ',unlimited?'34.5 GB / Unlimited':'34.5 / 100 GB')+'</b><div class="subscription-preview-progress"><i style="width:'+(unlimited?'0':'34.5')+'%"></i></div></div><div data-subscription-expiry><small>'+text('Действует до','Expires')+'</small><b data-expiry="1796688000000"></b></div></div>',
+ METRICS:url.searchParams.get('metrics')==='0'?'':'<div class="subscription-preview-meta" data-subscription-metrics><div data-subscription-traffic data-used-gib="34.5" data-limit-gib="'+(unlimited?0:100)+'"><small>'+text('Трафик','Data usage')+'</small><b>'+text(unlimited?'34,5 ГБ / Без лимита':'34,5 / 100 ГБ',unlimited?'34.5 GB / Unlimited':'34.5 / 100 GB')+'</b><div class="subscription-preview-progress"><i style="width:'+(unlimited?'0':'34.5')+'%"></i></div></div><div data-subscription-expiry><small>'+text('Действует до','Expires')+'</small><b data-expiry="1796688000000"></b></div></div>',
  CTA:active?'<button type="button" class="subscription-preview-cta" id="connect-link">'+text('Подключиться','Connect')+'</button><input type="hidden" id="subscription-link" value="/s/disposable-test-token-0123456789abcdef">':'<div class="subscription-preview-cta" aria-disabled="true">'+text('Подписка неактивна','Subscription inactive')+'</div>',
  QUICK_ACTIONS:active?'<div class="subscription-preview-quick"><button type="button" id="copy-link">'+text('Скопировать ссылку','Copy link')+'</button><button type="button" id="toggle-qr" aria-expanded="false">QR</button><button type="button" id="toggle-link" aria-expanded="false">'+text('Показать ссылку','Show private link')+'</button><button type="button" id="toggle-devices">'+text('Устройства','Devices')+'</button></div>':'',
  QR:active?'<div id="subscription-qr" class="subscription-preview-qr" hidden></div>':'',DEVICE_INFO:active?'<div id="subscription-devices" class="subscription-public-devices" hidden>'+text('Подключённые устройства: 2 · Лимит: 5','Connected devices: 2 · Limit: 5')+'</div>':'',
@@ -43,7 +43,17 @@ function fixture(url){
    assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=30,'Readable heading');assert(g.minTap>=44,'Touch target too small');
    assert.equal(await page.locator('[role="tab"]').count(),0,'No tab navigation');assert(await page.locator('[data-setup-section="apps"]').isVisible());assert(await page.locator('[data-setup-section="connect"]').isVisible());assert.equal(await page.locator('#copy-link').count(),0,'Only one copy button');
    assert.equal(await page.locator('[role="meter"]').getAttribute('aria-valuenow'),'34.5');
+   assert.deepEqual(await page.locator('.portal-usage-breakdown b').allTextContents(),lang==='en'?['34.5 GB','65.5 GB']:['34,5 ГБ','65,5 ГБ']);
+   const layout=await page.evaluate(()=>{
+     const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {top:r.top,left:r.left,right:r.right,bottom:r.bottom}};
+     return {copy:rect('#connect-link'),qr:rect('#toggle-qr'),apps:rect('[data-setup-section="apps"]'),usage:rect('[data-subscription-traffic]')};
+   });
+   assert(layout.copy.top<layout.apps.top,'Access comes before app installation');
+   if(width>=390)assert(Math.abs(layout.copy.top-layout.qr.top)<1,'Copy and QR share one row');
+   if(width<=390)assert(layout.copy.top<layout.usage.top,'Mobile prioritizes access before metrics');
    if(width===390||width===1440)await page.screenshot({path:path.join(out,'portal-overview-'+width+'-'+lang+'.png'),fullPage:true,animations:'disabled'});
+   assert(await page.locator('.portal-app-disclosure').evaluate(el=>!el.open),'Catalog starts collapsed');
+   await page.locator('#portal-app-disclosure-label').click();
    await page.locator('[data-app-filter="android"]').click();assert.equal(await page.locator('.subscription-preview-app:visible').count(),2);
 
    await page.locator('#connect-link').click();
@@ -57,9 +67,28 @@ function fixture(url){
   await page.goto(base+'/?lang=en&accent=dark');await page.waitForSelector('#connect-link');assert.equal(await page.locator('#connect-link').evaluate(el=>getComputedStyle(el).color),'rgb(255, 255, 255)','Dark custom accent needs contrasting button text');checks++;
   await page.goto(base+'/?lang=en&apps=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="apps"]').hidden);assert(await page.locator('#connect-link').isVisible());checks++;
   await page.goto(base+'/?lang=en&metrics=0');await page.waitForFunction(()=>document.querySelector('.subscription-public-info-panel').hidden);checks++;
-  await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#connect-link');assert(await page.locator('.subscription-preview-progress').isHidden(),'Unlimited usage must not imply a percentage');checks++;
+  await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#connect-link');assert(await page.locator('.subscription-preview-progress').isHidden(),'Unlimited usage must not imply a percentage');assert.equal(await page.locator('.portal-usage-breakdown>div').count(),1,'Unlimited plans have no remaining-quota block');assert.equal(((await page.locator('[data-subscription-traffic]').innerText()).match(/Unlimited/g)||[]).length,1,'Do not repeat unlimited labels');await page.screenshot({path:path.join(out,'portal-unlimited-1920-en.png'),fullPage:true});checks++;
   await page.goto(base+'/?lang=en&active=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="connect"]').hidden);assert(await page.locator('[data-setup-section="apps"]').isHidden());assert(await page.locator('[data-setup-section="support"]').isVisible());checks++;
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto(base+'/?lang=en');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[data-setup-section="connect"]').evaluate(el=>getComputedStyle(el).animationName),'none');checks++;
+  await page.goto(base+'/?lang=en');
+  await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-studio.js').toString()});
+  await page.evaluate(()=>{
+    const [markup,mount]=window.XMeshSubscriptionStudio.create({subscriptionLanguage:'en',subscriptionSyncPanelTheme:false,subscriptionShowDevices:true,subscriptionShowSupport:true},async()=>{},()=>{},{users:2,nodes:1});
+    document.body.innerHTML=markup;mount();
+  });
+  const studio=page.locator('[data-subscription-preview-frame]');
+  assert.equal(await studio.locator('.subscription-preview').getAttribute('lang'),'en');
+  assert.equal(await studio.locator('[data-preview-used]').innerText(),'12.4 GB');
+  assert(!/[А-Яа-яЁё]/.test(await studio.innerText()),'Studio English preview has untranslated copy');
+  assert(await studio.locator('.portal-app-disclosure').evaluate(el=>!el.open));
+  await studio.locator('[data-portal-language="ru"]').click();
+  assert.equal(await studio.locator('[data-preview-used]').innerText(),'12,4 ГБ');
+  await page.locator('[name="subscriptionShowTraffic"]').uncheck();
+  assert(await studio.locator('[data-subscription-traffic]').isHidden());
+  await page.locator('[name="subscriptionShowExpiry"]').uncheck();
+  assert(await studio.locator('.subscription-public-info-panel').isHidden());
+  await page.locator('[name="subscriptionShowQr"]').uncheck();
+  assert(await studio.locator('[data-subscription-qr]').isHidden());checks++;
   assert.deepEqual(errors,[]);console.log('Public portal: '+checks+' viewport/locale/state cases, onboarding, copy, QR, filters, keyboard, English, real usage and reduced motion passed');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -272,6 +272,18 @@ window.XMeshSubscriptionStudio = (() => {
       '<h1 data-subscription-active="">Подписка активна</h1>',
       '<p data-subscription-description="">Настройки подключения</p>',
       '</div>',
+      '<svg class="portal-orbit" viewBox="0 0 260 260" aria-hidden="true">',
+      '<circle cx="130" cy="130" r="95">',
+      '</circle>',
+      '<ellipse cx="130" cy="130" rx="116" ry="42" transform="rotate(38 130 130)">',
+      '</ellipse>',
+      '<ellipse cx="130" cy="130" rx="116" ry="42" transform="rotate(-52 130 130)">',
+      '</ellipse>',
+      '<circle class="portal-orbit-dot" cx="202" cy="67" r="4">',
+      '</circle>',
+      '<circle class="portal-orbit-dot" cx="64" cy="181" r="3">',
+      '</circle>',
+      '</svg>',
       '</section>',
       '<aside class="subscription-public-info-panel">',
       '<header class="subscription-public-panel-title">',
@@ -288,11 +300,13 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-preview-meta" data-subscription-metrics="">',
       '<div data-subscription-traffic="">',
       '<small data-subscription-traffic-label="">Трафик</small>',
-      '<b>12.4 / 100 ГБ</b>',
+      '<b class="portal-usage-total">12.4%</b>',
       '<div class="subscription-preview-progress">',
       '<i style="width:12.4%">',
       '</i>',
       '</div>',
+      '<p class="portal-usage-allowance" data-preview-allowance=""></p>',
+      '<div class="portal-usage-breakdown"><div><small data-preview-used-label=""></small><b data-preview-used=""></b></div><div><small data-preview-remaining-label=""></small><b data-preview-remaining=""></b></div></div>',
       '</div>',
       '<div data-subscription-expiry="">',
       '<small data-subscription-expiry-label="">Действует до</small>',
@@ -301,35 +315,6 @@ window.XMeshSubscriptionStudio = (() => {
       '</div>',
       '</div>',
       '</aside>',
-      '</div>',
-      '<div class="subscription-public-workspace">',
-      '<section class="subscription-cabinet-panel" id="cabinet-panel-apps" data-setup-section="apps">',
-      '<header class="subscription-cabinet-section-heading">',
-      '<div>',
-      '<h2 id="cabinet-apps-heading" tabindex="-1">Приложения для подключения</h2>',
-      '<p id="cabinet-apps-note">Выберите устройство. Нажмите на приложение, чтобы установить его.</p>',
-      '</div>',
-      '</header>',
-      '<div class="subscription-cabinet-app-tools">',
-
-      '<div class="subscription-cabinet-filters" role="group" aria-label="Фильтр платформ" data-preview-platform-filters="">',
-      '<button type="button" data-app-filter="all" aria-pressed="true">Все</button>',
-      '<button type="button" data-app-filter="ios" aria-pressed="false">iOS</button>',
-      '<button type="button" data-app-filter="android" aria-pressed="false">Android</button>',
-      '<button type="button" data-app-filter="windows" aria-pressed="false">Windows</button>',
-      '<button type="button" data-app-filter="macos" aria-pressed="false">macOS</button>',
-      '<button type="button" data-app-filter="linux" aria-pressed="false">Linux</button>',
-      '</div>',
-      '</div>',
-      '<div class="subscription-public-catalog">',
-      '<section class="subscription-preview-apps" data-subscription-apps="">',
-      '<header data-subscription-apps-title="">Приложения для подключения</header>',
-      '<div data-subscription-app-list="">',
-      '</div>',
-      '</section>',
-      '</div>',
-      '<p class="subscription-cabinet-no-apps" id="cabinet-apps-empty" hidden="">По вашему запросу приложений не найдено.</p>',
-      '</section>',
       '<section class="subscription-cabinet-panel" id="cabinet-panel-connect" data-setup-section="connect">',
       '<div class="subscription-cabinet-connect-grid">',
       '<section class="subscription-public-access-panel">',
@@ -367,12 +352,61 @@ window.XMeshSubscriptionStudio = (() => {
       '</section>',
       '<p class="subscription-public-action-status" id="subscription-action-status" aria-live="polite">',
       '</p>',
-      '<div class="subscription-public-secondary-surfaces">',
+      '<div class="subscription-public-secondary-surfaces" data-portal-qr-slot="">',
       '<div class="subscription-preview-qr" data-preview-qr="" hidden="">',
       '</div>',
       '</div>',
       '</section>',
       '</div>',
+      '</section>',
+      '</div>',
+      '<div class="subscription-public-workspace">',
+      '<section class="portal-quickstart">',
+      '<h2 id="portal-quickstart-title">Как подключиться</h2>',
+      '<ol>',
+      '<li>',
+      '<span aria-hidden="true">01</span>',
+      '<b id="portal-guide-copy">Скопируйте ссылку</b>',
+      '</li>',
+      '<li>',
+      '<span aria-hidden="true">02</span>',
+      '<b id="portal-guide-app">Откройте VPN-приложение</b>',
+      '</li>',
+      '<li>',
+      '<span aria-hidden="true">03</span>',
+      '<b id="portal-guide-import">Добавьте подписку по ссылке</b>',
+      '</li>',
+      '</ol>',
+      '<p id="portal-guide-finish">После добавления включите подключение в приложении.</p>',
+      '</section>',
+      '<section class="subscription-cabinet-panel" id="cabinet-panel-apps" data-setup-section="apps">',
+      '<details class="portal-app-disclosure">',
+      '<summary id="portal-app-disclosure-label">Нужно установить приложение?</summary>',
+      '<header class="subscription-cabinet-section-heading">',
+      '<div>',
+      '<h2 id="cabinet-apps-heading" tabindex="-1">Приложения для подключения</h2>',
+      '<p id="cabinet-apps-note">Выберите устройство. Нажмите на приложение, чтобы установить его.</p>',
+      '</div>',
+      '</header>',
+      '<div class="subscription-cabinet-app-tools">',
+      '<div class="subscription-cabinet-filters" role="group" aria-label="Фильтр платформ" data-preview-platform-filters="">',
+      '<button type="button" data-app-filter="all" aria-pressed="true">Все</button>',
+      '<button type="button" data-app-filter="ios" aria-pressed="false">iOS</button>',
+      '<button type="button" data-app-filter="android" aria-pressed="false">Android</button>',
+      '<button type="button" data-app-filter="windows" aria-pressed="false">Windows</button>',
+      '<button type="button" data-app-filter="macos" aria-pressed="false">macOS</button>',
+      '<button type="button" data-app-filter="linux" aria-pressed="false">Linux</button>',
+      '</div>',
+      '</div>',
+      '<div class="subscription-public-catalog">',
+      '<section class="subscription-preview-apps" data-subscription-apps="">',
+      '<header data-subscription-apps-title="">Приложения для подключения</header>',
+      '<div data-subscription-app-list="">',
+      '</div>',
+      '</section>',
+      '</div>',
+      '<p class="subscription-cabinet-no-apps" id="cabinet-apps-empty" hidden="">По вашему запросу приложений не найдено.</p>',
+      '</details>',
       '</section>',
       '<section class="subscription-cabinet-panel" id="cabinet-panel-devices" data-setup-section="devices">',
       '<header class="subscription-cabinet-section-heading">',
@@ -423,7 +457,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=6fc2d828fd52',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=ea1329135007'
+        '/subscription-public.css?v=aff218a70f5f'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
@@ -534,6 +568,8 @@ window.XMeshSubscriptionStudio = (() => {
         const empty=previewShadow.querySelector('#cabinet-apps-empty');
         if(empty)empty.hidden=count>0;
       };
+      const previewQr=previewShadow.querySelector('[data-subscription-qr]');
+      previewShadow.querySelector('.subscription-public-primary-action')?.append(previewQr);
       const draw = () => {
         applyPanelTheme();
         const d=read();
@@ -597,7 +633,7 @@ window.XMeshSubscriptionStudio = (() => {
         local.notes.forEach((v,i)=>setText(['cabinet-step-one-note','cabinet-step-two-note','cabinet-step-three-note'][i],v));
         const findApps=previewShadow.querySelector('[data-preview-app-search]');
         if(findApps){findApps.placeholder=local.appsSearch;findApps.setAttribute('aria-label',local.appsSearch)}
-        setText('cabinet-apps-heading',english?'1. Install an app':'1. Установите приложение');
+        setText('cabinet-apps-heading',english?'Choose an app':'Выберите приложение');
         const allFilter=previewShadow.querySelector('[data-app-filter="all"]');
         if(allFilter)allFilter.textContent=local.all;
         const deviceSample=previewShadow.querySelector('[data-preview-devices]');
@@ -632,8 +668,25 @@ window.XMeshSubscriptionStudio = (() => {
           logo.hidden=true;logo.removeAttribute('src');symbol.hidden=false;
         }
         $('[data-subscription-brand-note]').textContent=english?'Your subscription':'Ваша подписка';
-        $('[data-preview-endpoint-label]').textContent=english?'2. Add your subscription':'2. Добавьте подписку';
-        $('[data-preview-endpoint-note]').textContent=english?'Copy the link and add it to your app.':'Скопируйте ссылку и добавьте её в приложение.';
+        const dashboard=english?{
+          'portal-quickstart-title':'Connect in three steps','portal-guide-copy':'Copy your link above',
+          'portal-guide-app':'Open your VPN app','portal-guide-import':'Import the link',
+          'portal-guide-finish':'Once imported, turn on the connection in your app.',
+          'portal-app-disclosure-label':'Need to install an app?'
+        }:{
+          'portal-quickstart-title':'Подключение в три шага','portal-guide-copy':'Скопируйте ссылку выше',
+          'portal-guide-app':'Откройте VPN-приложение','portal-guide-import':'Добавьте подписку по ссылке',
+          'portal-guide-finish':'После добавления включите подключение в приложении.',
+          'portal-app-disclosure-label':'Нужно установить приложение?'
+        };
+        Object.entries(dashboard).forEach(([id,text])=>setText(id,text));
+        $('[data-preview-allowance]').textContent=english?'Limit: 100 GB':'Лимит: 100 ГБ';
+        $('[data-preview-used-label]').textContent=english?'Used':'Использовано';
+        $('[data-preview-remaining-label]').textContent=english?'Remaining':'Осталось';
+        $('[data-preview-used]').textContent=english?'12.4 GB':'12,4 ГБ';
+        $('[data-preview-remaining]').textContent=english?'87.6 GB':'87,6 ГБ';
+        $('[data-preview-endpoint-label]').textContent=english?'Manage access':'Управление доступом';
+        $('[data-preview-endpoint-note]').textContent=english?'Add your subscription to a VPN app using the link or QR code.':'Добавьте подписку в VPN-приложение по ссылке или QR-коду.';
         $('[data-preview-status-label]').textContent=english?'Subscription status':'Статус подписки';
         $('[data-preview-status-note]').textContent=english?'Traffic and validity':'Трафик и срок действия';
         $('[data-subscription-ok]').textContent=english?'● Active':'● Активна';
@@ -644,13 +697,13 @@ window.XMeshSubscriptionStudio = (() => {
           ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/example-token'
           : 'https://sub.example.com/s/example-token';
         $('[data-subscription-active]').textContent=(english?d.subscriptionHeroEn:d.subscriptionHero)||copy[0];
-        $('[data-subscription-ok]').hidden=/^(Подписка (не)?активна|Subscription (in)?active)$/i.test($('[data-subscription-active]').textContent.trim());
-        $('[data-subscription-description]').textContent=(english?d.subscriptionDescriptionEn:d.subscriptionDescription)||(english?'Connection setup and subscription information.':'Настройки подключения и информация о подписке.');
+        if(/^(Подписка (не)?активна|Subscription (in)?active)$/i.test($('[data-subscription-active]').textContent.trim()))$('[data-subscription-active]').textContent=english?'Your subscription':'Ваша подписка';
+        $('[data-subscription-description]').textContent=(english?d.subscriptionDescriptionEn:d.subscriptionDescription)||'';
         $('[data-subscription-traffic-label]').textContent=copy[1];
         $('[data-subscription-expiry-label]').textContent=copy[2];
         const sampleUsage=$('[data-subscription-traffic] b');
         const sampleDate=$('[data-subscription-expiry] b');
-        if(sampleUsage)sampleUsage.textContent=english?'12.4 / 100 GB':'12.4 / 100 ГБ';
+        if(sampleUsage)sampleUsage.textContent=english?'12.4%':'12,4%';
         if(sampleDate)sampleDate.textContent=english?'Dec 31, 2026':'31.12.2026';
         $('[data-subscription-connect]').textContent=(english?d.subscriptionCtaEn:d.subscriptionCta)||copy[3];
         if(['Connect','Подключиться'].includes($('[data-subscription-connect]').textContent.trim()))$('[data-subscription-connect]').textContent=english?'Copy subscription link':'Скопировать ссылку';
