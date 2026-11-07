@@ -117,14 +117,18 @@ function fixture(url){
     document.body.innerHTML=markup;mount();
   });
   const studio=page.locator('[data-subscription-preview-frame]');
-  assert.equal(await studio.locator('.subscription-preview').getAttribute('lang'),'en');
+  assert.equal(await studio.locator('.subscription-preview').getAttribute('lang'),'en');assert(await studio.locator('.experience-days').isVisible());
   assert.match(await studio.locator('.portal-donut-center b').innerText(),/^12.4 /);
   assert(!/[А-Яа-яЁё]/.test(await studio.innerText()),'Studio English preview has untranslated copy');
   assert(await studio.locator('.portal-app-disclosure').evaluate(el=>!el.open));
+  await studio.locator('.experience-start').click();assert(await studio.locator('.experience-guide').evaluate(el=>el.open));await page.keyboard.press('Escape');
+  await studio.locator('[data-subscription-qr]').click();await studio.locator('.experience-qr').waitFor({state:'visible'});assert(await studio.locator('.experience-qr').evaluate(el=>el.open));assert.equal(await studio.locator('.experience-qr svg').count(),1);await page.keyboard.press('Escape');assert(await studio.locator('[data-preview-qr]').isHidden());
+
   await studio.locator('[data-portal-language="ru"]').click();
   assert.match(await studio.locator('.portal-donut-center b').innerText(),/^12,4 /);
   await page.locator('[name="subscriptionShowTraffic"]').uncheck();
   assert(await studio.locator('[data-subscription-traffic]').isHidden());
+  const hiddenLayout=await studio.locator('.subscription-preview-hero').evaluate(el=>{const c=el.closest('.subscription-preview').querySelector('[data-setup-section="connect"]');return {header:el.getBoundingClientRect().bottom,connect:c.getBoundingClientRect().top}});assert(hiddenLayout.connect>=hiddenLayout.header,'Hidden metrics must not overlap connection and heading');
   await page.locator('[name="subscriptionShowExpiry"]').uncheck();
   assert(await studio.locator('.subscription-public-info-panel').isHidden());
   await page.locator('[name="subscriptionShowQr"]').uncheck();

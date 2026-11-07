@@ -310,7 +310,7 @@ window.XMeshSubscriptionStudio = (() => {
       '</div>',
       '<div data-subscription-expiry="">',
       '<small data-subscription-expiry-label="">Действует до</small>',
-      '<b>31.12.2026</b>',
+      '<b data-expiry="1798675200000">31.12.2026</b>',
       '</div>',
       '</div>',
       '</div>',
@@ -433,7 +433,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=6fc2d828fd52',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=8428f3bb8a7b'
+        '/subscription-public.css?v=6a55fffe32d1'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);

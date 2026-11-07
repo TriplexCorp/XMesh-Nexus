@@ -344,3 +344,8 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 .subscription-public .experience-change{display:block;margin:0 0 18px;padding:8px 0;min-height:44px;color:var(--cabinet-muted);background:none;border:0;font-size:15px;text-decoration:underline;text-underline-offset:4px}
 @container cabinet (max-width:560px){.subscription-public .subscription-public-primary-action>button:not(.experience-start){min-height:66px}}
 .subscription-public .experience-dialog .experience-open{text-align:center;font-weight:650}
+/* Optional account capabilities must not leave overlapping or empty grid cells. */
+.subscription-public .subscription-public-overview:not(:has([data-subscription-expiry]:not([hidden]))) .subscription-preview-hero{grid-row:1;grid-column:1/-1}
+.subscription-public .subscription-public-overview:not(:has([data-subscription-traffic]:not([hidden]))) [data-setup-section=connect]{grid-row:2;grid-column:1/-1}
+.subscription-public .subscription-public-overview:not(:has([data-setup-section=connect]:not([hidden]))) [data-subscription-expiry]{grid-row:1;grid-column:2}
+.subscription-public .subscription-public-overview:not(:has([data-setup-section=connect]:not([hidden]))) [data-subscription-traffic]{grid-row:2;grid-column:1/-1}

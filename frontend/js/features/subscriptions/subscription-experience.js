@@ -38,7 +38,7 @@ window.XMeshSubscriptionExperience={mount(root,options){
   const onCopy=async button=>{await current.copy?.();button.textContent=current.copyButton?.textContent||labels(current.language==='en').copy;clearTimeout(returnTimer);returnTimer=setTimeout(()=>{button.textContent=labels(current.language==='en').copy},1800)};
   copy.addEventListener('click',()=>void onCopy(copy));qrCopy.addEventListener('click',()=>void onCopy(qrCopy));
   root.querySelector('#toggle-qr,[data-subscription-qr]')?.setAttribute('aria-haspopup','dialog');
-  root.querySelector('#toggle-qr,[data-subscription-qr]')?.addEventListener('click',event=>{const target=root.querySelector('#subscription-qr,[data-preview-qr]');if(target&&!target.hidden){qr.node.insertBefore(target,qrCopy);qr.open(event.currentTarget)}});
+  root.querySelector('#toggle-qr,[data-subscription-qr]')?.addEventListener('click',event=>{const button=event.currentTarget;setTimeout(()=>{const target=root.querySelector('#subscription-qr,[data-preview-qr]');if(target&&!target.hidden){qr.node.insertBefore(target,qrCopy);qr.open(button)}},0)});
   qr.node.addEventListener('close',()=>{const target=qr.node.querySelector('.subscription-preview-qr');if(target)target.hidden=true;root.querySelector('#toggle-qr,[data-subscription-qr]')?.setAttribute('aria-expanded','false')});
   const update=next=>{current=next;render()};root._experience={update};update(options);
 }};
