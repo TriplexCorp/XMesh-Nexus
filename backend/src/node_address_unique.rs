@@ -38,12 +38,11 @@ pub(crate) async fn reject_duplicate(
         .execute(&mut **tx)
         .await?;
 
-    let rows = sqlx::query(
-        "SELECT id, data FROM panel_records WHERE collection='nodes' AND id <> $1",
-    )
-    .bind(current_id)
-    .fetch_all(&mut **tx)
-    .await?;
+    let rows =
+        sqlx::query("SELECT id, data FROM panel_records WHERE collection='nodes' AND id <> $1")
+            .bind(current_id)
+            .fetch_all(&mut **tx)
+            .await?;
 
     for row in rows {
         let existing: Value = row.try_get("data")?;
