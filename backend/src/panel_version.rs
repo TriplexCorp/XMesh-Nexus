@@ -60,13 +60,12 @@ async fn github_json(client: &reqwest::Client, path: &str) -> Option<Value> {
 /// because the product version can remain 6.0.0 over many commits.
 pub async fn check(Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
     require_owner(&actor)?;
-    let client = match reqwest::Client::builder()
+    let Ok(client) = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(4))
         .timeout(Duration::from_secs(9))
         .build()
-    {
-        Ok(client) => client,
-        Err(_) => return Ok(Json(json!({"status":"unavailable"}))),
+    else {
+        return Ok(Json(json!({"status":"unavailable"})));
     };
     let remote = github_json(&client, "commits/main").await;
     let Some(remote_sha) = remote
