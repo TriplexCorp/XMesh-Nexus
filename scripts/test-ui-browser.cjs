@@ -2151,7 +2151,7 @@ async function main() {
         assert(g.choices.length>=5,'Fixture must show a real node fleet');
         assert(g.assignment.y>=Math.max(g.primary.bottom,g.advanced.bottom),'Assignments must follow editable fields without waiting for preview height');
         assert(Math.abs(g.assignment.x-g.primary.x)<=2&&Math.abs(g.assignment.right-g.advanced.right)<=2,'Assignments must span the editable workspace beside preview');
-        assert(g.bodyScroll<=g.bodyClient+1,'Populated TLS/XHTTP Host editor must fit desktop without workspace scrolling');
+        assert(g.bodyScroll<=g.bodyClient+1,'Populated TLS/XHTTP Host editor must fit desktop without workspace scrolling: '+JSON.stringify(g));
         assert(g.copyValues.includes('/host-preview/'+('long-segment-'.repeat(24))),'Full long path must remain available to copy');
       }else assert(g.assignment.y>=g.primary.bottom&&g.advanced.y>=g.assignment.bottom&&g.preview.y>=g.advanced.bottom,'Mobile sections must not overlap');
       return g;

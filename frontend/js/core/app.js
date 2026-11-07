@@ -3468,10 +3468,9 @@ function hostEditorRefresh(form,changedProfile=false){
       show('Публичный endpoint',val('address')?val('address')+':'+(val('port')||'443'):'Выберите ноду')+
       show('SNI',sni)+
       show('HTTP Host',get('useSniAsHost')?.checked?sni:val('host'))+
-      show('XHTTP mode',val('xhttpMode')||xhttp.mode||'auto')+
+      (stream.network==='xhttp'?show('XHTTP mode',val('xhttpMode')||xhttp.mode||'auto'):'')+
       show('Путь',val('path')||xhttp.path||stream.wsSettings?.path||'—')+
-      show('REALITY publicKey',security==='reality'?(realityKey?'Задан':'Отсутствует'):'Не требуется')+
-      show('ShortID',security==='reality'?(shortId?'Задан':'Не задан'):'Не требуется');
+      (security==='reality'?show('REALITY publicKey',realityKey?'Задан':'Отсутствует')+show('ShortID',shortId?'Задан':'Не задан'):'');
   }
   const warnings=[];
   if(!profile)warnings.push('Выберите XRAY-профиль.');
