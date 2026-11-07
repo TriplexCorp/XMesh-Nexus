@@ -240,6 +240,32 @@ def main():
             cookie=cookie,origin=BASE)
         assert_status(code,201,"create inbound assignment for policy test")
         squad_id=squad["id"]
+
+        # A first-connection user must be able to import in Happ without
+        # activating their timer. Xray must provision their UUID while waiting.
+        code, pending_user, _ = request("POST", "/collections/users",
+            {"username":"ci_pending_first_connection","squads":[squad_id],
+             "hold":True,"holdDays":2,"expireAt":None,"limit":1.0,"used":0.0},
+            cookie=cookie,origin=BASE)
+        assert_status(code,201,"create on-hold first-connection subscriber")
+        pending_id=pending_user["id"]
+        code, secret, _ = request("GET",f"/users/{pending_id}/subscription",cookie=cookie)
+        assert_status(code,200,"read pending user's subscription token")
+        token=secret["token"]
+        assert re.fullmatch(r"[a-f0-9]{64}",token)
+        code,feed,_=request("GET",f"/sub/{token}",
+            headers={"User-Agent":"Happ/26.7.28 (Windows NT 10.0; Win64; x64)"})
+        assert_status(code,200,"Happ imports pending subscription without 403")
+        assert isinstance(feed,dict),f"pending native feed should be JSON: {type(feed)}"
+        code,waiting_portal,_=request("GET",f"/portal/{token}",
+            headers={"Accept":"text/html","User-Agent":"Mozilla/5.0"})
+        assert_status(code,200,"first-connection portal remains available")
+        assert "Ожидает первого подключения" in waiting_portal
+        code,waiting_rows,_=request("GET","/collections/users",cookie=cookie)
+        waiting=next(item for item in waiting_rows["items"] if item["id"]==pending_id)
+        assert waiting["hold"] is True and waiting.get("expireAt") is None, (
+            "Importing into Happ must never start the subscription timer",waiting)
+
         code,_,_=request("PATCH",f"/collections/users/{user_id}",
             {"squads":[squad_id],"limit":1.0,
              "expireAt":int(time.time()*1000)+86400000},
@@ -256,6 +282,11 @@ def main():
         assert policy["validUntilMs"]>policy["issuedAtMs"]
         assert any(u["xrayId"]==new_user["xrayId"] and
                    u["offlineBudgetBytes"]>0 for u in policy["users"])
+        assert any(client["id"]==pending_user["xrayId"]
+                   for client in desired["config"]["inbounds"][0]["settings"]["clients"]), (
+            "A waiting account must exist in signed Xray runtime to allow first traffic")
+        assert any(u["xrayId"]==pending_user["xrayId"] for u in policy["users"]), (
+            "A waiting account needs a signed node policy, not just an HTTP feed")
         serialized=json.dumps(desired["config"],sort_keys=True,
                               separators=(",",":"),ensure_ascii=False).encode()
         assert policy["configSha256"]==hashlib.sha256(serialized).hexdigest()
@@ -278,7 +309,7 @@ def main():
         # Distinct actual source snapshots must have strictly increasing sample times,
         # even when the test sends multiple requests within one millisecond.
         source_clock_ms = int(time.time() * 1000)
-        def report_signed(inbound_a, inbound_b, sampled_at_ms=None):
+        def report_signed(inbound_a, inbound_b, sampled_at_ms=None, pending_counter=None):
             nonlocal source_clock_ms
             source_clock_ms = max(source_clock_ms + 1, int(time.time() * 1000))
             sample={
@@ -295,6 +326,11 @@ def main():
                     "uplinkBytes":inbound_a[0]+inbound_b[0],
                     "downlinkBytes":inbound_a[1]+inbound_b[1]}]
             }
+            if pending_counter is not None:
+                sample["userTraffic"].append({
+                    "userId":pending_id,
+                    "uplinkBytes":pending_counter[0],
+                    "downlinkBytes":pending_counter[1]})
             raw=json.dumps(sample,separators=(",",":")).encode()
             stamp=int(time.time())
             unique=os.urandom(16).hex()
@@ -307,9 +343,32 @@ def main():
                  "X-XMesh-Signature":sig.hex()}
             return request("POST","/metrics/ingest",sample,headers=hdr)
 
-        assert_status(report_signed((50,90),(25,35))[0],201,"first per-inbound baseline")
-        assert_status(report_signed((100,120),(35,65))[0],201,"second per-inbound delta")
-        assert_status(report_signed((100,120),(35,65))[0],201,"idempotent cumulative replay on new signed request")
+        assert_status(report_signed((50,90),(25,35),pending_counter=(0,0))[0],
+                      201,"first Xray sample establishes pending baseline only")
+        code,users,_=request("GET","/collections/users",cookie=cookie)
+        before=next(item for item in users["items"] if item["id"]==pending_id)
+        assert before["hold"] is True and before.get("expireAt") is None, (
+            "Initial counter baseline must not activate hold",before)
+        earliest=int(time.time()*1000)-5000
+        assert_status(report_signed((100,120),(35,65),pending_counter=(32,48))[0],
+                      201,"verified positive Xray traffic starts pending subscription")
+        latest=int(time.time()*1000)+5000
+        code,users,_=request("GET","/collections/users",cookie=cookie)
+        activated=next(item for item in users["items"] if item["id"]==pending_id)
+        assert activated["hold"] is False
+        assert earliest <= activated["firstConnectedAt"] <= latest
+        expiry_ms=activated["expireAt"]
+        assert earliest+2*86400000 <= expiry_ms <= latest+2*86400000, (
+            "Two-day expiry must start with first signed VPN traffic",activated)
+        assert_status(report_signed((100,120),(35,65),pending_counter=(32,48))[0],
+                      201,"repeated counters cannot restart first-connection timer")
+        code,users,_=request("GET","/collections/users",cookie=cookie)
+        once=next(item for item in users["items"] if item["id"]==pending_id)
+        assert once["firstConnectedAt"]==activated["firstConnectedAt"]
+        assert once["expireAt"]==expiry_ms
+        code,feed,_=request("GET",f"/sub/{token}",
+            headers={"User-Agent":"Happ/26.7.28 (Windows NT 10.0; Win64; x64)"})
+        assert_status(code,200,"Happ continues to receive feed after activation")
         code,traffic,_=request("GET",f"/users/{user_id}/traffic",cookie=cookie)
         assert_status(code,200,"read real per-user inbound breakdown")
         assert any(c["nodeId"]==node and c["status"]=="verified" for c in traffic["collectors"])
@@ -379,6 +438,9 @@ def main():
         code,presence,_=request("GET","/users/presence",cookie=cookie)
         assert next(item["onlineAt"] for item in presence["items"] if item["id"]==user_id)==previous_online
 
+        code,_,_=request("DELETE",f"/collections/users/{pending_id}",
+                         cookie=cookie,origin=BASE)
+        assert_status(code,200,"clean up first-connection user")
         code,_,_=request("DELETE",f"/collections/users/{user_id}",
                          cookie=cookie,origin=BASE)
         assert_status(code,200,"clean up inbound stats user")
