@@ -389,6 +389,14 @@ persisted Squad data to achieve visual compactness.
 - Keep existing field IDs, card identifiers, `data-ui` contracts and focus
   semantics intact. Deep links from the version rail and update actions must
   target the System subpage; destructive actions remain separately authorized.
+- **Composition and empty-space budget:** Settings uses a bounded workspace
+  (up to 96rem) rather than stretching short forms across an ultrawide view.
+  The secondary navigation uses compact, single-line rows: category descriptions
+  appear in the active section heading, not repeated in each sidebar link.
+  Single-card pages center a bounded heading/card stack (up to 54rem).
+  Two-card pages retain balanced columns and collapse naturally on narrow
+  viewports. Empty cards, fake metrics and oversized spacer blocks are forbidden:
+  short pages are short by design.
 - The shell and cards inherit `nexus-v3` material, density and spacing tokens.
   Secondary navigation must remain usable on narrow/mobile viewports and must
   not create horizontal document overflow.
