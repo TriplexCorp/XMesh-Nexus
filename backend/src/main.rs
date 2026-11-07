@@ -2720,7 +2720,10 @@ async fn persist_user_traffic(
         .await?;
         for row in activated {
             let user_id: i64 = row.try_get("id")?;
-            tracing::info!(user_id, "First verified VPN traffic activated waiting subscription");
+            tracing::info!(
+                user_id,
+                "First verified VPN traffic activated waiting subscription"
+            );
         }
         persist_verified_traffic_deltas(conn, node_id, &serialized, sampled_at, false).await?;
         sqlx::query(
@@ -4686,14 +4689,32 @@ mod tests {
         let waiting = json!({"hold":true,"holdDays":30,"expireAt":null,"limit":1.0,"used":0.0});
         assert_eq!(user_status(&waiting, now), "ON_HOLD");
         assert!(super::user_can_connect(&waiting, now));
-        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":0}), now));
-        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":5000}), now));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":0}),
+            now
+        ));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":5000}),
+            now
+        ));
         assert!(!super::user_can_connect(&json!({"hold":true}), now));
-        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":30,"disabled":true}), now));
-        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":30,"limit":1.0,"used":1.0}), now));
-        assert!(!super::user_can_connect(&json!({"hold":true,"holdDays":30,"expireAt":now-1}), now));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":30,"disabled":true}),
+            now
+        ));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":30,"limit":1.0,"used":1.0}),
+            now
+        ));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":30,"expireAt":now-1}),
+            now
+        ));
         assert!(!super::user_can_connect(&json!({"expireAt":now-1}), now));
-        assert!(super::user_can_connect(&json!({"hold":false,"expireAt":now+1}), now));
+        assert!(super::user_can_connect(
+            &json!({"hold":false,"expireAt":now+1}),
+            now
+        ));
     }
 
     #[test]
