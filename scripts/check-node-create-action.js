@@ -159,39 +159,43 @@ assert.match(userCss,/@media\(max-width:680px\)[\s\S]*\.user-create-main-grid,\s
 assert.match(userCss,/\.user-create-footer-actions\{display:flex/,
  'Create/cancel actions must stay grouped in a dedicated footer');
 
-// Anti-sharing intelligence is deliberately explainable: device slots are
-// authoritative, traffic history is verified, and high traffic alone is not enough.
+// Activity history must report verifiable facts without pseudo-risk scoring.
 assert.match(html,/user-sharing-context\.js\?v=[a-f0-9]{12}[\s\S]*user-sharing-risk\.js\?v=[a-f0-9]{12}/,
- 'Sharing context must load immediately before the isolated risk monitor');
-assert.match(sharingContext,/globalThis\.DB=DB/,'Sharing monitor must receive the already-loaded runtime user snapshot');
-assert.match(sharingJs,/traffic\/history\?range=7d/,'Risk score must use verified seven-day Xray history');
-assert.match(sharingJs,/new1h>=2/,'Risk score must detect rapid device growth');
-assert.match(sharingJs,/nodes6h>=2/,'Risk score must detect concurrent multi-node activity');
-assert.match(sharingJs,/recent3h>=6\*GiB&&hourlyRatio>=4/,'Traffic anomaly must require both material volume and baseline deviation');
-assert.match(sharingJs,/Высокий объём трафика сам по себе не считается sharing/,
- 'Risk explanation must explicitly reject traffic volume as standalone proof');
-assert.match(sharingJs,/dataset\.sharingHead='devices'/,'Users table must gain the Devices column');
-assert.match(sharingJs,/dataset\.sharingHead='risk'/,'Users table must gain the Risk column');
-assert.match(sharingCss,/\.xm-risk-pill\.is-high/,'High-risk table state must be visually distinct');
-assert.match(sharingCss,/\.xm-sharing-dialog\{/,'Risk details must use a dedicated explainable dialog');
-
-// Device access is a shared workspace, not a cramped one-column diagnostic.
-// Guard semantics, original server-enforced limits and scoped Nexus surfaces.
-assert.match(sharingJs,/const riskPanel=`<section id="xm-assessment-panel"/,
- 'Access assessment must own a structured, explainable panel');
-assert.match(sharingJs,/xm-sharing-overview-action.*data-sharing-detail/,
- 'Risk summary must expose an actionable link to a flagged account');
-assert.match(sharingJs,/class="xm-assessment-meter.*role="meter"/,
- 'Risk index must be an accessible scale, not a fabricated probability');
+ 'Context must load immediately before the isolated activity feature');
+assert.match(sharingContext,/globalThis\.DB=DB/,
+ 'Activity workspace must receive the existing, authorized runtime snapshot');
+assert.match(sharingJs,/traffic\/history\?range=7d/,
+ 'Traffic history must be sourced from the authenticated seven-day API');
+assert.match(sharingJs,/function activityFor\(user\)/,
+ 'Activity must be loaded only when the user opens its details');
+assert.match(sharingJs,/new7d:devices\.filter/,
+ 'Registered devices must be counted from their actual first-seen timestamps');
+assert.match(sharingJs,/recent24h:valid\.filter/,
+ 'Rolling byte totals must reflect actual Xray samples');
+assert.match(sharingJs,/trafficAvailable=false/,
+ 'History failures must not be silently displayed as zero traffic');
+assert.doesNotMatch(sharingJs,/function tier\(score\)|const score=Math\.min\(100|riskFor\(|result\.score/,
+ 'Switching nodes or adding devices must never create a fabricated account-sharing score');
+assert.doesNotMatch(sharingJs,/xm-sharing-overview-action|xm-sharing-score|xm-risk-pill/,
+ 'Do not turn routine traffic and device changes into a noisy global alert banner');
+assert.match(sharingJs,/data-sharing-focus="activity"/,
+ 'Activity entry point must be available in the Users directory');
+assert.match(sharingJs,/dataset\.sharingHead='devices'/,'Users table must retain Devices');
+assert.match(sharingJs,/dataset\.sharingHead='risk'/,'Users table must retain Activity column');
+assert.match(sharingJs,/const activityPanel=.{0,12}<section id="xm-activity-panel"/,
+ 'Neutral activity facts must render in the shared device-management workspace');
 assert.match(sharingJs,/data-device-view-devices/,
- 'Assessment must link back to registered devices');
-assert.match(sharingCss,/\.xm-assessment-columns\{display:grid/,
- 'Evidence and reasons must have independent layout zones');
-assert.match(sharingCss,/@container sharing-content \(max-width:52rem\)/,
- 'Embedded device workspace must respond to its available width');
-assert.match(sharingCss,/html\[data-motion=off\] \.xm-assessment-meter>span/,
- 'Score animation must honor the global motion setting');
-
+ 'Activity must provide navigation back to registered devices');
+assert.match(sharingCss,/dialog#xm-sharing-dialog\.xm-sharing-dialog\{/,
+ 'Activity must reuse the native Nexus dialog material');
+assert.match(sharingCss,/height:fit-content;block-size:fit-content/,
+ 'The native dialog must be content-sized instead of stretching to viewport height');
+assert.match(sharingCss,/\.xm-activity-stats\{display:grid/,
+ 'Actual metrics must have a compact responsive layout');
+assert.match(sharingCss,/@container sharing-content \(max-width:39rem\)/,
+ 'Embedded device workspace must reflow according to actual available width');
+assert.match(sharingJs,/Лимит устройств контролируется отдельно на сервере/,
+ 'Interface must explain that real HWID restrictions are server-enforced');
 
 assertPackaged(assert,['node-dialogs.css','user-editor.css','user-sharing-risk.css','node-dialogs.js']);
 assertPackaged(assert,['diagnostics.js', 'diagnostics.css', 'user-sharing-context.js', 'user-sharing-risk.js']);

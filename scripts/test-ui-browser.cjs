@@ -537,10 +537,14 @@ async function main() {
           const pager=await page.locator('#ut .pg').evaluate(p=>{const s=p.querySelector('.xm-select-shell');return{height:p.getBoundingClientRect().height,selectWidth:s?.getBoundingClientRect().width}});
           assert(pager.selectWidth<=120&&pager.height<=80,'Users pagination must stay on one compact row');
         }
-        const healthy=page.locator('#ut .xm-risk-pill.is-normal').first();
-        await healthy.waitFor();
-        assert.equal(await healthy.locator('span').count(),0,'Healthy rows must not repeat a status sentence');
-        assert(await healthy.getAttribute('aria-label'),'Quiet assessment control needs an accessible name');
+        const activityEntry=page.locator('#ut .xm-activity-entry').first();
+        await activityEntry.waitFor({state:'attached'});
+        assert(await activityEntry.getAttribute('aria-label'),'Activity history must have an accessible entry point');
+        if(width>=1120)assert(await activityEntry.isVisible(),'Desktop activity entry should be visible');
+        // Mobile may retain Activity inside the table's own horizontal scroller.
+        // Its exact visibility is a responsive-layout choice, not a correctness gate.
+        assert.equal(await page.locator('#ut .xm-risk-pill,.xm-sharing-overview').count(),0,
+          'Routine device activity must not produce speculative sharing warnings');
         await screenshot(page,`devices-table-${width}-${count}-${limit}`);
         await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="devices"]`).click();
         const dialog=page.locator('#xm-sharing-dialog');
@@ -576,38 +580,54 @@ async function main() {
           assert((await dialog.locator('.xm-sharing-device-details').innerText()).includes('11_10.0.26200'),'Raw version remains available in diagnostics');
           await dialog.locator('.xm-sharing-device-details summary').first().click();
         }else assert(await dialog.locator('.xm-sharing-empty').isVisible());
-        const bounds=await dialog.evaluate(d=>{const r=d.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,scroll:d.querySelector('.xm-sharing-body').scrollWidth,client:d.querySelector('.xm-sharing-body').clientWidth}});
+        const bounds=await dialog.evaluate(d=>{const r=d.getBoundingClientRect(),sh=d.querySelector('.xm-sharing-shell').getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,shellHeight:sh.height,scroll:d.querySelector('.xm-sharing-body').scrollWidth,client:d.querySelector('.xm-sharing-body').clientWidth}});
         assert(bounds.left>=0&&bounds.right<=width+1&&bounds.top>=0&&bounds.bottom<=height+1,'Device dialog must fit the viewport');
         assert(bounds.scroll<=bounds.client+1,'Device content must not overflow horizontally');
+        assert(bounds.height<=bounds.shellHeight+5,
+          'Native dialog must match its intrinsic content height, not stretch to the viewport');
+        if(height>=650)assert(bounds.height<=Math.max(440,height*.78),
+          'Device dialog must not leave an empty lower half at ordinary viewport heights');
         if(width>=1920)assert(bounds.width>=900,'Device workspace must not inherit the narrow generic action dialog');
         await screenshot(page,`devices-${width}-${count}-${limit}`);
-        await dialog.locator('[data-device-tab=risk]').click();
-        assert.equal(await dialog.locator('.xm-sharing-score').innerText(),'0/100','Full slots alone must not increase suspicion');
-        assert(await dialog.locator('.xm-sharing-reasons').isVisible(),'Assessment explanation stays accessible');
-        assert(await dialog.locator('.xm-assessment-hero').isVisible(),'Assessment summary must have an intentional first-reading zone');
-        assert.equal(await dialog.locator('.xm-assessment-meter').getAttribute('aria-valuenow'),'0',
-          'Signal index must describe the real assessment score');
-        const assessmentLayout=await dialog.locator('.xm-assessment-columns').evaluate(el=>{
-          const rect=element=>element.getBoundingClientRect();
-          const reasons=rect(el.querySelector('.xm-assessment-signals')),facts=rect(el.querySelector('.xm-assessment-evidence'));
-          const body=el.closest('.xm-sharing-body');
-          return {sideBySide:Math.abs(reasons.top-facts.top)<2,
-            overflow:body.scrollWidth>body.clientWidth+1};
+        await dialog.locator('[data-device-tab=activity]').click();
+        assert(await dialog.locator('#xm-activity-panel:not([hidden])').isVisible(),
+          'Activity history must be shown in its own tab');
+        assert.equal(await dialog.locator('.xm-activity-stat').count(),4,
+          'Activity shows only factual metrics, never a risk score');
+        assert.equal(await dialog.locator('.xm-sharing-score,.xm-assessment-meter').count(),0,
+          'A device change must not imply a fabricated probability of sharing');
+        assert((await dialog.locator('.xm-activity-note').innerText()).includes('сами по себе не подтверждают'),
+          'Context must explain why these observations do not establish sharing');
+        const activityBounds=await dialog.evaluate(d=>{
+          const r=d.getBoundingClientRect(),sh=d.querySelector('.xm-sharing-shell').getBoundingClientRect();
+          const body=d.querySelector('.xm-sharing-body'),last=d.querySelector('.xm-activity-note');
+          const contentBottom=last?.getBoundingClientRect().bottom??0;
+          const viewportBottom=body.getBoundingClientRect().bottom;
+          return {
+            height:r.height,shellHeight:sh.height,
+            overflow:body.scrollWidth>body.clientWidth+1,
+            bodyScrolls:body.scrollHeight>body.clientHeight+2,
+            trailingGap:viewportBottom-contentBottom
+          };
         });
-        assert(!assessmentLayout.overflow,'Assessment workspace must not overflow horizontally');
-        if(width>=1920)assert(assessmentLayout.sideBySide,
-          'Wide assessment dialog must compose signals and metrics side by side');
+        assert(activityBounds.height<=activityBounds.shellHeight+5,
+          'Activity modal must hug its content instead of filling the screen');
+        assert(!activityBounds.overflow,'Activity history must not overflow horizontally');
+        if(!activityBounds.bodyScrolls)assert(activityBounds.trailingGap<=32,
+          'Activity history must not leave unused space below its final content');
+        if(width>=760&&height>=650)assert(activityBounds.height<=Math.max(440,height*.78),
+          'Desktop activity history must not inherit an oversized dialog frame');
         if(count){
           await dialog.locator('[data-device-view-devices]').click();
           assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true',
-            'Assessment action must return to the device workspace');
-          await dialog.locator('[data-device-tab=risk]').click();
+            'Activity action must return to the device workspace');
+          await dialog.locator('[data-device-tab=activity]').click();
         }
-        await screenshot(page,`devices-analysis-${width}-${count}-${limit}`);
+        await screenshot(page,`devices-activity-${width}-${count}-${limit}`);
         await page.keyboard.press('Escape');
-        await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="risk"]`).evaluate(el=>el.click());
-        await dialog.locator('#xm-assessment-panel:not([hidden])').waitFor();
-        await dialog.locator('[data-device-tab=risk]').focus();await page.keyboard.press('ArrowLeft');
+        await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="activity"]`).evaluate(el=>el.click());
+        await dialog.locator('#xm-activity-panel:not([hidden])').waitFor();
+        await dialog.locator('[data-device-tab=activity]').focus();await page.keyboard.press('ArrowLeft');
         assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true','Arrow keys must switch device tabs');
         if(count>1){
           await dialog.locator('[data-device-select="1001"]').click();
@@ -643,7 +663,7 @@ async function main() {
           await dialog.locator('.xm-device-capacity').waitFor();
           assert(await dialog.locator('[data-device-limit-open]').isDisabled(),'Read-only viewer must not change the limit');
           assert.equal(await dialog.locator('[data-device-remove]').count(),0,'Read-only viewer must not remove bindings');
-          assert.equal(await dialog.locator('h2').innerText(),'Devices & access');
+          assert.equal(await dialog.locator('h2').innerText(),'Devices & activity');
           await screenshot(page,'devices-viewer-english');
         }
         return bounds;
