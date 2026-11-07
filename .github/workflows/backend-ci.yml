@@ -86,6 +86,8 @@ jobs:
         run: node scripts/check-english-coverage.js
       - name: Check subscription studio and independent deployment blueprint
         run: node scripts/check-subscription-studio.js
+      - name: Enforce compact personal cabinet tabs and preview parity
+        run: node scripts/check-subscription-cabinet.js
       - name: Verify real admin RBAC, authentication boundaries and CSP
         run: node scripts/check-admin-security.js
       - name: Enforce observer least-privilege API and UI security contracts
@@ -138,10 +140,10 @@ jobs:
         run: node scripts/check-xsp-v2-wire.js
       - name: Verify committed XSP-v2 staging artifact inventory
         run: node scripts/check-xsp-v2-main-checkpoint.js
-      - name: Test Xray-core and panel update buttons, queue and responsive layout
-        run: node scripts/check-settings-update-actions.js
       - name: Verify topbar panel version and read-only upstream update check
         run: node scripts/check-panel-version-topbar.js
+      - name: Test Xray-core and panel update buttons, queue and responsive layout
+        run: node scripts/check-settings-update-actions.js
       - name: Check managed Xray update safety and SQLx migration uniqueness
         run: node scripts/check-managed-xray-update.js
       - name: Ensure client fingerprint is configured at hosts, not users
