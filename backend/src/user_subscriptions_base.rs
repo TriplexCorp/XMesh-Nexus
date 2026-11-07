@@ -1065,7 +1065,9 @@ pub async fn serve(
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX);
-    if crate::user_status(&user, now) != "ACTIVE" {
+    // Waiting subscriptions are importable: ONLY confirmed VPN traffic, never
+    // a feed/QR request, can start their first-connection countdown.
+    if !crate::user_can_connect(&user, now) {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
             "Subscription inactive",
@@ -1347,6 +1349,24 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
     }
     if studio_enabled(settings, "subscriptionShowExpiry", true) {
         let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
+        let pending_days = if user.get("hold").and_then(Value::as_bool) == Some(true) {
+            crate::number(user, "holdDays").filter(|days| (1..=3650).contains(days))
+        } else {
+            None
+        };
+        if let Some(days) = pending_days {
+            let duration = if en {
+                format!("{days} days after first connection")
+            } else {
+                format!("{days} дн. с первого подключения")
+            };
+            let _ = write!(
+                metrics,
+                "<div data-subscription-expiry><small>{}</small><b>{}</b></div>",
+                if en { "Term" } else { "Срок" },
+                duration
+            );
+        } else {
         let _ = write!(
             metrics,
             "<div data-subscription-expiry><small>{}</small><b data-expiry=\"{}\">{}</b></div>",
@@ -1364,6 +1384,7 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
                 "Бессрочно"
             }
         );
+        }
     }
     if !metrics.is_empty() {
         metrics = format!(
@@ -1516,7 +1537,7 @@ struct PortalDecoration<'a> {
     logo_brand: &'a str,
 }
 
-fn portal_decoration(settings: &Value, en: bool, active: bool) -> PortalDecoration<'_> {
+fn portal_decoration(settings: &Value, en: bool, active: bool, waiting: bool) -> PortalDecoration<'_> {
     let support = if studio_enabled(settings, "subscriptionShowSupport", false) {
         let url = studio_string(settings, "subscriptionSupportUrl", "");
         let label = escape_html(studio_string(
@@ -1557,7 +1578,9 @@ fn portal_decoration(settings: &Value, en: bool, active: bool) -> PortalDecorati
             } else {
                 "#ef8888"
             },
-            if active {
+            if waiting {
+                if en { "Awaiting connection" } else { "Ожидает подключения" }
+            } else if active {
                 if en { "Active" } else { "Активна" }
             } else if en {
                 "Inactive"
@@ -1568,7 +1591,13 @@ fn portal_decoration(settings: &Value, en: bool, active: bool) -> PortalDecorati
     } else {
         String::new()
     };
-    let title = if active {
+    let title = if waiting {
+        if en {
+            "Ready for first connection"
+        } else {
+            "Ожидает первого подключения"
+        }
+    } else if active {
         studio_string(
             settings,
             if en {
@@ -1798,7 +1827,9 @@ pub async fn portal(
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX);
-    let active = crate::user_status(&user, now) == "ACTIVE";
+    let waiting = crate::user_status(&user, now) == "ON_HOLD"
+        && crate::user_can_connect(&user, now);
+    let active = crate::user_can_connect(&user, now);
     let settings = crate::read_settings(&state.pool).await?;
     let lang = if options.get("lang").is_some_and(|s| s == "en") {
         "en"
@@ -1813,7 +1844,7 @@ pub async fn portal(
     // User-Agent decides the JSON/link format and device profile.
     let raw_link = studio_url(&settings, &token);
     let controls = portal_controls(&user, &settings, lang, en, active, &raw_link);
-    let decoration = portal_decoration(&settings, en, active);
+    let decoration = portal_decoration(&settings, en, active, waiting);
     let html = portal_html(&settings, lang, en, metrics, controls, decoration);
     let mut response = Html(html).into_response();
     response
