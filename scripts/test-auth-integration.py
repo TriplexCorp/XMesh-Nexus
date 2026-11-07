@@ -162,10 +162,59 @@ def main():
     check(status, 201, "admin creates valid XRAY profile")
     profile_id = profile["id"]
     status, node, _ = api("POST", "/collections/nodes",
-                          {"name": "CI auth host node", "addr": "127.0.0.1",
+                          {"name": "CI auth host node", "addr": "192.0.2.251",
                            "profileId": profile_id}, admin_cookie)
     check(status, 201, "admin creates profile-bound node")
     node_id = node["id"]
+
+    # The form and direct API share this server-side validation. A 409 must
+    # identify the existing node instead of silently creating a second entry.
+    status, duplicate, _ = api("POST", "/collections/nodes",
+                               {"name": "CI accidental duplicate", "addr": "192.0.2.251"},
+                               admin_cookie)
+    check(status, 409, "duplicate Node IPv4 is rejected")
+    assert "192.0.2.251" in duplicate["error"] and str(node_id) in duplicate["error"], duplicate
+    assert "CI auth host node" in duplicate["error"], duplicate
+
+    status, another, _ = api("POST", "/collections/nodes",
+                             {"name": "CI second Node", "addr": "192.0.2.241"},
+                             admin_cookie)
+    check(status, 201, "a different Node address remains allowed")
+    status, duplicate, _ = api("PATCH", f"/collections/nodes/{another['id']}",
+                               {"addr": "192.0.2.251"}, admin_cookie)
+    check(status, 409, "editing Node address cannot steal another Node IP")
+    assert "192.0.2.251" in duplicate["error"] and str(node_id) in duplicate["error"], duplicate
+    check(api("PATCH", f"/collections/nodes/{another['id']}",
+              {"name": "CI second Node renamed"}, admin_cookie)[0], 200,
+          "unrelated Node edits remain allowed")
+    check(api("DELETE", f"/collections/nodes/{another['id']}",
+              cookie=admin_cookie)[0], 200, "clean up alternate Node")
+
+    # IPv6 text aliases must compare as one IP, not as different strings.
+    status, ipv6, _ = api("POST", "/collections/nodes",
+                          {"name": "CI IPv6 Node", "addr": "2001:db8::abcd"},
+                          admin_cookie)
+    check(status, 201, "create canonical IPv6 Node")
+    status, duplicate, _ = api("POST", "/collections/nodes",
+                               {"name": "CI IPv6 alias", "addr": "2001:0db8:0:0:0:0:0:abcd"},
+                               admin_cookie)
+    check(status, 409, "IPv6 aliases cannot produce duplicate Nodes")
+    check(api("DELETE", f"/collections/nodes/{ipv6['id']}",
+              cookie=admin_cookie)[0], 200, "clean up IPv6 Node")
+
+    # Advisory locks must close the race between two simultaneous POST calls.
+    from concurrent.futures import ThreadPoolExecutor
+    def create_racing_node(index):
+        return api("POST", "/collections/nodes",
+                   {"name": f"CI competing Node {index}", "addr": "192.0.2.242"},
+                   admin_cookie)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        attempts = list(executor.map(create_racing_node, (1, 2)))
+    assert sorted(attempt[0] for attempt in attempts) == [201, 409], attempts
+    winner = next(attempt[1] for attempt in attempts if attempt[0] == 201)
+    check(api("DELETE", f"/collections/nodes/{winner['id']}",
+              cookie=admin_cookie)[0], 200, "clean up concurrent Node")
+
     status, host, _ = api("POST", "/collections/hosts",
                           {"name": "ci active host", "profileId": profile_id,
                            "tag": "CI_AUTH_VLESS", "address": "ci-host.example.com",

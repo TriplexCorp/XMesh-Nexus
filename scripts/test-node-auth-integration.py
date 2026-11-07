@@ -66,7 +66,7 @@ def main():
     assert_status(code, 200, "bootstrap login")
     assert cookie and login["authenticated"]
 
-    code, created, _ = request("POST", "/collections/nodes", {"name": "CI signed telemetry", "addr": "127.0.0.1"},
+    code, created, _ = request("POST", "/collections/nodes", {"name": "CI signed telemetry", "addr": "192.0.2.250"},
                                cookie=cookie, origin=BASE)
     assert_status(code, 201, "create CI node")
     node = created["id"]
