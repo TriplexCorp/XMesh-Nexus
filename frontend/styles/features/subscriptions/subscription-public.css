@@ -216,3 +216,14 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 }
 @media(max-width:600px){.subscription-public .subscription-public-shell{width:calc(100% - 32px);padding-top:16px}.subscription-studio-preview .subscription-public-shell{width:100%}}
 @media(prefers-reduced-motion:reduce){.subscription-public *,.subscription-public *::before,.subscription-public *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.subscription-public a.subscription-preview-app:hover{transform:none}}
+
+/* Quiet motion with no layout shift on copy feedback. */
+.subscription-public .subscription-preview-hero,.subscription-public .subscription-preview-meta>div{animation:cabinetReveal .38s cubic-bezier(.2,.7,.2,1) both}
+.subscription-public .subscription-preview-meta>div{animation-delay:50ms}
+.subscription-public .subscription-public-primary-action>button{transition:background .18s ease,border-color .18s ease,transform .18s ease}
+.subscription-public .subscription-public-primary-action>button:active{transform:scale(.98)}
+.subscription-public :is(.subscription-public-link-card,.subscription-preview-qr):not([hidden]){animation:cabinetReveal .24s ease-out both}
+.subscription-public .portal-app-disclosure::details-content{interpolate-size:allow-keywords;block-size:0;overflow:clip;transition:block-size .3s ease,content-visibility .3s allow-discrete}
+.subscription-public .portal-app-disclosure[open]::details-content{block-size:auto}
+.subscription-public .portal-app-disclosure[open]>.subscription-public-catalog{animation:cabinetReveal .25s ease-out}
+@media(prefers-reduced-motion:reduce){.subscription-public *,.subscription-public *::before,.subscription-public *::after,.subscription-public details::details-content{animation:none!important;transition:none!important}}

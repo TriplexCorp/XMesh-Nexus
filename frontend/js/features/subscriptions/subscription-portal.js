@@ -15,14 +15,14 @@
   document.querySelector('.subscription-preview-languages')?.setAttribute('aria-label',language==='en'?'Language':'Язык');
   const copy = language === 'en'
     ? {
-        brandNote:'Your subscription',copyAction:'Copy subscription link',trafficLabel:'Data used',
+        brandNote:'Your subscription',copyAction:'Copy',trafficLabel:'Data used',
         linkLabel:'Your subscription link',
         linkNote:'Paste this link into your connection app. Keep it private.',
-        endpointLabel:'Manage access',
-        endpointNote:'Add your subscription to a VPN app using the link or QR code.',
+        endpointLabel:'Connect',
+        endpointNote:'In your VPN app, choose “Add subscription” or scan the QR code.',
         statusLabel:'Subscription status',
         statusNote:'Traffic, expiry and service availability.',
-        copied:'Link copied. You can now paste it into your app.',
+        copied:'Copied',
         copyUnavailable:'Copy not available',
         qrUnavailable:'QR unavailable',
         qrLabel:'Subscription QR code',
@@ -30,14 +30,14 @@
         hideLink:'Hide private link'
       }
     : {
-        brandNote:'Ваша подписка',copyAction:'Скопировать ссылку',trafficLabel:'Использовано трафика',
+        brandNote:'Ваша подписка',copyAction:'Копировать',trafficLabel:'Использовано трафика',
         linkLabel:'Ссылка на подписку',
         linkNote:'Добавьте ссылку в приложение для подключения. Не передавайте её посторонним.',
-        endpointLabel:'Управление доступом',
-        endpointNote:'Добавьте подписку в VPN-приложение по ссылке или QR-коду.',
+        endpointLabel:'Подключение',
+        endpointNote:'В VPN-приложении выберите «Добавить подписку» или отсканируйте QR-код.',
         statusLabel:'Статус подписки',
         statusNote:'Трафик, срок действия и доступность сервиса.',
-        copied:'Ссылка скопирована. Теперь добавьте её в приложение.',
+        copied:'Скопировано',
         copyUnavailable:'Не удалось скопировать',
         qrUnavailable:'QR недоступен',
         qrLabel:'QR-код подписки',
@@ -105,7 +105,7 @@
   const primaryCopy=document.getElementById('connect-link');
   if(primaryCopy&&['Connect','Подключиться'].includes(primaryCopy.textContent.trim()))primaryCopy.textContent=copy.copyAction;
   const qrButton=document.getElementById('toggle-qr');
-  if(qrButton){qrButton.textContent=language==='en'?'Show QR code':'Показать QR-код';document.querySelector('.subscription-public-primary-action')?.append(qrButton);}
+  if(qrButton){qrButton.textContent=language==='en'?'QR code':'QR-код';document.querySelector('.subscription-public-primary-action')?.append(qrButton);}
 
   const input = document.getElementById('subscription-link');
   const card = document.getElementById('subscription-link-card');
@@ -295,6 +295,7 @@
   function flashButton(button, message) {
     if (!button) return;
     if (!button.dataset.defaultLabel) button.dataset.defaultLabel = button.textContent || '';
+    button.setAttribute('aria-live','polite');
     button.textContent = message;
     window.setTimeout(() => {
       if (button.isConnected && button.dataset.defaultLabel) button.textContent = button.dataset.defaultLabel;
@@ -319,7 +320,7 @@
     }
     const message = copied ? copy.copied : copy.copyUnavailable;
     flashButton(button, message);
-    setActionStatus(message);
+    setActionStatus(copied ? '' : message);
   }
 
   document.getElementById('connect-link')?.addEventListener('click', event => {

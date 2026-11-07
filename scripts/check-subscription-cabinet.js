@@ -20,7 +20,7 @@ for(const markup of [template,preview]){
  for(const key of ['apps','connect','devices','support'])assert(markup.includes('data-setup-section="'+key+'"'),'Missing setup section '+key);
  assert(markup.indexOf('data-setup-section="connect"')<markup.indexOf('data-setup-section="apps"'),'Access actions precede the secondary app catalog');
  assert.match(markup,/<details class="portal-app-disclosure">/,'Apps must start collapsed');
- assert.match(markup,/class="portal-quickstart"/,'A short guide follows the dashboard');
+ assert.doesNotMatch(markup,/class="portal-quickstart"/,'Instructions must not repeat access actions');
 }
 assert.match(template,/id="subscription-link-card" hidden/,'Private URL remains hidden');
 assert.match(preview,/data-preview-link-card[^>]*hidden/,'Preview must hide the private URL');

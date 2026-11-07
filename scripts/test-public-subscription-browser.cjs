@@ -58,7 +58,7 @@ function fixture(url){
 
    await page.locator('#connect-link').click();
    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),base+'/s/disposable-test-token-0123456789abcdef');
-   assert((await page.locator('#subscription-action-status').innerText()).length>10);
+   assert.equal(await page.locator('#subscription-action-status').innerText(),'');assert.equal(await page.locator('#connect-link').innerText(),lang==='en'?'Copied':'Скопировано');assert.equal(await page.locator('.portal-quickstart').count(),0);
    await page.locator('#toggle-qr').click();assert.equal(await page.locator('#subscription-qr svg').count(),1);assert.equal(await page.locator('#subscription-qr').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');assert.equal(await page.locator('.subscription-preview-languages').getAttribute('aria-label'),lang==='en'?'Language':'Язык');assert.equal(await page.locator('#subscription-qr svg').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');
    await page.locator('#toggle-link').click();assert(await page.locator('#subscription-link-card').isVisible());await page.locator('#toggle-link').click();assert(await page.locator('#subscription-link-card').isHidden());
    await page.locator('#connect-link').focus();await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr','Keyboard order follows setup');
