@@ -57,7 +57,8 @@ assert.match(docker,/ARG PANEL_BUILD_REVISION=unknown/);
 assert.match(docker,/--mount=type=bind,source=\.,target=\/source,readonly/,
  'Direct Compose builds must inspect the checkout without copying Git into the image');
 assert.match(docker,/sh \/source\/scripts\/resolve-panel-build-revision[.]sh/);
-assert.match(docker,/PANEL_BUILD_REVISION="\$revision" cargo build --release/,
+assert.match(docker,/sh \/source\/scripts\/resolve-panel-build-revision[.]sh[^\n]* > \/build\/PANEL_BUILD_REVISION/);
+assert.match(docker,/PANEL_BUILD_REVISION="\$\(cat \/build\/PANEL_BUILD_REVISION\)" cargo build --release/,
  'Resolved SHA must be supplied to rustc instead of the unknown default');
 assert.match(resolver,/status --porcelain --untracked-files=normal/,
  'Build revision must not impersonate a clean upstream commit for dirty sources');
