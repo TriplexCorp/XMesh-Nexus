@@ -403,6 +403,32 @@ persisted Squad data to achieve visual compactness.
   Secondary navigation must remain usable on narrow/mobile viewports and must
   not create horizontal document overflow.
 
+### Dedicated CDN inbound traffic quota (stage 1)
+
+- Settings → **Лимиты CDN** controls one shared pool of inbound tags.
+  Any tag added to that group is metered across every node that runs the
+  inbound. All unselected inbounds remain outside the CDN quota.
+- Each user/template can specify `cdnLimitGb` (GiB, zero = unlimited) in
+  addition to the existing global account `limit`. The ordinary unlimited
+  user plan remains unaffected by exhausting their CDN pool.
+- The panel derives `cdnUsedBytes` from verified, monotonic Xray stats in
+  `user_inbound_traffic_totals`. Do not accept client-supplied usage or
+  derive per-user quotas from node NIC totals, inbound aggregate statistics,
+  or feed download counts. Counter resets retain their existing baselines.
+- Once a user's CDN pool is exhausted, signed desired-config provisioning
+  excludes that user's client from **only the chosen CDN inbounds**, leaving
+  the original UUID and other authorized inbounds unchanged. Existing
+  `user.limit` and expiry constraints still apply independently.
+- **Enforcement limitation:** this stage uses normal node reconciliation;
+  it does not promise instantaneous cutoff of live sessions and is not an
+  offline-enforced hard quota. Production hard-cutoff requires a separate
+  signed Agent policy extension with local inbound counters, reconnect
+  denial, shared budget allocation, restart handling and fail-closed
+  telemetry safeguards. Do not describe it as an exact realtime limit.
+- Periodic (monthly/daily) CDN resets are not implemented. The existing
+  explicit user traffic reset also resets CDN cumulative totals. This stage
+  introduces no new automatic reset schedule or user-supplied lease.
+
 ### Catalog toolbars and collection actions
 
 **Nodes is the reference composition for catalog controls.** Squads, Hosts,
