@@ -255,6 +255,29 @@ dialog.xm-action-confirm{--dialog-width:28rem;border:1px solid var(--nx-border-s
 /* Existing Hosts and Squads directories consume the same framed toolbar as Nodes. */
 .nx-directory-toolbar{padding:var(--nx-section-pad);border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);background:var(--nx-panel-bg)}
 
+/* Directory catalogs use the same control anatomy as Nodes. Keep search and
+   create in the first row, while density and optional explanation reflow below
+   on small widths; the toolbar padding is intentional, not empty space. */
+.nx-directory-toolbar{
+ grid-template-columns:minmax(0,19rem) minmax(0,1fr) auto auto;
+}
+.nx-directory-toolbar>.nx-directory-toolbar-note{grid-column:2;grid-row:auto}
+.nx-directory-toolbar>.nx-workspace-grid-controls{grid-column:3;justify-self:end}
+.nx-directory-toolbar>.nx-workspace-create{grid-column:4;justify-self:end}
+@media(max-width:1100px){
+ .nx-directory-toolbar{grid-template-columns:minmax(0,1fr) auto auto}
+ .nx-directory-toolbar>.nx-directory-toolbar-note{grid-column:1/-1;grid-row:2}
+ .nx-directory-toolbar>.nx-workspace-grid-controls{grid-column:2;grid-row:1}
+ .nx-directory-toolbar>.nx-workspace-create{grid-column:3;grid-row:1}
+}
+@media(max-width:680px){
+ .nx-directory-toolbar{grid-template-columns:minmax(0,1fr) auto}
+ .nx-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
+ .nx-directory-toolbar>.nx-workspace-create{grid-column:2;grid-row:1}
+ .nx-directory-toolbar>.nx-workspace-grid-controls{grid-column:1/-1;grid-row:2;justify-self:end}
+ .nx-directory-toolbar>.nx-directory-toolbar-note{grid-column:1/-1;grid-row:3}
+}
+
 /* Unified catalog action grammar: one toolbar, one add control, one grid picker. */
 .nx-workspace-toolbar{
  padding:var(--nx-section-pad);border:1px solid var(--nx-border);
@@ -290,9 +313,6 @@ dialog.xm-action-confirm{--dialog-width:28rem;border:1px solid var(--nx-border-s
  .nx-directory-toolbar>.nx-workspace-actions{min-width:0;flex-wrap:wrap}
 }
 @media(max-width:680px){
- .nx-directory-toolbar{grid-template-columns:minmax(0,1fr)}
- .nx-directory-toolbar>.nx-workspace-actions{grid-column:1;justify-self:stretch;justify-content:space-between}
- .nx-directory-toolbar>.nx-directory-toolbar-note{grid-column:1;grid-row:auto}
  .nx-workspace-actions{justify-content:space-between;margin-left:0}
  .nx-workspace-grid-controls{white-space:normal;flex-wrap:wrap}
 }
