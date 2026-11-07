@@ -3,6 +3,7 @@ mod auth;
 mod client_routing;
 mod core;
 mod mfa;
+mod node_address_unique;
 mod node_auth;
 mod node_enrollment;
 mod node_geodata;
@@ -1084,6 +1085,9 @@ async fn create_record(
     // User and initial subscription must be one atomic operation: never create
     // an account whose subscription secret could not be persisted.
     let mut tx = state.pool.begin().await?;
+    if collection == "nodes" {
+        node_address_unique::reject_duplicate(&mut tx, &data, 0).await?;
+    }
     let row = sqlx::query(
         "INSERT INTO panel_records (collection, data) VALUES ($1, $2) RETURNING id, data",
     )
@@ -1229,6 +1233,11 @@ async fn update_record(
             .await?
             .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let mut data: Value = existing.try_get("data")?;
+    let old_node_address = if collection == "nodes" {
+        node_address_unique::address_key(&data)
+    } else {
+        None
+    };
     let object = data.as_object_mut().ok_or_else(|| {
         ApiError::new(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1251,6 +1260,9 @@ async fn update_record(
         object.insert(key, value);
     }
     validate_record(&collection, &data)?;
+    if collection == "nodes" && old_node_address != node_address_unique::address_key(&data) {
+        node_address_unique::reject_duplicate(&mut tx, &data, id).await?;
+    }
     if collection == "hosts" {
         validate_host_binding(&state.pool, &data).await?;
     }
