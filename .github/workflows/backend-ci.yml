@@ -140,6 +140,8 @@ jobs:
         run: node scripts/check-xsp-v2-main-checkpoint.js
       - name: Test Xray-core and panel update buttons, queue and responsive layout
         run: node scripts/check-settings-update-actions.js
+      - name: Verify topbar panel version and read-only upstream update check
+        run: node scripts/check-panel-version-topbar.js
       - name: Check managed Xray update safety and SQLx migration uniqueness
         run: node scripts/check-managed-xray-update.js
       - name: Ensure client fingerprint is configured at hosts, not users
