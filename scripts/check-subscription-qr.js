@@ -37,5 +37,5 @@ assert.match(template,/class="subscription-public-brand-identity"/,'Public porta
 assert.match(template,/class="subscription-public-status-stack"/,'Public portal status must be grouped as an operational rail');
 assert.match(publicCss,/grid-template-columns:minmax\(0,\.88fr\) minmax\(0,1\.12fr\)/,'Subscription overview must balance its headline with status information');
 assert.match(publicCss,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,235px\),1fr\)\)/,'Client catalog must use readable responsive columns across the available width');
-assert.doesNotMatch(template,/>01<|>02</,'Enterprise portal must not expose decorative numbered panels');
+assert.match(template,/portal-guide-copy/,'A short guide explains the link import');
 console.log('Subscription absolute URL / QR / enterprise workspace contract: OK');

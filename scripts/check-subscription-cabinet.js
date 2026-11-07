@@ -18,7 +18,9 @@ for(const markup of [template,preview]){
  assert.doesNotMatch(markup,/role="tab(?:list|panel)?"|data-cabinet-tab|data-cabinet-panel/,'Customer setup must be one page');
  assert.doesNotMatch(markup,/cabinet-feature-actions|subscription-cabinet-checklist|portal-app-next/,'No duplicated overview or navigation actions');
  for(const key of ['apps','connect','devices','support'])assert(markup.includes('data-setup-section="'+key+'"'),'Missing setup section '+key);
- assert(markup.indexOf('data-setup-section="apps"')<markup.indexOf('data-setup-section="connect"'),'Install the app before copying the link');
+ assert(markup.indexOf('data-setup-section="connect"')<markup.indexOf('data-setup-section="apps"'),'Access actions precede the secondary app catalog');
+ assert.match(markup,/<details class="portal-app-disclosure">/,'Apps must start collapsed');
+ assert.match(markup,/class="portal-quickstart"/,'A short guide follows the dashboard');
 }
 assert.match(template,/id="subscription-link-card" hidden/,'Private URL remains hidden');
 assert.match(preview,/data-preview-link-card[^>]*hidden/,'Preview must hide the private URL');

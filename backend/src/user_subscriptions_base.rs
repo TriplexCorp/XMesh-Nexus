@@ -1342,7 +1342,7 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
         };
         let _ = write!(
             metrics,
-            "<div data-subscription-traffic><small>{}</small><b>{}</b><div class=\"subscription-preview-progress\"><i style=\"width:{pct:.1}%\"></i></div></div>",
+            "<div data-subscription-traffic data-used-gib=\"{consumed_gib}\" data-limit-gib=\"{limit}\"><small>{}</small><b>{}</b><div class=\"subscription-preview-progress\"><i style=\"width:{pct:.1}%\"></i></div></div>",
             if en { "Traffic" } else { "Трафик" },
             escape_html(&remaining)
         );
