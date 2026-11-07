@@ -326,6 +326,8 @@ const ENT={
     {k:'tlsManualProvision',l:'Принудительно внешний сертификат',t:'bool',h:'Необязательно: готовые пути сертификата определяются автоматически из профиля. Используйте только для явного запрета ACME.'},
     {k:'tlsDomain',l:'TLS-домен ноды',ph:'node.example.com',h:'DNS-имя, которым вы управляете. Используется только при управляемом TLS. Никаких глобальных доменов.'},
     {k:'tlsAcmeEmail',l:'Контакт ACME (email)',ph:'admin@example.com',h:'Email для регистрации Let’s Encrypt и уведомлений о сертификате.'},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
+    {k:'cdnMode',l:'Политика трафика',t:'sel',o:[['standard','Обычный · вне LTE-лимита'],['all','LTE · все inbound узла'],['selected','Смешанный · выбранные inbound']]},
+    {k:'cdnInboundTags',l:'Ограниченные inbound',t:'multi',o:()=>[...new Set(DB.profiles.flatMap(p=>inbs(p).map(i=>i.tag)))].map(tag=>[tag,tag])},
     {k:'billingPrice',l:'Стоимость аренды',t:'num'},
     {k:'billingCurrency',l:'Валюта',t:'sel',o:[['EUR','EUR · €'],['USD','USD · $'],['RUB','RUB · ₽'],['PLN','PLN · zł'],['GBP','GBP · £']]},
     {k:'billingDueDate',l:'Оплачено до',ph:'ГГГГ-ММ-ДД'},
@@ -337,7 +339,7 @@ const ENT={
     {k:'rotationIntervalHours',l:'Смена адреса каждые, ч',t:'num',h:'1–720 часов. По умолчанию 24. Адрес закреплён за пользователем между обновлениями подписки.'},
     {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'}],
 
-    def:()=>({flag:'',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,tlsAutoProvision:false,tlsManualProvision:false,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
+    def:()=>({flag:'',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,cdnMode:'standard',cdnInboundTags:[],tlsAutoProvision:false,tlsManualProvision:false,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
     chk:data=>{
       const address=String(data.addr??'');
       const ipv4=address.split('.');
@@ -364,6 +366,11 @@ const ENT={
       if(data.billingDueDate&&!/^\d{4}-\d{2}-\d{2}$/.test(data.billingDueDate))return 'Дата аренды: ГГГГ-ММ-ДД.';
       if(data.billingDueDate&&!Number.isFinite(Date.parse(data.billingDueDate+'T00:00:00Z')))return 'Некорректная дата аренды.';
       if(data.billingProviderUrl&&!/^https:\/\//.test(data.billingProviderUrl))return 'Укажите HTTPS-ссылку провайдера.';
+      if(data.cdnMode==='selected'){
+        if(!data.cdnInboundTags.length)return 'Выберите inbound для ограниченного LTE-трафика.';
+        const profileTags=new Set(inbs(nodeProfile).map(i=>i.tag));
+        if(data.cdnInboundTags.some(tag=>!profileTags.has(tag)))return 'Выбранный LTE inbound отсутствует в XRAY STUDIO профиле узла.';
+      }
       return '';
     },
     guard:r=>''},
@@ -3839,7 +3846,7 @@ function syncNodeEffectiveTls(form){
   }
 }
 function selectNodeEditorTab(form,key,focus=false){
-  if(!form||!['connection','network','billing'].includes(key))return;
+  if(!form||!['connection','network','traffic','billing'].includes(key))return;
   for(const tab of form.querySelectorAll('[data-node-editor-tab]')){
     const selected=tab.dataset.nodeEditorTab===key;
     tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;
@@ -3884,8 +3891,29 @@ document.addEventListener('change',event=>{
   if(external)external.checked=radio.value==='external';
   syncNodeEffectiveTls(form);
 });
+function syncNodeCdnFields(form,rebuild=false){
+  if(!form||form.dataset.ent!=='nodes')return;
+  const mode=form.elements.namedItem('cdnMode')?.value||'standard';
+  const area=form.querySelector('[data-node-cdn-inbounds]');
+  if(area){
+    if(rebuild){
+      const previouslySelected=new Set([...area.querySelectorAll('[name="cdnInboundTags"]:checked')].map(el=>el.value));
+      const id=form.elements.namedItem('profileId')?.value;
+      const profile=DB.profiles.find(p=>String(p.id)===String(id));
+      const available=[...new Set(inbs(profile).map(item=>item.tag))];
+      const list=area.querySelector('[data-node-cdn-options]');
+      if(list)list.innerHTML=available.map(tag=>'<label class="ck"><input type="checkbox" name="cdnInboundTags" value="'+esc(tag)+'"'+(previouslySelected.has(tag)?' checked':'')+'><span>'+esc(tag)+'</span></label>').join('')||'<span class="mu">Сначала назначьте профиль с inbound.</span>';
+    }
+    area.hidden=mode!=='selected';
+    area.inert=mode!=='selected';
+  }
+}
 document.addEventListener('change',event=>{
-  if(event.target.matches?.('form[data-ent="nodes"] [name="profileId"]'))syncNodeEffectiveTls(event.target.closest('form'));
+  if(event.target.matches?.('form[data-ent="nodes"] [name="profileId"]')){
+    const form=event.target.closest('form');
+    syncNodeEffectiveTls(form);syncNodeCdnFields(form,true);
+  }
+  if(event.target.matches?.('form[data-ent="nodes"] [name="cdnMode"]'))syncNodeCdnFields(event.target.closest('form'));
 });
 
 document.addEventListener('input',event=>{
@@ -3904,7 +3932,12 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :field(f.k==='billingNote'?{...f,t:'area',rows:4}:f,o[f.k]);
   const billingFields=e.fs.filter(f=>f.k.startsWith('billing')&&!['billingProviderUrl','billingNote'].includes(f.k)).map(billingField).join('');
   const providerFields=e.fs.filter(f=>['billingProviderUrl','billingNote'].includes(f.k)).map(billingField).join('');
-  const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!f.k.startsWith('geo')&&!['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k));
+  const nodeTrafficFields=e.fs.filter(f=>['mult','limit','resetDay'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
+  const nodeCdnModeField=field(e.fs.find(f=>f.k==='cdnMode'),o.cdnMode||'standard');
+  const nodeCdnProfile=DB.profiles.find(p=>String(p.id)===String(o.profileId));
+  const nodeCdnChoices=[...new Set(inbs(nodeCdnProfile).map(i=>i.tag))];
+  const nodeCdnChoiceField=field({...e.fs.find(f=>f.k==='cdnInboundTags'),o:nodeCdnChoices.map(tag=>[tag,tag])},o.cdnInboundTags||[]);
+  const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!f.k.startsWith('geo')&&!['rotationEnabled','rotationIntervalHours','rotationIps','cdnMode','cdnInboundTags'].includes(f.k));
   // GeoData belongs to its own node service dialog, never the general editor.
   // Keep the connection fields in a deliberate keyboard and reading order.
   // New fields remain supported and follow the explicitly grouped core fields.
@@ -3916,7 +3949,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     }):nodeCoreFields;
   // Certificate provisioning fields belong to the dedicated TLS sidebar.
   const tlsKeys=new Set(['tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail']);
-  const nodeMainFields=arrangedNodeCoreFields.filter(f=>!tlsKeys.has(f.k)).map(f=>f.k==='addr'
+  const nodeMainFields=arrangedNodeCoreFields.filter(f=>!tlsKeys.has(f.k)&&!['mult','limit','resetDay'].includes(f.k)).map(f=>f.k==='addr'
     ?'<div class="node-address-port">'+field(f,o[f.k])+field(nodeCoreFields.find(x=>x.k==='port'),o.port)+'</div>'
     :f.k==='port'?'':field(f,o[f.k])).join('');
   const tlsField=k=>{const f=nodeCoreFields.find(x=>x.k===k);const copy={tlsDomain:{l:'Домен сертификата',h:'DNS-имя, направленное на этот узел'},tlsAcmeEmail:{l:'Email для Let’s Encrypt',h:'Для уведомлений о сертификате'}};return f?field({...f,...copy[k]},o[f.k]):''};
@@ -3943,14 +3976,17 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт, страну, название и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e.fs):k==='nodes'
-    ?'<nav class="node-editor-tabs" role="tablist" aria-label="Настройки узла">'+[['connection','Подключение','server'],['network','IP-пул','globe'],['billing','Оплата','calendar']].map(([tab,label,icon],index)=>'<button type="button" role="tab" id="node-tab-'+tab+'" aria-controls="node-panel-'+tab+'" aria-selected="'+(index===0)+'" tabindex="'+(index===0?'0':'-1')+'" data-node-editor-tab="'+tab+'">'+ic(icon)+'<span>'+label+'</span></button>').join('')+'</nav><div class="node-form-layout">'+
+    ?'<nav class="node-editor-tabs" role="tablist" aria-label="Настройки узла">'+[['connection','Подключение','server'],['traffic','Трафик','activity'],['network','IP-пул','globe'],['billing','Оплата','calendar']].map(([tab,label,icon],index)=>'<button type="button" role="tab" id="node-tab-'+tab+'" aria-controls="node-panel-'+tab+'" aria-selected="'+(index===0)+'" tabindex="'+(index===0?'0':'-1')+'" data-node-editor-tab="'+tab+'">'+ic(icon)+'<span>'+label+'</span></button>').join('')+'</nav><div class="node-form-layout">'+
       '<div class="node-connection-pane" id="node-panel-connection" role="tabpanel" aria-labelledby="node-tab-connection" data-node-editor-pane="connection" data-active="true" aria-hidden="false"><section class="node-main-section" aria-label="Параметры подключения"><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section><aside class="node-network-stack">'+nodeTlsFields+'</aside></div>'+
-      `<section class="node-ip-section" id="node-panel-network" role="tabpanel" aria-labelledby="node-tab-network" data-node-editor-pane="network" data-active="false" aria-hidden="true" inert><div class="node-rotation-editor-body node-task-workspace"><section class="node-pool-editor"><h3 class="node-form-section-title">IP-пул и ротация</h3><p class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</p>${poolField}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output></section><aside class="node-task-aside node-rotation-settings"><h3 class="node-form-section-title">Ротация</h3>${rotationFields}${rotationProbe}</aside></div></section><section class="node-billing-section" id="node-panel-billing" role="tabpanel" aria-labelledby="node-tab-billing" data-node-editor-pane="billing" data-active="false" aria-hidden="true" inert><div class="node-task-workspace"><section class="node-rent-editor"><h3 class="node-form-section-title">Оплата сервера</h3><div class="node-billing-fields">${billingFields}</div></section><aside class="node-task-aside node-provider-editor"><h3 class="node-form-section-title">Провайдер</h3><div class="node-billing-fields">${providerFields}</div></aside></div></section></div>`
+      `<section class="node-billing-section node-traffic-section" id="node-panel-traffic" role="tabpanel" aria-labelledby="node-tab-traffic" data-node-editor-pane="traffic" data-active="false" aria-hidden="true" inert><div class="node-task-workspace"><section class="node-rent-editor"><h3 class="node-form-section-title">Политика LTE-трафика</h3><p class="note">Обычные узлы остаются без LTE-квоты. У ограниченных узлов общий месячный лимит задаётся пользователю, а не самому узлу.</p><div class="node-billing-fields">${nodeCdnModeField}<div data-node-cdn-inbounds ${o.cdnMode==='selected'?'':'hidden inert'}><div data-node-cdn-options>${nodeCdnChoiceField}</div><p class="note">При смешанном режиме отметьте только LTE inbound этого узла.</p></div></div></section><aside class="node-task-aside node-provider-editor"><h3 class="node-form-section-title">Сетевой трафик узла</h3><div class="node-billing-fields">${nodeTrafficFields}</div><p class="note">Это отдельный технический лимит узла. Он не заменяет 5 ГиБ LTE для каждого пользователя.</p></aside></div></section><section class="node-ip-section" id="node-panel-network" role="tabpanel" aria-labelledby="node-tab-network" data-node-editor-pane="network" data-active="false" aria-hidden="true" inert><div class="node-rotation-editor-body node-task-workspace"><section class="node-pool-editor"><h3 class="node-form-section-title">IP-пул и ротация</h3><p class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</p>${poolField}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output></section><aside class="node-task-aside node-rotation-settings"><h3 class="node-form-section-title">Ротация</h3>${rotationFields}${rotationProbe}</aside></div></section><section class="node-billing-section" id="node-panel-billing" role="tabpanel" aria-labelledby="node-tab-billing" data-node-editor-pane="billing" data-active="false" aria-hidden="true" inert><div class="node-task-workspace"><section class="node-rent-editor"><h3 class="node-form-section-title">Оплата сервера</h3><div class="node-billing-fields">${billingFields}</div></section><aside class="node-task-aside node-provider-editor"><h3 class="node-form-section-title">Провайдер</h3><div class="node-billing-fields">${providerFields}</div></aside></div></section></div>`
     :standardFields;
   const boundedEntityEditor=['tpls','admins'].includes(k);
   const editorFields=boundedEntityEditor?'<div class="entity-editor-body">'+fields+'</div>':fields;
   modal(`<form class="box${boundedEntityEditor?' entity-editor':''}" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog">${k==='hosts'?'<header class="host-editor-heading"><div><h2>'+(id?'Настройки хоста':'Новый хост')+'</h2><p data-no-translate>'+esc(o.remark||o.address||'')+'</p></div><button type="button" class="gh" data-x aria-label="Закрыть">'+ic('x')+'</button></header>':k==='nodes'?'<header class="node-editor-heading"><div><h2>'+(id?'Настройки узла':'Новый узел')+'</h2><p data-no-translate>'+esc(o.name||o.addr||'')+'</p></div><button type="button" class="gh" data-x aria-label="Закрыть">'+ic('x')+'</button></header>':k==='squads'?`<h2><span class="squad-heading-icon">${ic('layers')}</span>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`:`<h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`}${editorFields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
-  if(k==='nodes')syncNodeEffectiveTls(dlg.querySelector('form[data-ent="nodes"]'));
+  if(k==='nodes'){
+    const nodeForm=dlg.querySelector('form[data-ent="nodes"]');
+    syncNodeEffectiveTls(nodeForm);syncNodeCdnFields(nodeForm);
+  }
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
   if(k==='hosts'){
     const form=dlg.querySelector('form[data-ent="hosts"]');
@@ -4361,6 +4397,7 @@ async function nodesP(){
       <div class="node-body"><div class="node-summary"><div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b><div class="node-online-clients" title="Онлайн-клиенты по свежей телеметрии агента ноды"><span>Пользователи онлайн</span><b>${m?.onlineClients!=null&&Number.isFinite(Number(m.onlineClients))?Math.max(0,Math.trunc(Number(m.onlineClients))):"—"}</b></div></div><div><span>XRAY STUDIO</span>${p?'<b>'+esc(p.name)+'</b><small class="mu" data-node-profile-status="'+esc(n.id)+'" title="Проверка подписанной политики и реально используемой конфигурации Xray">'+esc(nodeProfileStatus(runtime.get(n.id)))+'</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'<span class="mu" data-node-profile-status="'+esc(n.id)+'">Профиль пока не назначен</span>'}</div></div>
       ${nodeShowsTlsStatus(p,n)?'<div class="node-tls-health" data-node-tls-status title="Ожидается подписанный отчёт агента">'+ic('shield')+'<span data-node-tls-label>TLS · нет данных</span></div>':''}
       ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span data-node-geodata-status>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
+      ${n.cdnMode&&n.cdnMode!=='standard'?`<div class="node-ip-rotation active" title="Отдельный лимит LTE задаётся каждому пользователю; доступ к основным узлам сохраняется">${ic('cloud')}<span>LTE · ${n.cdnMode==='all'?'все inbound':(Array.isArray(n.cdnInboundTags)?n.cdnInboundTags.length:0)+' inbound'}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       </div><div class="node-metrics"><div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
