@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&amp;family=Manrope:wght@400..800&amp;family=Inter:wght@400..800&amp;family=Golos+Text:wght@400..800&amp;family=Rubik:wght@400..800&amp;family=Nunito+Sans:wght@400..800&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=Roboto:wght@400..800&amp;family=PT+Sans:wght@400;700&amp;family=Montserrat:wght@400..800&amp;family=Ubuntu:wght@400;500;700&amp;family=Open+Sans:wght@400..800&amp;family=Source+Sans+3:wght@400..800&amp;family=Fira+Sans:wght@400;500;600;700&amp;family=Jost:wght@400..800&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/subscription-studio.css?v=6fc2d828fd52">
   <link rel="stylesheet" href="/subscription-surface.css?v=0a79377d5733">
-  <link rel="stylesheet" href="/subscription-public.css?v=ea1329135007">
+  <link rel="stylesheet" href="/subscription-public.css?v=80b2a51b11ab">
   <style>
   :root{
     --portal-accent:{{ACCENT}};
@@ -20,7 +20,7 @@
   }
   </style>
   <script src="/qr-code.js?v=20261021-qr-1" defer=""></script>
-  <script src="/subscription-portal.js?v=64d619447dfa" defer=""></script>
+  <script src="/subscription-portal.js?v=cfbc3bc6e762" defer=""></script>
 </head>
 <body class="subscription-public">
 <main class="subscription-public-shell">
@@ -47,7 +47,7 @@
           <p>{{DESCRIPTION}}</p>
 
         </div>
-      </section>
+      <svg class="portal-orbit" viewBox="0 0 260 260" aria-hidden="true"><circle cx="130" cy="130" r="95"></circle><ellipse cx="130" cy="130" rx="116" ry="42" transform="rotate(38 130 130)"></ellipse><ellipse cx="130" cy="130" rx="116" ry="42" transform="rotate(-52 130 130)"></ellipse><circle class="portal-orbit-dot" cx="202" cy="67" r="4"></circle><circle class="portal-orbit-dot" cx="64" cy="181" r="3"></circle></svg></section>
       <aside class="subscription-public-info-panel">
         <header class="subscription-public-panel-title">
           <span class="subscription-public-panel-icon is-status" aria-hidden="true"></span>
@@ -55,37 +55,7 @@
         </header>
         <div class="subscription-public-status-stack">{{METRICS}}</div>
       </aside>
-    </div>
-
-    <div class="subscription-public-workspace">
-
-
-
-
-
-
-
-
-
-
-
-    <section class="subscription-cabinet-panel" id="cabinet-panel-apps" data-setup-section="apps">
-        <header class="subscription-cabinet-section-heading"><div><h2 id="cabinet-apps-heading" tabindex="-1">Приложения для подключения</h2><p id="cabinet-apps-note">Выберите клиент для своей платформы.</p></div></header>
-        <div class="subscription-cabinet-app-tools">
-
-          <div class="subscription-cabinet-filters" role="group" aria-label="Фильтр платформ" id="cabinet-platform-filters">
-            <button type="button" data-app-filter="all" aria-pressed="true">Все</button>
-            <button type="button" data-app-filter="ios" aria-pressed="false">iOS</button>
-            <button type="button" data-app-filter="android" aria-pressed="false">Android</button>
-            <button type="button" data-app-filter="windows" aria-pressed="false">Windows</button>
-            <button type="button" data-app-filter="macos" aria-pressed="false">macOS</button>
-            <button type="button" data-app-filter="linux" aria-pressed="false">Linux</button>
-          </div>
-        </div>
-        <div class="subscription-public-catalog">{{APPS}}</div>
-
-        <p class="subscription-cabinet-no-apps" id="cabinet-apps-empty" hidden="">По вашему запросу приложений не найдено.</p>
-      </section><section class="subscription-cabinet-panel" id="cabinet-panel-connect" data-setup-section="connect">
+    <section class="subscription-cabinet-panel" id="cabinet-panel-connect" data-setup-section="connect">
         <div class="subscription-cabinet-connect-grid">
           <section class="subscription-public-access-panel">
             <header class="subscription-public-panel-title">
@@ -102,10 +72,30 @@
               <code id="subscription-link-display"></code>
             </section>
             <p class="subscription-public-action-status" id="subscription-action-status" aria-live="polite"></p>
-          <div class="subscription-public-secondary-surfaces">{{QR}}</div></section>
+          <div class="subscription-public-secondary-surfaces" data-portal-qr-slot="">{{QR}}</div></section>
 
         </div>
-      </section><section class="subscription-cabinet-panel" id="cabinet-panel-devices" data-setup-section="devices">
+      </section></div>
+
+    <div class="subscription-public-workspace"><section class="portal-quickstart"><h2 id="portal-quickstart-title">Как подключиться</h2><ol><li><span aria-hidden="true">01</span><b id="portal-guide-copy">Скопируйте ссылку</b></li><li><span aria-hidden="true">02</span><b id="portal-guide-app">Откройте VPN-приложение</b></li><li><span aria-hidden="true">03</span><b id="portal-guide-import">Добавьте подписку по ссылке</b></li></ol><p id="portal-guide-finish">После добавления включите подключение в приложении.</p></section>
+
+    <section class="subscription-cabinet-panel" id="cabinet-panel-apps" data-setup-section="apps"><details class="portal-app-disclosure"><summary id="portal-app-disclosure-label">Нужно установить приложение?</summary>
+        <header class="subscription-cabinet-section-heading"><div><h2 id="cabinet-apps-heading" tabindex="-1">Приложения для подключения</h2><p id="cabinet-apps-note">Выберите клиент для своей платформы.</p></div></header>
+        <div class="subscription-cabinet-app-tools">
+
+          <div class="subscription-cabinet-filters" role="group" aria-label="Фильтр платформ" id="cabinet-platform-filters">
+            <button type="button" data-app-filter="all" aria-pressed="true">Все</button>
+            <button type="button" data-app-filter="ios" aria-pressed="false">iOS</button>
+            <button type="button" data-app-filter="android" aria-pressed="false">Android</button>
+            <button type="button" data-app-filter="windows" aria-pressed="false">Windows</button>
+            <button type="button" data-app-filter="macos" aria-pressed="false">macOS</button>
+            <button type="button" data-app-filter="linux" aria-pressed="false">Linux</button>
+          </div>
+        </div>
+        <div class="subscription-public-catalog">{{APPS}}</div>
+
+        <p class="subscription-cabinet-no-apps" id="cabinet-apps-empty" hidden="">По вашему запросу приложений не найдено.</p>
+      </details></section><section class="subscription-cabinet-panel" id="cabinet-panel-devices" data-setup-section="devices">
         <header class="subscription-cabinet-section-heading"><div><h2 id="cabinet-devices-heading">Управление подключениями</h2><p id="cabinet-devices-note">Число привязанных устройств и доступный лимит.</p></div></header>
         <div class="subscription-cabinet-device-card"><span class="cabinet-device-emblem" aria-hidden="true">▣</span>{{DEVICE_INFO}}</div>
       </section><section class="subscription-cabinet-panel" id="cabinet-panel-support" data-setup-section="support">
