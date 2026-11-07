@@ -24,13 +24,13 @@ assert.match(portal,/brandNote:'Центр безопасного подключ
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
 const publicCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
 assert.match(template,/subscription-portal\.js\?v=20261101-enterprise-workspace-v3/,'Public portal must cache-bust the enterprise workspace behavior');
-assert.match(template,/subscription-public\.css\?v=20261101-enterprise-workspace-v3/,'Public portal must cache-bust the enterprise workspace redesign');
+assert.match(template,/subscription-public\.css\?v=[a-f0-9]{12}/,'Public portal must use a content fingerprint for its production stylesheet');
 assert.match(template,/id="subscription-link-card"/,'Public portal must expose the enterprise subscription link surface');
 assert.match(template,/id="subscription-brand-note"/,'Public portal must expose the localized product-header note');
 assert.match(template,/class="subscription-public-workspace"/,'Public portal must use the workspace composition layer');
 assert.match(template,/class="subscription-public-brand-identity"/,'Public portal must expose a product-header identity group');
 assert.match(template,/class="subscription-public-status-stack"/,'Public portal status must be grouped as an operational rail');
 assert.match(publicCss,/grid-template-columns:minmax\(0,8fr\) minmax\(330px,4fr\)/,'Desktop portal must use an 8/4 enterprise grid');
-assert.match(publicCss,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/,'Desktop client catalog must use four balanced columns');
+assert.match(publicCss,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,235px\),1fr\)\)/,'Client catalog must use readable responsive columns across the available width');
 assert.doesNotMatch(template,/>01<|>02</,'Enterprise portal must not expose decorative numbered panels');
 console.log('Subscription absolute URL / QR / enterprise workspace contract: OK');

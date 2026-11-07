@@ -238,26 +238,50 @@ window.XMeshSubscriptionStudio = (() => {
       '<p class="subscription-preview-caption">Указанные приложения и ссылки отображаются на странице подписки.</p>',
       '</section></div>',
       '<aside class="subscription-studio-side">',
-      '<div class="subscription-preview-label"><b>Предпросмотр</b></div>',
-      '<div class="subscription-preview" data-subscription-preview>',
-      '<div class="subscription-preview-brand"><span data-subscription-logo-symbol>✦</span><img data-subscription-logo alt="" hidden><b data-subscription-brand></b><div class="subscription-preview-languages" role="group" aria-label="Language / Язык"><button type="button" data-portal-language="ru" aria-pressed="true" lang="ru">RU</button><button type="button" data-portal-language="en" aria-pressed="false" lang="en">EN</button></div></div>',
-      '<div class="subscription-preview-hero"><span class="subscription-preview-ok" data-subscription-ok>●</span><h3 data-subscription-active></h3><p data-subscription-description></p></div>',
-      '<div class="subscription-preview-meta" data-subscription-metrics>',
+      '<div class="subscription-preview-label"><b>Предпросмотр публичной страницы</b><span>Адаптивный вид · демоданные</span></div>',
+      '<div class="subscription-studio-preview subscription-public" data-subscription-preview-frame>',
+      '<main class="subscription-public-shell"><div class="subscription-preview" data-subscription-preview>',
+      '<header class="subscription-preview-brand"><div class="subscription-public-brand-identity"><span data-subscription-logo-symbol>✦</span><img data-subscription-logo alt="" hidden><div class="subscription-public-brand-copy"><b data-subscription-brand></b><small data-subscription-brand-note></small></div></div>',
+      '<div class="subscription-preview-languages" role="group" aria-label="Language / Язык"><button type="button" data-portal-language="ru" aria-pressed="true" lang="ru">RU</button><button type="button" data-portal-language="en" aria-pressed="false" lang="en">EN</button></div></header>',
+      '<section class="subscription-preview-hero"><div class="subscription-preview-hero-copy"><span class="subscription-preview-ok" data-subscription-ok>●</span><h3 data-subscription-active></h3><p data-subscription-description></p></div><div class="subscription-public-hero-accent" aria-hidden="true"><i></i><i></i><i></i></div></section>',
+      '<div class="subscription-public-workspace"><div class="subscription-public-grid">',
+      '<section class="subscription-public-access-panel">',
+      '<header class="subscription-public-panel-title"><span class="subscription-public-panel-icon is-access" aria-hidden="true"></span><div><b data-preview-endpoint-label></b><small data-preview-endpoint-note></small></div></header>',
+      '<div class="subscription-public-primary-action"><div class="subscription-preview-cta" data-subscription-connect></div></div>',
+      '<section class="subscription-public-link-card" data-preview-link-card><div class="subscription-public-link-card-head"><div><b data-preview-link-label></b><small data-preview-link-note></small></div><em>HTTPS</em></div><code data-preview-demo-link></code></section>',
+      '<div class="subscription-preview-quick" data-subscription-quick><button type="button" data-subscription-copy>Копировать ссылку</button><button type="button" data-subscription-qr>QR</button><button type="button" data-subscription-devices>Устройства</button></div>',
+      '</section>',
+      '<aside class="subscription-public-info-panel"><header class="subscription-public-panel-title"><span class="subscription-public-panel-icon is-status" aria-hidden="true"></span><div><b data-preview-status-label></b><small data-preview-status-note></small></div></header>',
+      '<div class="subscription-public-status-stack"><div class="subscription-preview-meta" data-subscription-metrics>',
       '<div data-subscription-traffic><small data-subscription-traffic-label></small><b>12.4 / 100 ГБ</b><div class="subscription-preview-progress"><i></i></div></div>',
       '<div data-subscription-expiry><small data-subscription-expiry-label></small><b>31.12.2026</b></div>',
-      '</div>',
-      '<div class="subscription-preview-cta" data-subscription-connect></div>',
-      '<div class="subscription-preview-quick" data-subscription-quick><span data-subscription-copy>Копировать ссылку</span><span data-subscription-qr>QR</span><span data-subscription-devices>Устройства</span></div>',
-      '<section class="subscription-preview-apps" data-subscription-apps><header data-subscription-apps-title>Приложения для подключения</header><div data-subscription-app-list></div></section>',
-      '<div class="subscription-preview-support" data-subscription-support></div>',
-      '<footer data-subscription-footer></footer></div>',
+      '</div><span class="subscription-preview-support" data-subscription-support></span></div></aside></div>',
+      '<div class="subscription-public-catalog"><section class="subscription-preview-apps" data-subscription-apps><header data-subscription-apps-title>Приложения для подключения</header><div data-subscription-app-list></div></section></div>',
+      '</div><footer data-subscription-footer></footer></div></main></div>',
       '<div class="subscription-studio-stats"><div><small>Пользователей</small><b>'+esc(counts.users)+'</b></div><div><small>Узлов</small><b>'+esc(counts.nodes)+'</b></div></div>',
       '</aside></form></div>'
     ].join('');
     const mount = () => {
       const form=document.getElementById('subscription-studio-form');
       if(!form)return;
-      const $ = s=>form.querySelector(s);
+      // The visitor portal stylesheet is deliberately forbidden in the panel's
+      // global CSS graph. Mount the real public markup inside a ShadowRoot,
+      // then load the production CSS only there: no auth-panel style leakage.
+      const previewHost=form.querySelector('[data-subscription-preview-frame]');
+      const previewShadow=previewHost.attachShadow({mode:'open'});
+      const previewBody=document.createElement('div');
+      previewBody.className='subscription-studio-preview subscription-public';
+      while(previewHost.firstChild)previewBody.appendChild(previewHost.firstChild);
+      for(const href of [
+        '/subscription-studio.css?v=6fc2d828fd52',
+        '/subscription-surface.css?v=0a79377d5733',
+        '/subscription-public.css?v=a07af0ce990d'
+      ]){
+        const link=document.createElement('link');
+        link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
+      }
+      previewShadow.appendChild(previewBody);
+      const $=s=>form.querySelector(s)||previewShadow.querySelector(s);
       const customRows=()=>[...form.querySelectorAll('[data-custom-client-row]')];
       const readCustomClients=()=>customRows().map(row=>({
         id:row.dataset.customClientId,
@@ -347,7 +371,7 @@ window.XMeshSubscriptionStudio = (() => {
         const lang=previewLanguage,english=lang==='en',copy=locale[lang];
         const previewRoot=$('[data-subscription-preview]');
         previewRoot.lang=lang;
-        form.querySelectorAll('[data-portal-language]').forEach(button=>{
+        previewShadow.querySelectorAll('[data-portal-language]').forEach(button=>{
           const active=button.dataset.portalLanguage===lang;
           button.setAttribute('aria-pressed',String(active));
           button.classList.toggle('on',active);
@@ -375,6 +399,16 @@ window.XMeshSubscriptionStudio = (() => {
         }else{
           logo.hidden=true;logo.removeAttribute('src');symbol.hidden=false;
         }
+        $('[data-subscription-brand-note]').textContent=english?'Secure access workspace':'Центр безопасного подключения';
+        $('[data-preview-endpoint-label]').textContent=english?'Secure connection endpoint':'Защищённая точка подключения';
+        $('[data-preview-endpoint-note]').textContent=english?'Personal HTTPS access':'Личный HTTPS-адрес подписки';
+        $('[data-preview-status-label]').textContent=english?'Subscription status':'Статус подписки';
+        $('[data-preview-status-note]').textContent=english?'Traffic and validity':'Трафик и срок действия';
+        $('[data-preview-link-label]').textContent=english?'Personal HTTPS link':'Персональная HTTPS-ссылка';
+        $('[data-preview-link-note]').textContent=english?'Sample URL — not a real access token':'Демонстрационный адрес, без настоящего токена';
+        $('[data-preview-demo-link]').textContent=d.subscriptionDomain && pathOK(d.subscriptionPath)
+          ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/example-token'
+          : 'https://sub.example.com/s/example-token';
         $('[data-subscription-active]').textContent=(english?d.subscriptionHeroEn:d.subscriptionHero)||copy[0];
         $('[data-subscription-description]').textContent=(english?d.subscriptionDescriptionEn:d.subscriptionDescription)||(english?'Connection setup and subscription information.':'Настройки подключения и информация о подписке.');
         $('[data-subscription-traffic-label]').textContent=copy[1];
@@ -418,9 +452,9 @@ window.XMeshSubscriptionStudio = (() => {
           '<div class="subscription-topology-item"><span>'+esc('SERVER '+id.toUpperCase())+'</span><b>'+esc(labels[id])+'</b><small>'+esc(names[id])+'</small></div>'
         ).join('');
       };
-      form.addEventListener('click',event=>{
+      previewShadow.addEventListener('click',event=>{
         const button=event.target.closest('[data-portal-language]');
-        if(!button || !form.contains(button))return;
+        if(!button || !previewShadow.contains(button))return;
         const next=button.dataset.portalLanguage;
         if(next!=='ru'&&next!=='en')return;
         previewLanguage=next;

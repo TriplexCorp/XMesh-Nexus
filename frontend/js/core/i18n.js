@@ -15,6 +15,11 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Предпросмотр публичной страницы":"Public page preview",
+    "Адаптивный вид · демоданные":"Responsive preview · sample data",
+    "Личный HTTPS-адрес подписки":"Personal HTTPS subscription URL",
+    "Трафик и срок действия":"Traffic and validity",
+    "Демонстрационный адрес, без настоящего токена":"Example URL without a real access token",
     "Если перед нодой стоит промежуточный сервер, выберите защиту публичного подключения.":"If a proxy sits in front of the node, select the security layer used by the public endpoint.",
     "Проверка сертификата применяется только к TLS-подключению клиента.":"Certificate verification applies only to the client TLS connection.",
     "Путь транспорта":"Transport path",
