@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&family=Manrope:wght@400..800&family=Inter:wght@400..800&family=Golos+Text:wght@400..800&family=Rubik:wght@400..800&family=Nunito+Sans:wght@400..800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Roboto:wght@400..800&family=PT+Sans:wght@400;700&family=Montserrat:wght@400..800&family=Ubuntu:wght@400;500;700&family=Open+Sans:wght@400..800&family=Source+Sans+3:wght@400..800&family=Fira+Sans:wght@400;500;600;700&family=Jost:wght@400..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/subscription-studio.css?v=6fc2d828fd52">
   <link rel="stylesheet" href="/subscription-surface.css?v=0a79377d5733">
-  <link rel="stylesheet" href="/subscription-public.css?v=56ef92e0add0">
+  <link rel="stylesheet" href="/subscription-public.css?v=b80c95bcc4a4">
   <style>
   :root{
     --portal-accent:{{ACCENT}};
@@ -21,7 +21,7 @@
   }
   </style>
   <script src="/qr-code.js?v=20261021-qr-1" defer></script>
-  <script src="/subscription-portal.js?v=a2f15c300286" defer></script>
+  <script src="/subscription-portal.js?v=80f773b00219" defer></script>
 </head>
 <body class="subscription-public">
 <main class="subscription-public-shell">
@@ -43,10 +43,13 @@
     <div class="subscription-public-overview">
       <section class="subscription-preview-hero">
         <div class="subscription-preview-hero-copy">
-          <span class="subscription-cabinet-kicker" id="cabinet-kicker">МОЙ КАБИНЕТ <span aria-hidden="true">/</span> VPN ACCESS</span>
           {{STATUS_DOT}}
-          <h3>{{HERO}}</h3>
+          <h1>{{HERO}}</h1>
           <p>{{DESCRIPTION}}</p>
+        <div class="cabinet-feature-actions">
+                <button type="button" class="cabinet-action-primary" data-cabinet-open="apps" id="cabinet-start">Настроить подключение <span aria-hidden="true">↗</span></button>
+                <button type="button" class="cabinet-action-secondary" data-cabinet-open="connect" id="cabinet-find-app">Выбрать приложение</button>
+              </div>
         </div>
       </section>
       <aside class="subscription-public-info-panel">
@@ -69,23 +72,8 @@
 
       <section class="subscription-cabinet-panel" role="tabpanel" id="cabinet-panel-overview" aria-labelledby="cabinet-tab-overview" data-cabinet-panel="overview">
         <div class="subscription-public-grid">
-          <article class="subscription-cabinet-feature">
-            <div class="subscription-cabinet-feature-art" aria-hidden="true">
-              <div class="cabinet-signal-rings"><span></span><span></span><span></span><i></i></div>
-              <div class="cabinet-signal-mark">S / ACCESS</div>
-            </div>
-            <div class="subscription-cabinet-feature-copy">
-              <span class="cabinet-eyebrow" id="cabinet-feature-eyebrow">ВАШ ДОСТУП</span>
-              <h2 id="cabinet-feature-heading">Простое подключение. Полный контроль.</h2>
-              <p id="cabinet-feature-note">Ваши параметры и приложения собраны в одном месте.</p>
-              <div class="cabinet-feature-actions">
-                <button type="button" class="cabinet-action-primary" data-cabinet-open="connect" id="cabinet-start">Настроить подключение <span aria-hidden="true">↗</span></button>
-                <button type="button" class="cabinet-action-secondary" data-cabinet-open="apps" id="cabinet-find-app">Выбрать приложение</button>
-              </div>
-            </div>
-          </article>
           <article class="subscription-cabinet-checklist">
-            <header><span class="cabinet-eyebrow" id="cabinet-steps-eyebrow">КАК НАЧАТЬ</span><span class="cabinet-steps-count">01 — 03</span></header>
+            <header><span id="cabinet-steps-eyebrow">Как подключиться</span></header>
             <ol>
               <li><span>1</span><div><b id="cabinet-step-one">Выберите приложение</b><small id="cabinet-step-one-note">Подходящий клиент для вашего устройства</small></div></li>
               <li><span>2</span><div><b id="cabinet-step-two">Добавьте подписку</b><small id="cabinet-step-two-note">По ссылке или QR-коду</small></div></li>
@@ -122,7 +110,7 @@
       </section>
 
       <section class="subscription-cabinet-panel" role="tabpanel" id="cabinet-panel-apps" aria-labelledby="cabinet-tab-apps" data-cabinet-panel="apps" hidden>
-        <header class="subscription-cabinet-section-heading"><div><span class="cabinet-eyebrow" id="cabinet-apps-kicker">КАТАЛОГ</span><h2 id="cabinet-apps-heading">Приложения для подключения</h2><p id="cabinet-apps-note">Выберите клиент для своей платформы.</p></div></header>
+        <header class="subscription-cabinet-section-heading"><div><h2 id="cabinet-apps-heading">Приложения для подключения</h2><p id="cabinet-apps-note">Выберите клиент для своей платформы.</p></div></header>
         <div class="subscription-cabinet-app-tools">
           <label class="subscription-cabinet-search"><span aria-hidden="true">⌕</span><input type="search" id="cabinet-app-search" autocomplete="off" placeholder="Найти приложение…" aria-label="Поиск приложений"></label>
           <div class="subscription-cabinet-filters" role="group" aria-label="Фильтр платформ" id="cabinet-platform-filters">
@@ -135,16 +123,17 @@
           </div>
         </div>
         <div class="subscription-public-catalog">{{APPS}}</div>
+        <div class="portal-app-next"><p id="portal-app-next-note">Установите приложение и вернитесь на эту страницу.</p><button type="button" class="cabinet-action-primary" data-cabinet-open="connect" id="portal-app-next">Далее: добавить подписку</button></div>
         <p class="subscription-cabinet-no-apps" id="cabinet-apps-empty" hidden>По вашему запросу приложений не найдено.</p>
       </section>
 
       <section class="subscription-cabinet-panel" role="tabpanel" id="cabinet-panel-devices" aria-labelledby="cabinet-tab-devices" data-cabinet-panel="devices" hidden>
-        <header class="subscription-cabinet-section-heading"><div><span class="cabinet-eyebrow" id="cabinet-devices-kicker">ВАШИ УСТРОЙСТВА</span><h2 id="cabinet-devices-heading">Управление подключениями</h2><p id="cabinet-devices-note">Число привязанных устройств и доступный лимит.</p></div></header>
+        <header class="subscription-cabinet-section-heading"><div><h2 id="cabinet-devices-heading">Управление подключениями</h2><p id="cabinet-devices-note">Число привязанных устройств и доступный лимит.</p></div></header>
         <div class="subscription-cabinet-device-card"><span class="cabinet-device-emblem" aria-hidden="true">▣</span>{{DEVICE_INFO}}</div>
       </section>
 
       <section class="subscription-cabinet-panel" role="tabpanel" id="cabinet-panel-support" aria-labelledby="cabinet-tab-support" data-cabinet-panel="support" hidden>
-        <header class="subscription-cabinet-section-heading"><div><span class="cabinet-eyebrow" id="cabinet-support-kicker">ПОМОЩЬ</span><h2 id="cabinet-support-heading">Мы рядом, когда нужна помощь</h2><p id="cabinet-support-note">Свяжитесь со службой поддержки по указанному каналу.</p></div></header>
+        <header class="subscription-cabinet-section-heading"><div><h2 id="cabinet-support-heading">Мы рядом, когда нужна помощь</h2><p id="cabinet-support-note">Свяжитесь со службой поддержки по указанному каналу.</p></div></header>
         <div class="subscription-cabinet-support-card"><span class="cabinet-support-emblem" aria-hidden="true">✳</span>{{SUPPORT}}</div>
       </section>
     </div>
