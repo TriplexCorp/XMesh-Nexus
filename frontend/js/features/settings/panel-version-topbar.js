@@ -113,7 +113,8 @@
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&open){toggle(false);trigger.focus()}
   });
-  const languageObserver=new MutationObserver(()=>render());
-  languageObserver.observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
+  // Listen to the app's explicit locale event: watching <html lang> causes
+  // a feedback loop with the global i18n translator's DOM mutation handler.
+  document.addEventListener('xmesh:locale-changed',render);
   window.XMeshPanelVersion={init};
 })();
