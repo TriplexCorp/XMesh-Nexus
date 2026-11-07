@@ -72,8 +72,7 @@
 .subscription-preview-meta>div,
 .subscription-public-access-panel,
 .subscription-public-info-panel,
-.subscription-preview-apps,
-.subscription-public-catalog{
+.subscription-preview-apps{
   border:1px solid var(--portal-line);
   border-radius:calc(var(--portal-radius,20px)*.72);
   background:color-mix(in srgb,var(--portal-surface) 94%,transparent);
@@ -114,11 +113,10 @@
   color:var(--portal-text,#ecf3f6);
   text-decoration:none;
 }
-.subscription-preview-apps,
-.subscription-public-catalog{padding:.9rem}
+.subscription-preview-apps{padding:.9rem}
 .subscription-preview-apps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem}
 .subscription-preview-app,
-.subscription-public-catalog .subscription-preview-app{
+.subscription-preview-app{
   min-width:0;
   padding:.65rem .75rem;
   border:1px solid var(--portal-line);
@@ -128,35 +126,10 @@
 }
 a.subscription-preview-app:hover{border-color:var(--portal-line-strong);background:color-mix(in srgb,var(--portal-accent,#61d5e7) 6%,var(--portal-surface));transform:translateY(-1px)}
 
-/* Live portal: use the same surface at a useful desktop width instead of a
- * small centered card floating in a mostly empty page. */
-.subscription-public .subscription-public-shell{
-  min-height:100dvh;
-  display:flex;
-  align-items:flex-start;
-  justify-content:center;
-  padding:clamp(1rem,3vw,3rem);
-}
-.subscription-public .subscription-preview{width:min(100%,78rem);margin-inline:auto}
-.subscription-public .subscription-public-workspace{display:grid;gap:1rem}
-.subscription-public .subscription-public-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(17rem,.72fr);gap:1rem;align-items:stretch}
-.subscription-public .subscription-public-access-panel,
-.subscription-public .subscription-public-info-panel{padding:1rem;min-width:0}
-.subscription-public .subscription-public-panel-title{display:flex;align-items:center;gap:.65rem;margin-bottom:.85rem}
-.subscription-public .subscription-public-status-stack{display:grid;gap:.65rem}
-.subscription-public .subscription-public-link-card{margin-top:.75rem;padding:.8rem;border:1px solid var(--portal-line);border-radius:.7rem;background:color-mix(in srgb,var(--portal-bg,#0c131b) 48%,transparent)}
-.subscription-public .subscription-public-catalog{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
-.subscription-public .subscription-preview-app{display:grid;gap:.18rem;text-decoration:none;color:inherit}
-.subscription-public footer{padding-top:.2rem;color:var(--portal-muted);font-size:.68rem;text-align:center}
+/* The public portal's grid, shell and responsive rules live exclusively in
+ * subscription-public.css. Never define them here: this shared stylesheet is
+ * also loaded by Subscription Studio and used to override the real catalog,
+ * turning the catalog wrapper into a three-column grid with one tiny child.
+ */
 
-@media(max-width:820px){
-  .subscription-public .subscription-public-grid{grid-template-columns:minmax(0,1fr)}
-  .subscription-public .subscription-public-catalog{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media(max-width:560px){
-  .subscription-preview{padding:1rem;border-radius:1rem}
-  .subscription-preview-meta{grid-template-columns:minmax(0,1fr)}
-  .subscription-preview-apps,.subscription-public .subscription-public-catalog{grid-template-columns:minmax(0,1fr)}
-  .subscription-public .subscription-public-shell{padding:.6rem}
-}
 @media(prefers-reduced-motion:reduce){a.subscription-preview-app{transition:none}}
