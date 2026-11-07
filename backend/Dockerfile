@@ -11,12 +11,14 @@ COPY backend/src ./src
 COPY backend/migrations ./migrations
 # Keep dependency downloads and compiled artifacts between Docker builds.
 # Mounting target as a cache requires copying the final binary outside it.
+# Resolve provenance in its own step: the checkout bind is gone before Cargo
+# executes dependency build scripts or proc macros.
 RUN --mount=type=bind,source=.,target=/source,readonly \
-    --mount=type=cache,id=xmesh-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    sh /source/scripts/resolve-panel-build-revision.sh "$PANEL_BUILD_REVISION" /source > /build/PANEL_BUILD_REVISION
+RUN --mount=type=cache,id=xmesh-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=xmesh-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=xmesh-cargo-target,target=/build/backend/target,sharing=locked \
-    revision="$(sh /source/scripts/resolve-panel-build-revision.sh "$PANEL_BUILD_REVISION" /source)" \
-    && PANEL_BUILD_REVISION="$revision" cargo build --release \
+    PANEL_BUILD_REVISION="$(cat /build/PANEL_BUILD_REVISION)" cargo build --release \
     && mkdir -p /build/output \
     && cp target/release/xmesh-api /build/output/xmesh-api
 
