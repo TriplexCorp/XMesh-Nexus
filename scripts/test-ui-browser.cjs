@@ -392,12 +392,12 @@ async function main() {
           const search=el.querySelector('[data-host-search]').getBoundingClientRect();
           const create=el.querySelector('[data-ne="hosts"]').getBoundingClientRect();
           return{left:toolbar.left,right:toolbar.right,contentLeft,searchLeft:search.left,
-            searchRight:search.right,searchTop:search.top,createTop:create.top,
+            searchRight:search.right,searchMid:(search.top+search.bottom)/2,createMid:(create.top+create.bottom)/2,
             createLeft:create.left,createRight:create.right,viewport:window.innerWidth};
         });
         assert(g.left>=0&&g.right<=g.viewport+1,'Hosts toolbar must stay inside viewport');
         assert(Math.abs(g.searchLeft-g.contentLeft)<2,'Hosts search must align with the left content edge, including designed padding');
-        assert(Math.abs(g.searchTop-g.createTop)<3,'Hosts search and creation must share the leading toolbar row');
+        assert(Math.abs(g.searchMid-g.createMid)<3,'Hosts search and creation must share the leading toolbar row');
         assert(g.searchRight<g.createLeft,'Hosts creation must stay to the right of search');
         assert(g.createRight<=g.right+1,'Hosts create must stay inside toolbar');
       }
@@ -442,13 +442,13 @@ async function main() {
           const input=el.querySelector('[data-squad-search]').getBoundingClientRect();
           const create=el.querySelector('[data-ne="squads"]').getBoundingClientRect();
           return {bounds:{left:bounds.left,right:bounds.right},contentLeft,
-            input:{left:input.left,right:input.right,top:input.top},
-            create:{left:create.left,right:create.right,top:create.top},
+            input:{left:input.left,right:input.right,mid:(input.top+input.bottom)/2},
+            create:{left:create.left,right:create.right,mid:(create.top+create.bottom)/2},
             viewport:window.innerWidth};
         });
         assert(layout.bounds.left>=0&&layout.bounds.right<=layout.viewport+1,'Squad toolbar must fit viewport');
         assert(Math.abs(layout.input.left-layout.contentLeft)<2,'Squads search must align with the left content edge, including designed padding');
-        assert(Math.abs(layout.input.top-layout.create.top)<3,'Squads search and creation must share the leading toolbar row');
+        assert(Math.abs(layout.input.mid-layout.create.mid)<3,'Squads search and creation must share the leading toolbar row');
         assert(layout.input.right<layout.create.left,'Squads create must remain to the right of search');
         assert(layout.create.right<=layout.bounds.right+1,'Squads create must remain inside toolbar');
       }
