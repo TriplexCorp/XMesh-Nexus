@@ -80,12 +80,14 @@
     const used=Number(metric.dataset.usedGib),limit=Number(metric.dataset.limitGib);
     if(metric.hasAttribute('data-used-gib')&&Number.isFinite(used)&&Number.isFinite(limit)){
       const fmt=n=>new Intl.NumberFormat(language==='en'?'en-GB':'ru-RU',{maximumFractionDigits:2}).format(n)+' '+(language==='en'?'GB':'ГБ');
-      const combined=metric.querySelector('b');combined.classList.add('portal-usage-total');
+      const combined=metric.querySelector('b');combined.classList.add('portal-usage-total');combined.hidden=limit<=0;
       combined.textContent=limit>0?new Intl.NumberFormat(language,{maximumFractionDigits:1}).format(Math.min(100,used/limit*100))+'%':(language==='en'?'Unlimited':'Без лимита');
       const allowance=document.createElement('p');allowance.className='portal-usage-allowance';
-      allowance.textContent=language==='en'?'Limit: '+(limit>0?fmt(limit):'Unlimited'):'Лимит: '+(limit>0?fmt(limit):'Без лимита');
+      allowance.textContent=limit>0?(language==='en'?'Limit: ':'Лимит: ')+fmt(limit):(language==='en'?'Unlimited':'Без лимита');
       const breakdown=document.createElement('div');breakdown.className='portal-usage-breakdown';
-      for(const [label,amount] of [[language==='en'?'Used':'Использовано',fmt(used)],[language==='en'?'Remaining':'Осталось',limit>0?fmt(Math.max(0,limit-used)):(language==='en'?'Unlimited':'Без лимита')]]){
+      const fields=[[language==='en'?'Used':'Использовано',fmt(used)]];
+      if(limit>0)fields.push([language==='en'?'Remaining':'Осталось',fmt(Math.max(0,limit-used))]);
+      for(const [label,amount] of fields){
         const field=document.createElement('div'),small=document.createElement('small'),bold=document.createElement('b');small.textContent=label;bold.textContent=amount;field.append(small,bold);breakdown.append(field);
       }
       metric.append(allowance,breakdown);
@@ -203,7 +205,6 @@
   document.getElementById('copy-link')?.remove();
   document.getElementById('toggle-devices')?.remove();
   const heading=document.querySelector('.subscription-preview-hero h1');
-  const status=document.querySelector('.subscription-preview-ok');
   if(heading&&/^(Подписка (не)?активна|Subscription (in)?active)$/i.test(heading.textContent.trim()))heading.textContent=copy.brandNote;
   const guide=document.querySelector('.portal-quickstart');if(guide)guide.hidden=!available.connect;
   const description=document.querySelector('.subscription-preview-hero p');

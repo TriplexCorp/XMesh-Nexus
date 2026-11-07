@@ -126,6 +126,8 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 .subscription-public .portal-usage-allowance{grid-column:1/-1;margin:0;color:var(--cabinet-muted);font-size:15px}
 .subscription-public .portal-usage-breakdown{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
 .subscription-public .portal-usage-breakdown>div{display:grid;align-content:start;gap:4px;padding:14px 16px;border:1px solid var(--cabinet-line);border-radius:calc(var(--portal-radius)*.65);background:var(--cabinet-wash);min-width:0}
+.subscription-public .portal-usage-breakdown>div:only-child{grid-column:1/-1}
+.subscription-public .subscription-preview-meta>[data-subscription-traffic]>b:not(.portal-usage-total){grid-column:1/-1}
 .subscription-public .portal-usage-breakdown small{font-size:14px}
 .subscription-public .portal-usage-breakdown b{font-size:24px}
 .subscription-public [data-subscription-expiry]{grid-column:1;grid-row:2;justify-content:center;min-height:188px}
