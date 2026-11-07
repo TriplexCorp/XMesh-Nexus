@@ -745,7 +745,7 @@ let tt;const toast=(m,al,fn)=>{
   t.style.removeProperty('--toast-left');
  }
  void t.offsetWidth;t.classList.add('show');
- clearTimeout(tt);tt=setTimeout(close,al?6000:C.toastDuration*1000);
+ clearTimeout(tt);tt=setTimeout(close,al?Math.max(10000,(C.toastDuration+2)*1000):C.toastDuration*1000);
 };
 const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,contentWidth:1920,gapScale:1,autoCoreRefresh:1,coreRefreshSeconds:30,contrast:'standard',linkStyle:'standard',lineSpacing:'normal',tabularNums:0,followReducedMotion:1,stickyTopbar:0,navCounter:1,startPage:'home',toastDuration:4,toastPosition:'center'};
 let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;C.ts=cl(Number(C.ts)||1,.9,2);C.radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);// Remove legacy split-text preferences: the unified interface scale controls text and UI together.
@@ -4546,16 +4546,16 @@ function securityP(){
 /* ================= НАСТРОЙКИ ================= */
 // Subpages reuse existing inputs and save actions rather than inventing parallel forms.
 const SETTINGS_PAGES=Object.freeze([
- ['general','Общие','Отдельные названия и домены панели управления и подписки','sliders'],
+ ['general','Общие','Брендинг, домены и персональные параметры навигации','sliders'],
  ['colors','Цвет и тема','Основная палитра интерфейса и брендовые акценты','sun'],
  ['layout','Композиция','Плотность, радиусы и вид карточек','layers'],
- ['typography','Текст и эффекты','Размер и начертание текста','pen'],
- ['integrations','Интеграции','События, о которых панель сообщает во внешние сервисы','link'],
+ ['typography','Текст и эффекты','Читаемость, шрифты и настройки движения','pen'],
+ ['integrations','Интеграции','События и уведомления интерфейса','link'],
  ['system','Ядро и обновления','Установка и обновление бинарника ядра на сервере панели','server'],
  ['traffic','Лимиты CDN','Общая группа ограниченных inbound для пользователей','cloud'],
  ['security','Безопасность','Авторизация, двухфакторная защита, сессии и аудит','shield-check'],
  ['admins','Администраторы','Управление доступом сотрудников панели','shield'],
- ['data','Данные панели','Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.','file']
+ ['data','Данные панели','Экспорт данных и перенос персонального оформления','file']
 ]);
 function settingsPagesForSession(){
  return SETTINGS_PAGES.filter(([key])=>key!=='admins'||sessionUser?.role==='owner');
@@ -5397,7 +5397,7 @@ the old node will lose access. Cancel and create a new Node ID if both must work
     const a=document.createElement('a');a.href=url;a.download='xmesh-appearance.json';a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
-  else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
+  else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-snapshot.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
   else if(b=g('[data-panel-update-status]')){
     b.disabled=true;
@@ -5582,7 +5582,7 @@ document.addEventListener('change',async e=>{const t=e.target;
       const payload=JSON.parse(await file.text());
       if(payload?.schema!=='xmesh-appearance-v1'||!payload.settings||typeof payload.settings!=='object'||Array.isArray(payload.settings))
         throw Error('Неверный формат файла оформления.');
-      const raw=payload.settings,old=C,next={...CDEFAULT};
+      const raw=payload.settings,next={...CDEFAULT};
       const hex=/^#[0-9a-f]{6}$/i;
       const allowedAccent=['emerald','ocean','amber','rose','violet','cyan','ruby','sapphire','teal','coral','indigo','copper','glacier','graphite','lime','terracotta','orchid','aurora','sakura','storm','flame','sage','midnight','tropical','custom'];
       const allowedFont=['onest','inter','golos','rubik','nunito','plex','roboto','pt','montserrat','ubuntu','opensans','source','fira','jost','system','mono'];
