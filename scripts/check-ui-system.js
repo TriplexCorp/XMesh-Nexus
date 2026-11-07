@@ -122,8 +122,24 @@ assert.match(app,/input\.value=key==='fp'\?'chrome':''/,
  'Resetting Host overrides must leave the single chrome choice selected');
 
 // Settings navigation is a real hash-routed workspace, not a hidden long page.
-for(const name of ['general','colors','layout','typography','integrations','system','data'])
+for(const name of ['general','colors','layout','typography','integrations','system','data','admins','security'])
  assert(app.includes("'"+name+"'"),'Settings subpage missing: '+name);
+const nav=app.slice(app.indexOf('const NAV='),app.indexOf('const FLAT='));
+assert(!nav.includes("['admins'")&&!nav.includes("['security'"),
+ 'Admin and Security must be removed from the top-level sidebar');
+assert(nav.includes("['set','sliders','Настройки']"),
+ 'Settings must remain the single System navigation entry');
+assert.match(app,/settingsPagesForSession\(\)/,'Settings navigation must be filtered by role');
+assert.match(app,/key!=='admins'\|\|sessionUser\?\.role==='owner'/,
+ 'Non-owners must not see the Administrators subpage');
+assert.match(app,/route==='set\/admins'&&sessionUser\?\.role!=='owner'/,
+ 'Deep link to Administrators must be blocked for non-owners');
+assert.match(app,/settingsPage==='security'\?securityP\(\)/,
+ 'Settings must reuse the original dedicated Security workspace');
+assert.match(app,/settingsPage==='admins'\?await simple\(\['admins'\]\)/,
+ 'Settings must reuse the original Administrators editor');
+assert.match(app,/history\.replaceState\(history\.state,\x27\x27,location\.pathname\+location\.search\+\x27#set\/\x27\+route\)/,
+ 'Legacy Security/Admins direct links must be retained');
 assert.match(app,/route\.startsWith\('set\/'\)\?'set':route/,'Settings deep links must share the authorized settings page');
 assert.match(app,/function settingsPageFromHash\(\)/,'Settings subpage must survive a reload');
 assert.match(app,/source\.content\.querySelectorAll\('\[data-settings-group\]'\)/,'Only active settings cards should be mounted');
@@ -133,6 +149,8 @@ assert.match(app,/location\.hash='set\/system'/,'Xray-core rail action must open
 const settingsCss=read('frontend/styles/features/settings/settings.css');
 assert.match(settingsCss,/\.settings-center-rail\{/,'Settings must have a secondary navigation rail');
 assert.match(settingsCss,/@container settings-workspace \(max-width:70rem\)/,'Settings navigation must reflow at narrow sizes');
+assert.match(settingsCss,/width:100%;max-width:none;margin:0/,'Settings should use the full available width and left alignment');
+assert.match(settingsCss,/\.settings-center-embedded/,'Dedicated feature screens should mount inside the Settings workspace');
 
 // Catalog controls must remain a reusable interaction surface, not five forks.
 assert.match(app,/function workspaceGridControls\(kind\)/,'Catalog density controls must be shared');
