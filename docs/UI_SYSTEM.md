@@ -370,6 +370,29 @@ is collapsed. Native HTML disclosure semantics, keyboard focus and existing
 Nexus Classic/Glass/Raised tokens apply. Do not change membership or
 persisted Squad data to achieve visual compactness.
 
+### Settings center: navigable subpages
+
+- `#set` opens General. The sections `#set/general`, `#set/colors`,
+  `#set/layout`, `#set/typography`, `#set/integrations`,
+  `#set/system` and `#set/data` are real hash destinations: browser refresh,
+  Back/Forward and direct links must retain the selected section.
+- The secondary navigation is a shared Settings shell. It does not create a
+  second global rail or duplicate Security Center / Subscription Studio:
+  those remain independent, linked destinations.
+- Each subpage mounts **only its own existing setting cards** in a responsive
+  one- or two-column workspace. Do not restore the former kilometer-long
+  settings page, empty placeholder panels or fake save controls.
+- Appearance choices save with the existing browser-local behavior; brand
+  fields save through their existing form; webhook toggles persist immediately.
+  Xray-core and panel-update operations retain their authenticated backend
+  handlers. Fetch core/update metadata only while the System subpage is open.
+- Keep existing field IDs, card identifiers, `data-ui` contracts and focus
+  semantics intact. Deep links from the version rail and update actions must
+  target the System subpage; destructive actions remain separately authorized.
+- The shell and cards inherit `nexus-v3` material, density and spacing tokens.
+  Secondary navigation must remain usable on narrow/mobile viewports and must
+  not create horizontal document overflow.
+
 ### Catalog toolbars and collection actions
 
 **Nodes is the reference composition for catalog controls.** Squads, Hosts,
