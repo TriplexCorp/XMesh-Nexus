@@ -1963,6 +1963,7 @@ window.XMeshI18n=(()=>{
   "Управление доступом": "Manage access",
   "Добавьте подписку в VPN-приложение по ссылке или QR-коду.": "Add your subscription to a VPN app using the link or QR code.",
   "Скопируйте ссылку": "Copy your link",
+  "В VPN-приложении выберите «Добавить подписку» или отсканируйте QR-код.": "In your VPN app, choose “Add subscription” or scan the QR code.",
   "Подключение в три шага": "Connect in three steps",
   "Скопируйте ссылку выше": "Copy your link above",
   "Откройте VPN-приложение": "Open your VPN app",

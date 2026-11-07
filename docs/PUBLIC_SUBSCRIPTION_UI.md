@@ -2,8 +2,7 @@
 
 The single page prioritizes four account blocks: identity/status, actual usage,
 expiry, and access management. On desktop they form a two-column dashboard;
-on phones, copy and QR follow the status immediately. A short import guide sits
-below the dashboard. The application catalog is a native collapsed disclosure,
+on phones, copy and QR follow the status immediately. A single import hint lives beside the copy/QR actions; there is no repeated step guide. The application catalog is a native collapsed disclosure,
 with automatic platform detection and manual filters. There are no section tabs.
 
 Used/remaining values come from numeric server-rendered GiB attributes. Remaining

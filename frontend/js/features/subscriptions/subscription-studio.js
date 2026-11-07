@@ -361,33 +361,9 @@ window.XMeshSubscriptionStudio = (() => {
       '</section>',
       '</div>',
       '<div class="subscription-public-workspace">',
-      '<section class="portal-quickstart">',
-      '<h2 id="portal-quickstart-title">Как подключиться</h2>',
-      '<ol>',
-      '<li>',
-      '<span aria-hidden="true">01</span>',
-      '<b id="portal-guide-copy">Скопируйте ссылку</b>',
-      '</li>',
-      '<li>',
-      '<span aria-hidden="true">02</span>',
-      '<b id="portal-guide-app">Откройте VPN-приложение</b>',
-      '</li>',
-      '<li>',
-      '<span aria-hidden="true">03</span>',
-      '<b id="portal-guide-import">Добавьте подписку по ссылке</b>',
-      '</li>',
-      '</ol>',
-      '<p id="portal-guide-finish">После добавления включите подключение в приложении.</p>',
-      '</section>',
       '<section class="subscription-cabinet-panel" id="cabinet-panel-apps" data-setup-section="apps">',
       '<details class="portal-app-disclosure">',
       '<summary id="portal-app-disclosure-label">Нужно установить приложение?</summary>',
-      '<header class="subscription-cabinet-section-heading">',
-      '<div>',
-      '<h2 id="cabinet-apps-heading" tabindex="-1">Приложения для подключения</h2>',
-      '<p id="cabinet-apps-note">Выберите устройство. Нажмите на приложение, чтобы установить его.</p>',
-      '</div>',
-      '</header>',
       '<div class="subscription-cabinet-app-tools">',
       '<div class="subscription-cabinet-filters" role="group" aria-label="Фильтр платформ" data-preview-platform-filters="">',
       '<button type="button" data-app-filter="all" aria-pressed="true">Все</button>',
@@ -457,7 +433,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=6fc2d828fd52',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=aff218a70f5f'
+        '/subscription-public.css?v=c1d8861af844'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
@@ -685,8 +661,8 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-preview-remaining-label]').textContent=english?'Remaining':'Осталось';
         $('[data-preview-used]').textContent=english?'12.4 GB':'12,4 ГБ';
         $('[data-preview-remaining]').textContent=english?'87.6 GB':'87,6 ГБ';
-        $('[data-preview-endpoint-label]').textContent=english?'Manage access':'Управление доступом';
-        $('[data-preview-endpoint-note]').textContent=english?'Add your subscription to a VPN app using the link or QR code.':'Добавьте подписку в VPN-приложение по ссылке или QR-коду.';
+        $('[data-preview-endpoint-label]').textContent=english?'Connect':'Подключение';
+        $('[data-preview-endpoint-note]').textContent=english?'In your VPN app, choose “Add subscription” or scan the QR code.':'В VPN-приложении выберите «Добавить подписку» или отсканируйте QR-код.';
         $('[data-preview-status-label]').textContent=english?'Subscription status':'Статус подписки';
         $('[data-preview-status-note]').textContent=english?'Traffic and validity':'Трафик и срок действия';
         $('[data-subscription-ok]').textContent=english?'● Active':'● Активна';
@@ -706,8 +682,8 @@ window.XMeshSubscriptionStudio = (() => {
         if(sampleUsage)sampleUsage.textContent=english?'12.4%':'12,4%';
         if(sampleDate)sampleDate.textContent=english?'Dec 31, 2026':'31.12.2026';
         $('[data-subscription-connect]').textContent=(english?d.subscriptionCtaEn:d.subscriptionCta)||copy[3];
-        if(['Connect','Подключиться'].includes($('[data-subscription-connect]').textContent.trim()))$('[data-subscription-connect]').textContent=english?'Copy subscription link':'Скопировать ссылку';
-        $('[data-subscription-qr]').textContent=english?'Show QR code':'Показать QR-код';
+        if(['Connect','Подключиться'].includes($('[data-subscription-connect]').textContent.trim()))$('[data-subscription-connect]').textContent=english?'Copy':'Копировать';
+        $('[data-subscription-qr]').textContent=english?'QR code':'QR-код';
         $('[data-subscription-footer]').textContent=english?d.subscriptionFooterEn:d.subscriptionFooter;
         $('[data-subscription-traffic]').hidden=!d.subscriptionShowTraffic;
         $('[data-subscription-expiry]').hidden=!d.subscriptionShowExpiry;
