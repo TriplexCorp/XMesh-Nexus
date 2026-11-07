@@ -63,8 +63,8 @@ body.subscription-public{
   box-shadow:0 0 0 1px color-mix(in srgb,var(--portal-text) 7%,transparent),0 8px 22px -12px var(--portal-accent);
 }
 .subscription-public .subscription-public-brand-copy{display:grid;gap:1px;min-width:0}
-.subscription-public-brand-copy>b{font-size:14px;line-height:1.3;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.subscription-public-brand-copy>small{font-size:10px;line-height:1.35;color:var(--portal-muted);letter-spacing:.035em;text-transform:uppercase}
+.subscription-public-brand-copy>b{font-size:16px;line-height:1.3;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.subscription-public-brand-copy>small{font-size:13.5px;line-height:1.4;color:var(--portal-muted);letter-spacing:.025em;text-transform:uppercase}
 .subscription-public .subscription-preview-languages{
   margin-left:auto;
   display:flex;
@@ -107,7 +107,7 @@ body.subscription-public{
   border-radius:999px;
   background:color-mix(in srgb,var(--portal-accent) 7%,transparent);
   color:color-mix(in srgb,var(--portal-text) 88%,var(--portal-accent));
-  font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  font-size:12px;font-weight:780;letter-spacing:.035em;text-transform:uppercase;
 }
 .subscription-public .subscription-preview-hero h3{
   margin:0;
@@ -121,8 +121,8 @@ body.subscription-public{
   margin:1px 0 0;
   max-width:72ch;
   color:color-mix(in srgb,var(--portal-text) 64%,transparent);
-  font-size:13px;
-  line-height:1.7;
+  font-size:15px;
+  line-height:1.6;
 }
 .subscription-public .subscription-public-hero-accent{display:flex;align-items:flex-end;gap:6px;padding:0 4px 5px 0;opacity:.72}
 .subscription-public-hero-accent i{display:block;width:5px;border-radius:999px;background:color-mix(in srgb,var(--portal-accent) 78%,var(--portal-text));box-shadow:0 0 22px -8px var(--portal-accent)}
@@ -185,8 +185,8 @@ body.subscription-public{
 .subscription-public-panel-icon.is-status::before{left:9px;top:9px;width:14px;height:14px;border:1.5px solid var(--portal-accent);border-radius:50%}
 .subscription-public-panel-icon.is-status::after{left:15px;top:13px;width:2px;height:7px;border-radius:2px;background:var(--portal-accent);box-shadow:0 4px 0 -0.5px var(--portal-accent)}
 .subscription-public-panel-title>div{display:grid;gap:2px;min-width:0}
-.subscription-public-panel-title b{font-size:13px;line-height:1.35;letter-spacing:-.012em}
-.subscription-public-panel-title small{font-size:10.5px;line-height:1.45;color:var(--portal-muted)}
+.subscription-public-panel-title b{font-size:16px;line-height:1.35;letter-spacing:-.012em}
+.subscription-public-panel-title small{font-size:12px;line-height:1.5;color:var(--portal-muted)}
 
 /* Primary subscription action */
 .subscription-public .subscription-public-primary-action{display:block}
@@ -201,7 +201,7 @@ body.subscription-public{
   color:#0c151d;
   box-shadow:0 18px 32px -24px var(--portal-accent),0 1px 0 rgba(255,255,255,.34) inset;
   text-align:center;text-decoration:none;
-  font:inherit;font-size:13px;font-weight:850;letter-spacing:-.005em;
+  font:inherit;font-size:15px;font-weight:810;letter-spacing:-.005em;
   cursor:pointer;
   transition:transform .15s,filter .15s,box-shadow .15s;
 }
@@ -221,7 +221,7 @@ body.subscription-public{
 .subscription-public-link-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
 .subscription-public-link-card-head>div{display:grid;gap:2px;min-width:0}
 .subscription-public-link-card-head b{font-size:11.5px;line-height:1.35}
-.subscription-public-link-card-head small{max-width:72ch;font-size:10px;line-height:1.5;color:var(--portal-muted)}
+.subscription-public-link-card-head small{max-width:72ch;font-size:12px;line-height:1.5;color:var(--portal-muted)}
 .subscription-public-link-card em{
   flex:none;font-style:normal;
   padding:5px 7px;
@@ -239,7 +239,7 @@ body.subscription-public{
   border-radius:9px;
   background:color-mix(in srgb,var(--portal-bg) 88%,transparent);
   color:color-mix(in srgb,var(--portal-text) 86%,var(--portal-accent));
-  font:600 11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;
+  font:600 12.5px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
 }
 .subscription-public-action-status{min-height:1em;margin:0;color:var(--portal-muted);font-size:9.5px;line-height:1.3}
 
@@ -256,7 +256,7 @@ body.subscription-public{
   border-radius:10px;
   background:color-mix(in srgb,var(--portal-text) 1.5%,transparent);
   color:color-mix(in srgb,var(--portal-text) 85%,transparent);
-  font:inherit;font-size:10.5px;font-weight:760;
+  font:inherit;font-size:12.5px;font-weight:740;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   cursor:pointer;
   transition:border-color .15s,background .15s,color .15s,transform .15s;
@@ -276,7 +276,7 @@ body.subscription-public{
   border:1px solid var(--portal-soft-border);border-radius:10px;
   background:color-mix(in srgb,var(--portal-bg) 62%,transparent);
   color:color-mix(in srgb,var(--portal-text) 72%,transparent);
-  font-size:10.5px;line-height:1.5;overflow-wrap:anywhere;
+  font-size:12px;line-height:1.5;overflow-wrap:anywhere;
 }
 
 /* Operational status rail */
@@ -295,8 +295,8 @@ body.subscription-public{
   background:color-mix(in srgb,var(--portal-bg) 57%,transparent);
 }
 .subscription-public .subscription-preview-meta>div:first-child{grid-column:1/-1}
-.subscription-public .subscription-preview-meta small{font-size:9.5px;line-height:1.35;color:var(--portal-muted);text-transform:uppercase;letter-spacing:.055em}
-.subscription-public .subscription-preview-meta b{font-size:14px;line-height:1.35;letter-spacing:-.02em;overflow-wrap:anywhere}
+.subscription-public .subscription-preview-meta small{font-size:11.5px;line-height:1.35;color:var(--portal-muted);text-transform:uppercase;letter-spacing:.055em}
+.subscription-public .subscription-preview-meta b{font-size:16px;line-height:1.35;letter-spacing:-.02em;overflow-wrap:anywhere}
 .subscription-public .subscription-preview-progress{height:4px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--portal-text) 9%,transparent)}
 .subscription-public .subscription-preview-progress i{display:block;height:100%;border-radius:inherit;background:var(--portal-accent);box-shadow:0 0 14px color-mix(in srgb,var(--portal-accent) 30%,transparent)}
 .subscription-public .subscription-preview-support{
