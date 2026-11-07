@@ -1537,7 +1537,12 @@ struct PortalDecoration<'a> {
     logo_brand: &'a str,
 }
 
-fn portal_decoration(settings: &Value, en: bool, active: bool, waiting: bool) -> PortalDecoration<'_> {
+fn portal_decoration(
+    settings: &Value,
+    en: bool,
+    active: bool,
+    waiting: bool,
+) -> PortalDecoration<'_> {
     let support = if studio_enabled(settings, "subscriptionShowSupport", false) {
         let url = studio_string(settings, "subscriptionSupportUrl", "");
         let label = escape_html(studio_string(
@@ -1831,8 +1836,8 @@ pub async fn portal(
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX);
-    let waiting = crate::user_status(&user, now) == "ON_HOLD"
-        && crate::user_can_connect(&user, now);
+    let waiting =
+        crate::user_status(&user, now) == "ON_HOLD" && crate::user_can_connect(&user, now);
     let active = crate::user_can_connect(&user, now);
     let settings = crate::read_settings(&state.pool).await?;
     let lang = if options.get("lang").is_some_and(|s| s == "en") {
