@@ -299,6 +299,34 @@ See `FINALMASK_COMPATIBILITY.md` for the compatibility matrix.
 
 ## 7. Subscription system
 
+### First-connection subscription start (ON_HOLD)
+
+The **start counting after first connection** option creates a user with
+`hold=true`, a finite `holdDays` duration and no initial expiry date.
+A valid waiting subscriber **may import their private HTTPS subscription
+into Happ** or another supported client: the public feed returns HTTP 200
+and the signed Xray desired configuration contains their authorized account.
+Downloading the feed, opening the portal or showing its QR code does not
+start the countdown.
+
+The backend starts the duration only on **accepted, authenticated, positive,
+per-user Xray traffic evidence**. A newly created waiting account can start
+on its first nonzero signed observation; a zero-only baseline, unchanged counter,
+stale/replayed report, disabled account or
+exhausted quota does not activate an account. The transition is atomic and
+one-shot: `hold=false`, `firstConnectedAt` and `expireAt` are written
+together from the verified timestamp. Further updates never reset this
+starting point. Before activation, the node does not receive an offline
+spending allowance for the waiting subscriber: signed online telemetry is
+required to begin their access.
+
+Disabled, expired, over-quota and invalid-duration subscriptions still
+return HTTP 403. If a waiting subscription has no publishable Hosts,
+the valid feed is HTTP 200 with an empty native JSON array (`[]`) — the
+administrator must publish Hosts and synchronize node configuration.
+
+
+
 The subscription subsystem converts managed state into client-consumable output.
 
 ### Token lifecycle

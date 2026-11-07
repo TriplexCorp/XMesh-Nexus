@@ -2610,6 +2610,90 @@ async fn persist_verified_traffic_deltas(
     Ok(())
 }
 
+async fn activate_waiting_users_on_traffic(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    samples: &Value,
+    sampled_at: i64,
+    source_ms: i64,
+) -> Result<(), ApiError> {
+    // Only authenticated, accepted, positive per-user traffic starts the
+    // timer. Imports and zero-only initial counter baselines cannot.
+    // A conditional update ensures idempotence across parallel nodes.
+    let activated = sqlx::query(
+        "WITH genuine_delta AS (
+            SELECT DISTINCT sample.user_id,
+                (previous.user_id IS NULL) AS first_observation
+            FROM jsonb_to_recordset($2::jsonb)
+                AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+            LEFT JOIN user_node_traffic_totals AS previous
+              ON previous.node_id=$1 AND previous.user_id=sample.user_id
+            WHERE (
+                previous.user_id IS NOT NULL
+                AND sample.uplink_bytes >= previous.last_uplink_bytes
+                AND sample.downlink_bytes >= previous.last_downlink_bytes
+                AND (sample.uplink_bytes > previous.last_uplink_bytes
+                     OR sample.downlink_bytes > previous.last_downlink_bytes)
+            ) OR (
+                previous.user_id IS NULL
+                AND (sample.uplink_bytes > 0 OR sample.downlink_bytes > 0)
+            )
+         ), eligible AS (
+            SELECT u.id,
+                CASE WHEN (u.data->>'holdDays') ~ '^[0-9]{1,4}$'
+                     THEN (u.data->>'holdDays')::BIGINT ELSE 0 END AS days,
+                CASE WHEN (u.data->>'expireAt') ~ '^-?[0-9]{1,16}$'
+                     THEN (u.data->>'expireAt')::BIGINT ELSE 0 END AS expiry,
+                CASE WHEN jsonb_typeof(u.data->'limit')='number'
+                     THEN (u.data->>'limit')::NUMERIC ELSE 0 END AS quota,
+                CASE WHEN jsonb_typeof(u.data->'used')='number'
+                     THEN (u.data->>'used')::NUMERIC ELSE 0 END AS consumed
+            FROM panel_records AS u
+            JOIN genuine_delta AS sample ON sample.user_id=u.id
+            WHERE u.collection='users'
+              AND u.data->>'hold'='true'
+              AND u.data->>'disabled' IS DISTINCT FROM 'true'
+              AND (
+                 NOT sample.first_observation
+                 OR (
+                   u.data->>'firstConnectedAt' IS NULL
+                   AND COALESCE(u.data->>'onlineAt','0')='0'
+                 )
+              )
+         )
+         UPDATE panel_records AS u
+         SET data=u.data || jsonb_build_object(
+             'hold',false,
+             'firstConnectedAt',LEAST($3::BIGINT,$4::BIGINT),
+             'onlineAt',LEAST($3::BIGINT,$4::BIGINT),
+             'expireAt',LEAST($3::BIGINT,$4::BIGINT)
+                   + eligible.days * 86400000::BIGINT),
+             updated_at=NOW()
+         FROM eligible
+         WHERE u.collection='users' AND u.id=eligible.id
+           AND eligible.days BETWEEN 1 AND 3650
+           AND (eligible.quota<=0 OR eligible.consumed<eligible.quota)
+           AND (eligible.expiry<=0 OR eligible.expiry>=$3::BIGINT)
+           AND u.data->>'hold'='true'
+           AND u.data->>'firstConnectedAt' IS NULL
+         RETURNING u.id",
+    )
+    .bind(node_id)
+    .bind(samples)
+    .bind(sampled_at)
+    .bind(source_ms)
+    .fetch_all(&mut *conn)
+    .await?;
+    for row in activated {
+        let user_id: i64 = row.try_get("id")?;
+        tracing::info!(
+            user_id,
+            "First verified VPN traffic activated waiting subscription"
+        );
+    }
+    Ok(())
+}
+
 async fn persist_user_traffic(
     conn: &mut sqlx::PgConnection,
     node_id: i64,
@@ -2652,6 +2736,8 @@ async fn persist_user_traffic(
         .bind(source_ms)
         .execute(&mut *conn)
         .await?;
+        activate_waiting_users_on_traffic(conn, node_id, &serialized, sampled_at, source_ms)
+            .await?;
         persist_verified_traffic_deltas(conn, node_id, &serialized, sampled_at, false).await?;
         sqlx::query(
             "INSERT INTO user_node_traffic_totals AS totals (
@@ -4544,6 +4630,25 @@ fn user_status(user: &Value, now_ms: i64) -> &'static str {
     "ACTIVE"
 }
 
+/// A waiting user must be able to import a feed and authenticate to Xray,
+/// otherwise a first-connection timer can never start. This does not grant
+/// access to disabled, expired or quota-exhausted accounts.
+pub(crate) fn user_can_connect(user: &Value, now_ms: i64) -> bool {
+    match user_status(user, now_ms) {
+        "ACTIVE" => true,
+        "ON_HOLD" => {
+            let days = number(user, "holdDays").unwrap_or(0);
+            let limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
+            let consumed = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
+            let expiry = number(user, "expireAt").unwrap_or(0);
+            (1..=3650).contains(&days)
+                && (limit <= 0.0 || consumed < limit)
+                && (expiry <= 0 || expiry >= now_ms)
+        }
+        _ => false,
+    }
+}
+
 fn number(value: &Value, key: &str) -> Option<i64> {
     value.get(key).and_then(Value::as_i64).or_else(|| {
         value
@@ -4589,6 +4694,40 @@ mod tests {
         assert_eq!(user_status(&json!({"limit":10,"used":10}), now), "LIMITED");
         assert_eq!(user_status(&json!({"expireAt":now-1}), now), "EXPIRED");
         assert_eq!(user_status(&json!({"limit":0,"used":500}), now), "ACTIVE");
+    }
+
+    #[test]
+    fn waiting_user_can_fetch_and_provision_without_starting_the_clock() {
+        let now = 1_800_000_000_000_i64;
+        let waiting = json!({"hold":true,"holdDays":30,"expireAt":null,"limit":1.0,"used":0.0});
+        assert_eq!(user_status(&waiting, now), "ON_HOLD");
+        assert!(super::user_can_connect(&waiting, now));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":0}),
+            now
+        ));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":5000}),
+            now
+        ));
+        assert!(!super::user_can_connect(&json!({"hold":true}), now));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":30,"disabled":true}),
+            now
+        ));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":30,"limit":1.0,"used":1.0}),
+            now
+        ));
+        assert!(!super::user_can_connect(
+            &json!({"hold":true,"holdDays":30,"expireAt":now-1}),
+            now
+        ));
+        assert!(!super::user_can_connect(&json!({"expireAt":now-1}), now));
+        assert!(super::user_can_connect(
+            &json!({"hold":false,"expireAt":now+1}),
+            now
+        ));
     }
 
     #[test]

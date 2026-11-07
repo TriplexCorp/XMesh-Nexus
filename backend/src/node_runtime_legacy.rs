@@ -1291,7 +1291,9 @@ fn provision_proxy_users(
         let mut entries = Vec::new();
         let mut seen = std::collections::HashSet::new();
         for user in users {
-            if crate::user_status(user, now_ms) != "ACTIVE" {
+            // Provision eligible ON_HOLD users so the first *real* Xray connection
+            // can produce signed traffic and start their subscription timer.
+            if !crate::user_can_connect(user, now_ms) {
                 continue;
             }
             let authorized = user
@@ -1425,8 +1427,14 @@ fn build_offline_policy(
         } else {
             None
         };
-        let offline_budget =
-            remaining.map(|bytes| (bytes / active_nodes.max(1)).min(64 * 1024 * 1024));
+        // Waiting subscriptions require confirmed online telemetry to start
+        // their clock. Never issue a disconnected spending lease before then,
+        // including when the user has an otherwise unlimited traffic plan.
+        let offline_budget = if user.get("hold").and_then(Value::as_bool) == Some(true) {
+            Some(0)
+        } else {
+            remaining.map(|bytes| (bytes / active_nodes.max(1)).min(64 * 1024 * 1024))
+        };
         user_policies.push(json!({
             "userId":user_id,"xrayId":uuid.to_string(),
             "expireAtMs":expires,"panelUsedBytes":used_bytes,
@@ -2400,6 +2408,37 @@ mod provision_tests {
         assert_eq!(config["policy"]["levels"]["0"]["statsUserUplink"], true);
         assert_eq!(settings["decryption"], "none");
     }
+    #[test]
+    fn waiting_user_is_provisioned_but_disabled_and_exhausted_accounts_are_not() {
+        let now = 1_800_000_000_000_i64;
+        let mut config = json!({"inbounds":[{"protocol":"vless","tag":"NL",
+            "settings":{"decryption":"none","clients":[]}}]});
+        let users = vec![
+            json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000",
+                "squads":[4],"hold":true,"holdDays":30,"expireAt":null}),
+            json!({"id":2,"xrayId":"550e8400-e29b-41d4-a716-446655440001",
+                "squads":[4],"hold":true,"holdDays":30,"disabled":true}),
+            json!({"id":3,"xrayId":"550e8400-e29b-41d4-a716-446655440002",
+                "squads":[4],"hold":true,"holdDays":30,"limit":1.0,"used":1.0}),
+            json!({"id":4,"xrayId":"550e8400-e29b-41d4-a716-446655440003",
+                "squads":[4],"hold":true,"holdDays":0}),
+        ];
+        let squads = vec![json!({"id":4,"inb":["NL"]})];
+        provision_proxy_users(&mut config, &users, &squads, now).unwrap();
+        let clients = config["inbounds"][0]["settings"]["clients"]
+            .as_array()
+            .unwrap();
+        assert_eq!(clients.len(), 1);
+        assert_eq!(clients[0]["email"], "xmesh-u1--NL");
+        let policy = build_offline_policy(&config, &users, 5, now, &"a".repeat(64), 1);
+        let allowed = policy["users"].as_array().unwrap();
+        assert_eq!(allowed.len(), 1);
+        assert_eq!(
+            allowed[0]["offlineBudgetBytes"], 0,
+            "Waiting users may not consume an unlimited disconnected lease"
+        );
+    }
+
     #[test]
     fn stats_email_escapes_non_ascii_inbound_tag() {
         let mut config = json!({"inbounds":[{"protocol":"vless","tag":"CDN NL","settings":{}}]});
