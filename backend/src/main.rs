@@ -2653,7 +2653,7 @@ async fn persist_user_traffic(
         .execute(&mut *conn)
         .await?;
         // Only authenticated, accepted, positive per-user traffic starts the
-        // timer. Subscription imports and initial counter baselines cannot.
+        // timer. Imports and zero-only initial counter baselines cannot.
         // A conditional update ensures idempotence across parallel nodes.
         let activated = sqlx::query(
             "WITH genuine_delta AS (
