@@ -19,7 +19,7 @@ fn bad_request(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, message)
 }
 
-pub(super) fn validate_settings(value: &Value) -> Result<(), ApiError> {
+pub fn validate_settings(value: &Value) -> Result<(), ApiError> {
     if let Some(tags) = value.get("cdnInboundTags") {
         let tags = tags
             .as_array()
@@ -48,7 +48,7 @@ pub(super) fn validate_settings(value: &Value) -> Result<(), ApiError> {
     Ok(())
 }
 
-pub(super) fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
+pub fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
     validate_settings(settings)?;
     Ok(settings
         .get("cdnInboundTags")
@@ -63,7 +63,7 @@ pub(super) fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
         .unwrap_or_default())
 }
 
-pub(super) fn validate_user(user: &Value) -> Result<(), ApiError> {
+pub fn validate_user(user: &Value) -> Result<(), ApiError> {
     if user.get("cdnUsedBytes").is_some() {
         return Err(bad_request(
             "CDN: расход вычисляется сервером и не может быть изменён вручную.",
@@ -82,7 +82,7 @@ pub(super) fn validate_user(user: &Value) -> Result<(), ApiError> {
 
 /// Attach a server-calculated value, never trusting user-submitted or
 /// node-aggregated traffic. The same inbound tag on multiple nodes is summed.
-pub(super) async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(), ApiError> {
+pub async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(), ApiError> {
     if users.is_empty() {
         return Ok(());
     }
@@ -119,7 +119,7 @@ pub(super) async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(
 
 /// A missing server-derived meter fails closed for a quota-enabled user.
 /// Zero means unlimited CDN access; unrelated inbound tags stay unaffected.
-pub(super) fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<String>) -> bool {
+pub fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<String>) -> bool {
     if !cdn_tags.contains(inbound_tag) {
         return false;
     }
