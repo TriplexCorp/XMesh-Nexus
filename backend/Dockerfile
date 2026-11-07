@@ -2,6 +2,9 @@
 FROM rust:1.99.1-bookworm AS builder
 WORKDIR /build/backend
 ENV CARGO_INCREMENTAL=0
+ARG PANEL_BUILD_REVISION=unknown
+ENV PANEL_BUILD_REVISION=${PANEL_BUILD_REVISION}
+COPY VERSION /build/VERSION
 COPY backend/Cargo.toml ./Cargo.toml
 COPY backend/src ./src
 COPY backend/migrations ./migrations

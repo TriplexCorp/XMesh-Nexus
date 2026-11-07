@@ -51,6 +51,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        PANEL_BUILD_REVISION: ${PANEL_BUILD_REVISION:-unknown}
     environment:
       APP_ADDR: 0.0.0.0:8080
       STATIC_DIR: /app/static

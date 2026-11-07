@@ -140,6 +140,8 @@ jobs:
         run: node scripts/check-xsp-v2-wire.js
       - name: Verify committed XSP-v2 staging artifact inventory
         run: node scripts/check-xsp-v2-main-checkpoint.js
+      - name: Verify topbar panel version and read-only upstream update check
+        run: node scripts/check-panel-version-topbar.js
       - name: Test Xray-core and panel update buttons, queue and responsive layout
         run: node scripts/check-settings-update-actions.js
       - name: Check managed Xray update safety and SQLx migration uniqueness

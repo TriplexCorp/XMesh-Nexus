@@ -5799,6 +5799,7 @@ async function bootPanel(){
     const session=await response.json();
     if(!session.authenticated){location.replace(location.pathname);return}
     sessionUser=session.user||null;
+    window.XMeshPanelVersion?.init(sessionUser);
     document.documentElement.dataset.accessRole=viewerMode()?'viewer':sessionUser.role;
     if(viewerMode()){
       const allowed=new Set(['#home','#statistics','#users','#nodes']);
