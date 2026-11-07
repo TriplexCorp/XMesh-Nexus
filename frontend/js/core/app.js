@@ -1019,7 +1019,7 @@ const view=()=>{
       '<span><strong>'+esc(c.label)+'</strong><small>'+esc(c.meta)+'</small></span></label>').join(''):
       '<p class="note">Добавьте хосты или узлы и назначьте им профиль XRAY STUDIO.</p>');
    return '<article class="card balancer-editor balancer-card" data-balancer-index="'+index+'" data-balancer-enabled="'+(item.enabled!==false)+'" data-balancer-search-text="'+esc([item.remark,item.tag,item.serverDescription,...sourceChoices.map(c=>c.label)].join(' '))+'">'+
-    '<header class="balancer-card-head"><span class="balancer-card-emblem">'+ic('layers')+'</span><div class="balancer-card-identity"><strong class="balancer-card-title" data-no-translate>'+esc(item.remark||'Новый балансировщик')+'</strong><span class="balancer-card-tag">'+esc(item.tag||'—')+'</span></div>'+
+    '<header class="balancer-card-head"><span class="balancer-card-emblem">'+ic('layers')+'</span><div class="balancer-card-identity"><strong class="balancer-card-title"'+(item.remark&&item.remark!=='Новый балансировщик'?' data-no-translate':'')+'>'+esc(item.remark||'Новый балансировщик')+'</strong><span class="balancer-card-tag">'+esc(item.tag||'—')+'</span></div>'+
     '<span class="balancer-card-state" data-active="'+(item.enabled!==false)+'">'+(item.enabled!==false?'Включён':'Отключён')+'</span>'+
     '<button type="button" class="gh sm balancer-card-delete" data-balancer-delete="'+index+'" title="Удалить" aria-label="Удалить">'+ic('trash')+'</button></header>'+
     '<div class="balancer-card-metrics"><div><span>'+ic('server')+' Серверы</span><strong>'+selected.size+'</strong></div>'+
