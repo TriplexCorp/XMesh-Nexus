@@ -16,9 +16,9 @@ const html=fs.readFileSync('frontend/index.html','utf8');
 const strictBootstrap=fs.readFileSync('frontend/js/features/nodes/node-bootstrap-v6.js','utf8');
 const dockerfile=fs.readFileSync('backend/Dockerfile','utf8');
 
-assert.match(app, /<div class="nodes-toolbar" data-ui-toolbar="filters" role="search"/,
+assert.match(app, /<div class="nodes-toolbar nx-workspace-toolbar" data-ui-toolbar="filters" role="search"/,
  'Node list toolbar must be scoped to nodes page');
-assert.match(app, /<button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">/ ,
+assert.match(app, /<button type="button" class="node-create-action nx-workspace-create" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon nx-workspace-create-icon" aria-hidden="true">/ ,
  'New Node button must retain its existing creation handler and accessible label');
 assert.match(app, /<span class="node-create-label">Новый узел<\/span>/,
  'Node primary action must have clear visible text');
