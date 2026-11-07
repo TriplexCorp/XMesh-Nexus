@@ -1,8 +1,8 @@
 /* Public subscription portal — enterprise workspace shell.
    Shared subscription-studio.css still owns theme/font/card tokens; this file
    defines the production information architecture, density and interaction UI. */
-:root{color-scheme:dark light;--ui-radius:16px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-*{box-sizing:border-box}
+.subscription-public{color-scheme:dark light;--ui-radius:16px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.subscription-public,.subscription-public *{box-sizing:border-box}
 
 body.subscription-public{
   margin:0;
@@ -15,8 +15,8 @@ body.subscription-public{
     linear-gradient(180deg,color-mix(in srgb,var(--portal-bg,#0b1016) 96%,#000 4%),var(--portal-bg,#0b1016));
 }
 
-.subscription-public-shell{
-  width:min(calc(100% - 48px),1440px);
+.subscription-public .subscription-public-shell{
+  width:min(calc(100% - 48px),1340px);
   margin:clamp(18px,3.4vh,44px) auto;
   padding-bottom:clamp(28px,5vh,64px);
 }
@@ -55,14 +55,14 @@ body.subscription-public{
   backdrop-filter:blur(18px);
   -webkit-backdrop-filter:blur(18px);
 }
-.subscription-public-brand-identity{display:flex;align-items:center;gap:13px;min-width:0}
+.subscription-public .subscription-public-brand-identity{display:flex;align-items:center;gap:13px;min-width:0}
 .subscription-public-brand-identity>span,
 .subscription-public-brand-identity>img{
   width:38px;height:38px;flex:none;object-fit:cover;
   border-radius:11px;
   box-shadow:0 0 0 1px color-mix(in srgb,var(--portal-text) 7%,transparent),0 8px 22px -12px var(--portal-accent);
 }
-.subscription-public-brand-copy{display:grid;gap:1px;min-width:0}
+.subscription-public .subscription-public-brand-copy{display:grid;gap:1px;min-width:0}
 .subscription-public-brand-copy>b{font-size:14px;line-height:1.3;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .subscription-public-brand-copy>small{font-size:10px;line-height:1.35;color:var(--portal-muted);letter-spacing:.035em;text-transform:uppercase}
 .subscription-public .subscription-preview-languages{
@@ -124,19 +124,19 @@ body.subscription-public{
   font-size:13px;
   line-height:1.7;
 }
-.subscription-public-hero-accent{display:flex;align-items:flex-end;gap:6px;padding:0 4px 5px 0;opacity:.72}
+.subscription-public .subscription-public-hero-accent{display:flex;align-items:flex-end;gap:6px;padding:0 4px 5px 0;opacity:.72}
 .subscription-public-hero-accent i{display:block;width:5px;border-radius:999px;background:color-mix(in srgb,var(--portal-accent) 78%,var(--portal-text));box-shadow:0 0 22px -8px var(--portal-accent)}
 .subscription-public-hero-accent i:nth-child(1){height:18px;opacity:.38}
 .subscription-public-hero-accent i:nth-child(2){height:31px;opacity:.68}
 .subscription-public-hero-accent i:nth-child(3){height:46px}
 
 /* Main workspace */
-.subscription-public-workspace{
+.subscription-public .subscription-public-workspace{
   padding:clamp(24px,3vw,40px) clamp(24px,3.2vw,48px) clamp(28px,3.2vw,44px);
   display:grid;
   gap:22px;
 }
-.subscription-public-grid{
+.subscription-public .subscription-public-grid{
   display:grid;
   grid-template-columns:minmax(0,8fr) minmax(330px,4fr);
   gap:22px;
@@ -144,7 +144,7 @@ body.subscription-public{
   align-items:stretch;
 }
 .subscription-public-access-panel,
-.subscription-public-info-panel{
+.subscription-public .subscription-public-info-panel{
   min-width:0;
   border:1px solid var(--portal-border);
   border-radius:max(17px,var(--portal-radius));
@@ -152,21 +152,21 @@ body.subscription-public{
     linear-gradient(150deg,color-mix(in srgb,var(--portal-surface) 96%,transparent),color-mix(in srgb,var(--portal-bg) 91%,transparent));
   box-shadow:0 1px 0 color-mix(in srgb,var(--portal-text) 3.4%,transparent) inset,0 18px 42px -36px rgba(0,0,0,.85);
 }
-.subscription-public-access-panel{
+.subscription-public .subscription-public-access-panel{
   padding:clamp(20px,2.3vw,30px);
   display:grid;
   grid-template-columns:minmax(0,1fr);
   gap:15px;
   align-content:start;
 }
-.subscription-public-info-panel{
+.subscription-public .subscription-public-info-panel{
   padding:clamp(20px,2.1vw,28px);
   display:grid;
   grid-template-rows:auto 1fr;
   gap:18px;
   align-content:start;
 }
-.subscription-public-panel-title{
+.subscription-public .subscription-public-panel-title{
   display:flex;align-items:center;gap:12px;
   min-height:42px;
   padding-bottom:17px;
@@ -189,7 +189,7 @@ body.subscription-public{
 .subscription-public-panel-title small{font-size:10.5px;line-height:1.45;color:var(--portal-muted)}
 
 /* Primary subscription action */
-.subscription-public-primary-action{display:block}
+.subscription-public .subscription-public-primary-action{display:block}
 .subscription-public .subscription-preview-cta{
   appearance:none;
   display:flex;align-items:center;justify-content:center;
@@ -211,7 +211,7 @@ body.subscription-public{
 .subscription-public .subscription-preview-cta[aria-disabled=true]{cursor:not-allowed;opacity:.62;box-shadow:none}
 
 /* Private URL */
-.subscription-public-link-card{
+.subscription-public .subscription-public-link-card{
   display:grid;gap:11px;
   padding:16px;
   border:1px solid var(--portal-soft-border);
@@ -263,7 +263,7 @@ body.subscription-public{
 }
 .subscription-public .subscription-preview-quick button:hover{border-color:color-mix(in srgb,var(--portal-accent) 42%,var(--portal-border));background:color-mix(in srgb,var(--portal-accent) 5%,transparent);color:var(--portal-text);transform:translateY(-1px)}
 .subscription-public .subscription-preview-quick button:focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
-.subscription-public-secondary-surfaces{display:grid;gap:10px}
+.subscription-public .subscription-public-secondary-surfaces{display:grid;gap:10px}
 .subscription-public .subscription-preview-qr{
   justify-self:start;width:min(100%,248px);padding:13px;
   border:1px solid var(--portal-soft-border);border-radius:14px;background:#fff;
@@ -280,7 +280,7 @@ body.subscription-public{
 }
 
 /* Operational status rail */
-.subscription-public-status-stack{display:grid;gap:12px;align-content:start}
+.subscription-public .subscription-public-status-stack{display:grid;gap:12px;align-content:start}
 .subscription-public .subscription-preview-meta{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
@@ -312,7 +312,7 @@ body.subscription-public{
 .subscription-public .subscription-preview-support:hover{border-color:color-mix(in srgb,var(--portal-accent) 38%,var(--portal-border));background:color-mix(in srgb,var(--portal-accent) 5%,transparent);color:var(--portal-text)}
 
 /* Client catalog */
-.subscription-public-catalog{min-width:0}
+.subscription-public .subscription-public-catalog{min-width:0}
 .subscription-public .subscription-preview-apps{
   margin:0;
   padding:clamp(20px,2.3vw,30px);
@@ -325,17 +325,17 @@ body.subscription-public{
 .subscription-public .subscription-preview-apps>header{
   display:flex;align-items:center;min-height:34px;
   padding-bottom:15px;border-bottom:1px solid var(--portal-soft-border);
-  font-size:12.5px;font-weight:850;letter-spacing:-.015em;
+  font-size:16px;font-weight:790;letter-spacing:-.02em;
 }
 .subscription-public .subscription-preview-apps>div{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:10px;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr));
+  gap:12px;
 }
 .subscription-public .subscription-preview-app{
-  min-width:0;min-height:66px;
-  display:flex;align-items:center;gap:11px;
-  padding:11px 12px;
+  min-width:0;min-height:76px;
+  display:flex;align-items:center;gap:13px;
+  padding:13px 15px;
   border:1px solid var(--portal-soft-border);border-radius:11px;
   background:color-mix(in srgb,var(--portal-bg) 52%,transparent);
   color:var(--portal-text);text-decoration:none;
@@ -348,16 +348,16 @@ body.subscription-public{
   box-shadow:0 14px 28px -26px rgba(0,0,0,.9);
 }
 .subscription-public .subscription-preview-app>span{
-  width:34px;height:34px;flex:none;display:grid;place-items:center;
+  width:42px;height:42px;flex:none;display:grid;place-items:center;
   border:1px solid color-mix(in srgb,var(--portal-accent) 16%,transparent);
   border-radius:9px;
   background:color-mix(in srgb,var(--portal-accent) 7%,transparent);
   color:color-mix(in srgb,var(--portal-accent) 85%,var(--portal-text));
-  font-size:9px;font-weight:850;
+  font-size:11px;font-weight:850;
 }
 .subscription-public .subscription-preview-app>div{min-width:0;display:grid;gap:2px}
-.subscription-public .subscription-preview-app b{font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.subscription-public .subscription-preview-app small{font-size:9px;line-height:1.35;color:var(--portal-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.subscription-public .subscription-preview-app b{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.subscription-public .subscription-preview-app small{font-size:11.5px;line-height:1.45;color:var(--portal-muted);overflow-wrap:anywhere}
 
 /* Footer */
 .subscription-public .subscription-preview footer{
@@ -369,37 +369,37 @@ body.subscription-public{
 
 /* Studio-configurable variants keep their semantic meaning without breaking hierarchy. */
 .subscription-public .subscription-preview[data-portal-layout=compact] .subscription-preview-hero{padding-block:28px}
-.subscription-public .subscription-preview[data-portal-layout=compact] .subscription-public-workspace{padding-block:24px;gap:16px}
-.subscription-public .subscription-preview[data-portal-layout=compact] .subscription-public-grid{gap:16px}
+.subscription-public .subscription-preview[data-portal-layout=compact] .subscription-public .subscription-public-workspace{padding-block:24px;gap:16px}
+.subscription-public .subscription-preview[data-portal-layout=compact] .subscription-public .subscription-public-grid{gap:16px}
 .subscription-public .subscription-preview[data-portal-layout=centered] .subscription-preview-hero{grid-template-columns:1fr;text-align:center;justify-items:center}
 .subscription-public .subscription-preview[data-portal-layout=centered] .subscription-preview-hero-copy{justify-items:center}
-.subscription-public .subscription-preview[data-portal-layout=centered] .subscription-public-hero-accent{display:none}
+.subscription-public .subscription-preview[data-portal-layout=centered] .subscription-public .subscription-public-hero-accent{display:none}
 .subscription-public .subscription-preview[data-portal-theme=light]{--portal-border:color-mix(in srgb,var(--portal-text) 13%,transparent);--portal-soft-border:color-mix(in srgb,var(--portal-text) 9%,transparent)}
 .subscription-public .subscription-preview[data-portal-theme=light] .subscription-preview-cta{color:#15202a}
 
 @media(max-width:1080px){
-  .subscription-public-shell{width:min(calc(100% - 32px),1040px);margin:16px auto;padding-bottom:28px}
-  .subscription-public-grid{grid-template-columns:minmax(0,1fr) minmax(300px,.58fr);gap:16px}
-  .subscription-public .subscription-preview-apps>div{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .subscription-public .subscription-public-shell{width:min(calc(100% - 32px),1040px);margin:16px auto;padding-bottom:28px}
+  .subscription-public .subscription-public-grid{grid-template-columns:minmax(0,1fr) minmax(300px,.58fr);gap:16px}
+  .subscription-public .subscription-preview-apps>div{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
   .subscription-public .subscription-preview-meta{grid-template-columns:1fr}
   .subscription-public .subscription-preview-meta>div:first-child{grid-column:auto}
 }
 
 @media(max-width:820px){
-  .subscription-public-shell{width:min(calc(100% - 24px),760px);margin:12px auto;padding-bottom:24px}
+  .subscription-public .subscription-public-shell{width:min(calc(100% - 24px),760px);margin:12px auto;padding-bottom:24px}
   .subscription-public .subscription-preview-brand{padding-inline:20px}
   .subscription-public .subscription-preview-hero{grid-template-columns:1fr;padding:32px 20px 26px}
-  .subscription-public-hero-accent{display:none}
-  .subscription-public-workspace{padding:20px;gap:16px}
-  .subscription-public-grid{grid-template-columns:1fr;gap:16px}
+  .subscription-public .subscription-public-hero-accent{display:none}
+  .subscription-public .subscription-public-workspace{padding:20px;gap:16px}
+  .subscription-public .subscription-public-grid{grid-template-columns:1fr;gap:16px}
   .subscription-public .subscription-preview-meta{grid-template-columns:repeat(2,minmax(0,1fr))}
   .subscription-public .subscription-preview-meta>div:first-child{grid-column:1/-1}
-  .subscription-public .subscription-preview-apps>div{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .subscription-public .subscription-preview-apps>div{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
   .subscription-public .subscription-preview footer{padding-inline:20px}
 }
 
 @media(max-width:560px){
-  .subscription-public-shell{width:calc(100% - 12px);margin:6px auto;padding-bottom:12px}
+  .subscription-public .subscription-public-shell{width:calc(100% - 12px);margin:6px auto;padding-bottom:12px}
   .subscription-public .subscription-preview{border-radius:max(14px,var(--portal-radius))}
   .subscription-public .subscription-preview-brand{min-height:64px;padding:12px 14px}
   .subscription-public-brand-copy>small{display:none}
@@ -408,9 +408,9 @@ body.subscription-public{
   .subscription-public .subscription-preview-hero{padding:28px 15px 22px}
   .subscription-public .subscription-preview-hero h3{font-size:31px;max-width:16ch}
   .subscription-public .subscription-preview-hero p{font-size:12px;line-height:1.6}
-  .subscription-public-workspace{padding:15px;gap:12px}
+  .subscription-public .subscription-public-workspace{padding:15px;gap:12px}
   .subscription-public-access-panel,.subscription-public-info-panel,.subscription-public .subscription-preview-apps{padding:16px;border-radius:13px}
-  .subscription-public-panel-title{padding-bottom:14px}
+  .subscription-public .subscription-public-panel-title{padding-bottom:14px}
   .subscription-public .subscription-preview-quick{grid-template-columns:1fr 1fr}
   .subscription-public .subscription-preview-quick button:first-child{grid-column:1/-1}
   .subscription-public .subscription-preview-meta{grid-template-columns:1fr}
@@ -424,4 +424,31 @@ body.subscription-public{
   .subscription-public .subscription-preview-cta,
   .subscription-public .subscription-preview-quick button,
   .subscription-public .subscription-preview-app{transition:none;transform:none!important}
+}
+
+/* The Studio renders the actual public markup in a container, not a separate
+ * miniature widget. Rules below are scoped to this preview only. */
+.subscription-studio-preview.subscription-public{width:100%;min-width:0;background:transparent}
+.subscription-studio-preview .subscription-public-shell{width:100%;margin:0;padding:0;min-height:0;display:block;container:subscription-preview-container/inline-size}
+.subscription-studio-preview .subscription-preview{width:100%;margin:0;min-height:0;box-shadow:none}
+.subscription-studio-preview .subscription-preview-brand{min-height:58px;padding:12px 16px}
+.subscription-studio-preview .subscription-preview-hero{padding:25px 18px}
+.subscription-studio-preview .subscription-preview-hero h3{font-size:clamp(26px,3vw,36px)}
+.subscription-studio-preview .subscription-public-workspace{padding:16px;gap:12px}
+.subscription-studio-preview .subscription-public-access-panel,
+.subscription-studio-preview .subscription-public-info-panel,
+.subscription-studio-preview .subscription-preview-apps{padding:15px}
+.subscription-studio-preview .subscription-preview footer{padding:14px 16px}
+@container subscription-preview-container (max-width:900px){
+ .subscription-studio-preview .subscription-public-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+ .subscription-studio-preview .subscription-preview-hero{grid-template-columns:minmax(0,1fr)}
+ .subscription-studio-preview .subscription-public-hero-accent{display:none}
+ .subscription-studio-preview .subscription-preview-meta{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .subscription-studio-preview .subscription-preview-apps>div{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
+}
+@container subscription-preview-container (max-width:480px){
+ .subscription-studio-preview .subscription-preview-meta{grid-template-columns:minmax(0,1fr)}
+ .subscription-studio-preview .subscription-preview-apps>div{grid-template-columns:minmax(0,1fr)}
+ .subscription-studio-preview .subscription-preview-quick{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .subscription-studio-preview .subscription-preview-quick button:first-child{grid-column:1/-1}
 }
