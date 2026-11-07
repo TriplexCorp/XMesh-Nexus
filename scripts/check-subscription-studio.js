@@ -250,7 +250,7 @@ assert.match(src,/\/subscription-public[.]css[?]v=[a-f0-9]{12}/,
 assert.match(template,/subscription-surface\.css[^"]*"[^>]*>[\s\S]*subscription-public\.css/,
   'Visitor portal must apply public layout after shared surface tokens');
 for(const cls of [
- 'subscription-public-shell','subscription-public-grid','subscription-public-access-panel',
+ 'subscription-public-shell','subscription-public-workspace','subscription-public-access-panel',
  'subscription-public-info-panel','subscription-public-status-stack','subscription-public-catalog',
  'subscription-public-link-card','subscription-preview-hero-copy'
 ]) {
@@ -261,7 +261,7 @@ assert.match(view,/data-subscription-preview-frame/,
   'The studio preview must be container-responsive, not a separate mock');
 assert.match(template,/class="subscription-public-overview"/,'Public page must expose the new status-first overview');
 assert.match(view,/class="subscription-public-overview"/,'Studio preview must share the real overview layout');
-assert.match(view,/data-preview-link-card hidden/,'Studio must preview a private URL hidden by default');
+assert.match(view,/data-preview-link-card[^>]*hidden/,'Studio must preview a private URL hidden by default');
 assert.match(view,/data-subscription-reveal/,'Studio preview must offer the explicit reveal action');
 assert.match(src,/quick\.hidden=false/,'Link reveal must stay available when other quick actions are disabled');
 assert.match(portalCss,/\.subscription-studio-preview \.subscription-public-shell/,'Studio must receive container-sized portal styling');
