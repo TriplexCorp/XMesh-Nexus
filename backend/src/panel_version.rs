@@ -14,7 +14,10 @@ const BUILD_REVISION: &str = match option_env!("PANEL_BUILD_REVISION") {
 const GITHUB_API: &str = "https://api.github.com/repos/TriplexCorp/XMesh-Nexus";
 
 fn valid_revision(value: &str) -> bool {
-    value.len() == 40 && value.bytes().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 fn installed_revision() -> Option<&'static str> {
     valid_revision(BUILD_REVISION).then_some(BUILD_REVISION)
@@ -43,7 +46,9 @@ async fn github_json(client: &reqwest::Client, path: &str) -> Option<Value> {
         .get(format!("{GITHUB_API}/{path}"))
         .header(reqwest::header::USER_AGENT, "XMesh-Nexus-VersionCheck")
         .header(reqwest::header::ACCEPT, "application/vnd.github+json")
-        .send().await.ok()?;
+        .send()
+        .await
+        .ok()?;
     if !response.status().is_success() {
         return None;
     }
@@ -53,9 +58,7 @@ async fn github_json(client: &reqwest::Client, path: &str) -> Option<Value> {
 /// Only the owner may initiate an upstream network check; it is never an update.
 /// Compare known build revisions by Git ancestry rather than VERSION alone,
 /// because the product version can remain 6.0.0 over many commits.
-pub async fn check(
-    Extension(actor): Extension<auth::AuthUser>,
-) -> Result<Json<Value>, ApiError> {
+pub async fn check(Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
     require_owner(&actor)?;
     let client = match reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(4))
@@ -96,7 +99,8 @@ pub async fn check(
             "revision":local
         })));
     };
-    let status = classify_compare_status(compare.get("status").and_then(Value::as_str).unwrap_or(""));
+    let status =
+        classify_compare_status(compare.get("status").and_then(Value::as_str).unwrap_or(""));
     Ok(Json(json!({
         "status":status,
         "latest_revision":remote_sha,
