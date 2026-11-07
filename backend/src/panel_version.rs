@@ -7,7 +7,10 @@ use std::time::Duration;
 use crate::{ApiError, auth, require_owner};
 
 const PRODUCT_VERSION: &str = include_str!("../../VERSION");
-const BUILD_REVISION: &str = env!("PANEL_BUILD_REVISION");
+const BUILD_REVISION: &str = match option_env!("PANEL_BUILD_REVISION") {
+    Some(revision) => revision,
+    None => "unknown",
+};
 const GITHUB_API: &str = "https://api.github.com/repos/TriplexCorp/XMesh-Nexus";
 
 fn valid_revision(value: &str) -> bool {
