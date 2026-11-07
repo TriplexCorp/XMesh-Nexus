@@ -453,6 +453,49 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionClientLinks:Object.fromEntries(clientCatalog.map(([id])=>[id,input(form,'subClientLink_'+id).value.trim()]).filter(([,url])=>url))
       });
       let previewLanguage=data.subscriptionLanguage;
+      let previewTab='overview',previewPlatform='all';
+      const previewTabs=()=>[...previewShadow.querySelectorAll('[data-cabinet-tab]')];
+      const panelFor=name=>previewShadow.querySelector('[data-cabinet-panel="'+name+'"]');
+      const previewAvailable={
+        overview:()=>true,
+        connect:()=>true,
+        apps:()=>!previewShadow.querySelector('[data-subscription-apps]')?.hidden,
+        devices:()=>!!input(form,'subscriptionShowDevices')?.checked,
+        support:()=>!!input(form,'subscriptionShowSupport')?.checked
+      };
+      const switchPreviewTab=(name,focus=false)=>{
+        previewTab=previewAvailable[name]?.()?name:'overview';
+        for(const button of previewTabs()){
+          const kind=button.dataset.cabinetTab;
+          button.hidden=!previewAvailable[kind]?.();
+          const active=kind===previewTab;
+          button.setAttribute('aria-selected',String(active));
+          button.tabIndex=active?0:-1;
+          if(active&&focus)button.focus();
+        }
+        previewShadow.querySelectorAll('[data-cabinet-panel]').forEach(panel=>{
+          panel.hidden=panel.dataset.cabinetPanel!==previewTab;
+        });
+        previewShadow.querySelectorAll('[data-cabinet-open]').forEach(button=>{
+          button.hidden=!previewAvailable[button.dataset.cabinetOpen]?.();
+        });
+        const devices=previewShadow.querySelector('[data-preview-devices]');
+        if(devices&&previewTab==='devices')devices.hidden=false;
+      };
+      const applyPreviewFilter=()=>{
+        const needle=(previewShadow.querySelector('[data-preview-app-search]')?.value||'').trim().toLocaleLowerCase(previewLanguage);
+        let count=0;
+        previewShadow.querySelectorAll('.subscription-preview-app').forEach(tile=>{
+          const platform=tile.querySelector('small')?.textContent?.toLocaleLowerCase('en')||'';
+          const name=tile.querySelector('b')?.textContent?.toLocaleLowerCase(previewLanguage)||'';
+          const match=(previewPlatform==='all'||platform.includes(previewPlatform))&&
+            (!needle||name.includes(needle)||platform.includes(needle));
+          tile.hidden=!match;
+          if(match)count++;
+        });
+        const empty=previewShadow.querySelector('#cabinet-apps-empty');
+        if(empty)empty.hidden=count>0;
+      };
       const draw = () => {
         applyPanelTheme();
         const d=read();
@@ -460,6 +503,66 @@ window.XMeshSubscriptionStudio = (() => {
         const lang=previewLanguage,english=lang==='en',copy=locale[lang];
         const previewRoot=$('[data-subscription-preview]');
         previewRoot.lang=lang;
+        const local=english?{
+          tabs:['Overview','Connect','Applications','Devices','Support'],
+          kicker:'MY ACCOUNT / VPN ACCESS',featureEyebrow:'YOUR ACCESS',
+          featureHeading:'Everything you need, in one place.',
+          featureNote:'Your connection and compatible apps are always close at hand.',
+          start:'Set up connection',findApp:'Choose an app',stepsEyebrow:'GET STARTED',
+          steps:['Choose your app','Add your subscription','Enable the connection'],
+          notes:['A compatible client for your device','Using your link or QR code','Connect inside your app'],
+          guideTitle:'Quick setup',guideDescription:'Open your app and import your access.',
+          guideHint:'Your personal link grants access to the subscription. Never share it.',
+          appsKicker:'CLIENT LIBRARY',appsNote:'Find a compatible client for your platform.',
+          appsSearch:'Search applications…',appsEmpty:'No applications match these filters.',
+          devicesKicker:'YOUR DEVICES',devicesHeading:'Connected devices',
+          devicesNote:'Your registered device count and allowance.',
+          supportKicker:'HELP CENTER',supportHeading:'Need a hand?',
+          supportNote:'Contact support using the configured channel.',all:'All',
+          devicesSample:'Connected devices: 2 · Limit: 5'
+        }:{
+          tabs:['Обзор','Подключение','Приложения','Устройства','Поддержка'],
+          kicker:'МОЙ КАБИНЕТ / VPN ACCESS',featureEyebrow:'ВАШ ДОСТУП',
+          featureHeading:'Всё для подключения. В одном месте.',
+          featureNote:'Личные настройки и приложения всегда под рукой.',
+          start:'Настроить подключение',findApp:'Выбрать приложение',stepsEyebrow:'КАК НАЧАТЬ',
+          steps:['Выберите приложение','Добавьте подписку','Включите подключение'],
+          notes:['Совместимый клиент для вашего устройства','По личной ссылке или QR-коду','Активируйте доступ в приложении'],
+          guideTitle:'Быстрое подключение',
+          guideDescription:'Откройте приложение и импортируйте ваш доступ.',
+          guideHint:'Персональная ссылка открывает доступ к подписке. Не передавайте её посторонним.',
+          appsKicker:'КАТАЛОГ',appsNote:'Выберите клиент для своей платформы.',
+          appsSearch:'Найти приложение…',appsEmpty:'По вашему запросу приложений не найдено.',
+          devicesKicker:'ВАШИ УСТРОЙСТВА',devicesHeading:'Подключённые устройства',
+          devicesNote:'Количество зарегистрированных устройств и лимит.',
+          supportKicker:'ПОМОЩЬ',supportHeading:'Нужна помощь?',
+          supportNote:'Свяжитесь с поддержкой по указанному каналу.',all:'Все',
+          devicesSample:'Подключённые устройства: 2 · Лимит: 5'
+        };
+        const setText=(id,text)=>{const node=previewShadow.getElementById(id);if(node)node.textContent=text;};
+        ['overview','connect','apps','devices','support'].forEach((key,i)=>setText('cabinet-tab-'+key+'-label',local.tabs[i]));
+        const keys={
+          'cabinet-kicker':'kicker','cabinet-feature-eyebrow':'featureEyebrow',
+          'cabinet-feature-heading':'featureHeading','cabinet-feature-note':'featureNote',
+          'cabinet-start':'start','cabinet-find-app':'findApp',
+          'cabinet-steps-eyebrow':'stepsEyebrow','cabinet-guide-title':'guideTitle',
+          'cabinet-guide-description':'guideDescription','cabinet-guide-hint':'guideHint',
+          'cabinet-apps-kicker':'appsKicker','cabinet-apps-note':'appsNote',
+          'cabinet-apps-empty':'appsEmpty','cabinet-devices-kicker':'devicesKicker',
+          'cabinet-devices-heading':'devicesHeading','cabinet-devices-note':'devicesNote',
+          'cabinet-support-kicker':'supportKicker','cabinet-support-heading':'supportHeading',
+          'cabinet-support-note':'supportNote'
+        };
+        Object.entries(keys).forEach(([id,key])=>setText(id,local[key]));
+        local.steps.forEach((v,i)=>setText(['cabinet-step-one','cabinet-step-two','cabinet-step-three'][i],v));
+        local.notes.forEach((v,i)=>setText(['cabinet-step-one-note','cabinet-step-two-note','cabinet-step-three-note'][i],v));
+        const findApps=previewShadow.querySelector('[data-preview-app-search]');
+        if(findApps){findApps.placeholder=local.appsSearch;findApps.setAttribute('aria-label',local.appsSearch)}
+        setText('cabinet-apps-heading',(english?d.subscriptionAppsTitleEn:d.subscriptionAppsTitle)||appsHeading(lang));
+        const allFilter=previewShadow.querySelector('[data-app-filter="all"]');
+        if(allFilter)allFilter.textContent=local.all;
+        const deviceSample=previewShadow.querySelector('[data-preview-devices]');
+        if(deviceSample)deviceSample.textContent=local.devicesSample;
         previewShadow.querySelectorAll('[data-portal-language]').forEach(button=>{
           const active=button.dataset.portalLanguage===lang;
           button.setAttribute('aria-pressed',String(active));
@@ -533,9 +636,12 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-app-list]').innerHTML=allEnabled.map(([id,label,platform])=>
           '<div class="subscription-preview-app"><span>'+esc(label.slice(0,2))+'</span><div><b>'+esc(label)+'</b><small>'+esc(platform)+'</small></div></div>'
         ).join('');
+        switchPreviewTab(previewTab);
+        applyPreviewFilter();
         const support=$('[data-subscription-support]');
         support.textContent=(english?d.subscriptionSupportLabelEn:d.subscriptionSupportLabel)||(english?'Support':'Поддержка');
         support.hidden=!d.subscriptionShowSupport;
+        switchPreviewTab(previewTab);
         const labels={a:'Панель',b:'',c:''};
         labels[d.subscriptionPlacement]+=(labels[d.subscriptionPlacement]?' + ':'')+'Подписки';
         labels[d.nodePlacement]+=(labels[d.nodePlacement]?' + ':'')+'VPN-ноды';
@@ -545,6 +651,45 @@ window.XMeshSubscriptionStudio = (() => {
         ).join('');
       };
       previewShadow.addEventListener('click',event=>{
+        const tab=event.target.closest('[data-cabinet-tab],[data-cabinet-open]');
+        if(tab&&previewShadow.contains(tab)){
+          switchPreviewTab(tab.dataset.cabinetTab||tab.dataset.cabinetOpen,true);
+          return;
+        }
+        const filter=event.target.closest('[data-app-filter]');
+        if(filter&&previewShadow.contains(filter)){
+          previewPlatform=filter.dataset.appFilter;
+          previewShadow.querySelectorAll('[data-app-filter]').forEach(button=>{
+            button.setAttribute('aria-pressed',String(button===filter));
+          });
+          applyPreviewFilter();
+          return;
+        }
+        const devices=event.target.closest('[data-subscription-devices]');
+        if(devices&&previewShadow.contains(devices)){switchPreviewTab('devices',true);return}
+        const qrButton=event.target.closest('[data-subscription-qr]');
+        if(qrButton&&previewShadow.contains(qrButton)){
+          const target=previewShadow.querySelector('[data-preview-qr]');
+          if(!target)return;
+          target.hidden=!target.hidden;
+          qrButton.setAttribute('aria-expanded',String(!target.hidden));
+          if(!target.hidden&&!target.firstChild){
+            const url=previewShadow.querySelector('[data-preview-demo-link]')?.textContent||'https://sub.example.com/s/example-token';
+            const Qr=window.qrcodegen?.QrCode;
+            if(Qr){
+              const qr=Qr.encodeText(url,Qr.Ecc.MEDIUM),quiet=4;
+              const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
+              svg.setAttribute('viewBox','0 0 '+(qr.size+quiet*2)+' '+(qr.size+quiet*2));
+              svg.setAttribute('aria-label','Sample QR');
+              const bg=document.createElementNS(ns,'rect');bg.setAttribute('width','100%');bg.setAttribute('height','100%');bg.setAttribute('fill','#fff');svg.append(bg);
+              let data='';
+              for(let y=0;y<qr.size;y++)for(let x=0;x<qr.size;x++)if(qr.getModule(x,y))data+='M'+(x+quiet)+','+(y+quiet)+'h1v1h-1z';
+              const path=document.createElementNS(ns,'path');path.setAttribute('d',data);path.setAttribute('fill','#101923');svg.append(path);
+              target.replaceChildren(svg);
+            }
+          }
+          return;
+        }
         const reveal=event.target.closest('[data-subscription-reveal]');
         if(reveal&&previewShadow.contains(reveal)){
           const card=previewShadow.querySelector('[data-preview-link-card]');
@@ -560,6 +705,17 @@ window.XMeshSubscriptionStudio = (() => {
         previewLanguage=next;
         draw();
       });
+      previewShadow.addEventListener('keydown',event=>{
+        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+        const tabs=previewTabs().filter(button=>!button.hidden);
+        const current=tabs.indexOf(previewShadow.activeElement);
+        if(current<0)return;
+        event.preventDefault();
+        const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:
+          (current+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+        switchPreviewTab(tabs[next].dataset.cabinetTab,true);
+      });
+      previewShadow.querySelector('[data-preview-app-search]')?.addEventListener('input',applyPreviewFilter);
       form.addEventListener('input',draw);
       form.addEventListener('change',event=>{
         if(event.target.name==='subscriptionLanguage' && ['ru','en'].includes(event.target.value))previewLanguage=event.target.value;
