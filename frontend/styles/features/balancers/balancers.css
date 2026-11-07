@@ -332,3 +332,57 @@
   grid-template-columns:1fr;
 }
 }
+
+
+/* Balancer catalog: a compact read surface until the operator opens editing. */
+.balancer-workspace{container:balancer-workspace / inline-size;gap:var(--nx-page-gap)}
+.nx-workspace-toolbar.balancer-toolbar{display:flex;align-items:center;gap:.6rem .8rem;flex-wrap:wrap}
+.balancer-directory-search{flex:1 1 17rem;max-width:32rem}
+.balancer-toolbar .node-result-count{margin-right:auto}
+.balancer-toolbar>.nx-workspace-actions{margin-left:auto}
+.balancer-list{grid-template-columns:repeat(auto-fill,minmax(min(100%,23rem),1fr));align-items:start;gap:var(--nx-page-gap)}
+.balancer-list[data-grid-mode=compact]{grid-template-columns:repeat(auto-fill,minmax(min(100%,19rem),1fr));gap:var(--nx-space-3)}
+.balancer-list[data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
+.balancer-card{
+ display:flex;flex-direction:column;gap:.9rem;min-width:0;min-height:0;
+ padding:var(--nx-card-pad);border:1px solid var(--nx-border-strong);
+ border-radius:var(--nx-card-radius);background:var(--nx-panel-bg);
+ box-shadow:var(--nx-panel-shadow);
+ container:balancer-card / inline-size;
+ transition:border-color var(--nx-duration),box-shadow var(--nx-duration);
+}
+.balancer-card:hover{border-color:var(--nx-selected-border)}
+.balancer-card[hidden]{display:none}
+.balancer-card-head{display:flex;align-items:center;gap:.65rem;min-width:0}
+.balancer-card-emblem{display:grid;place-items:center;flex:none;width:2.35rem;height:2.35rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg);color:var(--a)}
+.balancer-card-identity{display:grid;gap:.3rem;min-width:0;flex:1}
+.balancer-card-title{min-width:0;overflow-wrap:anywhere;font-size:1rem;line-height:1.35}
+.balancer-card-tag{color:var(--mu);font-size:.72rem;overflow-wrap:anywhere}
+.balancer-card-state{display:inline-flex;align-items:center;flex:none;border:1px solid var(--nx-border);border-radius:999px;padding:.3rem .55rem;font-size:.72rem;font-weight:680;color:var(--mu)}
+.balancer-card-state[data-active=true]{border-color:color-mix(in srgb,var(--ok) 35%,var(--nx-border));color:var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)}
+.balancer-card-delete{flex:none;display:grid;place-items:center;min-width:2rem;padding:.35rem}
+.balancer-card-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--nx-separator);border-bottom:1px solid var(--nx-separator);padding:.8rem 0;gap:.6rem}
+.balancer-card-metrics>div{display:grid;gap:.35rem;min-width:0}
+.balancer-card-metrics>div+div{border-left:1px solid var(--nx-separator);padding-left:.75rem}
+.balancer-card-metrics span{display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:var(--mu)}
+.balancer-card-metrics .ic{width:.85rem;height:.85rem}
+.balancer-card-metrics strong{font-size:.92rem;line-height:1.35;overflow-wrap:anywhere}
+.balancer-card-description{flex:1;min-height:1.2rem;margin:0;color:var(--mu);font-size:.79rem;line-height:1.5;overflow-wrap:anywhere}
+.balancer-card-details{border-top:1px solid var(--nx-separator);margin-top:auto;padding-top:.7rem}
+.balancer-card-details>summary{display:flex;align-items:center;justify-content:center;gap:.4rem;min-height:var(--nx-control-h-sm);border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);font-size:.8rem;font-weight:700;color:var(--tx);cursor:pointer;list-style:none}
+.balancer-card-details>summary::-webkit-details-marker{display:none}
+.balancer-card-details>summary:hover,.balancer-card-details[open]>summary{border-color:var(--nx-selected-border);background:var(--nx-hover-bg)}
+.balancer-card-details>summary:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
+.balancer-card-form{display:grid;gap:1rem;min-width:0;padding-top:1rem}
+.balancer-card .balancer-edit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.balancer-card .balancer-source-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@container balancer-card (max-width:39rem){
+ .balancer-card .balancer-edit-grid,.balancer-card .balancer-source-grid{grid-template-columns:minmax(0,1fr)}
+}
+@container balancer-workspace (min-width:75rem){
+ .balancer-list:not([data-grid-mode=spacious])>.balancer-card:has(.balancer-card-details[open]){grid-column:span 2}
+}
+@media(max-width:700px){
+ .balancer-toolbar .balancer-directory-search{max-width:none;flex-basis:100%}
+ .balancer-toolbar>.nx-workspace-actions{margin-left:0;width:100%;justify-content:space-between}
+}

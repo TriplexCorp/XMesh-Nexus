@@ -82,3 +82,9 @@
 .squad-directory-note{display:flex;align-items:flex-start;gap:.45rem;max-width:78rem;margin:0;color:var(--mu);font-size:.73rem;line-height:1.5}
 .squad-directory-note>.ic{flex:none;width:.85rem;height:.85rem;margin-top:.12rem}
 @media(max-width:600px){.squad-card-head{grid-template-columns:2.7rem minmax(0,1fr)}.squad-card-head-actions{grid-column:2;justify-self:start;gap:.5rem}}
+
+
+/* Fleet-style density is shared through data-grid-mode, while squad anatomy stays local. */
+.squad-card-grid[data-grid-mode=compact]{grid-template-columns:repeat(auto-fill,minmax(min(100%,21.5rem),1fr));gap:var(--nx-space-3)}
+.squad-card-grid[data-grid-mode=compact]>.squad-card{padding:var(--nx-space-4);gap:var(--nx-space-3)}
+.squad-card-grid[data-grid-mode=spacious]{grid-template-columns:repeat(auto-fill,minmax(min(100%,37rem),1fr))}

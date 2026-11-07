@@ -250,3 +250,53 @@ dialog.xm-action-confirm{--dialog-width:28rem;border:1px solid var(--nx-border-s
   .nx-directory-toolbar{grid-template-columns:minmax(0,1fr) auto;row-gap:.45rem}
   .nx-directory-toolbar-note{grid-column:1/-1;grid-row:2}
 }
+
+
+/* Existing Hosts and Squads directories consume the same framed toolbar as Nodes. */
+.nx-directory-toolbar{padding:var(--nx-section-pad);border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);background:var(--nx-panel-bg)}
+
+/* Unified catalog action grammar: one toolbar, one add control, one grid picker. */
+.nx-workspace-toolbar{
+ padding:var(--nx-section-pad);border:1px solid var(--nx-border);
+ border-radius:var(--nx-card-radius);background:var(--nx-panel-bg);min-width:0;
+}
+.nx-directory-toolbar>.nx-workspace-actions{justify-self:end;min-width:0}
+.nx-workspace-actions{display:flex;align-items:center;justify-content:flex-end;gap:.6rem;flex-wrap:wrap;margin-left:auto;min-width:0}
+.nx-workspace-grid-controls{display:inline-flex;align-items:center;gap:.45rem;white-space:nowrap;min-height:var(--nx-control-h)}
+.nx-workspace-grid-controls>.note{margin:0;color:var(--nx-muted);font-size:var(--nx-text-xs)}
+.nx-workspace-grid-controls .seg{display:inline-flex;align-items:center}
+.nx-workspace-grid-controls .seg button{padding-inline:.6rem}
+.nx-workspace-create{
+ display:inline-flex;align-items:center;justify-content:center;gap:.55rem;
+ min-height:var(--nx-control-h);padding:.35rem .9rem .35rem .4rem;
+ border:1px solid color-mix(in srgb,var(--a) 35%,var(--nx-border));
+ border-radius:var(--ui-control-radius);
+ background:color-mix(in srgb,var(--a) 9%,var(--elevated));
+ color:var(--tx);font-size:var(--nx-text-sm);font-weight:700;line-height:1.2;
+ white-space:nowrap;cursor:pointer;
+ transition:background-color var(--nx-duration),border-color var(--nx-duration),transform var(--nx-duration);
+}
+.nx-workspace-create-icon{
+ display:inline-grid;place-items:center;flex:none;width:1.9rem;height:1.9rem;
+ border-radius:calc(var(--ui-control-radius)*.65);background:var(--a);color:var(--btn-text);
+}
+.nx-workspace-create-icon .ic{width:1rem;height:1rem}
+.nx-workspace-create:hover{background:color-mix(in srgb,var(--a) 15%,var(--elevated));border-color:var(--nx-selected-border)}
+.nx-workspace-create:focus-visible,.nx-workspace-grid-controls button:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
+.nx-workspace-create:active{transform:translateY(1px)}
+.nx-workspace-filter{display:grid;gap:.25rem;min-width:8rem;color:var(--mu);font-size:var(--nx-text-xs)}
+.nx-workspace-filter select{min-height:var(--nx-control-h)}
+@media(max-width:850px){
+ .nx-directory-toolbar>.nx-workspace-actions{min-width:0;flex-wrap:wrap}
+}
+@media(max-width:680px){
+ .nx-directory-toolbar{grid-template-columns:minmax(0,1fr)}
+ .nx-directory-toolbar>.nx-workspace-actions{grid-column:1;justify-self:stretch;justify-content:space-between}
+ .nx-directory-toolbar>.nx-directory-toolbar-note{grid-column:1;grid-row:auto}
+ .nx-workspace-actions{justify-content:space-between;margin-left:0}
+ .nx-workspace-grid-controls{white-space:normal;flex-wrap:wrap}
+}
+@media(max-width:380px){
+ .nx-workspace-actions>.nx-workspace-create{flex:1 1 100%}
+}
+@media(prefers-reduced-motion:reduce){.nx-workspace-create{transition:none;transform:none}}
