@@ -24,7 +24,7 @@ assert.match(portal,/brandNote:'Центр безопасного подключ
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
 const publicCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
 assert.match(template,/subscription-portal\.js\?v=20261101-enterprise-workspace-v3/,'Public portal must cache-bust the enterprise workspace behavior');
-assert.match(template,/subscription-public\.css\?v=20261101-enterprise-workspace-v3/,'Public portal must cache-bust the enterprise workspace redesign');
+assert.match(template,/subscription-public\.css\?v=[a-f0-9]{12}/,'Public portal must use a content fingerprint for its production stylesheet');
 assert.match(template,/id="subscription-link-card"/,'Public portal must expose the enterprise subscription link surface');
 assert.match(template,/id="subscription-brand-note"/,'Public portal must expose the localized product-header note');
 assert.match(template,/class="subscription-public-workspace"/,'Public portal must use the workspace composition layer');
