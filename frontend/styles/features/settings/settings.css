@@ -78,3 +78,46 @@
 .settings-workspace .history-placeholder{border:0;border-top:1px solid var(--nx-separator);border-radius:0;background:none;padding:.85rem 0 0;margin-top:1rem;line-height:1.6}
 .settings-workspace #core-panel .setting-row>.sw{justify-self:end}
 .settings-workspace #core-panel .setting-control select{width:100%}
+
+
+/* Settings center: one purposeful subpage at a time, with durable hash navigation. */
+.settings-center{display:grid;grid-template-columns:minmax(12.5rem,14.5rem) minmax(0,1fr);gap:var(--nx-page-gap);align-items:start;min-width:0}
+.settings-center-rail{position:sticky;top:5rem;align-self:start;max-height:calc(100dvh - 6rem);overflow-y:auto;min-width:0;padding:.55rem;border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);background:var(--nx-panel-bg);box-shadow:var(--nx-panel-shadow);scrollbar-width:thin}
+.settings-center-nav{display:grid;gap:.2rem}
+.settings-center-link{display:flex;align-items:center;gap:.7rem;min-width:0;padding:.68rem .7rem;border:1px solid transparent;border-radius:var(--nx-control-radius);color:var(--mu);text-decoration:none;transition:background var(--nx-duration),border-color var(--nx-duration),color var(--nx-duration)}
+.settings-center-link:hover{background:var(--nx-hover-bg);color:var(--tx)}
+.settings-center-link.is-active{background:var(--nx-selected-bg);border-color:var(--nx-selected-border);color:var(--tx)}
+.settings-center-link:focus-visible,.settings-center-related a:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
+.settings-center-link-icon{display:grid;place-items:center;flex:none;width:2rem;height:2rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
+.settings-center-link-icon .ic{width:1rem;height:1rem}
+.settings-center-link.is-active .settings-center-link-icon{color:var(--a);border-color:var(--nx-selected-border)}
+.settings-center-link-copy{display:grid;gap:.16rem;min-width:0}
+.settings-center-link-copy strong{font-size:.82rem;font-weight:730;line-height:1.32}
+.settings-center-link-copy small{color:var(--mu);font-size:.69rem;line-height:1.4}
+.settings-center-related{display:grid;gap:.15rem;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--nx-separator)}
+.settings-center-related a{display:flex;align-items:center;gap:.55rem;min-height:2.25rem;padding:.4rem .7rem;border-radius:var(--nx-control-radius);color:var(--mu);font-size:.76rem;text-decoration:none}
+.settings-center-related a:hover{color:var(--tx);background:var(--nx-hover-bg)}
+.settings-center-related .ic{width:.95rem;height:.95rem;flex:none}
+.settings-center-main{display:grid;gap:var(--nx-page-gap);min-width:0;align-content:start}
+.settings-center-heading{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:.8rem;padding:.16rem .08rem .7rem;border-bottom:1px solid var(--nx-separator)}
+.settings-center-heading h2{margin:0;color:var(--tx);font-size:1.2rem;font-weight:760;letter-spacing:-.02em}
+.settings-center-heading p{margin:.28rem 0 0;color:var(--mu);font-size:.78rem;line-height:1.45}
+.settings-center-grid{min-width:0;align-items:start}
+.settings-center-grid[data-single=true]{grid-template-columns:minmax(0,1fr);max-width:54rem}
+.settings-center-grid .appearance-column{min-width:0}
+.settings-center-grid .card{min-width:0}
+@container settings-workspace (max-width:70rem){
+ .settings-center{grid-template-columns:minmax(0,1fr)}
+ .settings-center-rail{position:static;max-height:none;overflow:visible}
+ .settings-center-nav{display:flex;align-items:stretch;gap:.3rem;overflow-x:auto;scrollbar-width:thin;padding-bottom:.25rem}
+ .settings-center-link{flex:0 0 auto;max-width:13rem;padding:.55rem .65rem}
+ .settings-center-link-icon{width:1.7rem;height:1.7rem}
+ .settings-center-link-copy small{display:none}
+ .settings-center-related{display:flex;gap:.3rem;flex-wrap:wrap;padding-top:.35rem}
+ .settings-center-related a{min-height:2rem}
+}
+@container settings-workspace (max-width:48rem){
+ .settings-center-grid{grid-template-columns:minmax(0,1fr)}
+ .settings-center-heading{padding-bottom:.45rem}
+ .settings-center-link{max-width:none}
+}
