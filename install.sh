@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 cd "$(dirname "$0")"
 # Build metadata is never stored in the operator-owned .env.
-export PANEL_BUILD_REVISION="$(git rev-parse --verify HEAD 2>/dev/null || printf unknown)"
+export PANEL_BUILD_REVISION="$(sh scripts/resolve-panel-build-revision.sh unknown "$PWD")"
 
 prepare_only=0
 if [[ "${1:-}" == "--prepare-only" ]]; then prepare_only=1; fi
