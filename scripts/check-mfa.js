@@ -54,12 +54,16 @@ assert.match(login,/\/api\/v1\/auth\/mfa\/verify/);
 assert.match(loginHtml,/id="mfa-step"/);
 assert.match(panel,/window\.XMeshMfa\?\.panel/);
 assert.match(panel,/window\.XMeshMfa\?\.mount/);
-assert.match(panel,/\['security','shield-check','Безопасность'\]/,
- 'Account security must have a visible sidebar entry');
+assert.doesNotMatch(panel,/\['security','shield-check','Безопасность'\]/,
+ 'Security must not remain as a standalone global sidebar item');
+assert.match(panel,/\['security','Безопасность','Авторизация, двухфакторная защита, сессии и аудит','shield-check'\]/,
+ 'Security must appear as a dedicated Settings subpage');
+assert.match(panel,/settingsPage==='security'\?securityP\(\)/,
+ 'Settings security subpage must render the existing protected MFA workspace');
 assert.match(panel,/security:\['Безопасность',securityP\]/,
- 'Security section must route to dedicated MFA workspace');
+ 'Original Security route must remain available for compatibility');
 assert.doesNotMatch(panel,/href="#security"/,
- 'Account security must exist only on its dedicated page, not in general settings');
+ 'Legacy standalone Security link must not reappear in settings');
 assert.match(panel,/function securityP\(\)/,
  'A dedicated account security page must exist');
 assert.doesNotMatch(panel,/window\.XMeshMfa\?\.panel\(\)\|\|''/,
