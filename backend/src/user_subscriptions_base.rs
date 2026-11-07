@@ -1537,7 +1537,7 @@ struct PortalDecoration<'a> {
     logo_brand: &'a str,
 }
 
-fn portal_status_label(en: bool, active: bool, waiting: bool) -> &'static str {
+const fn portal_status_label(en: bool, active: bool, waiting: bool) -> &'static str {
     if waiting {
         if en {
             "Awaiting connection"
