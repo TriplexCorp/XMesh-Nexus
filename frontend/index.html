@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#071b15">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=Inter:wght@400..800&family=Golos+Text:wght@400..800&family=Rubik:wght@400..800&family=Nunito+Sans:wght@400..800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Roboto:wght@400..800&family=PT+Sans:wght@400;700&family=Montserrat:wght@400..800&family=Ubuntu:wght@400;500;700&family=Open+Sans:wght@400..800&family=Source+Sans+3:wght@400..800&family=Fira+Sans:wght@400;500;600;700&family=Jost:wght@400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles/system/nexus-ui-v3.css?v=54a39ca80e7e">
+<link rel="stylesheet" href="/styles/system/nexus-ui-v3.css?v=7dc32d553cb8">
 <link rel="stylesheet" href="/styles/system/workspace-dialog-contract.css?v=89dae5441971">
 </head>
 <body>
@@ -23,7 +23,21 @@
   <header class="top">
     <div class="top-identity"><h1 id="title"></h1></div>
     <button class="search" id="pal" type="button" aria-label="Поиск и команды" aria-keyshortcuts="Control+K Meta+K"><span id="si" class="search-glyph"></span><span class="search-label">Поиск и команды</span><kbd>Ctrl K</kbd></button>
-    <div class="tl"><button class="ib" id="theme" aria-label="Сменить тему"></button><button class="ib" id="bell" type="button" aria-label="Уведомления" aria-haspopup="dialog" aria-expanded="false"></button><div class="top-language" id="top-language">
+    <div class="tl"><div class="top-panel-version" id="top-panel-version" hidden>
+      <button class="top-panel-version-trigger" type="button" data-panel-version-trigger aria-label="Версия панели" aria-haspopup="dialog" aria-expanded="false" aria-controls="top-panel-version-menu">
+        <span class="top-panel-version-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 8 4.5v11L12 22l-8-4.5v-11L12 2Z"/><path d="m12 12 8-5.5M12 12 4 6.5M12 12v10"/></svg></span>
+        <span class="top-panel-version-label" data-panel-version-number>Nexus</span>
+      </button>
+      <section class="top-panel-version-menu" id="top-panel-version-menu" data-panel-version-menu role="dialog" aria-label="Версия панели" hidden>
+        <header><strong data-panel-version-heading>Версия панели</strong><small data-panel-version-revision>—</small></header>
+        <p class="top-panel-version-message" data-panel-version-status role="status" aria-live="polite"></p>
+        <div class="top-panel-version-actions">
+          <button type="button" data-panel-version-check>Проверить обновления</button>
+          <a data-panel-version-settings href="#set" hidden>Открыть обновление в настройках</a>
+        </div>
+        <p class="top-panel-version-caption" data-panel-version-caption></p>
+      </section>
+    </div><button class="ib" id="theme" aria-label="Сменить тему"></button><button class="ib" id="bell" type="button" aria-label="Уведомления" aria-haspopup="dialog" aria-expanded="false"></button><div class="top-language" id="top-language">
       <button class="ib top-language-trigger" id="language-trigger" type="button" aria-label="Язык интерфейса" aria-haspopup="true" aria-expanded="false" aria-controls="language-menu"></button>
       <div class="top-language-menu" id="language-menu" role="group" aria-label="Выбор языка" hidden>
         <button type="button" data-panel-language="ru" aria-pressed="false">Русский <span>RU</span></button>
@@ -59,7 +73,8 @@
 <script src="/js/features/nodes/node-routing.js?v=d862fb66d248"></script>
 <script src="/js/features/routing/client-routing.js?v=0f12ef3d01a0"></script>
 <script src="/js/features/hosts/host-editor.js?v=d33ed233d987"></script>
-<script src="/js/core/app.js?v=e784e9420aee"></script>
+<script src="/js/features/settings/panel-version-topbar.js?v=286d15341fcd"></script>
+<script src="/js/core/app.js?v=f3cc3211ba57"></script>
 <script src="/js/features/users/user-fingerprint-override.js?v=81b3aa0c1314"></script>
 <script src="/js/features/users/user-editor-draft.js?v=781ad0402494"></script>
 <script src="/js/features/users/user-client-routing.js?v=3f9b9cb717d2"></script>
