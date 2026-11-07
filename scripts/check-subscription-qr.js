@@ -19,8 +19,8 @@ assert.match(portal,/const quiet = 4/,'Subscription QR must include a four-modul
 assert.match(portal,/x \+ quiet/);
 assert.match(portal,/y \+ quiet/);
 assert.match(portal,/compactSubscriptionUrl/,'Portal should show a shortened bearer URL rather than dumping the full token on screen');
-assert.match(portal,/brandNote:'Secure access workspace'/,'English enterprise header note must be localized');
-assert.match(portal,/brandNote:'Центр безопасного подключения'/,'Russian enterprise header note must be localized');
+assert.match(portal,/brandNote:'Your subscription'/,'English enterprise header note must be localized');
+assert.match(portal,/brandNote:'Ваша подписка'/,'Russian enterprise header note must be localized');
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
 const publicCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
 assert.match(template,/subscription-portal\.js\?v=[a-f0-9]{12}/,'Public portal behavior must use a content fingerprint');
