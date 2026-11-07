@@ -121,6 +121,19 @@ assert.match(app,/def:\(\)=>\(\{port:443,fp:'chrome',order:DB\.hosts\.length\+1/
 assert.match(app,/input\.value=key==='fp'\?'chrome':''/,
  'Resetting Host overrides must leave the single chrome choice selected');
 
+// Catalog controls must remain a reusable interaction surface, not five forks.
+assert.match(app,/function workspaceGridControls\(kind\)/,'Catalog density controls must be shared');
+assert.match(app,/function workspaceCreateButton\(kind,label,id=''\)/,'Catalog creation buttons must be shared');
+assert.match(app,/function mountWorkspaceGrid\(root\)/,'Catalog density must have one event contract');
+assert.match(app,/xmeshNexusCollectionView:/,'Density choice must persist by collection');
+for(const kind of ['squads','hosts','balancers'])
+ assert(app.includes('data-workspace-grid="'+kind+'"'),'Missing grid mode on '+kind);
+assert.match(app,/balancer-card-details/,'Balancer editing must live inside a compact summary card');
+assert.match(app,/const rows=read\(\)\.map\(\(\{_expanded,\.\.\.row\}\)=>row\)/,
+ 'View-only expanded state must never be persisted to clientBalancers');
+assert.match(components,/\.nx-workspace-create\{/,'One shared primary create visual style is required');
+assert.match(components,/\.nx-workspace-grid-controls\{/,'Catalog density controls must share one appearance');
+
 // Unified directory toolbar contract: search left, create right on all sizes.
 assert.match(app,/class="nx-directory-toolbar squad-directory-toolbar">'\+search\+/,
  'Squads toolbar must start with its search control');
