@@ -3310,7 +3310,7 @@ async function templatesP(){
   const section=(kind,items,renderItem)=>{
     const filter=templateFilters[kind]||'';
     return '<section class="template-section" role="tabpanel" id="templates-panel-'+kind+'" aria-labelledby="templates-tab-'+kind+'" data-template-section="'+kind+'" '+(templateTab===kind?'':'hidden inert')+'>'+
-      '<div class="template-section-tools">'+(items.length?'<div class="nx-directory-search template-search">'+ic('search')+
+      '<div class="template-section-tools nx-workspace-toolbar" data-ui-toolbar="filters">'+(items.length?'<div class="nx-directory-search template-search">'+ic('search')+
         '<input type="search" data-template-search="'+kind+'" aria-label="Поиск шаблонов" placeholder="Найти шаблон…" autocomplete="off" value="'+text(filter)+'">'+
         '<button type="button" class="nx-directory-search-clear" data-template-clear="'+kind+'" aria-label="Очистить поиск" '+(filter?'':'hidden')+'>'+ic('x')+'</button></div><span class="template-filter-count" data-template-count="'+kind+'" aria-live="polite"></span>':'')+
         '<div class="nx-workspace-actions">'+workspaceGridControls(kind)+workspaceCreateButton(kind,'Новый шаблон')+'</div></div>'+
