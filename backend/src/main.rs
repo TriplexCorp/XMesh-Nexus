@@ -1284,6 +1284,8 @@ async fn update_record(
         sqlx::query(
             "UPDATE user_inbound_traffic_totals SET uplink_bytes=0,downlink_bytes=0 WHERE user_id=$1"
         ).bind(id).execute(&mut *tx).await?;
+        sqlx::query("UPDATE user_inbound_traffic_monthly SET quota_uplink_bytes=0,quota_downlink_bytes=0 WHERE user_id=$1")
+            .bind(id).execute(&mut *tx).await?;
     }
     let row = sqlx::query(
         "UPDATE panel_records SET data = $3, updated_at = NOW() \
@@ -1498,6 +1500,7 @@ fn validate_settings_keys(object: &serde_json::Map<String, Value>) -> Result<(),
                 | "subscriptionJson"
                 | "clientBalancers"
                 | "cdnInboundTags"
+                | "cdnResetPeriod"
                 | "clientRoutingProfiles"
                 | "subscriptionClients"
                 | "subscriptionClientLinks"
@@ -1719,6 +1722,9 @@ fn validate_settings_integrations(object: &serde_json::Map<String, Value>) -> Re
     subscription_settings::validate(object)?;
     if let Some(tags) = object.get("cdnInboundTags") {
         cdn_quota::validate_settings(&json!({"cdnInboundTags":tags}))?;
+    }
+    if let Some(period) = object.get("cdnResetPeriod") {
+        cdn_quota::validate_settings(&json!({"cdnResetPeriod":period}))?;
     }
     if let Some(groups) = object.get("clientBalancers") {
         subscription_json::validate_client_balancers(groups)
@@ -2807,6 +2813,59 @@ async fn persist_inbound_traffic(
             ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userInboundTraffic.")
         })?;
         persist_verified_traffic_deltas(conn, node_id, &serialized, sampled_at, true).await?;
+        // Attribute only verified positive deltas to the UTC month in which
+        // they are accepted. Counter resets and first observations never
+        // create usage. The monthly charge is immutable when a node is deleted.
+        let node = sqlx::query_scalar::<_, Value>(
+            "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
+        )
+        .bind(node_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .unwrap_or_else(|| json!({}));
+        let settings = sqlx::query_scalar::<_, Value>(
+            "SELECT value FROM app_settings WHERE key='panel'",
+        )
+        .fetch_optional(&mut *conn)
+        .await?
+        .unwrap_or_else(|| json!({}));
+        let inbound_tags = inbound_samples.iter().map(|sample| sample.inbound_tag.clone()).collect::<Vec<_>>();
+        let charged_tags = cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?
+            .into_iter().collect::<Vec<_>>();
+        sqlx::query(
+            "INSERT INTO user_inbound_traffic_monthly AS monthly (
+                month_start,node_id,user_id,inbound_tag,
+                quota_uplink_bytes,quota_downlink_bytes,updated_at
+             )
+             SELECT date_trunc('month', NOW() AT TIME ZONE 'UTC')::date,
+                    $1,s.user_id,s.inbound_tag,
+                    CASE WHEN s.inbound_tag=ANY($3::TEXT[])
+                           AND s.uplink_bytes>=previous.last_uplink_bytes
+                           AND s.downlink_bytes>=previous.last_downlink_bytes
+                         THEN s.uplink_bytes-previous.last_uplink_bytes ELSE 0 END,
+                    CASE WHEN s.inbound_tag=ANY($3::TEXT[])
+                           AND s.uplink_bytes>=previous.last_uplink_bytes
+                           AND s.downlink_bytes>=previous.last_downlink_bytes
+                         THEN s.downlink_bytes-previous.last_downlink_bytes ELSE 0 END,
+                    NOW()
+             FROM jsonb_to_recordset($2::jsonb)
+                 AS s(user_id BIGINT,inbound_tag TEXT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+             JOIN panel_records u ON u.collection='users' AND u.id=s.user_id
+             JOIN user_inbound_traffic_totals AS previous
+               ON previous.node_id=$1 AND previous.user_id=s.user_id AND previous.inbound_tag=s.inbound_tag
+             WHERE s.inbound_tag=ANY($3::TEXT[])
+               AND s.uplink_bytes>=previous.last_uplink_bytes
+               AND s.downlink_bytes>=previous.last_downlink_bytes
+             ON CONFLICT(month_start,node_id,user_id,inbound_tag) DO UPDATE SET
+               quota_uplink_bytes=monthly.quota_uplink_bytes+EXCLUDED.quota_uplink_bytes,
+               quota_downlink_bytes=monthly.quota_downlink_bytes+EXCLUDED.quota_downlink_bytes,
+               updated_at=NOW()",
+        )
+        .bind(node_id)
+        .bind(&serialized)
+        .bind(charged_tags)
+        .execute(&mut *conn)
+        .await?;
         sqlx::query(
             "INSERT INTO user_inbound_traffic_totals AS totals (
                 node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
@@ -4437,6 +4496,7 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
                 ));
             }
         }
+        cdn_quota::validate_node(data)?;
         node_rotation::validate_node(data)?;
         node_routing::validate_saved(data)?;
         if let Some(hosting) = object.get("hosting") {
