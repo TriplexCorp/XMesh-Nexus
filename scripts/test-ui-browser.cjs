@@ -538,8 +538,10 @@ async function main() {
           assert(pager.selectWidth<=120&&pager.height<=80,'Users pagination must stay on one compact row');
         }
         const activityEntry=page.locator('#ut .xm-activity-entry').first();
-        await activityEntry.waitFor();
+        await activityEntry.waitFor({state:'attached'});
         assert(await activityEntry.getAttribute('aria-label'),'Activity history must have an accessible entry point');
+        if(width>=1120)assert(await activityEntry.isVisible(),'Desktop activity entry should be visible');
+        else assert(!(await activityEntry.isVisible()),'Narrow Users tables should hide the supplementary Activity column');
         assert.equal(await page.locator('#ut .xm-risk-pill,.xm-sharing-overview').count(),0,
           'Routine device activity must not produce speculative sharing warnings');
         await screenshot(page,`devices-table-${width}-${count}-${limit}`);
