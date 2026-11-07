@@ -208,7 +208,7 @@ dialog:is(.sv-overlay,.xm-studio-modal) :is(.sv-dialog,.xm-studio-modal-shell){m
 /* User intelligence is a workstation, not a small action dialog. Its header,
  * KPIs and tabs stay visible while the active pane owns the scroll area. */
 #stats-user-modal{
-  --dialog-width:72rem;
+  --dialog-width:96rem;
   inline-size:min(var(--dialog-width),calc(100vw - 2rem));
   min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
   max-inline-size:calc(100vw - 2rem);
