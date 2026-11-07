@@ -62,7 +62,7 @@ const healthEn=new Function('panelIsEnglish','window',ui.slice(statusStart,statu
  ()=>true,{XMeshI18n:{getLocale:()=> 'en-US'}});
 assert.match(healthEn({connected:true,tlsStatus:{state:'valid',daysRemaining:89}}).label,/89 days/);
 
-for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-inline','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
+for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-inline','syncNodeEffectiveTls(nodeForm)','form[data-ent="nodes"] [name="profileId"]'])
  assert(ui.includes(contract),'Node TLS UI contract missing: '+contract);
 
 // A TLS-required profile cannot be saved without a real certificate source.
