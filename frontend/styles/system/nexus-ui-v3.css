@@ -1,6 +1,6 @@
 /* Single panel presentation authority: foundation -> components -> shared layouts -> feature geometry. */
 @import url("./nexus-v3-foundation.css?v=1a2c74ea22c7");
-@import url("./nexus-v3-components.css?v=9242ab987522");
+@import url("./nexus-v3-components.css?v=b8ffc47efc89");
 @import url("./nexus-v3-layout.css?v=aa9c2b3e01cf");
 
 /* Scoped panel features. The public subscription portal has its own document entrypoint. */
