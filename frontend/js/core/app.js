@@ -955,40 +955,6 @@ const syncSubscriptionTheme=()=>{
  return subscriptionThemeSync;
 };
 const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(DB.set,patch=>api.saveSettings(patch),toast,{users:DB.users.length,nodes:DB.nodes.length},panelSubscriptionTheme);
-/* Shared catalog controls. Density changes presentation, never saved records. */
-const WORKSPACE_GRID_MODES=['compact','standard','spacious'];
-function workspaceGridMode(kind){
- try{const mode=localStorage.getItem('xmeshNexusCollectionView:'+kind);return WORKSPACE_GRID_MODES.includes(mode)?mode:'standard'}
- catch(_){return 'standard'}
-}
-function workspaceGridControls(kind){
- const active=workspaceGridMode(kind);
- return '<div class="nx-workspace-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки">'+
-  [['compact','Плотно'],['standard','Стандарт'],['spacious','Крупно']].map(([mode,label])=>
-   '<button type="button" data-workspace-grid-mode="'+kind+':'+mode+'" aria-pressed="'+(active===mode)+'" class="'+(active===mode?'on':'')+'">'+label+'</button>').join('')+'</div></div>';
-}
-function workspaceCreateButton(kind,label,id=''){
- return '<button type="button" class="nx-workspace-create" '+(id?'id="'+id+'"':'data-ne="'+kind+'"')+'>'+
-  '<span class="nx-workspace-create-icon" aria-hidden="true">'+ic('plus')+'</span><span>'+label+'</span></button>';
-}
-function mountWorkspaceGrid(root){
- root?.addEventListener('click',event=>{
-  const button=event.target.closest('[data-workspace-grid-mode]');
-  if(!button||!root.contains(button))return;
-  const [kind,mode]=button.dataset.workspaceGridMode.split(':');
-  if(!WORKSPACE_GRID_MODES.includes(mode))return;
-  const grid=root.querySelector('[data-workspace-grid="'+kind+'"]');
-  if(!grid)return;
-  grid.dataset.gridMode=mode;
-  try{localStorage.setItem('xmeshNexusCollectionView:'+kind,mode)}catch(_){}
-  root.querySelectorAll('[data-workspace-grid-mode]').forEach(control=>{
-   if(!control.dataset.workspaceGridMode.startsWith(kind+':'))return;
-   const selected=control.dataset.workspaceGridMode===kind+':'+mode;
-   control.classList.toggle('on',selected);
-   control.setAttribute('aria-pressed',String(selected));
-  });
- });
-}
 // Balancers are an explicit subscription feature, never inferred from node count.
 // Keeping this as a separate workspace prevents accidental SMART activation.
 const balancersP=async()=>{
@@ -3243,6 +3209,40 @@ async function hostsP(){
   }];
 }
 
+/* Shared catalog controls. Density changes presentation, never saved records. */
+const WORKSPACE_GRID_MODES=['compact','standard','spacious'];
+function workspaceGridMode(kind){
+ try{const mode=localStorage.getItem('xmeshNexusCollectionView:'+kind);return WORKSPACE_GRID_MODES.includes(mode)?mode:'standard'}
+ catch(_){return 'standard'}
+}
+function workspaceGridControls(kind){
+ const active=workspaceGridMode(kind);
+ return '<div class="nx-workspace-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки">'+
+  [['compact','Плотно'],['standard','Стандарт'],['spacious','Крупно']].map(([mode,label])=>
+   '<button type="button" data-workspace-grid-mode="'+kind+':'+mode+'" aria-pressed="'+(active===mode)+'" class="'+(active===mode?'on':'')+'">'+label+'</button>').join('')+'</div></div>';
+}
+function workspaceCreateButton(kind,label,id=''){
+ return '<button type="button" class="nx-workspace-create" '+(id?'id="'+id+'"':'data-ne="'+kind+'"')+'>'+
+  '<span class="nx-workspace-create-icon" aria-hidden="true">'+ic('plus')+'</span><span>'+label+'</span></button>';
+}
+function mountWorkspaceGrid(root){
+ root?.addEventListener('click',event=>{
+  const button=event.target.closest('[data-workspace-grid-mode]');
+  if(!button||!root.contains(button))return;
+  const [kind,mode]=button.dataset.workspaceGridMode.split(':');
+  if(!WORKSPACE_GRID_MODES.includes(mode))return;
+  const grid=root.querySelector('[data-workspace-grid="'+kind+'"]');
+  if(!grid)return;
+  grid.dataset.gridMode=mode;
+  try{localStorage.setItem('xmeshNexusCollectionView:'+kind,mode)}catch(_){}
+  root.querySelectorAll('[data-workspace-grid-mode]').forEach(control=>{
+   if(!control.dataset.workspaceGridMode.startsWith(kind+':'))return;
+   const selected=control.dataset.workspaceGridMode===kind+':'+mode;
+   control.classList.toggle('on',selected);
+   control.setAttribute('aria-pressed',String(selected));
+  });
+ });
+}
 /* Templates share the canonical CRUD forms and PostgreSQL collections.
  * No duplicate template store or fake "apply subscription" action. */
 let templateFilters={tpls:'',subs:''};
