@@ -40,14 +40,25 @@
       </nav>
     </header>
 
-    <section class="subscription-preview-hero">
-      <div class="subscription-preview-hero-copy">
-        {{STATUS_DOT}}
-        <h3>{{HERO}}</h3>
-        <p>{{DESCRIPTION}}</p>
-      </div>
-      <div class="subscription-public-hero-accent" aria-hidden="true"><i></i><i></i><i></i></div>
-    </section>
+    <div class="subscription-public-overview">
+      <section class="subscription-preview-hero">
+        <div class="subscription-preview-hero-copy">
+          {{STATUS_DOT}}
+          <h3>{{HERO}}</h3>
+          <p>{{DESCRIPTION}}</p>
+        </div>
+      </section>
+      <aside class="subscription-public-info-panel">
+        <header class="subscription-public-panel-title">
+          <span class="subscription-public-panel-icon is-status" aria-hidden="true"></span>
+          <div><b id="subscription-status-label"></b><small id="subscription-status-note"></small></div>
+        </header>
+        <div class="subscription-public-status-stack">
+          {{METRICS}}
+          {{SUPPORT}}
+        </div>
+      </aside>
+    </div>
 
     <div class="subscription-public-workspace">
       <div class="subscription-public-grid">
@@ -57,35 +68,23 @@
             <div><b id="subscription-endpoint-label"></b><small id="subscription-endpoint-note"></small></div>
           </header>
           <div class="subscription-public-primary-action">{{CTA}}</div>
+          {{QUICK_ACTIONS}}
           <section class="subscription-public-link-card" id="subscription-link-card" hidden>
             <div class="subscription-public-link-card-head">
               <div><b id="subscription-link-label"></b><small id="subscription-link-note"></small></div>
               <em>HTTPS</em>
             </div>
             <code id="subscription-link-display"></code>
-            <p class="subscription-public-action-status" id="subscription-action-status" aria-live="polite"></p>
           </section>
-          {{QUICK_ACTIONS}}
+          <p class="subscription-public-action-status" id="subscription-action-status" aria-live="polite"></p>
           <div class="subscription-public-secondary-surfaces">
             {{QR}}
             {{DEVICE_INFO}}
           </div>
         </section>
-
-        <aside class="subscription-public-info-panel">
-          <header class="subscription-public-panel-title">
-            <span class="subscription-public-panel-icon is-status" aria-hidden="true"></span>
-            <div><b id="subscription-status-label"></b><small id="subscription-status-note"></small></div>
-          </header>
-          <div class="subscription-public-status-stack">
-            {{METRICS}}
-            {{SUPPORT}}
-          </div>
-        </aside>
-      </div>
-
-      <div class="subscription-public-catalog">
-        {{APPS}}
+        <div class="subscription-public-catalog">
+          {{APPS}}
+        </div>
       </div>
     </div>
 
