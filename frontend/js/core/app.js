@@ -1019,7 +1019,24 @@ const balancersP=async()=>{
  const options=[['leastPing','Наименьшая задержка'],['roundRobin','По очереди'],['random','Случайный сервер']];
  const field=(label,name,value,placeholder='',max=160)=>
   '<label class="f"><span>'+label+'</span><input data-balancer-field="'+name+'" maxlength="'+max+'" value="'+esc(value||'')+'" placeholder="'+esc(placeholder)+'"></label>';
- const view=()=>{
+ const applyFilter=()=>{
+ const root=$('#balancers-list');
+ if(!root)return;
+ const query=String($('#balancer-search')?.value||'').normalize('NFKC').toLocaleLowerCase().trim();
+ const state=$('#balancer-state-filter')?.value||'all';
+ let visible=0;
+ for(const card of root.querySelectorAll('.balancer-card')){
+  const matched=(!query||card.dataset.balancerSearchText.normalize('NFKC').toLocaleLowerCase().includes(query))&&
+    (state==='all'||(state==='enabled')===(card.dataset.balancerEnabled==='true'));
+  card.hidden=!matched;
+  if(matched)visible++;
+ }
+ const count=$('#balancers-count');
+ if(count)count.textContent=(query||state!=='all'?visible+' / ':'')+draft.length+' групп';
+ const empty=$('#balancers-search-empty');
+ if(empty)empty.hidden=visible!==0||!draft.length;
+};
+const view=()=>{
   const root=$('#balancers-list');
   if(!root)return;
   root.innerHTML=draft.length?draft.map((item,index)=>{
@@ -1035,9 +1052,14 @@ const balancersP=async()=>{
       '<label class="balancer-source"><input type="checkbox" data-balancer-source="'+esc(c.key)+'"'+(selected.has(c.key)?' checked':'')+'>'+
       '<span><strong>'+esc(c.label)+'</strong><small>'+esc(c.meta)+'</small></span></label>').join(''):
       '<p class="note">Добавьте хосты или узлы и назначьте им профиль XRAY STUDIO.</p>');
-   return '<section class="card balancer-editor" data-balancer-index="'+index+'">'+
-    '<div class="balancer-editor-head"><div><span class="balancer-seq">#'+(index+1)+'</span><strong>'+esc(item.remark||'Новый балансировщик')+'</strong></div>'+
-    '<button type="button" class="gh sm" data-balancer-delete="'+index+'">'+ic('trash')+'Удалить</button></div>'+
+   return '<article class="card balancer-editor balancer-card" data-balancer-index="'+index+'" data-balancer-enabled="'+(item.enabled!==false)+'" data-balancer-search-text="'+esc([item.remark,item.tag,item.serverDescription,...sourceChoices.map(c=>c.label)].join(' '))+'">'+
+    '<header class="balancer-card-head"><span class="balancer-card-emblem">'+ic('layers')+'</span><div class="balancer-card-identity"><strong class="balancer-card-title">'+esc(item.remark||'Новый балансировщик')+'</strong><span class="balancer-card-tag">'+esc(item.tag||'—')+'</span></div>'+
+    '<span class="balancer-card-state" data-active="'+(item.enabled!==false)+'">'+(item.enabled!==false?'Включён':'Отключён')+'</span>'+
+    '<button type="button" class="gh sm balancer-card-delete" data-balancer-delete="'+index+'" title="Удалить" aria-label="Удалить">'+ic('trash')+'</button></header>'+
+    '<div class="balancer-card-metrics"><div><span>'+ic('server')+' Серверы</span><strong>'+selected.size+'</strong></div>'+
+    '<div><span>'+ic('activity')+' Стратегия</span><strong>'+esc(options.find(([key])=>key===item.strategy)?.[1]||options[0][1])+'</strong></div></div>'+
+    '<p class="balancer-card-description">'+esc(item.serverDescription||'Группы серверов для JSON-подписок.')+'</p>'+
+    '<details class="balancer-card-details"'+(item._expanded?' open':'')+'><summary>'+ic('sliders')+' Настроить</summary><div class="balancer-card-form">'+
     '<div class="balancer-edit-grid">'+field('Remark','remark',item.remark,'🇩🇪 Лучший — Германия {STATUS_EMOJI}',120)+
        field('Tag (уникальный)','tag',item.tag,'DE_BEST',64)+
        field('Описание','serverDescription',item.serverDescription,'Самый быстрый сервер',240)+
@@ -1055,9 +1077,9 @@ const balancersP=async()=>{
       field('Проверочный HTTPS URL','probeURL',obs.probeURL||'https://www.gstatic.com/generate_204','https://...',256)+
       field('Проверка связности','connectivity',obs.connectivity||'http://cp.cloudflare.com/generate_204','https://...',256)+
       '</div><p class="note">Xray поддерживает probeInterval и probeUrl. Таймаут, выборка и связность сохраняются как настройки группы, но не передаются в неподдерживаемые поля Xray.</p></details>'+
-   '</section>';
+   '</div></details></article>';
   }).join(''):'<div class="balancer-empty"><strong>Балансировщиков пока нет</strong><p>Добавьте любую комбинацию серверов. Одиночные подключения работают независимо.</p></div>';
-  $('#balancers-count').textContent=draft.length+' групп';
+  applyFilter();
  };
  const read=()=>[...$$('.balancer-editor')].map((row,i)=>{
   const get=name=>row.querySelector('[data-balancer-field="'+name+'"]');
@@ -1066,28 +1088,47 @@ const balancersP=async()=>{
    sampling:Number(get('sampling').value),probeURL:get('probeURL').value.trim(),connectivity:get('connectivity').value.trim()};
   return {tag:get('tag').value.trim(),remark:get('remark').value.trim(),serverDescription:get('serverDescription').value.trim(),
    strategy:get('strategy').value,enabled:get('enabled').checked,hideSelectedInbounds:get('hideSelectedInbounds').checked,
-   selector:source,observatory:obs};
+   selector:source,observatory:obs,_expanded:row.querySelector('.balancer-card-details')?.open||false};
  });
- const markup='<section class="balancer-workspace"><div class="balancer-intro"><div>'+
-  '<p>Группы серверов для JSON-подписок.</p>'+
-  '</div><div class="balancer-toolbar"><span id="balancers-count"></span><button class="btn" type="button" id="balancer-add">'+ic('plus')+'Новый балансировщик</button></div></div>'+
-  '<div id="balancers-list" class="balancer-list"></div>'+
+ const markup='<section class="balancer-workspace"><div class="nx-workspace-toolbar balancer-toolbar" data-ui-toolbar="filters">'+
+  '<div class="nx-directory-search balancer-directory-search">'+ic('search')+'<input id="balancer-search" type="search" aria-label="Поиск балансировщиков" placeholder="Найти балансировщик…" autocomplete="off">'+
+  '<button type="button" class="nx-directory-search-clear" id="balancer-search-clear" aria-label="Очистить поиск" hidden>'+ic('x')+'</button></div>'+
+  '<label class="nx-workspace-filter"><span>Состояние</span><select id="balancer-state-filter"><option value="all">Все</option><option value="enabled">Активные</option><option value="disabled">Отключены</option></select></label>'+
+  '<span class="node-result-count" id="balancers-count"></span><div class="nx-workspace-actions">'+workspaceGridControls('balancers')+workspaceCreateButton('balancers','Новый балансировщик','balancer-add')+'</div></div>'+
+  '<div id="balancers-list" class="balancer-list" data-ui-layout="cards" data-workspace-grid="balancers" data-grid-mode="'+workspaceGridMode('balancers')+'"></div>'+
+  '<div class="nx-directory-search-empty" id="balancers-search-empty" hidden>'+ic('search')+'<b>Совпадений не найдено</b><span>Попробуйте другой запрос или очистите поиск.</span></div>'+
   '<div class="balancer-savebar"><p>Изменения применятся после сохранения.</p>'+
   '<button type="button" class="btn" id="balancer-save">'+ic('save')+'Сохранить изменения</button></div></section>';
  return [markup,()=>{
   const list=$('#balancers-list');
   if(!list)return;
   view();
-  $('#balancer-add').addEventListener('click',()=>{
+  mountWorkspaceGrid($('.balancer-workspace'));
+   const search=$('#balancer-search'),clear=$('#balancer-search-clear');
+   search.addEventListener('input',()=>{clear.hidden=!search.value;applyFilter()});
+   clear.addEventListener('click',()=>{search.value='';clear.hidden=true;applyFilter();search.focus()});
+   search.addEventListener('keydown',event=>{if(event.key==='Escape'&&search.value){event.preventDefault();clear.click()}});
+   $('#balancer-state-filter').addEventListener('change',applyFilter);
+   list.addEventListener('change',event=>{
+    if(!event.target.matches('[data-balancer-field="enabled"]'))return;
+    const card=event.target.closest('.balancer-card');
+    card.dataset.balancerEnabled=String(event.target.checked);
+    card.querySelector('.balancer-card-state').dataset.active=String(event.target.checked);
+    card.querySelector('.balancer-card-state').textContent=event.target.checked?'Включён':'Отключён';
+    applyFilter();
+   });
+   $('#balancer-add').addEventListener('click',()=>{
    draft=read();
    let next=1;
    while(draft.some(item=>item.tag==='AUTO_'+next))next++;
-   draft.push({tag:'AUTO_'+next,remark:'Новый балансировщик',serverDescription:'',
+   draft.push({tag:'AUTO_'+next,remark:'Новый балансировщик',serverDescription:'',_expanded:true,
     enabled:true,strategy:'leastPing',selector:[],hideSelectedInbounds:false,
     observatory:{probeInterval:'20s',probeTimeout:'2s',sampling:5,
     probeURL:'https://www.gstatic.com/generate_204',connectivity:'http://cp.cloudflare.com/generate_204'}});
    view();
-   list.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
+   search.value='';clear.hidden=true;$('#balancer-state-filter').value='all';applyFilter();
+    list.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
+    list.lastElementChild?.querySelector('[data-balancer-field="remark"]')?.focus();
   });
   list.addEventListener('click',event=>{
    const button=event.target.closest('[data-balancer-delete]');
@@ -1098,7 +1139,7 @@ const balancersP=async()=>{
   });
   const save=$('#balancer-save');
   save.addEventListener('click',async()=>{
-   const rows=read();
+   const rows=read().map(({_expanded,...row})=>row);
    for(const row of rows){
     if(!row.tag||!row.remark||!row.selector.length){
      toast('Укажите tag, название и хотя бы один сервер для каждого балансировщика');return;
