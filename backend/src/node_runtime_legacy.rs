@@ -2433,7 +2433,14 @@ mod provision_tests {
             json!({"id":4,"xrayId":"550e8400-e29b-41d4-a716-446655440003","squads":[4],"expireAt":now-1}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["SE"]})];
-        provision_proxy_users(&mut config, &users, &squads, now, &std::collections::HashSet::default()).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &users,
+            &squads,
+            now,
+            &std::collections::HashSet::default(),
+        )
+        .unwrap();
         let settings = &config["inbounds"][0]["settings"];
         assert!(settings.get("users").is_none());
         assert_eq!(settings["clients"].as_array().unwrap().len(), 1);
@@ -2468,7 +2475,14 @@ mod provision_tests {
                 "squads":[4],"hold":true,"holdDays":0}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]})];
-        provision_proxy_users(&mut config, &users, &squads, now, &std::collections::HashSet::default()).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &users,
+            &squads,
+            now,
+            &std::collections::HashSet::default(),
+        )
+        .unwrap();
         let clients = config["inbounds"][0]["settings"]["clients"]
             .as_array()
             .unwrap();
