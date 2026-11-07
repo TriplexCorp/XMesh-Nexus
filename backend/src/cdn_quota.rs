@@ -45,6 +45,11 @@ pub fn validate_settings(value: &Value) -> Result<(), ApiError> {
             }
         }
     }
+    if let Some(period) = value.get("cdnResetPeriod") {
+        if !matches!(period.as_str(), Some("lifetime" | "monthly")) {
+            return Err(bad_request("CDN: режим сброса должен быть lifetime или monthly."));
+        }
+    }
     Ok(())
 }
 
@@ -61,6 +66,52 @@ pub fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
                 .collect()
         })
         .unwrap_or_default())
+}
+
+/// Node-scoped quota policy. Legacy global tags remain supported.
+/// A marked LTE node can include all inbounds or an explicit subset, so
+/// ordinary inbounds on another node with the same tag never become LTE.
+pub fn validate_node(node: &Value) -> Result<(), ApiError> {
+    let mode = node.get("cdnMode").and_then(Value::as_str).unwrap_or("standard");
+    if !matches!(mode, "standard" | "all" | "selected") {
+        return Err(bad_request("CDN: неизвестный режим трафика узла."));
+    }
+    if let Some(value) = node.get("cdnInboundTags") {
+        validate_settings(&json!({"cdnInboundTags":value}))?;
+    }
+    if mode == "selected"
+        && node.get("cdnInboundTags").and_then(Value::as_array).is_none_or(Vec::is_empty)
+    {
+        return Err(bad_request("CDN: выберите хотя бы один inbound этого узла."));
+    }
+    Ok(())
+}
+
+pub fn tags_for_node(
+    settings: &Value,
+    node: &Value,
+    candidate_tags: &[String],
+) -> Result<HashSet<String>, ApiError> {
+    validate_node(node)?;
+    let mut selected = tags(settings)?;
+    match node.get("cdnMode").and_then(Value::as_str).unwrap_or("standard") {
+        "all" => selected.extend(candidate_tags.iter().cloned().filter(|tag| tag != "xmesh_stats_in")),
+        "selected" => selected.extend(
+            node.get("cdnInboundTags").and_then(Value::as_array).into_iter().flatten()
+                .filter_map(Value::as_str).map(str::to_owned),
+        ),
+        _ => {}
+    }
+    Ok(selected)
+}
+
+pub fn reset_period(settings: &Value) -> Result<&'static str, ApiError> {
+    validate_settings(settings)?;
+    Ok(if settings.get("cdnResetPeriod").and_then(Value::as_str) == Some("monthly") {
+        "monthly"
+    } else {
+        "lifetime"
+    })
 }
 
 pub fn validate_user(user: &Value) -> Result<(), ApiError> {
@@ -87,23 +138,38 @@ pub async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(), ApiE
         return Ok(());
     }
     let settings = crate::read_settings(pool).await?;
-    let tags = tags(&settings)?;
     let mut usage = HashMap::<i64, i64>::new();
-    if !tags.is_empty() {
-        let mut names = tags.into_iter().collect::<Vec<_>>();
-        names.sort_unstable();
-        let rows = sqlx::query(
-            "SELECT user_id, COALESCE(SUM(uplink_bytes + downlink_bytes),0)::BIGINT AS bytes
-             FROM user_inbound_traffic_totals
-             WHERE inbound_tag = ANY($1::TEXT[])
+    // Monthly deltas are recorded when signed telemetry is accepted, in UTC.
+    // This durable ledger survives node deletion and policy edits. Existing
+    // cumulative meters cannot accurately reconstruct historic months.
+    let rows = if reset_period(&settings)? == "monthly" {
+        sqlx::query(
+            "SELECT user_id, COALESCE(SUM(quota_uplink_bytes + quota_downlink_bytes),0)::BIGINT AS bytes
+             FROM user_inbound_traffic_monthly
+             WHERE month_start = date_trunc('month', NOW() AT TIME ZONE 'UTC')::date
              GROUP BY user_id",
+        )
+        .fetch_all(pool)
+        .await?
+    } else {
+        let mut names = tags(&settings)?.into_iter().collect::<Vec<_>>();
+        names.sort_unstable();
+        sqlx::query(
+            "SELECT totals.user_id, COALESCE(SUM(totals.uplink_bytes + totals.downlink_bytes),0)::BIGINT AS bytes
+             FROM user_inbound_traffic_totals AS totals
+             LEFT JOIN panel_records AS node ON node.collection='nodes' AND node.id=totals.node_id
+             WHERE totals.inbound_tag = ANY($1::TEXT[])
+                OR node.data->>'cdnMode'='all'
+                OR (node.data->>'cdnMode'='selected' AND
+                    node.data->'cdnInboundTags' ? totals.inbound_tag)
+             GROUP BY totals.user_id",
         )
         .bind(names)
         .fetch_all(pool)
-        .await?;
-        for row in rows {
-            usage.insert(row.try_get("user_id")?, row.try_get("bytes")?);
-        }
+        .await?
+    };
+    for row in rows {
+        usage.insert(row.try_get("user_id")?, row.try_get("bytes")?);
     }
     for user in users {
         let id = user.get("id").and_then(Value::as_i64).unwrap_or(0);
@@ -168,6 +234,21 @@ mod tests {
             &tags
         ));
         assert!(exhausted(&json!({"cdnLimitGb":1.0}), "CDN_DE", &tags));
+    }
+
+    #[test]
+    fn node_scoped_lte_inbounds_preserve_standard_nodes() {
+        let settings = json!({"cdnInboundTags":[],"cdnResetPeriod":"monthly"});
+        let standard = json!({"cdnMode":"standard"});
+        let lte = json!({"cdnMode":"all"});
+        let mixed = json!({"cdnMode":"selected","cdnInboundTags":["PL_LTE"]});
+        let candidates = vec!["PL_LTE".to_owned(), "MAIN_DE".to_owned()];
+        assert_eq!(reset_period(&settings).unwrap(), "monthly");
+        assert!(tags_for_node(&settings, &standard, &candidates).unwrap().is_empty());
+        assert!(tags_for_node(&settings, &lte, &candidates).unwrap().contains("PL_LTE"));
+        assert!(!tags_for_node(&settings, &mixed, &candidates).unwrap().contains("MAIN_DE"));
+        assert!(validate_node(&json!({"cdnMode":"selected","cdnInboundTags":[]})).is_err());
+        assert!(validate_settings(&json!({"cdnResetPeriod":"weekly"})).is_err());
     }
 
     #[test]
