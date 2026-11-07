@@ -45,12 +45,12 @@ pub fn validate_settings(value: &Value) -> Result<(), ApiError> {
             }
         }
     }
-    if let Some(period) = value.get("cdnResetPeriod") {
-        if !matches!(period.as_str(), Some("lifetime" | "monthly")) {
-            return Err(bad_request(
-                "CDN: режим сброса должен быть lifetime или monthly.",
-            ));
-        }
+    if let Some(period) = value.get("cdnResetPeriod")
+        && !matches!(period.as_str(), Some("lifetime" | "monthly"))
+    {
+        return Err(bad_request(
+            "CDN: режим сброса должен быть lifetime или monthly.",
+        ));
     }
     Ok(())
 }
@@ -115,8 +115,8 @@ pub fn tags_for_node(
         "all" => selected.extend(
             candidate_tags
                 .iter()
-                .cloned()
-                .filter(|tag| tag != "xmesh_stats_in"),
+                .filter(|tag| *tag != "xmesh_stats_in")
+                .cloned(),
         ),
         "selected" => selected.extend(
             node.get("cdnInboundTags")
