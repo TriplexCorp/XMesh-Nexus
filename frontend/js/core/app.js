@@ -3331,7 +3331,7 @@ async function templatesP(){
 async function simple(ks){const h=await Promise.all(ks.map(k=>crudCard(k,ks.length>1)));return [h.join('')]}
 /* Host = client-facing endpoint, not a second Xray server configuration.
    Resolve inherited values for preview only; never expose server privateKey. */
-const {hostEditorMarkup,hostNodeCountryCode,hostNodeCountryRemark,hostAutofillNodeFields}=
+const {hostEditorMarkup,hostNodeCountryCode,hostNodeCountryRemark,hostAutofillNodeFields,bindHostEditor}=
   window.XMeshHostEditor.create({
     getProfiles:()=>DB.profiles,getNodes:()=>DB.nodes,findProfile:hostProfile,
     inbounds:inbs,renderField:field,escapeHtml:esc,icon:ic,
@@ -3858,11 +3858,12 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :standardFields;
   const boundedEntityEditor=['tpls','admins'].includes(k);
   const editorFields=boundedEntityEditor?'<div class="entity-editor-body">'+fields+'</div>':fields;
-  modal(`<form class="box${boundedEntityEditor?' entity-editor':''}" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog">${k==='nodes'?'<header class="node-editor-heading"><div><h2>'+(id?'Настройки узла':'Новый узел')+'</h2><p data-no-translate>'+esc(o.name||o.addr||'')+'</p></div><button type="button" class="gh" data-x aria-label="Закрыть">'+ic('x')+'</button></header>':k==='squads'?`<h2><span class="squad-heading-icon">${ic('layers')}</span>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`:`<h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`}${editorFields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
+  modal(`<form class="box${boundedEntityEditor?' entity-editor':''}" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog">${k==='hosts'?'<header class="host-editor-heading"><div><h2>'+(id?'Настройки хоста':'Новый хост')+'</h2><p data-no-translate>'+esc(o.remark||o.address||'')+'</p></div><button type="button" class="gh" data-x aria-label="Закрыть">'+ic('x')+'</button></header>':k==='nodes'?'<header class="node-editor-heading"><div><h2>'+(id?'Настройки узла':'Новый узел')+'</h2><p data-no-translate>'+esc(o.name||o.addr||'')+'</p></div><button type="button" class="gh" data-x aria-label="Закрыть">'+ic('x')+'</button></header>':k==='squads'?`<h2><span class="squad-heading-icon">${ic('layers')}</span>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`:`<h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>`}${editorFields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
   if(k==='nodes')syncNodeEffectiveTls(dlg.querySelector('form[data-ent="nodes"]'));
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
   if(k==='hosts'){
     const form=dlg.querySelector('form[data-ent="hosts"]');
+    bindHostEditor(form);
     hostEditorRefresh(form);
     void hostDeriveRealityPublic(form);
   }

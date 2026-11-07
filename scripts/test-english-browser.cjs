@@ -43,6 +43,14 @@ async function main(){const browser=await chromium.launch({headless:true,executa
     await scan(page,'User '+key);
    }}finally{await page.keyboard.press('Escape')}
   });
+  await check('English Host settings tabs and expert fields',async()=>{
+   await navigate('hosts');await page.locator('[data-ne="hosts"]').first().click();
+   try{for(const key of ['connection','client','preview']){
+    await page.locator(`[data-host-editor-tab="${key}"]`).click();
+    if(key==='client')await page.locator('.host-client-settings summary').click();
+    await scan(page,'Host '+key);
+   }}finally{await page.keyboard.press('Escape')}
+  });
   await check('English Node settings tabs',async()=>{
    await navigate('nodes');await page.locator(`[data-ne="nodes:${node.id}"]`).click();
    assert.equal(await page.locator('[data-node-tls-state]').innerText(),'Security not configured','A selected profile with missing Security must not be reported as missing');

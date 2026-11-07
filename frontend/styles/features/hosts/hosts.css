@@ -1,45 +1,44 @@
-/* Host workbench: independent form rails; system contract owns the outer dialog. */
-dialog.host-wide>form.box>h2{margin:0;font-size:1.4rem;line-height:1.3;padding-bottom:.7rem;border-bottom:1px solid var(--nx-border)}
-.host-editor-layout {
-  display:grid;
-  grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,.95fr);
-  grid-template-areas:"primary overrides preview" "assignment assignment preview";
-  grid-template-rows:auto 1fr;
-  gap:20px 26px;
-  align-items:start;
-  min-width:0;
-}
-.host-editor-layout>section,.host-assignment-panel{min-width:0;display:flex;flex-direction:column;gap:12px;box-sizing:border-box;margin:0}
-.host-editor-layout>.host-primary-panel{grid-area:primary}
-.host-editor-layout>.host-advanced-panel{grid-area:overrides;padding-inline:24px;border-inline:1px solid var(--nx-border)}
-.host-editor-layout>.host-editor-side{grid-area:preview;padding:18px;border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);background:var(--nx-section-bg)}
+/* Host tasks share one intrinsic frame; fields remain in the same form. */
+dialog.host-wide .host-editor-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+dialog.host-wide .host-editor-heading h2{margin:0;font-size:1.2rem;line-height:1.3}
+dialog.host-wide .host-editor-heading p{margin:.3rem 0 0;color:var(--mu);font-size:.8rem;overflow-wrap:anywhere}
+dialog.host-wide .host-editor-heading>[data-x]{display:grid;place-items:center;flex:none;width:var(--xm-close-size);height:var(--xm-close-size);padding:0}
+dialog.host-wide .host-editor-heading>[data-x] svg{width:var(--xm-close-glyph-size);height:var(--xm-close-glyph-size)}
+.host-editor-layout{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0;gap:.85rem}
+.host-editor-tabs{display:flex;gap:.35rem;border-bottom:1px solid var(--nx-separator);padding-bottom:.5rem;min-width:0}
+.host-editor-tabs [role=tab]{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.6rem .9rem;min-height:2.65rem;font-size:.85rem;font-weight:650;color:var(--mu);border:1px solid transparent;border-radius:var(--ui-control-radius);background:transparent;box-shadow:none}
+.host-editor-tabs [aria-selected=true]{color:var(--tx);background:var(--nx-selected-bg)}
+.host-editor-tabs [role=tab]:hover{color:var(--tx)}
+.host-editor-tabs svg{width:1.1rem;height:1.1rem;flex:none}
+.host-editor-panes{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:.15rem}
+[data-host-editor-pane]{grid-area:1/1;min-width:0;align-self:start}
+[data-host-editor-pane][data-active=false]{visibility:hidden;pointer-events:none;max-height:100%;overflow:clip}
+.host-connection-workspace,.host-preview-workspace{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:2rem;align-items:start;min-width:0}
+.host-primary-panel,.host-assignment-panel,.host-advanced-panel,.host-editor-side,.host-preview-status{min-width:0;display:flex;flex-direction:column;gap:1rem;margin:0}
+.host-assignment-panel,.host-preview-status{padding-inline-start:1.5rem;border-inline-start:1px solid var(--nx-border)}
 dialog.host-wide .node-form-section-title{display:flex;align-items:center;gap:.6rem;font-size:.94rem;line-height:1.4;font-weight:720;margin:0;padding:0;border:0;min-width:0}
 .host-editor-layout .node-form-section-title svg{color:var(--a);width:1.1rem;height:1.1rem;flex:none}
-.host-primary-panel>.node-form-section-title:not(:first-child){padding-top:12px;border-top:1px solid var(--nx-border)}
+.host-primary-panel>.node-form-section-title:not(:first-child){padding-top:.7rem;border-top:1px solid var(--nx-border)}
 .host-editor-layout .f{min-width:0;margin:0;gap:6px}
 .host-editor-layout .f>span:first-child{font-size:.78rem;line-height:1.4;font-weight:650}
 .host-editor-layout .f :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){width:100%;max-width:100%;min-width:0;box-sizing:border-box;min-height:2.4rem;font-size:.85rem}
 .host-editor-layout .f small{font-size:.73rem;line-height:1.4;color:var(--mu);overflow-wrap:anywhere}
-.host-connect-fields,.host-public-fields,.host-assignment-fields,.host-advanced-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;min-width:0}
+.host-connect-fields,.host-public-fields,.host-advanced-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;align-items:start;min-width:0}
 .host-connect-fields>.f:first-child{grid-column:1/-1}
-.host-public-fields>.f>span:first-child,.host-advanced-fields>.f>span:first-child{min-block-size:2.8em}
-.host-assignment-panel{grid-area:assignment;padding-top:14px;border-top:1px solid var(--nx-border)}
-.host-assignment-fields{grid-template-columns:minmax(0,1fr) minmax(13rem,.3fr)}
-.host-editor-layout .host-assignment-panel .ms{grid-template-columns:repeat(3,minmax(0,1fr))}
-.host-assignment-fields>.f:last-child{padding-left:16px;border-left:1px solid var(--nx-border)}
-.host-assignment-fields>.f:last-child>span:first-child{flex:1}
+.host-public-fields>.f>span:first-child{min-block-size:2.8em}
+.host-assignment-fields{display:grid;gap:1rem;min-width:0}
+.host-assignment-fields>.f:last-child{padding-top:.8rem;border-top:1px solid var(--nx-border)}
 .host-editor-layout .ms{display:grid;align-items:stretch;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;min-width:0}
 .host-editor-layout .ms label{width:100%;max-width:100%;min-width:0;font-size:.78rem;box-sizing:border-box;padding:.45rem .6rem;align-items:start}
 .host-editor-layout .ms label>input{margin-top:.1rem}
 .host-editor-layout .ms label>span{min-width:0;overflow-wrap:anywhere}
 .host-editor-layout [data-host-count]{font-size:.73rem;line-height:1.4;color:var(--mu)}
 .host-advanced-fields .f:has([name="publicKey"]){grid-column:1/-1}
-.host-advanced-fields .f:has([name="publicKey"])>span,.host-advanced-fields .f:has([name="clientEncryption"])>span{min-block-size:0}
 .host-advanced-heading{display:grid;gap:6px}
-.host-advanced-actions{display:flex;justify-content:flex-start;padding-top:12px;border-top:1px solid var(--nx-border)}
+.host-advanced-actions{padding-top:.8rem;border-top:1px solid var(--nx-border)}
 .host-editor-layout .node-ip-hint{margin:0;font-size:.75rem;line-height:1.45;color:var(--mu);overflow-wrap:anywhere}
 .host-resolved{display:grid;min-width:0}
-.host-resolved-line{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:12px;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--nx-border);min-width:0;font-size:.76rem;line-height:1.4}
+.host-resolved-line{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:12px;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--nx-border);min-width:0;font-size:.76rem;line-height:1.4}
 .host-resolved-line:last-child{border:0}
 .host-resolved-line>span{color:var(--mu);min-width:0}
 .host-resolved-line>b{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:.78rem;min-width:0;font-weight:650}
@@ -48,27 +47,19 @@ dialog.host-wide .node-form-section-title{display:flex;align-items:center;gap:.6
 .host-value-copy svg{width:14px;height:14px}
 .host-validation:not([hidden]){border-left:2px solid var(--wr);padding:.6rem .7rem;color:var(--tx);background:var(--nx-panel-bg);font-size:.75rem;line-height:1.45;margin:0}
 dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36px;white-space:normal;text-align:left}
-.host-preview-disclaimer{padding-top:10px;border-top:1px solid var(--nx-border)}
-@media (max-width:1260px){
-  .host-editor-layout{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"primary preview" "assignment preview" "overrides overrides";grid-template-rows:auto auto auto}
-  .host-editor-layout>.host-advanced-panel{padding:16px 0 0;border:0;border-top:1px solid var(--nx-border)}
-  .host-advanced-fields{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .host-assignment-fields{grid-template-columns:minmax(0,1fr)}
-  .host-assignment-fields>.f:last-child{padding-left:0;border-left:0}
-  .host-editor-layout .host-assignment-panel .ms{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:span 2}
+.host-preview-disclaimer{padding-top:.6rem;border-top:1px solid var(--nx-border)}
+@media (max-width:900px){
+ .host-connection-workspace,.host-preview-workspace{grid-template-columns:minmax(0,1fr);gap:1.25rem}
+ .host-assignment-panel,.host-preview-status{padding:1rem 0 0;border-inline:0;border-top:1px solid var(--nx-border)}
 }
-@media (max-width:760px){
-  .host-editor-layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"primary" "assignment" "overrides" "preview";grid-template-rows:repeat(4,max-content)}
-  .host-advanced-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:1/-1}
+@media (max-width:560px){
+ .host-editor-tabs{gap:.15rem}
+ .host-editor-tabs [role=tab]{flex:1 1 0;min-width:0;padding:.5rem .35rem;font-size:.76rem;gap:.3rem}
+ .host-editor-tabs [role=tab] span{white-space:normal}
+ .host-editor-tabs svg{display:none}
+ .host-connect-fields,.host-public-fields,.host-advanced-fields{grid-template-columns:minmax(0,1fr)}
+ .host-public-fields>.f>span:first-child{min-block-size:0}
 }
-@media (max-width:440px){
-  .host-connect-fields,.host-public-fields,.host-advanced-fields{grid-template-columns:minmax(0,1fr)}
-  .host-connect-fields>*,.host-advanced-fields>*{grid-column:1/-1}
-  .host-public-fields>.f>span:first-child,.host-advanced-fields>.f>span:first-child{min-block-size:0}
-}
-
 
 /* Host directory · compact Nexus cards. Shared system tokens own all material
    choices (solid, glass and raised); this feature only defines composition. */
@@ -175,10 +166,10 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36p
   .host-card-primary-actions{flex:1 1 auto}
   .host-card-order{margin-left:auto}
 }
-.host-advanced-actions{display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:start;gap:.5rem}
+.host-advanced-actions{display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:start;gap:.5rem}
 .host-advanced-actions>[data-host-clear-overrides]{min-width:0;white-space:normal}
-.host-client-settings{min-width:0}
-.host-client-settings[open]{grid-column:1/-1}
+.host-client-settings{min-width:0;justify-self:start}
+.host-client-settings[open]{grid-column:1/-1;justify-self:stretch}
 .host-client-settings>summary{cursor:pointer;color:var(--tx);font-size:.73rem;font-weight:650;line-height:1.3;padding:.55rem .65rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg)}
 .host-client-settings .f{margin-top:.65rem}
 .host-client-settings textarea{font-family:var(--font-mono,monospace);min-height:7rem;resize:vertical}
@@ -187,3 +178,5 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36p
 .host-field-help{display:inline-block;color:var(--mu);font-size:.8rem;cursor:help;margin-left:.25rem;font-weight:400}
 .host-field-help:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px;border-radius:50%}
 .host-client-settings>summary{font-weight:500;color:var(--mu)}
+
+@media (max-width:560px){.host-advanced-actions{grid-template-columns:minmax(0,1fr)}.host-advanced-actions>[data-host-clear-overrides]{justify-self:start;max-width:100%}}

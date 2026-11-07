@@ -1857,6 +1857,8 @@ window.XMeshI18n=(()=>{
   "Поддерживается Hysteria v2": "Hysteria v2 supported",
   "Подключать GeoSite/GeoIP к Xray на этой ноде": "Enable GeoSite/GeoIP for Xray on this node",
   "Подключена · ждёт профиль": "Connected · awaiting profile",
+  "Настройки хоста": "Host settings",
+  "Параметры клиента": "Client settings",
   "Подключение и назначение": "Connection & assignment",
   "Подключение узла": "Connect node",
   "Подключение, профиль Xray и ограничения узла": "Node connection, Xray profile and limits",

@@ -289,7 +289,11 @@ Host editor markup and Node → Host country/remark presets belong to
 live profile/node getters, profile/inbound lookup and the existing field/icon/
 escaping helpers plus the country catalog. It owns no DB copy or route state.
 `app.js` supplies the adapter and retains live preview, validation, X25519,
-event dispatch and submit ownership. The module does not define styles or a
+CRUD event dispatch and submit ownership. The feature owns accessible Host task
+tabs: Connection (endpoint and node assignment), Client settings, and Preview.
+All fields remain in one form; inactive tasks are inert and share one intrinsic
+CSS grid frame so switching does not move the dialog or footer. Invalid controls
+reveal their task before browser focus. The module does not define styles or a
 second control/material system.
 
 #### Squads directory

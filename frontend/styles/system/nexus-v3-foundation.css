@@ -458,7 +458,8 @@ html[data-glow=off]{--glow-alpha:0%}
 html[data-glow=subtle]{--glow-alpha:2%}
 html[data-glow=normal]{--glow-alpha:4%}
 html[data-glow=rich]{--glow-alpha:8%}
-body{background-image:radial-gradient(ellipse 120vw 100vh at 8% 0%,color-mix(in srgb,var(--a) var(--glow-alpha),transparent),transparent 85%),radial-gradient(ellipse 120vw 110vh at 100% 10%,color-mix(in srgb,var(--b) calc(var(--glow-alpha) * .7),transparent),transparent 90%);background-attachment:fixed}
+/* A uniform tint keeps the ambient setting without radial contours or gradient banding. */
+body{background-image:none;background-color:color-mix(in srgb,var(--bg),var(--a) calc(var(--glow-alpha) * .45))}
 *{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track)}
 *::-webkit-scrollbar{width:var(--scrollbar-size);height:var(--scrollbar-size)}
 *::-webkit-scrollbar-track{background:var(--scrollbar-track)}

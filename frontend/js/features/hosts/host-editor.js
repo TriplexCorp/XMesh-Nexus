@@ -51,35 +51,85 @@ window.XMeshHostEditor=(() => {
         return hint?markup.replace('<span>'+spec.l+'</span>','<span>'+spec.l+' <span class="host-field-help" tabindex="0" role="img" title="'+esc(hint)+'" aria-label="'+esc(hint)+'">ⓘ</span></span>'):markup;
       }).join('');
       const clientFields=['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].filter(k=>f(k)).map(k=>field(f(k),typeof o[k]==='object'&&o[k]!==null?JSON.stringify(o[k],null,2):o[k]||'')).join('');
-      // Three permanent, side-by-side editing zones. Keep all input names and
-      // actions unchanged so the existing save and live-preview logic still work.
+      const tabs=[['connection','Подключение','link'],['client','Параметры клиента','sliders'],['preview','Предпросмотр','globe']];
+      const panel=(key,body)=>'<div id="host-panel-'+key+'" role="tabpanel" aria-labelledby="host-tab-'+key+'" data-host-editor-pane="'+key+'" data-active="'+(key==='connection')+'" aria-hidden="'+(key!=='connection')+'"'+(key==='connection'?'':' inert')+'>'+body+'</div>';
       return '<div class="host-editor-layout">'+
-        '<section class="host-editor-main host-primary-panel" aria-label="Подключение и назначение">'+
-        '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
-        '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
-        '<div class="node-form-section-title">Публичная точка</div>'+
-        '<div class="host-public-fields">'+basic+'</div>'+
-        '</section>'+
-        '<div class="host-assignment-panel"><div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
-        '<div class="host-assignment-fields">'+nodes+'</div>'+
-        '<small class="note" data-host-count></small></div>'+
-        '<section class="host-advanced host-advanced-panel" aria-label="Расширенные переопределения">'+
-        '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Расширенные переопределения</span></div>'+
-        '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
-        '<div class="host-advanced-fields">'+advanced+'</div>'+
-        '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button>'+
-        '<details class="host-client-settings"><summary>Экспертные настройки JSON</summary><p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details></div></section>'+
-        '<section class="host-editor-side" aria-label="Клиентское подключение">'+
-        '<div class="node-form-section-title">'+ic('globe')+'<span>Клиентское подключение</span></div>'+
-        '<p class="node-ip-hint">Предпросмотр из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+
-        '<div class="host-resolved" data-host-resolved></div>'+
-        '<p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p>'+
-        '<p class="host-validation" data-host-warnings role="status" hidden></p>'+
-        '<button type="button" class="gh sm" data-host-repair hidden></button>'+
-        '<button type="button" class="gh sm" data-host-link-profile hidden></button>'+
-        '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p></section></div>';
+        '<nav class="host-editor-tabs" role="tablist" aria-label="Настройки хоста">'+tabs.map(([key,label,icon],index)=>'<button type="button" role="tab" id="host-tab-'+key+'" aria-controls="host-panel-'+key+'" aria-selected="'+(index===0)+'" tabindex="'+(index===0?'0':'-1')+'" data-host-editor-tab="'+key+'">'+ic(icon)+'<span>'+label+'</span></button>').join('')+'</nav>'+
+        '<div class="host-editor-panes">'+
+        panel('connection','<div class="host-connection-workspace"><section class="host-editor-main host-primary-panel" aria-label="Подключение и назначение">'+
+          '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
+          '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
+          '<div class="node-form-section-title">Публичная точка</div><div class="host-public-fields">'+basic+'</div></section>'+
+          '<section class="host-assignment-panel"><div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
+          '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small></section></div>')+
+        panel('client','<section class="host-advanced host-advanced-panel" aria-label="Параметры клиента">'+
+          '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Параметры клиента</span></div>'+
+          '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
+          '<div class="host-advanced-fields">'+advanced+'</div>'+
+          '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button>'+
+          '<details class="host-client-settings"><summary>Экспертные настройки JSON</summary><p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details></div></section>')+
+        panel('preview','<section class="host-editor-side" aria-label="Клиентское подключение">'+
+          '<div class="node-form-section-title">'+ic('globe')+'<span>Клиентское подключение</span></div>'+
+          '<p class="node-ip-hint">Предпросмотр из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+
+          '<div class="host-preview-workspace"><div class="host-resolved" data-host-resolved></div><div class="host-preview-status">'+
+          '<p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p>'+
+          '<p class="host-validation" data-host-warnings role="status" hidden></p>'+
+          '<button type="button" class="gh sm" data-host-repair hidden></button>'+
+          '<button type="button" class="gh sm" data-host-link-profile hidden></button>'+
+          '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p></div></div></section>')+
+        '</div></div>';
     }
-    return Object.freeze({hostEditorMarkup,hostNodeCountryCode,hostNodeCountryRemark,hostAutofillNodeFields});
+    function bindHostEditor(form){
+      if(!form||form.dataset.hostTabsBound)return;
+      form.dataset.hostTabsBound='true';
+      // Prepare themed selects before measuring the shared intrinsic task frame.
+      // Inactive tasks stay visually hidden throughout this synchronous setup.
+      for(const pane of form.querySelectorAll('[data-host-editor-pane]'))pane.inert=false;
+      window.XMeshSelects?.refresh(form);
+      for(const pane of form.querySelectorAll('[data-host-editor-pane]'))pane.inert=pane.dataset.active!=='true';
+      const keys=['connection','client','preview'];
+      const activate=(key,focus=false)=>{
+        for(const tab of form.querySelectorAll('[data-host-editor-tab]')){
+          const selected=tab.dataset.hostEditorTab===key;
+          tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;
+          if(selected&&focus)tab.focus();
+        }
+        for(const pane of form.querySelectorAll('[data-host-editor-pane]')){
+          const active=pane.dataset.hostEditorPane===key;
+          pane.dataset.active=String(active);pane.inert=!active;pane.setAttribute('aria-hidden',String(!active));
+        }
+        const pane=form.querySelector('[data-host-editor-pane="'+key+'"]');
+        window.XMeshSelects?.refresh(pane);
+        const body=form.querySelector('.host-editor-panes');if(body)body.scrollTop=0;
+      };
+      form.addEventListener('click',event=>{
+        const tab=event.target.closest('[data-host-editor-tab]');
+        if(tab)activate(tab.dataset.hostEditorTab);
+      });
+      form.addEventListener('keydown',event=>{
+        const tab=event.target.closest('[data-host-editor-tab]');
+        if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+        event.preventDefault();
+        const index=keys.indexOf(tab.dataset.hostEditorTab);
+        activate(keys[event.key==='Home'?0:event.key==='End'?keys.length-1:(index+(event.key==='ArrowRight'?1:-1)+keys.length)%keys.length],true);
+      });
+      let revealing=false;
+      form.addEventListener('invalid',event=>{
+        if(revealing)return;
+        const pane=event.target.closest('[data-host-editor-pane]');
+        if(pane){revealing=true;activate(pane.dataset.hostEditorPane);setTimeout(()=>{revealing=false},0);}
+      },true);
+      form.addEventListener('submit',()=>{
+        for(const key of ['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings']){
+          const raw=form.elements.namedItem(key)?.value.trim();
+          if(!raw)continue;
+          try{const value=JSON.parse(raw);if(value&&typeof value==='object'&&!Array.isArray(value))continue;}catch(_){}
+          activate('client');const details=form.querySelector('.host-client-settings');if(details)details.open=true;break;
+        }
+      },true);
+    }
+
+    return Object.freeze({hostEditorMarkup,hostNodeCountryCode,hostNodeCountryRemark,hostAutofillNodeFields,bindHostEditor});
   }
   return Object.freeze({create});
 })();

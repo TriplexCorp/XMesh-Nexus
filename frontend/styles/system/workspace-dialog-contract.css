@@ -46,7 +46,7 @@ dialog#dlg.node-wide>form.box{
 }
 
 #dlg.host-wide{
-  --dialog-width:96rem;
+  --dialog-width:72rem;
   width:min(var(--dialog-width),calc(100vw - 2rem));
   inline-size:min(var(--dialog-width),calc(100vw - 2rem));
   min-width:min(72rem,calc(100vw - 2rem));
@@ -80,10 +80,9 @@ dialog#dlg.node-wide>form.box{
 #dlg.host-wide>form.box>.host-editor-layout{
   min-height:0;
   max-height:100%;
-  overflow:auto;
+  overflow:hidden;
   overscroll-behavior:contain;
-  scrollbar-gutter:stable;
-  align-items:start;
+  align-items:stretch;
 }
 
 #dlg.host-wide>form.box>#fe{
