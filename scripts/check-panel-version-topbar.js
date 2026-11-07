@@ -2,6 +2,9 @@
 'use strict';
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+const {execFileSync}=require('node:child_process');
 const {assertPackaged}=require('./ci/frontend-source.cjs');
 const read=path=>fs.readFileSync(path,'utf8');
 const html=read('frontend/index.html');
@@ -15,6 +18,7 @@ const docker=read('backend/Dockerfile');
 const signer=read('backend/Dockerfile.xsp-signer');
 const compose=read('compose.yaml');
 const ctl=read('xmeshctl');
+const resolver=read('scripts/resolve-panel-build-revision.sh');
 const install=read('install.sh');
 const i18n=read('frontend/js/core/i18n.js');
 new Function(script);
@@ -50,10 +54,49 @@ assert.match(docker,/COPY VERSION \/build\/VERSION/);
 assert.match(signer,/source=VERSION,target=\/source\/VERSION,ro/,'Signer must bind the canonical product version');
 assert.match(signer,/cp \/source\/VERSION \/build\/VERSION/,'Signer must make product version available before Rust compilation');
 assert.match(docker,/ARG PANEL_BUILD_REVISION=unknown/);
+assert.match(docker,/--mount=type=bind,source=\\.,target=\\/source,readonly/,
+ 'Direct Compose builds must inspect the checkout without copying Git into the image');
+assert.match(docker,/sh \\/source\\/scripts\\/resolve-panel-build-revision[.]sh/);
+assert.match(docker,/PANEL_BUILD_REVISION="\\$revision" cargo build --release/,
+ 'Resolved SHA must be supplied to rustc instead of the unknown default');
+assert.match(resolver,/status --porcelain --untracked-files=normal/,
+ 'Build revision must not impersonate a clean upstream commit for dirty sources');
+assert.match(resolver,/diff --quiet HEAD/,
+ 'Build revision must reject locally changed tracked sources');
 assert.match(compose,/PANEL_BUILD_REVISION: \$\{PANEL_BUILD_REVISION:-unknown\}/);
-assert.match(ctl,/PANEL_BUILD_REVISION="\$\{revision:-unknown\}" docker compose/);
+assert.match(ctl,/PANEL_BUILD_REVISION="\\$revision" docker compose/);
+assert.match(ctl,/resolve-panel-build-revision[.]sh/);
 assert.match(install,/export PANEL_BUILD_REVISION=/);
+assert.match(install,/resolve-panel-build-revision[.]sh/);
 assert.match(i18n,/"Проверить обновления":"Check for updates"/);
 assert.match(i18n,/"Не удалось связаться с GitHub\. Актуальность не подтверждена\."/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'Balanced CSS');
-console.log('Panel build version and owner-only on-demand update check: OK');
+// Exercise the resolver with actual Git history and a temporary worktree. The
+// local metadata must be exact, not inferred from the remote branch tip.
+const source=fs.mkdtempSync(path.join(os.tmpdir(),'xmesh-version-source-'));
+const archive=fs.mkdtempSync(path.join(os.tmpdir(),'xmesh-version-archive-'));
+const run=(revision,dir)=>execFileSync('sh',[path.resolve('scripts/resolve-panel-build-revision.sh'),revision,dir],{encoding:'utf8'}).trim();
+const git=(...args)=>execFileSync('git',args,{cwd:source,encoding:'utf8'}).trim();
+try{
+  assert.equal(run('unknown',archive),'unknown','Archive without .git cannot claim SHA');
+  git('init','-q');
+  fs.writeFileSync(path.join(source,'fixture.txt'),'original\\n');
+  git('add','fixture.txt');
+  git('-c','user.name=CI','-c','user.email=ci@example.invalid','commit','-qm','fixture');
+  const revision=git('rev-parse','HEAD');
+  assert.match(revision,/^[0-9a-f]{40}$/);
+  assert.equal(run('unknown',source),revision,'Clean checkout discovers exact HEAD');
+  assert.equal(run('main',source),'unknown','Invalid explicit revision is never substituted with HEAD');
+  fs.appendFileSync(path.join(source,'fixture.txt'),'modified\\n');
+  assert.equal(run('unknown',source),'unknown','Tracked modifications must not impersonate HEAD');
+  fs.writeFileSync(path.join(source,'fixture.txt'),'original\\n');
+  fs.writeFileSync(path.join(source,'extra.txt'),'untracked\\n');
+  assert.equal(run('unknown',source),'unknown','Untracked source files must invalidate HEAD');
+  assert.equal(run(revision,source),revision,'Caller-supplied SHA is accepted as explicit build provenance');
+  fs.rmSync(path.join(source,'extra.txt'));
+  assert.equal(run('unknown',source),revision,'Clean checkout can recover after dirty changes');
+}finally{
+  fs.rmSync(source,{recursive:true,force:true});
+  fs.rmSync(archive,{recursive:true,force:true});
+}
+console.log('Panel build provenance and owner-only on-demand update check: OK');
