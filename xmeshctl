@@ -79,7 +79,14 @@ require_compose() {
   fi
 }
 
-compose() { docker compose "$@"; }
+compose() {
+  # Tag only the built binary, never the operator-owned .env.
+  local revision="${PANEL_BUILD_REVISION:-}"
+  if [[ -z "$revision" ]]; then
+    revision="$(git -C "$ROOT" rev-parse --verify HEAD 2>/dev/null || true)"
+  fi
+  PANEL_BUILD_REVISION="${revision:-unknown}" docker compose "$@"
+}
 
 show_status() {
   say "Состояние сервисов"
