@@ -1,8 +1,10 @@
 # Public subscription experience 2.0
 
-The primary task is connecting a device. The account header keeps status and expiry
-visible, followed by a wide connection panel and a smaller analytics rail. Phones
-show connection before expiry and traffic. Branding, colors, fonts, radius,
+The primary task is connecting a device. A broad connection card sits beside a
+combined expiry and traffic rail. Below it, real shortcuts open instructions and
+registered-device information or navigate to usage and support. Quick setup keeps
+platform selection on the page and opens the same application guide. Phones show
+connection before the combined account rail. Branding, colors, fonts, radius,
 materials, application visibility, custom clients and configured URLs remain owned
 by Subscription Studio. The authenticated panel remains isolated from public CSS.
 
@@ -41,8 +43,8 @@ Unattributed historical consumption remains explicitly unattributed. Upload and
 download appear only when both directions are measured; they are labeled as
 measured server traffic if a legacy unassigned baseline also exists.
 
-Unlimited plans show an amount and an unlimited label, with server distribution
-behind a disclosure. Finite plans show the real allowance and remaining amount.
+Unlimited plans show an amount and an unlimited label without a fictitious quota
+progress bar. Real server distribution is shown in the lower analytics card. Finite plans show the real allowance and remaining amount.
 No history, speed, plan name or statistics period is invented. Device counts are
 registered slots, not a count of live VPN connections; absent tracking is distinct
 from zero. Missing/invalid expiry is distinct from an explicit zero (unlimited).
@@ -70,7 +72,7 @@ and fallback exceptions clean up temporary DOM fields and report failure safely.
 
 ## Validation and limits
 
-- Browser suite: 36 viewport/locale/state cases at 320, 375, 390, 430, 768, 1024, 1440 and 1920 px; RU/EN; dark/light;
+- Browser suite: 37 viewport/locale/state cases at 320, 375, 390, 430, 768, 1024, 1440 and 1920 px; RU/EN; dark/light;
   copy, QR, focus, platform/app selection, terminal/waiting states, unlimited,
   empty traffic, hidden capabilities and reduced motion.
 - Rust: missing/unlimited/waiting expiry and browser/client Accept matrices, plus
@@ -104,3 +106,21 @@ agent or user credentials are used for testing.
 - [Linear](https://linear.app), [Vercel](https://vercel.com),
   [Stripe](https://stripe.com): visual references for hierarchy, restraint and
   numerical clarity, not sources of copied branding or layout code.
+
+## Dashboard reference follow-up
+
+The new composition follows the supplied visual reference: framed header, accent
+connection card, combined account rail, functional shortcut bar, platform tiles
+and a support banner. Decorative waves are local inline SVG and inherit the owner
+accent; no external images or tracking are added. Light/dark, material and radius
+settings remain supported in both the portal and Studio.
+
+The reference's Pro tier, priority benefits, auto-renew switch, recommended servers
+and latency values have no authoritative source in this portal and are not
+fabricated. The lower-right panel explicitly shows measured usage by server.
+Device information describes registered slots, not active VPN sessions.
+The expired/paused/quota-exhausted states retain this composition without enabling
+connection controls.
+
+[Desktop](checkpoints/subscription-dashboard-reference/desktop.png) ·
+[Mobile](checkpoints/subscription-dashboard-reference/mobile.png)

@@ -1,6 +1,7 @@
 'use strict';
 // Shared by the bearer-scoped customer page and Studio's sample preview.
 window.XMeshSubscriptionTraffic={mount(metric,{used,limit,servers=[],language='ru'}){
+  metric._portalDistribution?.remove();
   metric.querySelector('.portal-donut')?.remove();
   const en=language==='en',text=en?{total:'Total',other:'Unattributed usage',empty:'No server measurements yet',all:'All servers',limit:'Limit',remaining:'Remaining',unlimited:'Unlimited'}:{total:'Всего',other:'Без привязки к серверу',empty:'Измерений по серверам пока нет',all:'Все серверы',limit:'Лимит',remaining:'Осталось',unlimited:'Без лимита'};
   const fmt=n=>{const power=n>=1048576?2:n>=1024?1:0;return new Intl.NumberFormat(en?'en-GB':'ru-RU',{maximumFractionDigits:2}).format(n/(1024**power))+' '+(en?['GB','TB','PB']:['ГБ','ТБ','ПБ'])[power]};
@@ -29,11 +30,11 @@ window.XMeshSubscriptionTraffic={mount(metric,{used,limit,servers=[],language='r
   const reset=el('button','portal-donut-reset',text.all);reset.type='button';reset.addEventListener('click',()=>{selected=-1;select(-1)});
   if(items.length)legend.append(reset);else legend.append(el('p','',text.empty));
   root.append(chart,legend);metric.append(root);
-  if(limit===0){
-    root.dataset.unlimited='true';const summary=el('div','experience-unlimited-summary');summary.append(el('b','',fmt(total)),el('small','',text.unlimited));root.prepend(summary);
-    if(items.length){const details=el('details','experience-server-details'),heading=el('summary','',en?'By server':'По серверам');details.append(heading,chart,legend);root.append(details)}
-    else{chart.hidden=true;legend.hidden=true;summary.append(el('p','',text.empty))}
-  }
+  root.dataset.unlimited=String(limit===0);
+  const summary=el('div','experience-unlimited-summary');summary.append(el('b','',fmt(total)),el('small','',limit===0?text.unlimited:text.total));root.prepend(summary);
+  if(items.length){const details=el('details','experience-server-details'),heading=el('summary','',en?'By server':'По серверам');const content=el('div','experience-distribution-content');content.append(chart,legend);details.append(heading,content);metric._portalDistribution=details;root.append(details)}
+  else{chart.hidden=true;legend.hidden=true;summary.append(el('p','',text.empty))}
+  if(limit>0){const meter=el('div','experience-quota-meter');meter.setAttribute('role','progressbar');meter.setAttribute('aria-label',en?'Data allowance used':'Использовано лимита');meter.setAttribute('aria-valuemin','0');meter.setAttribute('aria-valuemax',String(limit));meter.setAttribute('aria-valuenow',String(Math.min(total,limit)));meter.setAttribute('aria-valuetext',fmt(total)+' / '+fmt(limit));const fill=el('i');fill.style.width=Math.min(100,total/limit*100)+'%';meter.append(fill);root.append(meter)}
 
   const allowance=el('p','portal-donut-allowance',limit>0?text.limit+': '+fmt(limit)+' · '+text.remaining+': '+fmt(Math.max(0,limit-total)):text.unlimited);root.append(allowance);if(limit===0)allowance.hidden=true;
   if(servers.length&&servers.every(s=>Number.isFinite(s.upload)&&Number.isFinite(s.download))){
