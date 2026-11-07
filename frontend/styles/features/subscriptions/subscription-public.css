@@ -16,7 +16,7 @@ body.subscription-public{
 }
 
 .subscription-public .subscription-public-shell{
-  width:min(calc(100% - 48px),1340px);
+  width:min(calc(100% - 40px),1440px);
   margin:clamp(18px,3.4vh,44px) auto;
   padding-bottom:clamp(28px,5vh,64px);
 }
