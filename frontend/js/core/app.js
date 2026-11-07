@@ -1060,7 +1060,7 @@ const view=()=>{
   '<div class="nx-directory-search balancer-directory-search">'+ic('search')+'<input id="balancer-search" type="search" aria-label="Поиск балансировщиков" placeholder="Найти балансировщик…" autocomplete="off">'+
   '<button type="button" class="nx-directory-search-clear" id="balancer-search-clear" aria-label="Очистить поиск" hidden>'+ic('x')+'</button></div>'+
   '<label class="nx-workspace-filter"><span>Состояние</span><select id="balancer-state-filter"><option value="all">Все</option><option value="enabled">Активные</option><option value="disabled">Отключены</option></select></label>'+
-  '<span class="node-result-count" id="balancers-count"></span><div class="nx-workspace-actions">'+workspaceGridControls('balancers')+'<button type="button" class="btn balancer-toolbar-save" id="balancer-save" title="Применить изменения балансировщиков">'+ic('save')+' Сохранить</button>'+workspaceCreateButton('balancers','Новый балансировщик','balancer-add')+'</div></div>'+
+  '<span class="node-result-count" id="balancers-count"></span><div class="nx-workspace-actions">'+workspaceGridControls('balancers')+'<button type="button" class="btn balancer-toolbar-save" id="balancer-save">'+ic('save')+' Сохранить</button>'+workspaceCreateButton('balancers','Новый балансировщик','balancer-add')+'</div></div>'+
   '<div id="balancers-list" class="balancer-list" data-ui-layout="cards" data-workspace-grid="balancers" data-grid-mode="'+workspaceGridMode('balancers')+'"></div>'+
   '<div class="nx-directory-search-empty" id="balancers-search-empty" hidden>'+ic('search')+'<b>Совпадений не найдено</b><span>Попробуйте другой запрос или очистите поиск.</span></div>'+
   '</section>';
