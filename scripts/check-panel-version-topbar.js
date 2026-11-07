@@ -28,6 +28,8 @@ assert.match(app,/XMeshPanelVersion\?\.init\(sessionUser\)/);
 assert.match(script,/getJSON\('\/api\/v1\/panel\/version'\)/);
 assert.match(script,/getJSON\('\/api\/v1\/panel\/version\/check'\)/);
 assert.match(script,/owner=user\?\.role==='owner'/);
+assert.match(script,/addEventListener\('xmesh:locale-changed',render\)/,'Language changes must use the explicit locale event');
+assert.doesNotMatch(script,/MutationObserver/,'Watching the lang attribute would recursively render the translator');
 assert.match(script,/check\.hidden=!owner/);
 assert.match(script,/settings\.hidden=!owner\|\|checked\?\.status!=='update_available'/);
 assert.match(script,/status\.dataset\.state=checked\?\.status\|\|'idle'/);
