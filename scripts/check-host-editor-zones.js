@@ -75,6 +75,8 @@ assert.deepEqual(sections,[
  'host-editor-main host-primary-panel',
  'host-assignment-panel',
  'host-advanced host-advanced-panel',
+ 'host-client-group',
+ 'host-client-group',
  'host-editor-side'
 ],'Each task must preserve its semantic editing sections.');
 for(const key of names){
@@ -86,6 +88,8 @@ for(const action of ['data-host-node-preset','data-host-count','data-host-resolv
  assert(html.includes(action),'Missing working host editor action '+action);
 }
 assert(!html.includes('<details class="host-advanced'),'Existing transport and security overrides must remain visible');
+assert.equal((html.match(/class="host-client-group"/g)||[]).length,2,'Client fields must have Transport and Security groupings');
+assert.match(html,/class="host-advanced-groups"/,'Both groups must remain inside the same Host form');
 assert(html.includes('host-client-settings'),'Expert client metadata must have its own disclosure');
 // Bootstrap refreshes replace arrays. An existing feature instance must see
 // the new collections and must leave their objects untouched during rendering.
@@ -110,9 +114,11 @@ assert.match(feature,/form.addEventListener\('invalid'/,'Native errors must reve
 assert.match(feature,/ArrowLeft.*ArrowRight.*Home.*End/,'Tabs need standard keyboard navigation');
 assert.match(app,/bindHostEditor\(form\)/,'The real form must install task interactions');
 assert.match(css,/\.host-editor-panes\s*\{[^}]*display:grid[^}]*overflow:auto/,'The task frame must own scrolling');
+assert.match(css,/\.host-resolved\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,'Preview must fill the canvas rather than leaving an empty right sidebar');
+assert.match(css,/\.host-advanced-groups\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,'Client fields must use two readable desktop groups');
 assert.match(css,/\[data-host-editor-pane\]\s*\{[^}]*grid-area:1\/1/,'All tasks must share one intrinsic frame');
 assert.match(css,/\[data-host-editor-pane\]\[data-active=false\][^}]*visibility:hidden;pointer-events:none;max-height:100%;overflow:clip/,'Inactive tasks must reserve geometry without extending the scroll area');
-assert.match(css,/#dlg\.host-wide\s*\{[^}]*--dialog-width:72rem/,'Hosts must use a readable dialog width');
+assert.match(css,/#dlg\.host-wide\s*\{[^}]*--dialog-width:80rem/,'Hosts must use a readable dialog width');
 assert.match(css,/#dlg\.host-wide>form\.box\s*\{[\s\S]*?grid-template-rows:auto minmax\(0,1fr\) auto auto[\s\S]*?overflow:hidden/,'The shell must reserve a shrinkable body and visible footer');
 assert.match(css,/#dlg\.host-wide>form\.box>\.host-editor-layout\s*\{[^}]*overflow:hidden/,'The tab rail must stay outside the scrolling task frame');
 assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*position:static[^}]*z-index:auto/,'Footer must not cover fields');
