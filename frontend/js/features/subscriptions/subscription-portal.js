@@ -72,34 +72,13 @@
   };
   Object.entries(dashboard).forEach(([id,text])=>{const el=document.getElementById(id);if(el)el.textContent=text});
 
-  // This meter visualizes the server-provided allowance, never an invented trend.
   document.querySelectorAll('[data-subscription-traffic]').forEach(metric=>{
-    const track=metric.querySelector('.subscription-preview-progress');
-    if(!track)return;
-    const value=metric.querySelector('b')?.textContent||'';
-    const used=Number(metric.dataset.usedGib),limit=Number(metric.dataset.limitGib);
-    if(metric.hasAttribute('data-used-gib')&&Number.isFinite(used)&&Number.isFinite(limit)){
-      const fmt=n=>new Intl.NumberFormat(language==='en'?'en-GB':'ru-RU',{maximumFractionDigits:2}).format(n)+' '+(language==='en'?'GB':'ГБ');
-      const combined=metric.querySelector('b');combined.classList.add('portal-usage-total');combined.hidden=limit<=0;
-      combined.textContent=limit>0?new Intl.NumberFormat(language,{maximumFractionDigits:1}).format(Math.min(100,used/limit*100))+'%':(language==='en'?'Unlimited':'Без лимита');
-      const allowance=document.createElement('p');allowance.className='portal-usage-allowance';
-      allowance.textContent=limit>0?(language==='en'?'Limit: ':'Лимит: ')+fmt(limit):(language==='en'?'Unlimited':'Без лимита');
-      const breakdown=document.createElement('div');breakdown.className='portal-usage-breakdown';
-      const fields=[[language==='en'?'Used':'Использовано',fmt(used)]];
-      if(limit>0)fields.push([language==='en'?'Remaining':'Осталось',fmt(Math.max(0,limit-used))]);
-      for(const [label,amount] of fields){
-        const field=document.createElement('div'),small=document.createElement('small'),bold=document.createElement('b');small.textContent=label;bold.textContent=amount;field.append(small,bold);breakdown.append(field);
-      }
-      metric.append(allowance,breakdown);
-    }
-    if(/Unlimited|Без лимита/i.test(value)){track.hidden=true;return;}
-    const percent=Number.parseFloat(track.querySelector('i')?.style.width||'');
-    if(!Number.isFinite(percent)){track.hidden=true;return;}
-    track.setAttribute('role','meter');track.setAttribute('aria-label',copy.trafficLabel);
-    track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');
-    track.setAttribute('aria-valuenow',String(Math.max(0,Math.min(100,percent))));
-    track.setAttribute('aria-valuetext',value);
+    let servers=[];
+    try{servers=JSON.parse(metric.dataset.trafficServers||'[]')}catch{ /* Keep factual total if breakdown is unavailable. */ }
+    window.XMeshSubscriptionTraffic?.mount(metric,{used:Number(metric.dataset.usedGib)||0,limit:Number(metric.dataset.limitGib)||0,servers,language});
   });
+  document.getElementById('toggle-link')?.remove();
+  document.getElementById('subscription-link-card')?.remove();
   const info=document.querySelector('.subscription-public-info-panel');
   if(info)info.hidden=!document.querySelector('[data-subscription-metrics]');
   const primaryCopy=document.getElementById('connect-link');

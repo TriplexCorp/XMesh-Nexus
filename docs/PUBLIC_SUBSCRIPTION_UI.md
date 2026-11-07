@@ -19,3 +19,11 @@ branding, colors, fonts, radius and materials. Motion respects reduced-motion.
 `node scripts/test-public-subscription-browser.cjs` checks the real template and
 assets with disposable data at 320/390/768/1440/1920 px in RU/EN and dark/light,
 including ordering, collapsed apps, usage, copy/QR, keyboard and visibility states.
+
+Traffic now uses a shared SVG donut in the live portal and Studio. Bearer resolution
+precedes a user-scoped SQL read of authenticated per-node counters; only display
+names and GiB enter an HTML-escaped data attribute. No admin API is exposed.
+Hover/focus previews a server; click/Enter selects it; Escape or All servers resets.
+Touch users can choose the matching legend button. Empty counters show no segments;
+legacy unassigned consumption is explicitly unattributed. Link reveal is removed
+from the live UI; copy and QR still share the canonical bearer URL.
