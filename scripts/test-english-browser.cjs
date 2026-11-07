@@ -44,7 +44,10 @@ async function main(){const browser=await chromium.launch({headless:true,executa
    }}finally{await page.keyboard.press('Escape')}
   });
   await check('English Host settings tabs and expert fields',async()=>{
+   const tlsProfile=await create('profiles',{name:prefix+' TLS host',config:JSON.stringify({inbounds:[{tag:prefix+'-host-tls',listen:'127.0.0.1',port:28355,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'xhttp',security:'tls',tlsSettings:{serverName:'english.example.invalid'},xhttpSettings:{path:'/english'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+   await create('nodes',{name:prefix+' TLS node',addr:'192.0.2.12',port:443,profileId:tlsProfile.id});
    await navigate('hosts');await page.locator('[data-ne="hosts"]').first().click();
+   await page.locator('#dlg [name="profileId"]').evaluate((select,id)=>{select.value=String(id);select.dispatchEvent(new Event('change',{bubbles:true}))},tlsProfile.id);
    try{for(const key of ['connection','client','preview']){
     await page.locator(`[data-host-editor-tab="${key}"]`).click();
     if(key==='client')await page.locator('.host-client-settings summary').click();
