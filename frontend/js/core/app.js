@@ -367,7 +367,7 @@ const ENT={
       return '';
     },
     guard:r=>''},
-  tpls:{t:'Шаблоны пользователей',n:'Лимиты, срок и доступ для новых пользователей.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
+  tpls:{t:'Шаблоны пользователей',n:'Лимиты, срок и доступ для новых пользователей.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Лимит CDN, ГиБ',t:'num',h:'0 — без лимита на CDN. Применяется только к inbound, выбранным в настройках панели.'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Трафик',r=>r.limit?r.limit+' ГБ':'∞'],['Срок',r=>r.days?r.days+' дн':'∞'],['Устройств',r=>r.hwid],['Сквады',r=>r.squads.map(i=>chip(esc(DB.squads.find(s=>s.id==i)?.name||'?'),'--b')).join(' ')],['Режим',r=>r.hold?chip('on hold','--c3'):'—']]},
   subs:{t:'Шаблоны подписки',n:'Формат и содержимое клиентской конфигурации.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'fmt',l:'Формат',t:'sel',o:FMT},{k:'content',l:'Содержимое',t:'area',rows:9}],def:()=>({fmt:'XRAY_JSON',content:'{}'}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Формат',r=>chip(r.fmt,'--c3')],['Размер',r=>r.content.length+' симв.']]},
@@ -390,8 +390,8 @@ const ENT={
   },
 
 };
-const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'tg',l:'Telegram ID',ph:'Например, 123456789'},{k:'email',l:'Email',t:'email',ph:'name@example.com'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
-const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
+const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'tg',l:'Telegram ID',ph:'Например, 123456789'},{k:'email',l:'Email',t:'email',ph:'name@example.com'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Лимит CDN, ГиБ',t:'num',h:'0 — без лимита. Применяется ко всей группе CDN-inbound.'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
+const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Лимит CDN, ГиБ',t:'num',h:'0 — без лимита на CDN (основные серверы не затрагиваются)'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
 
 // All 249 ISO 3166-1 alpha-2 regions, plus Kosovo (user-assigned XK).
 // ISO GB is the United Kingdom; UK and England are search aliases, not duplicate codes.
@@ -2369,6 +2369,8 @@ function userDrawer(id,tab){
     <div class="user-overview-band">
       <div class="user-usage-line">${ic("activity")}<span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Сбросить трафик пользователя">${ic('redo')} Сбросить трафик</button><span class="user-expiry-summary" data-user-expiry-summary >${ic('calendar')} <span>Осталось</span> <strong>${userRemainingLabel(u.expireAt)}</strong></span></div>
       ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,usageRatio*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,usageRatio*100)))}"><i></i></div>`:''}
+      ${Array.isArray(DB.set.cdnInboundTags)&&DB.set.cdnInboundTags.length?
+        `<div class="user-usage-line"><span>CDN / Белые списки</span><strong>${(Number(u.cdnUsedBytes||0)/1073741824).toFixed(2)} ГиБ</strong><small>${Number(u.cdnLimitGb||0)>0?'из '+Number(u.cdnLimitGb)+' ГиБ':'без лимита'}</small></div>`:''}
       <div class="user-identity-row">${ic("key")}<span>Xray ID</span>${viewerMode() ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
     </div>
     <nav class="user-editor-tabs" role="tablist" aria-label="Настройки пользователя">${[['ov','Настройки','sliders'],['acc','Доступ и подписка','globe'],['routing','Маршрутизация','route'],['traffic','Трафик','activity'],['dev','Устройства','monitor']].map(([key,title,icon],index)=>`<button type="button" role="tab" id="user-tab-${key}" aria-controls="user-panel-${key}" aria-selected="${index===0}" tabindex="${index===0?0:-1}" data-user-editor-tab="${key}">${ic(icon)}<span>${title}</span></button>`).join('')}</nav>
@@ -2384,9 +2386,10 @@ function userDrawer(id,tab){
             </section>
             <section class="user-detail-card user-connection-card"><header class="user-card-title">${ic('sliders')}<div><h3>Параметры подключения</h3><p>Ограничения и поведение трафика</p></div></header>
               ${field(FE.find(f=>f.k==='limit'),u.limit)}
+              ${field(FE.find(f=>f.k==='cdnLimitGb'),u.cdnLimitGb)}
               ${field(FE.find(f=>f.k==='strategy'),u.strategy)}
               ${field(FE.find(f=>f.k==='tag'),u.tag)}
-              ${FE.filter(f=>!['username','limit','expireAt','strategy','desc','tg','email','tag'].includes(f.k)).map(f=>field(f,u[f.k])).join('')}
+              ${FE.filter(f=>!['username','limit','cdnLimitGb','expireAt','strategy','desc','tg','email','tag'].includes(f.k)).map(f=>field(f,u[f.k])).join('')}
             </section>
             <section class="user-detail-card user-note-card"><header class="user-card-title">${ic('file')}<div><h3>Заметка</h3><p>Внутренняя заметка администратора</p></div></header>
               <label class="f user-notes-field"><span class="sr-only">Заметка</span><textarea name="desc" rows="3" spellcheck="true" placeholder="Дополнительная информация о пользователе…" data-user-note>${esc(u.desc||'')}</textarea><small class="user-note-meta"><span data-user-note-count>${Array.from(u.desc||'').length} символов</span></small></label>
@@ -4509,6 +4512,7 @@ const SETTINGS_PAGES=Object.freeze([
  ['typography','Текст и эффекты','Размер и начертание текста','pen'],
  ['integrations','Интеграции','События, о которых панель сообщает во внешние сервисы','link'],
  ['system','Ядро и обновления','Установка и обновление бинарника ядра на сервере панели','server'],
+ ['traffic','Лимиты CDN','Общая группа ограниченных inbound для пользователей','cloud'],
  ['security','Безопасность','Авторизация, двухфакторная защита, сессии и аудит','shield-check'],
  ['admins','Администраторы','Управление доступом сотрудников панели','shield'],
  ['data','Данные панели','Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.','file']
@@ -4622,7 +4626,22 @@ async function setP(){
   // The HTML template is never mounted. Only the active page's original cards
   // enter the DOM, so duplicate forms, handlers and deep scrolling disappear.
   const source=document.createElement('template');
-  source.innerHTML=sourceHtml;
+  // One shared CDN traffic pool. A tag can be present on multiple nodes;
+  // its signed per-user counters are aggregated on the backend.
+  const cdnTagChoices=[...new Set([...tags(),...(Array.isArray(DB.set.cdnInboundTags)?DB.set.cdnInboundTags:[])])].filter(Boolean);
+  const cdnSelection=new Set(Array.isArray(DB.set.cdnInboundTags)?DB.set.cdnInboundTags:[]);
+  const cdnSettingsMarkup=`<section class="card" data-settings-group="traffic">
+    <div class="hd"><div><h3>CDN / Белые списки</h3><p>Единый лимит трафика по выбранным inbound на всех нодах</p></div></div>
+    <p class="note">Основные подключения остаются без ограничений CDN. Лимит назначается каждому пользователю и применяется при следующей синхронизации конфигурации ноды.</p>
+    <div class="f"><span>Inbound, входящие в CDN-группу</span>
+      <div class="ms" role="group" aria-label="CDN inbound">
+        ${cdnTagChoices.map(tag=>`<label class="ck"><input type="checkbox" name="cdnInboundTags" value="${esc(tag)}" ${cdnSelection.has(tag)?'checked':''} ${sessionUser?.role!=='owner'?'disabled':''}><span>${esc(tag)}</span></label>`).join('')||'<span class="mu">В профилях XRAY STUDIO пока нет inbound.</span>'}
+      </div>
+      <small>Подсчёт: подтверждённые upload + download конкретного пользователя. Счётчик без периодического сброса; ручной сброс трафика пользователя обнуляет и расход CDN.</small>
+    </div>
+    <div class="act"><button type="button" class="btn" data-cdn-tags-save ${sessionUser?.role!=='owner'?'disabled':''}>${ic('check')} Сохранить CDN-группу</button></div>
+  </section>`;
+  source.innerHTML=sourceHtml+cdnSettingsMarkup;
   const selected=[...source.content.querySelectorAll('[data-settings-group]')]
     .filter(card=>card.dataset.settingsGroup===settingsPage);
   // Render the existing Security Center and Admins editors inside Settings.
@@ -4717,6 +4736,17 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
+  if(b=g('[data-cdn-tags-save]')){
+    e.preventDefault();
+    if(sessionUser?.role!=='owner')return;
+    const panel=b.closest('[data-settings-group="traffic"]');
+    const chosen=[...panel.querySelectorAll('[name="cdnInboundTags"]:checked')].map(input=>input.value);
+    b.disabled=true;
+    try{await api.saveSettings({cdnInboundTags:chosen});toast('CDN-группа сохранена. Новые правила применятся при синхронизации нод.')}
+    catch(error){toast('Ошибка сохранения CDN-группы: '+(error.message||'API'))}
+    finally{b.disabled=false}
+    return;
+  }
   if(b=g('[data-node-routing]')){
     e.preventDefault();
     const node=DB.nodes.find(item=>Number(item.id)===Number(b.dataset.nodeRouting));
@@ -5543,7 +5573,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   }
   else if(t.id==='rail-tips'){C.railTips=t.checked?1:0;apply()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
-  else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
+  else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('cdnLimitGb',p.cdnLimitGb||0);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
 /* The coarse slider uses step="any" to preserve the full 48px endpoint.
    Provide explicit keyboard increments so Arrow keys never get stuck. */
 document.addEventListener('keydown',e=>{
@@ -5594,7 +5624,7 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     const d=read(FU,f);
     if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()))return er('Такое имя уже есть. Выберите другое.');
     if(!d.squads.length)return er('Выберите хотя бы один сквад.');
-    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:d.tg,email:d.email,desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[]};
+    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,cdnLimitGb:d.cdnLimitGb,used:0,strategy:d.strategy,tag:d.tag,tg:d.tg,email:d.email,desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[]};
     const submitButton=f.querySelector('.user-create-submit, .act .btn');
     f.dataset.creating='1';
     if(submitButton)submitButton.disabled=true;

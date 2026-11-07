@@ -1248,6 +1248,7 @@ fn provision_proxy_users(
     users: &[Value],
     squads: &[Value],
     now_ms: i64,
+    cdn_tags: &std::collections::HashSet<String>,
 ) -> Result<(), ApiError> {
     let inbounds = config
         .get_mut("inbounds")
@@ -1303,7 +1304,9 @@ fn provision_proxy_users(
                     ids.iter()
                         .any(|id| id.as_i64().is_some_and(|id| allowed.contains(&id)))
                 });
-            if !authorized {
+            if !authorized || crate::cdn_quota::exhausted(user, tag, cdn_tags) {
+                // Only CDN-tagged inbounds are excluded: main servers remain
+                // independently usable with the same user UUID.
                 continue;
             }
             let Some(id) = user.get("xrayId").and_then(Value::as_str) else {
@@ -1566,7 +1569,8 @@ pub async fn preview_routing(
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX);
-    provision_proxy_users(&mut config, &users, &squads, now)?;
+    let cdn_tags = crate::cdn_quota::tags(&crate::read_settings(&state.pool).await?)?;
+    provision_proxy_users(&mut config, &users, &squads, now, &cdn_tags)?;
     let geo = crate::node_geodata::apply(&node, &mut config)?;
     let nodes = crate::load_records(&state.pool, "nodes").await?;
     let hosts = crate::load_records(&state.pool, "hosts").await?;
@@ -2008,7 +2012,8 @@ async fn compile_node_profile(
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX);
-    provision_proxy_users(&mut config, &users, &squads, now)?;
+    let cdn_tags = crate::cdn_quota::tags(&crate::read_settings(&state.pool).await?)?;
+    provision_proxy_users(&mut config, &users, &squads, now, &cdn_tags)?;
     // Keep the source XRAY STUDIO profile immutable: every source node gets
     // its own GeoData assets and its own validated routing/exit graph.
     let nodes = crate::load_records(&state.pool, "nodes").await?;
@@ -2378,6 +2383,33 @@ mod provision_tests {
         assert_eq!(policy["nodeId"], 12);
     }
     #[test]
+    fn cdn_quota_drops_only_cdn_accounts_without_revoking_main_access() {
+        let uuid = "550e8400-e29b-41d4-a716-446655440000";
+        let mut config = json!({"inbounds":[
+            {"tag":"MAIN_DE","protocol":"vless","settings":{"clients":[]}},
+            {"tag":"CDN_DE","protocol":"vless","settings":{"clients":[]}},
+            {"tag":"CDN_UK","protocol":"vless","settings":{"clients":[]}}
+        ]});
+        let users = vec![json!({
+            "id":1,"xrayId":uuid,"squads":[4],"limit":0,
+            "cdnLimitGb":1.0,"cdnUsedBytes":1_073_741_824_i64
+        })];
+        let squads = vec![json!({"id":4,"inb":["MAIN_DE","CDN_DE","CDN_UK"]})];
+        let tags = std::collections::HashSet::from(["CDN_DE".to_owned(), "CDN_UK".to_owned()]);
+        provision_proxy_users(&mut config, &users, &squads, 1_800_000_000_000, &tags).unwrap();
+        let inbounds = config["inbounds"].as_array().unwrap();
+        assert_eq!(
+            inbounds[0]["settings"]["clients"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(inbounds[0]["settings"]["clients"][0]["id"], uuid);
+        assert_eq!(inbounds[1]["settings"]["clients"], json!([]));
+        assert_eq!(inbounds[2]["settings"]["clients"], json!([]));
+        // No synthetic client is provisioned; the authorization boundary is
+        // the real client list produced by the signed desired configuration.
+    }
+
+    #[test]
     fn runtime_inbound_contains_only_active_assigned_uuids() {
         let mut config = json!({"inbounds":[{"protocol":"vless","tag":"NL",
             "settings":{"decryption":"","clients":[]}}]});
@@ -2389,7 +2421,14 @@ mod provision_tests {
             json!({"id":4,"xrayId":"550e8400-e29b-41d4-a716-446655440003","squads":[4],"expireAt":now-1}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["SE"]})];
-        provision_proxy_users(&mut config, &users, &squads, now).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &users,
+            &squads,
+            now,
+            &std::collections::HashSet::default(),
+        )
+        .unwrap();
         let settings = &config["inbounds"][0]["settings"];
         assert!(settings.get("users").is_none());
         assert_eq!(settings["clients"].as_array().unwrap().len(), 1);
@@ -2424,7 +2463,14 @@ mod provision_tests {
                 "squads":[4],"hold":true,"holdDays":0}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]})];
-        provision_proxy_users(&mut config, &users, &squads, now).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &users,
+            &squads,
+            now,
+            &std::collections::HashSet::default(),
+        )
+        .unwrap();
         let clients = config["inbounds"][0]["settings"]["clients"]
             .as_array()
             .unwrap();
@@ -2445,7 +2491,14 @@ mod provision_tests {
         let users =
             vec![json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]})];
         let squads = vec![json!({"id":4,"inb":["CDN NL"]})];
-        provision_proxy_users(&mut config, &users, &squads, 1_800_000_000_000).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &users,
+            &squads,
+            1_800_000_000_000,
+            &std::collections::HashSet::default(),
+        )
+        .unwrap();
         assert_eq!(
             config["inbounds"][0]["settings"]["clients"][0]["email"],
             "xmesh-u7--CDN%20NL"
@@ -2487,7 +2540,14 @@ mod provision_tests {
         let blocked = json!({"id":8,"xrayId":"550e8400-e29b-41d4-a716-446655440001",
             "squads":[4],"disabled":true});
         let squads = vec![json!({"id":4,"inb":["VM","TR","SS","SS22","HY","MQ"]})];
-        provision_proxy_users(&mut config, &[active, blocked], &squads, 1_800_000_000_000).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &[active, blocked],
+            &squads,
+            1_800_000_000_000,
+            &std::collections::HashSet::default(),
+        )
+        .unwrap();
         for (i, expected) in ["id", "password", "password", "password", "auth", "pass"]
             .iter()
             .enumerate()
@@ -2517,7 +2577,14 @@ mod provision_tests {
         let users =
             vec![json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4,5]})];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["NL"]})];
-        provision_proxy_users(&mut config, &users, &squads, 1_800_000_000_000).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &users,
+            &squads,
+            1_800_000_000_000,
+            &std::collections::HashSet::default(),
+        )
+        .unwrap();
         assert_eq!(
             config["inbounds"][0]["settings"]["clients"]
                 .as_array()

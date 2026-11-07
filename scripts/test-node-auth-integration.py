@@ -407,6 +407,48 @@ def main():
         metered=next(u for u in users["items"] if u["id"]==user_id)
         assert abs(metered["used"]-(120/(1024**3)))<1e-9
 
+        # CDN-specific quota: the CDN meter sums only selected signed inbound
+        # counters and must never revoke access to an unselected main inbound.
+        code,settings,_=request("PATCH","/settings",
+            {"cdnInboundTags":["CDN_DE"]},cookie=cookie,origin=BASE)
+        assert_status(code,200,"owner configures CDN pool from inbound tags")
+        assert settings["cdnInboundTags"]==["CDN_DE"]
+        code,updated,_=request("PATCH",f"/collections/users/{user_id}",
+            {"cdnLimitGb":30/(1024**3)},cookie=cookie,origin=BASE)
+        assert_status(code,200,"assign a small CDN quota independent of global user limit")
+        assert updated["cdnUsedBytes"]==40,("CDN pool must count only CDN_DE signed traffic",updated)
+        code,desired,_=signed_post("/node/desired-config",{"node_id":node})
+        assert_status(code,200,"unlimited main inbound remains provisioned after CDN exhaustion")
+        main_clients=desired["config"]["inbounds"][0]["settings"]["clients"]
+        assert any(client["id"]==new_user["xrayId"] for client in main_clients), (
+            "CDN quota must not revoke unrelated MAIN inbound")
+        # Move the test pool to the live inbound: the same user must now be
+        # absent from the issued signed runtime, while other users survive.
+        code,settings,_=request("PATCH","/settings",
+            {"cdnInboundTags":["DE_VLESS"]},cookie=cookie,origin=BASE)
+        assert_status(code,200,"change CDN pool inbound selection")
+        code,updated,_=request("GET","/collections/users",cookie=cookie)
+        assert_status(code,200,"refresh server-derived CDN meter after group change")
+        this_user=next(u for u in updated["items"] if u["id"]==user_id)
+        assert this_user["cdnUsedBytes"]==80
+        code,desired,_=signed_post("/node/desired-config",{"node_id":node})
+        assert_status(code,200,"CDN exhaustion updates desired Xray authorization")
+        clients=desired["config"]["inbounds"][0]["settings"]["clients"]
+        assert all(client["id"]!=new_user["xrayId"] for client in clients), (
+            "Exhausted CDN user must not be provisioned on a limited inbound")
+        assert any(client["id"]==pending_user["xrayId"] for client in clients), (
+            "Other users must remain authorized on the same inbound")
+        code,_,_=request("PATCH","/settings",
+            {"cdnInboundTags":[]},cookie=cookie,origin=BASE)
+        assert_status(code,200,"disable CDN quota group without resetting counters")
+        code,desired,_=signed_post("/node/desired-config",{"node_id":node})
+        assert_status(code,200,"main access resumes without changing user UUID")
+        assert any(client["id"]==new_user["xrayId"]
+                   for client in desired["config"]["inbounds"][0]["settings"]["clients"])
+        code,_,_=request("PATCH",f"/collections/users/{user_id}",
+            {"cdnLimitGb":0},cookie=cookie,origin=BASE)
+        assert_status(code,200,"reset CDN test user limit without touching global quota")
+
         # Quota editing must preserve existing signed per-user usage, including
         # transitions from unlimited back to limited and their PATCH response.
         expected_usage = 120 / (1024**3)
