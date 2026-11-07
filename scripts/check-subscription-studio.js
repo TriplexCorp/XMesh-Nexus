@@ -226,7 +226,7 @@ const liveBackend=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
 for(const cls of ['subscription-preview','subscription-preview-brand','subscription-preview-hero','subscription-preview-meta','subscription-preview-progress','subscription-preview-cta','subscription-preview-quick','subscription-preview-support']) {
   assert(template.includes(cls)||liveBackend.includes(cls), 'Live subscription missing preview component: '+cls);
 }
-assert.match(template,/href="\/subscription-studio\.css"/,'Live portal must use the same shared preview stylesheet');
+assert.match(template,/href="\/subscription-studio[.]css[?]v=[a-f0-9]{12}"/,'Live portal must use the same versioned Studio stylesheet');
 assert.match(portalCss,/subscription-public-shell/,'Live layout requires its mobile-safe shell');
 const surfaceCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-surface.css','utf8');
 const panelEntry=fs.readFileSync('frontend/styles/system/nexus-ui-v3.css','utf8');
