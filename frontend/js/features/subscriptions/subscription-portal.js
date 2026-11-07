@@ -2,17 +2,26 @@
 // The live customer portal and SUBSCRIPTION STUDIO share the same
 // subscription-preview component and design tokens.
 (() => {
+  function actionInk(color){
+    const rgb=String(color).trim().match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if(!rgb)return '#101820';
+    const [r,g,b]=rgb.slice(1).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
+    const luminance=.2126*r+.7152*g+.0722*b;
+    return 1.05/(luminance+.05)>(luminance+.05)/.0587?'#ffffff':'#101820';
+  }
+  const previewRoot=document.querySelector('.subscription-preview');
+  if(previewRoot)previewRoot.style.setProperty('--portal-action-ink',actionInk(getComputedStyle(previewRoot).getPropertyValue('--portal-accent')));
   const language = document.documentElement.lang === 'en' ? 'en' : 'ru';
   const copy = language === 'en'
     ? {
-        brandNote:'Secure access workspace',
-        linkLabel:'Personal HTTPS link',
-        linkNote:'Use this address in a compatible client. Keep it private.',
-        endpointLabel:'Secure endpoint',
-        endpointNote:'The complete address includes this portal origin and your private token.',
+        brandNote:'Your subscription',copyAction:'Copy subscription link',trafficLabel:'Data used',
+        linkLabel:'Your subscription link',
+        linkNote:'Paste this link into your connection app. Keep it private.',
+        endpointLabel:'Add your subscription',
+        endpointNote:'Copy your link, then open your app and choose “Add subscription” or “Import from clipboard”.',
         statusLabel:'Subscription status',
         statusNote:'Traffic, expiry and service availability.',
-        copied:'HTTPS link copied!',
+        copied:'Link copied. You can now paste it into your app.',
         copyUnavailable:'Copy not available',
         qrUnavailable:'QR unavailable',
         qrLabel:'Subscription QR code',
@@ -20,14 +29,14 @@
         hideLink:'Hide private link'
       }
     : {
-        brandNote:'Центр безопасного подключения',
-        linkLabel:'Персональная HTTPS-ссылка',
-        linkNote:'Добавьте этот адрес в совместимое приложение. Не передавайте его посторонним.',
-        endpointLabel:'Защищённая точка подключения',
-        endpointNote:'Полный адрес включает домен этого портала и ваш приватный токен.',
+        brandNote:'Ваша подписка',copyAction:'Скопировать ссылку',trafficLabel:'Использовано трафика',
+        linkLabel:'Ссылка на подписку',
+        linkNote:'Добавьте ссылку в приложение для подключения. Не передавайте её посторонним.',
+        endpointLabel:'Добавьте подписку',
+        endpointNote:'Скопируйте ссылку. В приложении выберите «Добавить подписку» или «Импорт из буфера».',
         statusLabel:'Статус подписки',
         statusNote:'Трафик, срок действия и доступность сервиса.',
-        copied:'HTTPS-ссылка скопирована!',
+        copied:'Ссылка скопирована. Теперь добавьте её в приложение.',
         copyUnavailable:'Не удалось скопировать',
         qrUnavailable:'QR недоступен',
         qrLabel:'QR-код подписки',
@@ -44,6 +53,26 @@
       }
     }
   }
+
+  // This meter visualizes the server-provided allowance, never an invented trend.
+  document.querySelectorAll('[data-subscription-traffic]').forEach(metric=>{
+    const track=metric.querySelector('.subscription-preview-progress');
+    if(!track)return;
+    const value=metric.querySelector('b')?.textContent||'';
+    if(/Unlimited|Без лимита/i.test(value)){track.hidden=true;return;}
+    const percent=Number.parseFloat(track.querySelector('i')?.style.width||'');
+    if(!Number.isFinite(percent)){track.hidden=true;return;}
+    track.setAttribute('role','meter');track.setAttribute('aria-label',copy.trafficLabel);
+    track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');
+    track.setAttribute('aria-valuenow',String(Math.max(0,Math.min(100,percent))));
+    track.setAttribute('aria-valuetext',value);
+  });
+  const info=document.querySelector('.subscription-public-info-panel');
+  if(info)info.hidden=!document.querySelector('[data-subscription-metrics]');
+  const primaryCopy=document.getElementById('connect-link');
+  if(primaryCopy&&['Connect','Подключиться'].includes(primaryCopy.textContent.trim()))primaryCopy.textContent=copy.copyAction;
+  const qrButton=document.getElementById('toggle-qr');
+  if(qrButton)qrButton.textContent=language==='en'?'Show QR code':'Показать QR-код';
 
   const input = document.getElementById('subscription-link');
   const card = document.getElementById('subscription-link-card');
@@ -68,41 +97,41 @@
   const cabinetText = language === 'en' ? {
     kicker:'MY ACCOUNT / VPN ACCESS',
     tabs:['Overview','Connect','Applications','Devices','Support'],
-    featureEyebrow:'YOUR ACCESS',featureHeading:'Everything you need, in one place.',
-    featureNote:'Your connection and compatible apps are always close at hand.',
-    start:'Set up connection',findApp:'Choose an app',
-    stepsEyebrow:'GET STARTED',
+    featureEyebrow:'YOUR ACCESS',featureHeading:'Let’s connect your device',
+    featureNote:'A few simple steps. Start by choosing an app for your phone or computer.',
+    start:'Connect a device',findApp:'I already have an app',
+    stepsEyebrow:'How it works',
     steps:['Choose your app','Add your subscription','Enable the connection'],
-    notes:['A compatible client for your device','Using your link or QR code','Connect inside your app'],
-    guideTitle:'Quick setup',guideDescription:'Open your app and import your access.',
+    notes:['Install an app for your phone or computer','Copy your link from this page into the app','Tap Connect in the app. You’re ready to go.'],
+    guideTitle:'What to do next',guideDescription:'After adding the subscription, choose a server in your app and tap Connect. Return here whenever you need your link.',
     guideHint:'Your personal link grants access to the subscription. Never share it.',
     appsKicker:'CLIENT LIBRARY',appsHeading:'Connection apps',
-    appsNote:'Find a compatible client for your platform.',
+    appsNote:'Choose your device, then install one of the apps below.',
     appsSearch:'Search applications…',appsEmpty:'No applications match these filters.',
     devicesKicker:'YOUR DEVICES',devicesHeading:'Connected devices',
     devicesNote:'Your registered device count and allowance.',
     supportKicker:'HELP CENTER',supportHeading:'Need a hand?',
-    supportNote:'Contact support using the configured channel.',
-    all:'All',navLabel:'Account sections',platformLabel:'Filter by platform'
+    supportNote:'If something isn’t working, contact support. They can help you get connected.',
+    nextNote:'Install an app, then return to this page.',next:'Next: add subscription',all:'All',navLabel:'Account sections',platformLabel:'Filter by platform'
   } : {
     kicker:'МОЙ КАБИНЕТ / VPN ACCESS',
     tabs:['Обзор','Подключение','Приложения','Устройства','Поддержка'],
-    featureEyebrow:'ВАШ ДОСТУП',featureHeading:'Всё для подключения. В одном месте.',
-    featureNote:'Личные настройки и приложения всегда под рукой.',
-    start:'Настроить подключение',findApp:'Выбрать приложение',
-    stepsEyebrow:'КАК НАЧАТЬ',
+    featureEyebrow:'ВАШ ДОСТУП',featureHeading:'Подключим ваше устройство',
+    featureNote:'Несколько простых шагов. Начните с приложения для телефона или компьютера.',
+    start:'Подключить устройство',findApp:'Приложение уже есть',
+    stepsEyebrow:'Как подключиться',
     steps:['Выберите приложение','Добавьте подписку','Включите подключение'],
-    notes:['Совместимый клиент для вашего устройства','По личной ссылке или QR-коду','Активируйте доступ в приложении'],
-    guideTitle:'Быстрое подключение',guideDescription:'Откройте приложение и импортируйте ваш доступ.',
+    notes:['Установите приложение на телефон или компьютер','Скопируйте ссылку с этой страницы в приложение','Нажмите кнопку подключения в приложении. Готово!'],
+    guideTitle:'Что делать дальше',guideDescription:'После добавления подписки выберите сервер в приложении и включите подключение. Ссылка всегда будет на этой странице.',
     guideHint:'Персональная ссылка открывает доступ к подписке. Не передавайте её посторонним.',
     appsKicker:'КАТАЛОГ',appsHeading:'Приложения для подключения',
-    appsNote:'Выберите клиент для своей платформы.',
+    appsNote:'Выберите ваше устройство и установите одно из приложений.',
     appsSearch:'Найти приложение…',appsEmpty:'По вашему запросу приложений не найдено.',
     devicesKicker:'ВАШИ УСТРОЙСТВА',devicesHeading:'Подключённые устройства',
     devicesNote:'Количество зарегистрированных устройств и лимит.',
     supportKicker:'ПОМОЩЬ',supportHeading:'Нужна помощь?',
-    supportNote:'Свяжитесь с поддержкой по указанному каналу.',
-    all:'Все',navLabel:'Разделы личного кабинета',platformLabel:'Фильтр платформ'
+    supportNote:'Если что-то не получается, напишите в поддержку. Вам помогут подключиться.',
+    nextNote:'Установите приложение и вернитесь на эту страницу.',next:'Далее: добавить подписку',all:'Все',navLabel:'Разделы личного кабинета',platformLabel:'Фильтр платформ'
   };
   const setCabinetCopy = (id, value) => {
     const node = document.getElementById(id);
@@ -113,7 +142,7 @@
     setCabinetCopy('cabinet-tab-'+key+'-label',cabinetText.tabs[i])
   );
   const phrases={
-    'cabinet-feature-eyebrow':'featureEyebrow','cabinet-feature-heading':'featureHeading',
+    'portal-app-next-note':'nextNote','portal-app-next':'next','cabinet-feature-heading':'featureHeading',
     'cabinet-feature-note':'featureNote','cabinet-start':'start','cabinet-find-app':'findApp',
     'cabinet-steps-eyebrow':'stepsEyebrow','cabinet-guide-title':'guideTitle',
     'cabinet-guide-description':'guideDescription','cabinet-guide-hint':'guideHint',
@@ -145,6 +174,13 @@
     devices:!!document.getElementById('subscription-devices'),
     support:!!document.querySelector('.subscription-preview-support')
   };
+  const startButton=document.getElementById('cabinet-start');
+  if(startButton){
+    startButton.dataset.cabinetOpen=available.connect?(available.apps?'apps':'connect'):'support';
+    if(!available.connect)startButton.textContent=language==='en'?'Contact support':'Написать в поддержку';
+  }
+  const checklist=document.querySelector('.subscription-cabinet-checklist');
+  if(checklist)checklist.hidden=!available.connect;
   for(const button of tabButtons)button.hidden=!available[button.dataset.cabinetTab];
   for(const button of document.querySelectorAll('[data-cabinet-open]')) {
     button.hidden=!available[button.dataset.cabinetOpen];

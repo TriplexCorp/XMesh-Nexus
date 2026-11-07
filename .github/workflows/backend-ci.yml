@@ -86,7 +86,7 @@ jobs:
         run: node scripts/check-english-coverage.js
       - name: Check subscription studio and independent deployment blueprint
         run: node scripts/check-subscription-studio.js
-      - name: Enforce compact personal cabinet tabs and preview parity
+      - name: Enforce customer portal navigation, privacy and preview parity
         run: node scripts/check-subscription-cabinet.js
       - name: Verify real admin RBAC, authentication boundaries and CSP
         run: node scripts/check-admin-security.js
@@ -279,6 +279,7 @@ jobs:
           XMESH_BROWSER_OUTPUT: browser-results
           XMESH_UI_DISPOSABLE: "1"
         run: |
+          node scripts/test-public-subscription-browser.cjs
           node scripts/test-templates-browser.cjs
           node scripts/test-statistics-chart-hit-targets.cjs
           node scripts/test-ui-browser.cjs
