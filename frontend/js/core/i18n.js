@@ -3649,6 +3649,18 @@ window.XMeshI18n=(()=>{
     ["Подсказка: ip:1.2.3.4 · hosting:hetzner · profile:vless","Tip: ip:1.2.3.4 · hosting:hetzner · profile:vless"]
   ])dict.set(ru,en);
   const dynamic=[
+    // Host diagnostics interpolate saved node/profile names. Localize UI grammar
+    // while preserving the exact names authored by administrators.
+    [/^Несовместимые ноды: ([\s\S]+)\. Назначьте нодам существующий XRAY-профиль и только затем сохраняйте хост\.$/i,
+      (_,details)=>'Incompatible nodes: '+details
+        .replace(/\(ID (\d+): назначен профиль «([^»]*)»\)/gi,'(ID $1: assigned profile “$2”)')
+        .replace(/\(ID (\d+): профиль ID ([^)]+) отсутствует\)/gi,(_match,id,profileId)=>
+          '(ID '+id+': '+(profileId==='не назначен'?'profile not assigned':'profile ID '+profileId+' is missing')+')')
+        .replace(/\(ID (\d+): отключена\)/gi,'(ID $1: disabled)')
+        .replace(/нода удалена/gi,'node removed')+
+        '. Assign existing XRAY profiles to nodes before saving the host.'],
+    [/^Изменить профиль ноды «([\s\S]*?)»$/i,(_,node)=>'Change the profile for node “'+node+'”'],
+    [/^Назначить «([\s\S]*?)» ноде «([\s\S]*?)»$/i,(_,profile,node)=>'Assign “'+profile+'” to node “'+node+'”'],
     // Runtime version labels and system uptime are not fixed dictionary keys.
     [/^Версия\s+(v?\d[\w.+-]*)$/i,(_,version)=>'Version '+version],
     [/^(\d+)\s+мин$/i,(_,minutes)=>minutes+' min'],
