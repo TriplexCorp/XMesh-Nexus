@@ -2657,15 +2657,22 @@ async fn persist_user_traffic(
         // A conditional update ensures idempotence across parallel nodes.
         let activated = sqlx::query(
             "WITH genuine_delta AS (
-                SELECT DISTINCT sample.user_id
+                SELECT DISTINCT sample.user_id,
+                    (previous.user_id IS NULL) AS first_observation
                 FROM jsonb_to_recordset($2::jsonb)
                     AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-                JOIN user_node_traffic_totals AS previous
+                LEFT JOIN user_node_traffic_totals AS previous
                   ON previous.node_id=$1 AND previous.user_id=sample.user_id
-                WHERE sample.uplink_bytes >= previous.last_uplink_bytes
-                  AND sample.downlink_bytes >= previous.last_downlink_bytes
-                  AND (sample.uplink_bytes > previous.last_uplink_bytes
-                       OR sample.downlink_bytes > previous.last_downlink_bytes)
+                WHERE (
+                    previous.user_id IS NOT NULL
+                    AND sample.uplink_bytes >= previous.last_uplink_bytes
+                    AND sample.downlink_bytes >= previous.last_downlink_bytes
+                    AND (sample.uplink_bytes > previous.last_uplink_bytes
+                         OR sample.downlink_bytes > previous.last_downlink_bytes)
+                ) OR (
+                    previous.user_id IS NULL
+                    AND (sample.uplink_bytes > 0 OR sample.downlink_bytes > 0)
+                )
              ), eligible AS (
                 SELECT u.id,
                     CASE WHEN (u.data->>'holdDays') ~ '^[0-9]{1,4}$'
@@ -2681,11 +2688,19 @@ async fn persist_user_traffic(
                 WHERE u.collection='users'
                   AND u.data->>'hold'='true'
                   AND u.data->>'disabled' IS DISTINCT FROM 'true'
+                  AND (
+                     NOT sample.first_observation
+                     OR (
+                       u.data->>'firstConnectedAt' IS NULL
+                       AND COALESCE(u.data->>'onlineAt','0')='0'
+                     )
+                  )
              )
              UPDATE panel_records AS u
              SET data=u.data || jsonb_build_object(
                  'hold',false,
                  'firstConnectedAt',LEAST($3::BIGINT,$4::BIGINT),
+                 'onlineAt',LEAST($3::BIGINT,$4::BIGINT),
                  'expireAt',LEAST($3::BIGINT,$4::BIGINT)
                        + eligible.days * 86400000::BIGINT),
                  updated_at=NOW()
