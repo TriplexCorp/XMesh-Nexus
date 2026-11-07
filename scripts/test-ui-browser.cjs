@@ -584,6 +584,25 @@ async function main() {
         await dialog.locator('[data-device-tab=risk]').click();
         assert.equal(await dialog.locator('.xm-sharing-score').innerText(),'0/100','Full slots alone must not increase suspicion');
         assert(await dialog.locator('.xm-sharing-reasons').isVisible(),'Assessment explanation stays accessible');
+        assert(await dialog.locator('.xm-assessment-hero').isVisible(),'Assessment summary must have an intentional first-reading zone');
+        assert.equal(await dialog.locator('.xm-assessment-meter').getAttribute('aria-valuenow'),'0',
+          'Signal index must describe the real assessment score');
+        const assessmentLayout=await dialog.locator('.xm-assessment-columns').evaluate(el=>{
+          const rect=element=>element.getBoundingClientRect();
+          const reasons=rect(el.querySelector('.xm-assessment-signals')),facts=rect(el.querySelector('.xm-assessment-evidence'));
+          const body=el.closest('.xm-sharing-body');
+          return {sideBySide:Math.abs(reasons.top-facts.top)<2,
+            overflow:body.scrollWidth>body.clientWidth+1};
+        });
+        assert(!assessmentLayout.overflow,'Assessment workspace must not overflow horizontally');
+        if(width>=1920)assert(assessmentLayout.sideBySide,
+          'Wide assessment dialog must compose signals and metrics side by side');
+        if(count){
+          await dialog.locator('[data-device-view-devices]').click();
+          assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true',
+            'Assessment action must return to the device workspace');
+          await dialog.locator('[data-device-tab=risk]').click();
+        }
         await screenshot(page,`devices-analysis-${width}-${count}-${limit}`);
         await page.keyboard.press('Escape');
         await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="risk"]`).evaluate(el=>el.click());
