@@ -121,6 +121,19 @@ assert.match(app,/def:\(\)=>\(\{port:443,fp:'chrome',order:DB\.hosts\.length\+1/
 assert.match(app,/input\.value=key==='fp'\?'chrome':''/,
  'Resetting Host overrides must leave the single chrome choice selected');
 
+// Settings navigation is a real hash-routed workspace, not a hidden long page.
+for(const name of ['general','colors','layout','typography','integrations','system','data'])
+ assert(app.includes("'"+name+"'"),'Settings subpage missing: '+name);
+assert.match(app,/route\.startsWith\('set\/'\)\?'set':route/,'Settings deep links must share the authorized settings page');
+assert.match(app,/function settingsPageFromHash\(\)/,'Settings subpage must survive a reload');
+assert.match(app,/source\.content\.querySelectorAll\('\[data-settings-group\]'\)/,'Only active settings cards should be mounted');
+assert.match(app,/id="settings-subpage"/,'Settings subpage must have a real content region');
+assert.match(app,/href="#set\/\$\{key\}"/,'Settings sidebar links must be addressable');
+assert.match(app,/location\.hash='set\/system'/,'Xray-core rail action must open its settings category');
+const settingsCss=read('frontend/styles/features/settings/settings.css');
+assert.match(settingsCss,/\.settings-center-rail\{/,'Settings must have a secondary navigation rail');
+assert.match(settingsCss,/@container settings-workspace \(max-width:70rem\)/,'Settings navigation must reflow at narrow sizes');
+
 // Catalog controls must remain a reusable interaction surface, not five forks.
 assert.match(app,/function workspaceGridControls\(kind\)/,'Catalog density controls must be shared');
 assert.match(app,/function workspaceCreateButton\(kind,label,id=''\)/,'Catalog creation buttons must be shared');
