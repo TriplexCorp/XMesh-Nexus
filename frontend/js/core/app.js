@@ -223,7 +223,7 @@ const STM={ACTIVE:['Активен','--ok'],DISABLED:['Отключён','--mu']
 const NS={ONLINE:['Онлайн','--ok'],OFFLINE:['Не отвечает','--er'],CONNECTING:['Подключение','--wr'],DISABLED:['Отключён','--mu']};
 const STRAT=[['NO_RESET','Не сбрасывать'],['DAY','Каждый день'],['WEEK','Каждую неделю'],['MONTH','Каждый месяц']];
 const nstat=n=>n.disabled?'DISABLED':n.state;
-const NAV=[['Обзор',[['home','home','Дашборд',1],['statistics','chart-no-axes-combined','Статистика',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','globe-2','Хосты'],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO'],['balancers','network','Балансировщики'],['clientrouting','git-branch','Маршрутизация клиентов']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['security','shield-check','Безопасность'],['set','sliders','Настройки']]]];
+const NAV=[['Обзор',[['home','home','Дашборд',1],['statistics','chart-no-axes-combined','Статистика',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','globe-2','Хосты'],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO'],['balancers','network','Балансировщики'],['clientrouting','git-branch','Маршрутизация клиентов']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['set','sliders','Настройки']]]];
 const FLAT=NAV.flatMap(g=>g[1]);
 const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}" ${r.disabled?'':'checked'} aria-label="Включено"><span></span></label>`;
 const nodeTrafficFactor=n=>{const factor=Number(n?.mult??1);return Number.isFinite(factor)&&factor>0&&factor<=1000?factor:1};
@@ -1162,7 +1162,17 @@ function scrollToSettingsTarget(id){
 async function render(soft){
   document.querySelectorAll('body > .xm-period-portal').forEach(menu=>menu.remove());
   document.querySelector('body > .sv-studio-portal')?.remove();
-  T.forEach(clearInterval);T=[];const route=location.hash.slice(1);cur=route.startsWith('set/')?'set':route;if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
+  T.forEach(clearInterval);T=[];let route=location.hash.slice(1);
+  // Backward-compatible, direct legacy paths open their new Settings subpages.
+  if(route==='admins'||route==='security'){
+    history.replaceState(history.state,'',location.pathname+location.search+'#set/'+route);
+    route='set/'+route;
+  }
+  if(route==='set/admins'&&sessionUser?.role!=='owner'){
+    history.replaceState(history.state,'',location.pathname+location.search+'#set/general');
+    route='set/general';
+  }
+  cur=route.startsWith('set/')?'set':route;if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   v.dataset.workspace=PAGE_WORKSPACES[cur];v.dataset.page=cur;
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
@@ -4499,11 +4509,16 @@ const SETTINGS_PAGES=Object.freeze([
  ['typography','Текст и эффекты','Размер и начертание текста','pen'],
  ['integrations','Интеграции','События, о которых панель сообщает во внешние сервисы','link'],
  ['system','Ядро и обновления','Установка и обновление бинарника ядра на сервере панели','server'],
+ ['security','Безопасность','Авторизация, двухфакторная защита, сессии и аудит','shield-check'],
+ ['admins','Администраторы','Управление доступом сотрудников панели','shield'],
  ['data','Данные панели','Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.','file']
 ]);
+function settingsPagesForSession(){
+ return SETTINGS_PAGES.filter(([key])=>key!=='admins'||sessionUser?.role==='owner');
+}
 function settingsPageFromHash(){
  const slug=location.hash.slice(1).split('/')[1];
- return SETTINGS_PAGES.some(([key])=>key===slug)?slug:'general';
+ return settingsPagesForSession().some(([key])=>key===slug)?slug:'general';
 }
 function settingsPageForTarget(id){
  return id==='core-panel'||id==='panel-update-card'?'system':'general';
@@ -4610,10 +4625,15 @@ async function setP(){
   source.innerHTML=sourceHtml;
   const selected=[...source.content.querySelectorAll('[data-settings-group]')]
     .filter(card=>card.dataset.settingsGroup===settingsPage);
+  // Render the existing Security Center and Admins editors inside Settings.
+  // Neither is duplicated or reimplemented, preserving all authorization
+  // rules and the original per-feature lifecycle/mounting logic.
+  const embedded=settingsPage==='security'?securityP():
+    settingsPage==='admins'?await simple(['admins']):null;
   const columns=[[],[]];
   selected.forEach((card,index)=>columns[index%2].push(card.outerHTML));
   const [,title,description]=SETTINGS_PAGES.find(([key])=>key===settingsPage);
-  const navigation=SETTINGS_PAGES.map(([key,label,subtitle,iconName])=>{
+  const navigation=settingsPagesForSession().map(([key,label,subtitle,iconName])=>{
     const active=key===settingsPage;
     return `<a class="settings-center-link${active?' is-active':''}" href="#set/${key}" ${active?'aria-current="page"':''}>
       <span class="settings-center-link-icon" aria-hidden="true">${ic(iconName)}</span>
@@ -4623,18 +4643,15 @@ async function setP(){
   return [`<div class="settings-workspace" data-ui-page="settings"><div class="settings-center">
     <aside class="settings-center-rail" aria-label="Разделы настроек">
       <nav class="settings-center-nav" aria-label="Разделы настроек">${navigation}</nav>
-      <div class="settings-center-related">
-        <button type="button" data-settings-jump="security">${ic('shield')} Безопасность</button>
-        <a href="#subscription">${ic('link')} SUBSCRIPTION STUDIO</a>
-      </div>
     </aside>
     <div class="settings-center-main" id="settings-subpage" data-settings-section="${settingsPage}" data-single="${selected.length===1}">
-      <header class="settings-center-heading"><div><h2>${title}</h2><p>${description}</p></div></header>
+      ${settingsPage==='security'?'':`<header class="settings-center-heading"><div><h2>${title}</h2><p>${description}</p></div></header>`}
+      ${embedded?`<div class="settings-center-embedded" data-settings-group="${settingsPage}">${embedded[0]}</div>`:`
       <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${selected.length===1}">
         <div class="appearance-column workspace-stack">${columns[0].join('')}</div>
         ${columns[1].length?'<div class="appearance-column workspace-stack">'+columns[1].join('')+'</div>':''}
-      </div>
-    </div></div></div>`];
+      </div>`}
+    </div></div></div>`,embedded?.[1]];
 }
 
 /* ================= ПАЛИТРА КОМАНД ================= */
@@ -4790,7 +4807,6 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(g('.sw')||g('[data-sel]')&&0)return;
-  if(b=g('[data-settings-jump]')){location.hash=b.dataset.settingsJump;return;}
   if(b=g('[data-scroll-target]')){
     e.preventDefault();
     pendingScrollTarget=b.dataset.scrollTarget;
@@ -5945,10 +5961,6 @@ async function bootPanel(){
       });
       document.querySelector('#more')?.remove();
       if(!allowed.has(location.hash))location.hash='#home';
-    }
-    if(sessionUser?.role!=='owner'){
-      document.querySelector('a[href="#admins"]')?.remove();
-      if(location.hash==='#admins')location.hash='#home';
     }
     await initializePanel();
   }catch(err){location.replace(location.pathname+'?unavailable=1')}

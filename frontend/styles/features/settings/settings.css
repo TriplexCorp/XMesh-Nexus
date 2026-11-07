@@ -80,13 +80,12 @@
 .settings-workspace #core-panel .setting-control select{width:100%}
 
 
-/* Settings center: dense, intentionally bounded workspace instead of full-bleed
-   two-column cards and a second oversized sidebar. The same layout works for
-   all sections; density and appearance still come from the shared tokens. */
+/* Settings uses the full available dashboard workspace, aligned to its left edge.
+   Shared density/material tokens still govern the sidebar and feature surfaces. */
 .settings-center{
  display:grid;grid-template-columns:minmax(12rem,13.5rem) minmax(0,1fr);
  gap:var(--nx-page-gap);align-items:start;min-width:0;
- width:100%;max-width:96rem;margin-inline:auto
+ width:100%;max-width:none;margin:0
 }
 .settings-center-rail{
  position:sticky;top:5rem;align-self:start;min-width:0;
@@ -139,11 +138,10 @@
 .settings-center-related .ic{width:.95rem;height:.95rem;flex:none}
 .settings-center-main{
  display:grid;gap:var(--nx-page-gap);align-content:start;
- min-width:0;width:100%;max-width:100%;margin-inline:auto
+ min-width:0;width:100%;max-width:none;margin:0
 }
-/* In a short, single-card section, align heading and card together in a
-   readable column rather than leaving one tiny form stranded on the left. */
-.settings-center-main[data-single=true]{max-width:54rem}
+/* Single-card sections follow the same left alignment as the full dashboard. */
+.settings-center-main[data-single=true]{max-width:none}
 .settings-center-heading{
  display:flex;align-items:center;justify-content:space-between;min-width:0;
  gap:.8rem;padding:.15rem .08rem .7rem;border-bottom:1px solid var(--nx-separator)
@@ -174,7 +172,7 @@
   display:flex;gap:.3rem;flex-wrap:wrap;padding-top:.35rem
  }
  .settings-center-related :is(a,button){min-height:2rem}
- .settings-center-main[data-single=true]{max-width:54rem}
+ .settings-center-main[data-single=true]{max-width:none}
 }
 @container settings-workspace (max-width:60rem){
  .settings-center-grid{grid-template-columns:minmax(0,1fr)}
@@ -184,3 +182,11 @@
  .settings-center-link{max-width:none}
  .settings-center-main[data-single=true]{max-width:none}
 }
+
+/* Reuse original Security Center / Admins feature implementations as real
+   Settings subpages without adding a nested floating or centered canvas. */
+.settings-center-embedded{display:grid;min-width:0;width:100%;align-content:start}
+.settings-center-embedded>.security-workspace.security-center{
+ min-width:0;width:100%;max-width:none;margin:0
+}
+.settings-center-embedded>.card{width:100%;min-width:0}

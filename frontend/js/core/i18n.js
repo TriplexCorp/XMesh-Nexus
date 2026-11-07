@@ -391,6 +391,8 @@ window.XMeshI18n=(()=>{
     'Размер и начертание текста':'Text sizing and font weight',
     'Интеграции':'Integrations',
     'Ядро и обновления':'Core and updates',
+    'Авторизация, двухфакторная защита, сессии и аудит':'Authentication, two-factor protection, sessions and auditing',
+    'Управление доступом сотрудников панели':'Manage panel administrator access',
     // General Settings (all major subsections)
     'Цвет и тема':'Colors and theme',
     'Основная палитра интерфейса и брендовые акценты':'Primary interface palette and brand accents',

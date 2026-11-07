@@ -372,13 +372,16 @@ persisted Squad data to achieve visual compactness.
 
 ### Settings center: navigable subpages
 
-- `#set` opens General. The sections `#set/general`, `#set/colors`,
-  `#set/layout`, `#set/typography`, `#set/integrations`,
-  `#set/system` and `#set/data` are real hash destinations: browser refresh,
-  Back/Forward and direct links must retain the selected section.
-- The secondary navigation is a shared Settings shell. It does not create a
-  second global rail or duplicate Security Center / Subscription Studio:
-  those remain independent, linked destinations.
+- `#set` opens General. `#set/general`, `#set/colors`, `#set/layout`,
+  `#set/typography`, `#set/integrations`, `#set/system`, `#set/security`,
+  `#set/admins` (owner only), and `#set/data` are navigable, reload-safe
+  destinations with browser Back/Forward support. Legacy `#security` and
+  `#admins` URLs redirect into these settings routes.
+- The global System rail contains **Settings only**. The real Security Center
+  (MFA, sessions, audit and policy) and Administrators CRUD editor mount inside
+  the Settings navigation without duplicate forms or alternate API handlers.
+  Non-owners never see Administrators and are prevented from opening its deep
+  link. Subscription Studio remains a separate functional workbench.
 - Each subpage mounts **only its own existing setting cards** in a responsive
   one- or two-column workspace. Do not restore the former kilometer-long
   settings page, empty placeholder panels or fake save controls.
@@ -389,14 +392,13 @@ persisted Squad data to achieve visual compactness.
 - Keep existing field IDs, card identifiers, `data-ui` contracts and focus
   semantics intact. Deep links from the version rail and update actions must
   target the System subpage; destructive actions remain separately authorized.
-- **Composition and empty-space budget:** Settings uses a bounded workspace
-  (up to 96rem) rather than stretching short forms across an ultrawide view.
-  The secondary navigation uses compact, single-line rows: category descriptions
-  appear in the active section heading, not repeated in each sidebar link.
-  Single-card pages center a bounded heading/card stack (up to 54rem).
-  Two-card pages retain balanced columns and collapse naturally on narrow
-  viewports. Empty cards, fake metrics and oversized spacer blocks are forbidden:
-  short pages are short by design.
+- **Composition and empty-space budget:** Settings is left-aligned and fills
+  the available dashboard workspace rather than being centered within a 96rem
+  cap or restricting single-card pages to 54rem. The secondary navigation has
+  compact, single-line rows; explanations live in the active page heading.
+  Existing cards and controls use the shared density/layout tokens. Two-card
+  pages collapse naturally on narrow viewports. Empty cards, fabricated metrics
+  and oversized spacer blocks are forbidden.
 - The shell and cards inherit `nexus-v3` material, density and spacing tokens.
   Secondary navigation must remain usable on narrow/mobile viewports and must
   not create horizontal document overflow.

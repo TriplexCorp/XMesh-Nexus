@@ -173,25 +173,25 @@ async function main() {
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
-    await checked('Settings composition: bounded, aligned desktop workspace and compact navigation',async()=>{
+    await checked('Settings composition: full-width, left-aligned desktop workspace and compact navigation',async()=>{
       await page.setViewportSize({width:1920,height:1080});
       for(const section of ['general','layout','colors','integrations','system','data']){
         await navigate('set/'+section);
         const g=await page.evaluate(()=>{
           const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,y:r.y,bottom:r.bottom,width:r.width,height:r.height}};
-          const shell=document.querySelector('.settings-center'),main=document.querySelector('.settings-center-main');
+          const shell=document.querySelector('.settings-center'),main=document.querySelector('.settings-center-main'),view=document.querySelector('#view');
           const heading=document.querySelector('.settings-center-heading'),grid=document.querySelector('.settings-center-grid');
-          return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),shell:box(shell),main:box(main),heading:box(heading),grid:box(grid),nav:[...document.querySelectorAll('.settings-center-link')].map(box),cards:[...grid.querySelectorAll('.card')].map(box),single:main.dataset.single};
+          return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),view:box(view),shell:box(shell),main:box(main),heading:box(heading),grid:box(grid),nav:[...document.querySelectorAll('.settings-center-link')].map(box),cards:[...grid.querySelectorAll('.card')].map(box),single:main.dataset.single};
         });
         assert(g.scrollWidth<=g.viewport+1,'Settings must not create horizontal page scrolling');
-        assert(g.shell.width<=g.rem*96+2,'Settings must not spread across an ultrawide dashboard');
-        assert(g.nav.every(n=>n.height<=g.rem*3.55),'Navigation descriptions must not stretch every sidebar item');
+        assert(Math.abs(g.shell.x-g.view.x)<=3,'Settings should start at the normal dashboard content left edge');
+        assert(Math.abs(g.shell.width-g.view.width)<=3,'Settings must use all available dashboard width');
+        assert(g.nav.every(n=>n.height<=g.rem*3.55),'Navigation should remain compact');
         assert(g.main.x>=g.shell.x+g.rem*10,'Settings content must stay beside secondary navigation');
+        assert(g.main.width>=g.view.width*.6,'Settings content must not be artificially constrained');
         assert(g.cards.every(c=>c.width>=g.rem*20),'Cards must remain usable, not squeezed by the navigation rail');
-        if(g.single==='true'){
-          assert(g.main.width<=g.rem*54+2,'Sparse settings content must remain bounded');
-          assert(Math.abs(g.cards[0].x-g.heading.x)<3,'Single card and heading must share the same left edge');
-        }
+        if(g.single==='true')assert(Math.abs(g.cards[0].x-g.heading.x)<3,
+          'Single card and heading must share the same left edge');
         if(section==='layout')await screenshot(page,'settings-composition-compact-desktop');
       }
     });
@@ -219,6 +219,8 @@ async function main() {
         typography:'#ts',
         integrations:'[data-hk]',
         system:'#core-panel',
+        security:'#security-tab-auth',
+        admins:'[data-ne="admins"]',
         data:'#gx'
       };
       for(const [category,selector] of Object.entries(content)){
@@ -228,6 +230,18 @@ async function main() {
         assert.equal(await page.locator('[data-settings-group]').count(),category==='colors'||category==='layout'||category==='typography'||category==='integrations'?2:category==='system'?2:1);
         assert.equal(await page.locator('[data-settings-group]:not([data-settings-group="'+category+'"])').count(),0,'Inactive settings must not remain mounted');
       }
+      assert.equal(await page.locator('#nav a[href="#admins"],#nav a[href="#security"]').count(),0,
+        'Admin and Security must not occupy the global sidebar');
+      assert.equal(await page.locator('a.settings-center-link[href="#set/admins"]').count(),1,
+        'Owner must see the Admins category inside Settings');
+      await navigate('security');
+      assert.equal(new URL(page.url()).hash,'#set/security',
+        'Legacy Security URL must redirect to Settings');
+      await page.locator('#security-tab-auth').waitFor({state:'visible'});
+      await navigate('admins');
+      assert.equal(new URL(page.url()).hash,'#set/admins',
+        'Legacy Admins URL must redirect to Settings');
+      await page.locator('[data-ne="admins"]').first().waitFor({state:'visible'});
       await navigate('set/colors');
       await page.reload({waitUntil:'domcontentloaded'});
       await page.locator('#palette-apply').waitFor({state:'visible'});
