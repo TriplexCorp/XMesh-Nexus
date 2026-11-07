@@ -2403,20 +2403,8 @@ mod provision_tests {
             1
         );
         assert_eq!(inbounds[0]["settings"]["clients"][0]["id"], uuid);
-        assert_eq!(
-            inbounds[1]["settings"]["clients"]
-                .as_array()
-                .unwrap()
-                .as_slice(),
-            &[]
-        );
-        assert_eq!(
-            inbounds[2]["settings"]["clients"]
-                .as_array()
-                .unwrap()
-                .as_slice(),
-            &[]
-        );
+        assert_eq!(inbounds[1]["settings"]["clients"], json!([]));
+        assert_eq!(inbounds[2]["settings"]["clients"], json!([]));
         // No synthetic client is provisioned; the authorization boundary is
         // the real client list produced by the signed desired configuration.
     }
