@@ -3,17 +3,22 @@ FROM rust:1.99.1-bookworm AS builder
 WORKDIR /build/backend
 ENV CARGO_INCREMENTAL=0
 ARG PANEL_BUILD_REVISION=unknown
-ENV PANEL_BUILD_REVISION=${PANEL_BUILD_REVISION}
+# Git metadata is inspected only through a transient BuildKit mount, never copied
+# into the image. Missing/dirty source trees must not impersonate an upstream SHA.
 COPY VERSION /build/VERSION
 COPY backend/Cargo.toml ./Cargo.toml
 COPY backend/src ./src
 COPY backend/migrations ./migrations
 # Keep dependency downloads and compiled artifacts between Docker builds.
 # Mounting target as a cache requires copying the final binary outside it.
+# Resolve provenance in its own step: the checkout bind is gone before Cargo
+# executes dependency build scripts or proc macros.
+RUN --mount=type=bind,source=.,target=/source,readonly \
+    sh /source/scripts/resolve-panel-build-revision.sh "$PANEL_BUILD_REVISION" /source > /build/PANEL_BUILD_REVISION
 RUN --mount=type=cache,id=xmesh-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=xmesh-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=xmesh-cargo-target,target=/build/backend/target,sharing=locked \
-    cargo build --release \
+    PANEL_BUILD_REVISION="$(cat /build/PANEL_BUILD_REVISION)" cargo build --release \
     && mkdir -p /build/output \
     && cp target/release/xmesh-api /build/output/xmesh-api
 

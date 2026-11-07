@@ -17,12 +17,21 @@
 готовым обновлением. При недоступности GitHub не показывается ложный
 статус «актуально».
 
-`PANEL_BUILD_REVISION` передаётся через build arg Compose;
-`install.sh` и `xmeshctl` получают его из `git rev-parse HEAD`.
-Если контейнер построен вручную без metadata, меню честно сообщает
-«Ревизия сборки неизвестна» — сравнение в этом случае невозможно.
-Для прямого `docker compose build` задайте `PANEL_BUILD_REVISION`
-как полный SHA (40 строчных hex символов) именно собираемого commit.
+`PANEL_BUILD_REVISION` передаётся через build arg Compose; `install.sh` и
+`xmeshctl` используют общий resolver. При прямом `docker compose up --build`
+без build arg Dockerfile автоматически определяет HEAD **чистой Git-копии**
+через временное BuildKit bind-монтирование исходников. Git metadata не
+копируется в образ и не читается из изменяемой runtime-директории.
+В dirty checkout (в том числе с untracked файлами), source archive
+без `.git` либо некорректном явном SHA ревизия остаётся `unknown`,
+а проверка не притворяется сравнением с текущим `main`.
+Для точной проверки соберите чистый Git checkout; если используете
+внешний build pipeline, передайте полный SHA (40 строчных hex символов)
+именно собираемого commit как `PANEL_BUILD_REVISION`.
+
+Проверка после пересборки: `GET /api/v1/panel/version` должен вернуть
+`revision` из 40 hex символов. Одного `docker compose restart panel`
+недостаточно: это не пересобирает binary.
 
 При доступном обновлении меню предлагает перейти в существующий блок
 «Обновление XMesh Nexus» в настройках. Фактическая установка по-прежнему
