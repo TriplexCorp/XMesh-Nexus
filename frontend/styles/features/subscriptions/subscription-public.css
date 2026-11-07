@@ -141,7 +141,7 @@ body.subscription-public{
   grid-template-columns:minmax(0,8fr) minmax(330px,4fr);
   gap:22px;
   padding:0;
-  align-items:stretch;
+  align-items:start;
 }
 .subscription-public-access-panel,
 .subscription-public .subscription-public-info-panel{
@@ -162,7 +162,7 @@ body.subscription-public{
 .subscription-public .subscription-public-info-panel{
   padding:clamp(20px,2.1vw,28px);
   display:grid;
-  grid-template-rows:auto 1fr;
+  grid-template-rows:auto auto;
   gap:18px;
   align-content:start;
 }
