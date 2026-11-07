@@ -3648,7 +3648,7 @@ window.XMeshI18n=(()=>{
     ["Ничего не найдено. Измените запрос или сбросьте фильтры.","No matching nodes. Change your query or reset filters."],
     ["Подсказка: ip:1.2.3.4 · hosting:hetzner · profile:vless","Tip: ip:1.2.3.4 · hosting:hetzner · profile:vless"]
   ])dict.set(ru,en);
-  const dynamic=[
+  const priorityHostMessages=[
     // Host diagnostics interpolate saved node/profile names. Localize UI grammar
     // while preserving the exact names authored by administrators.
     [/^Несовместимые ноды: ([\s\S]+)\. Назначьте нодам существующий XRAY-профиль и только затем сохраняйте хост\.$/i,
@@ -3661,6 +3661,9 @@ window.XMeshI18n=(()=>{
         '. Assign existing XRAY profiles to nodes before saving the host.'],
     [/^Изменить профиль ноды «([\s\S]*?)»$/i,(_,node)=>'Change the profile for node “'+node+'”'],
     [/^Назначить «([\s\S]*?)» ноде «([\s\S]*?)»$/i,(_,profile,node)=>'Assign “'+profile+'” to node “'+node+'”'],
+  ];
+  // General dynamic labels retain their original priority below message templates.
+  const dynamic=[
     // Runtime version labels and system uptime are not fixed dictionary keys.
     [/^Версия\s+(v?\d[\w.+-]*)$/i,(_,version)=>'Version '+version],
     [/^(\d+)\s+мин$/i,(_,minutes)=>minutes+' min'],
@@ -3704,6 +3707,9 @@ window.XMeshI18n=(()=>{
     const exact=dict.get(raw)||dict.get(raw.replace(/\s+/g,' '))||(raw===raw.toUpperCase()?upperCaseMessages.get(raw):undefined);
     if(exact!==undefined)return (m?.[1]||'')+exact+(m?.[3]||'');
     if(!/[А-Яа-яЁё]/u.test(raw))return str;
+    // Match Host diagnostics first: generic templates such as `{value} хост.`
+    // would otherwise translate only the suffix and leave Cyrillic UI copy.
+    for(const [re,fn] of priorityHostMessages){const found=raw.match(re);if(found)return (m?.[1]||'')+fn(...found)+(m?.[3]||'')}
     for(const [re,render] of messageTemplates){const found=raw.match(re);if(found)return (m?.[1]||'')+render(found)+(m?.[3]||'')}
     for(const [re,fn] of dynamic){const found=raw.match(re);if(found)return (m?.[1]||'')+fn(...found)+(m?.[3]||'')}
     if(compositeTriggers.some(prefix=>raw.startsWith(prefix))){
