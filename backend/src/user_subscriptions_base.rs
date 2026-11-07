@@ -1461,6 +1461,15 @@ fn portal_controls(
             quick.push_str("<button type=\"button\" id=\"toggle-qr\" aria-controls=\"subscription-qr\" aria-expanded=\"false\">QR</button>");
             "<div id=\"subscription-qr\" class=\"subscription-preview-qr\" hidden aria-label=\"QR-код подписки\"></div>".clone_into(&mut qr);
         }
+        let _ = write!(
+            quick,
+            "<button type=\"button\" id=\"toggle-link\" aria-controls=\"subscription-link-card\" aria-expanded=\"false\">{}</button>",
+            if en {
+                "Show private link"
+            } else {
+                "Показать ссылку"
+            }
+        );
         if studio_enabled(settings, "subscriptionShowDevices", false) {
             let _ = write!(
                 quick,
@@ -1542,11 +1551,18 @@ fn portal_decoration(settings: &Value, en: bool, active: bool) -> PortalDecorati
     let visible_status = studio_enabled(settings, "subscriptionShowStatus", true);
     let status_dot = if visible_status {
         format!(
-            "<span class=\"subscription-preview-ok\" style=\"color:{}\">●</span>",
+            "<span class=\"subscription-preview-ok\" style=\"color:{}\">● {}</span>",
             if active {
                 "var(--portal-accent)"
             } else {
                 "#ef8888"
+            },
+            if active {
+                if en { "Active" } else { "Активна" }
+            } else if en {
+                "Inactive"
+            } else {
+                "Неактивна"
             }
         )
     } else {

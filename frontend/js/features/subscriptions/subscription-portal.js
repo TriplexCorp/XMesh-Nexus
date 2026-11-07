@@ -15,7 +15,9 @@
         copied:'HTTPS link copied!',
         copyUnavailable:'Copy not available',
         qrUnavailable:'QR unavailable',
-        qrLabel:'Subscription QR code'
+        qrLabel:'Subscription QR code',
+        showLink:'Show private link',
+        hideLink:'Hide private link'
       }
     : {
         brandNote:'Центр безопасного подключения',
@@ -28,7 +30,9 @@
         copied:'HTTPS-ссылка скопирована!',
         copyUnavailable:'Не удалось скопировать',
         qrUnavailable:'QR недоступен',
-        qrLabel:'QR-код подписки'
+        qrLabel:'QR-код подписки',
+        showLink:'Показать ссылку',
+        hideLink:'Скрыть ссылку'
       };
 
   for (const el of document.querySelectorAll('[data-expiry]')) {
@@ -93,7 +97,8 @@
     // upgraded to the origin the visitor actually used to open the portal.
     input.value = subscriptionUrl;
     if (card && display) {
-      card.hidden = false;
+      // A bearer link is a secret: only expose it after an explicit visitor action.
+      card.hidden = true;
       if (label) label.textContent = copy.linkLabel;
       if (note) note.textContent = copy.linkNote;
       display.textContent = compactSubscriptionUrl(subscriptionUrl);
@@ -142,6 +147,14 @@
   });
   document.getElementById('copy-link')?.addEventListener('click', event => {
     void copySubscription(event.currentTarget);
+  });
+
+  document.getElementById('toggle-link')?.addEventListener('click', event => {
+    if (!card) return;
+    card.hidden = !card.hidden;
+    const expanded = !card.hidden;
+    event.currentTarget.setAttribute('aria-expanded', String(expanded));
+    event.currentTarget.textContent = expanded ? copy.hideLink : copy.showLink;
   });
 
   function showQr(target) {
