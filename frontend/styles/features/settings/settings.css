@@ -190,3 +190,35 @@
  min-width:0;width:100%;max-width:none;margin:0
 }
 .settings-center-embedded>.card{width:100%;min-width:0}
+
+/* Functional browser preferences. The main design system remains authoritative;
+ * settings only supply user-selected root-level overrides. */
+html[data-contrast=high]{
+  --nx-muted:color-mix(in srgb,var(--tx) 84%,var(--mu));
+  --nx-border:color-mix(in srgb,var(--tx) 31%,var(--ln));
+  --nx-border-strong:color-mix(in srgb,var(--tx) 45%,var(--ln));
+}
+html[data-link-style=underline] .app a[href]:not(.settings-center-link):not(.btn):not(.gh){
+  text-decoration:underline;
+  text-underline-offset:.16em;
+}
+html[data-line-spacing=compact] .app :is(p,.note,.setting-copy small){line-height:1.3}
+html[data-line-spacing=relaxed] .app :is(p,.note,.setting-copy small){line-height:1.8}
+html[data-tabular-nums=on] .app{font-variant-numeric:tabular-nums}
+html[data-nav-counter=off] #unb{display:none!important}
+html[data-sticky-topbar=on] .top{
+  position:sticky;top:0;z-index:8;
+  background:var(--bg);padding-top:.6rem;
+}
+html[data-toast-position=right] #xmesh-feedback-toast[popover]:not(.toast-below-dialog){
+  left:auto;right:1rem;transform:translate(0,.5rem);
+}
+html[data-toast-position=right] #xmesh-feedback-toast[popover]:not(.toast-below-dialog).show{
+  transform:translate(0,0);
+}
+.settings-personal-data-actions{display:flex;align-items:end;gap:var(--nx-space-4);flex-wrap:wrap}
+.settings-personal-data-actions .f{flex:1 1 14rem;min-width:0}
+.settings-personal-data-actions input[type=file]{max-width:100%;min-width:0}
+@media(max-width:760px){
+  html[data-sticky-topbar=on] .top{position:relative;top:auto;padding-top:0}
+}
