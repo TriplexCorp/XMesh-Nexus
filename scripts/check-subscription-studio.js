@@ -228,6 +228,34 @@ for(const cls of ['subscription-preview','subscription-preview-brand','subscript
 }
 assert.match(template,/href="\/subscription-studio\.css"/,'Live portal must use the same shared preview stylesheet');
 assert.match(portalCss,/subscription-public-shell/,'Live layout requires its mobile-safe shell');
+const surfaceCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-surface.css','utf8');
+const panelEntry=fs.readFileSync('frontend/styles/system/nexus-ui-v3.css','utf8');
+// Regression 2026-11-07: two authorities turned the public app catalog
+// wrapper into a three-column grid with only one child, squeezing 7 apps
+// into an unreadable fraction of the page. Surface CSS must never own it.
+assert.doesNotMatch(surfaceCss,/\.subscription-public \.subscription-public-catalog\s*\{[^}]*grid-template-columns/,
+  'Shared surface stylesheet must not lay out the public catalog wrapper');
+assert.doesNotMatch(surfaceCss,/\.subscription-public \.subscription-public-shell\s*\{/,
+  'Standalone portal geometry belongs exclusively to public CSS');
+assert.match(portalCss,/\.subscription-public \.subscription-preview-apps\s*\{[^}]*grid-template-columns:minmax\(0,1fr\)/,
+  'Catalog heading must stack above the application cards');
+assert.match(portalCss,/\.subscription-public \.subscription-preview-apps>div\s*\{[^}]*repeat\(auto-fit,minmax\(min\(100%,235px\),1fr\)\)/,
+  'App card tracks must never squeeze regular app names');
+assert.match(panelEntry,/subscription-public\.css\?v=[a-f0-9]{12}/,
+  'Studio must load the same real public styles as the visitor portal');
+assert.match(template,/subscription-surface\.css[^"]*"[^>]*>[\s\S]*subscription-public\.css/,
+  'Visitor portal must apply public layout after shared surface tokens');
+for(const cls of [
+ 'subscription-public-shell','subscription-public-grid','subscription-public-access-panel',
+ 'subscription-public-info-panel','subscription-public-status-stack','subscription-public-catalog',
+ 'subscription-public-link-card','subscription-preview-hero-copy'
+]) {
+ assert(template.includes(cls),'Visitor portal is missing '+cls);
+ assert(view.includes(cls),'Studio preview must reuse live portal structure: '+cls);
+}
+assert.match(view,/data-subscription-preview-frame/,
+  'The studio preview must be container-responsive, not a separate mock');
+
 assert.match(fs.readFileSync('backend/src/user_subscriptions.rs','utf8'),/include_str!\("subscription_template\.html"\)/,'Backend must use shared portal template');
 assert.match(css,/\.subscription-studio-layout/);
 assert.match(css,/@media\(max-width:780px\)/);
