@@ -1537,6 +1537,22 @@ struct PortalDecoration<'a> {
     logo_brand: &'a str,
 }
 
+fn portal_status_label(en: bool, active: bool, waiting: bool) -> &'static str {
+    if waiting {
+        if en {
+            "Awaiting connection"
+        } else {
+            "Ожидает подключения"
+        }
+    } else if active {
+        if en { "Active" } else { "Активна" }
+    } else if en {
+        "Inactive"
+    } else {
+        "Неактивна"
+    }
+}
+
 fn portal_decoration(
     settings: &Value,
     en: bool,
@@ -1583,19 +1599,7 @@ fn portal_decoration(
             } else {
                 "#ef8888"
             },
-            if waiting {
-                if en {
-                    "Awaiting connection"
-                } else {
-                    "Ожидает подключения"
-                }
-            } else if active {
-                if en { "Active" } else { "Активна" }
-            } else if en {
-                "Inactive"
-            } else {
-                "Неактивна"
-            }
+            portal_status_label(en, active, waiting)
         )
     } else {
         String::new()
