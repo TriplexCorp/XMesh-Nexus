@@ -15,7 +15,7 @@ assert.match(api,/cdn_quota::attach_usage\(&state\.pool, std::slice::from_mut/,'
 assert.match(pool,/FROM user_inbound_traffic_totals/,'Pool must aggregate per-user per-inbound meters');
 assert.match(pool,/inbound_tag = ANY\(\$1::TEXT\[\]\)/,'Only selected inbound tags may enter the quota');
 assert.doesNotMatch(pool,/node_network_traffic_totals/,'Node NIC totals are not user CDN usage');
-assert.match(pool,/pub\(super\) fn exhausted/,'Per-user CDN quota must have a dedicated eligibility function');
+assert.match(pool,/pub fn exhausted/,'Per-user CDN quota must have a dedicated eligibility function');
 assert.match(runtime,/cdn_quota::exhausted\(user, tag, cdn_tags\)/,'Only tagged inbounds must be removed');
 assert.match(runtime,/let cdn_tags = crate::cdn_quota::tags/,'Signed desired config must use the persisted CDN group');
 assert.match(ui,/name="cdnInboundTags"/,'Settings must expose explicit inbound selection');
