@@ -276,7 +276,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=6fc2d828fd52',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=bcac7d0983f4'
+        '/subscription-public.css?v=9061fbee5fb9'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
