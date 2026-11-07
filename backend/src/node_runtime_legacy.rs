@@ -1427,8 +1427,14 @@ fn build_offline_policy(
         } else {
             None
         };
-        let offline_budget =
-            remaining.map(|bytes| (bytes / active_nodes.max(1)).min(64 * 1024 * 1024));
+        // Waiting subscriptions require confirmed online telemetry to start
+        // their clock. Never issue a disconnected spending lease before then,
+        // including when the user has an otherwise unlimited traffic plan.
+        let offline_budget = if user.get("hold").and_then(Value::as_bool) == Some(true) {
+            Some(0)
+        } else {
+            remaining.map(|bytes| (bytes / active_nodes.max(1)).min(64 * 1024 * 1024))
+        };
         user_policies.push(json!({
             "userId":user_id,"xrayId":uuid.to_string(),
             "expireAtMs":expires,"panelUsedBytes":used_bytes,
@@ -2422,6 +2428,11 @@ mod provision_tests {
         let clients = config["inbounds"][0]["settings"]["clients"].as_array().unwrap();
         assert_eq!(clients.len(), 1);
         assert_eq!(clients[0]["email"], "xmesh-u1--NL");
+        let policy = build_offline_policy(&config, &users, 5, now, &"a".repeat(64), 1);
+        let allowed = policy["users"].as_array().unwrap();
+        assert_eq!(allowed.len(), 1);
+        assert_eq!(allowed[0]["offlineBudgetBytes"], 0,
+            "Waiting users may not consume an unlimited disconnected lease");
     }
 
     #[test]
