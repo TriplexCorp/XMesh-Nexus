@@ -15,6 +15,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Брендинг, домены и персональные параметры навигации":"Branding, domains and personal navigation preferences",
+    "Читаемость, шрифты и настройки движения":"Readability, fonts and motion preferences",
+    "События и уведомления интерфейса":"Events and interface notifications",
+    "Экспорт данных и перенос персонального оформления":"Export data and transfer personal appearance",
     "Поведение панели":"Panel behavior",
     "Персональные параметры текущего браузера — не меняют настройки других администраторов.":"Settings for this browser only — they do not affect other administrators.",
     "Стартовая страница":"Start page",
