@@ -210,6 +210,30 @@ async function main() {
       await screenshot(page,'settings-composition-compact-mobile');
     });
 
+    await checked('CDN traffic pool: owner chooses inbounds and selection survives reload',async()=>{
+      await page.setViewportSize({width:1440,height:900});
+      await navigate('set/traffic');
+      const save=page.locator('[data-cdn-tags-save]');
+      await save.waitFor({state:'visible'});
+      const options=page.locator('[name="cdnInboundTags"]');
+      const count=await options.count();
+      const original=await options.evaluateAll(items=>items.filter(el=>el.checked).map(el=>el.value));
+      if(count){
+        await options.first().check();
+        await save.click();
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.locator('[data-cdn-tags-save]').waitFor({state:'visible'});
+        assert(await page.locator('[name="cdnInboundTags"]').first().isChecked(),
+          'Selected CDN inbound must persist through the owner settings API');
+        await page.locator('[name="cdnInboundTags"]').evaluateAll((items,saved)=>{
+          for(const item of items)item.checked=saved.includes(item.value);
+        },original);
+        await page.locator('[data-cdn-tags-save]').click();
+      }
+      assert.equal(new URL(page.url()).hash,'#set/traffic');
+      await screenshot(page,'settings-cdn-inbound-quota');
+    });
+
     await checked('Settings: deep links show one category, survive reload and preserve browser navigation',async()=>{
       await page.setViewportSize({width:1440,height:900});
       const content={
@@ -219,6 +243,7 @@ async function main() {
         typography:'#ts',
         integrations:'[data-hk]',
         system:'#core-panel',
+        traffic:'[data-cdn-tags-save]',
         security:'#security-tab-auth',
         admins:'[data-ne="admins"]',
         data:'#gx'
