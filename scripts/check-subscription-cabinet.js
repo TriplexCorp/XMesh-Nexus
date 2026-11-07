@@ -14,40 +14,22 @@ new Function(portal);
 const context={};
 new Function('window',studioSource+';return window.XMeshSubscriptionStudio;')(context);
 const [preview]=context.XMeshSubscriptionStudio.create({},async()=>{},()=>{},{users:2,nodes:1});
-const expected=['overview','connect','apps','devices','support'];
-for(const name of expected){
-  for(const markup of [template,preview]){
-    assert.match(markup,new RegExp('data-cabinet-tab="'+name+'"'));
-    assert.match(markup,new RegExp('data-cabinet-panel="'+name+'"'));
-    assert.match(markup,new RegExp('id="cabinet-panel-'+name+'"[^>]*hidden|id="cabinet-panel-'+name+'"[^>]*data-cabinet-panel="overview"'));
-  }
+for(const markup of [template,preview]){
+ assert.doesNotMatch(markup,/role="tab(?:list|panel)?"|data-cabinet-tab|data-cabinet-panel/,'Customer setup must be one page');
+ assert.doesNotMatch(markup,/cabinet-feature-actions|subscription-cabinet-checklist|portal-app-next/,'No duplicated overview or navigation actions');
+ for(const key of ['apps','connect','devices','support'])assert(markup.includes('data-setup-section="'+key+'"'),'Missing setup section '+key);
+ assert(markup.indexOf('data-setup-section="apps"')<markup.indexOf('data-setup-section="connect"'),'Install the app before copying the link');
 }
-assert.equal((preview.match(/data-cabinet-tab="/g)||[]).length,5);
-assert.equal((template.match(/data-cabinet-tab="/g)||[]).length,5);
-assert.match(template,/role="tablist"/);
-assert.match(template,/aria-selected="true" tabindex="0" data-cabinet-tab="overview"/);
-assert.match(portal,/event\.key==='ArrowRight'/,'Keyboard tabs must support arrow navigation');
-assert.match(portal,/button\.tabIndex=selected\?0:-1/);
-assert.match(portal,/selectCabinetTab\('overview'\)/);
-assert.match(studioSource,/switchPreviewTab\(previewTab\)/);
-assert.match(studioSource,/previewShadow\.querySelectorAll\('\[data-cabinet-panel\]'\)/);
-assert.match(portal,/apps:!!document\.querySelector\('\.subscription-preview-app'\)/);
-assert.match(portal,/devices:!!document\.getElementById\('subscription-devices'\)/);
-assert.match(portal,/support:!!document\.querySelector\('\.subscription-preview-support'\)/);
-assert.match(template,/id="subscription-link-card" hidden/,'Bearer link must be hidden');
-assert.match(preview,/data-preview-link-card hidden/,'Preview must hide demo URL until explicitly revealed');
-assert.match(portal,/card\.hidden = true/,'Private link hidden on load');
-assert.match(template,/id="subscription-qr" class="subscription-preview-qr" hidden|\{\{QR\}\}/,'QR is exclusively inside the connection panel');
-const overview=template.split('data-cabinet-panel="overview"')[1].split('data-cabinet-panel="connect"')[0];
-assert(!overview.includes('id="subscription-link-card"'),'Private URLs must not appear on dashboard');
-assert(!overview.includes('class="subscription-preview-qr"'),'QR must never dominate overview');
-assert.match(template,/data-app-filter="windows"/);
-assert.match(template,/data-app-filter="ios"/);
-assert.match(template,/id="cabinet-app-search"/);
+assert.match(template,/id="subscription-link-card" hidden/,'Private URL remains hidden');
+assert.match(preview,/data-preview-link-card[^>]*hidden/,'Preview must hide the private URL');
+assert.match(portal,/card\.hidden = true/);
+assert.match(portal,/getElementById\('copy-link'\)\?\.remove/,'Do not render two copy actions');
+assert.match(portal,/section.hidden=!available\[section.dataset.setupSection\]/,'Honor capability settings');
+assert.match(studioSource,/syncPreviewSections\(\)/,'Studio must preview the same one-page sections');
+assert.match(portal,/navigator\.clipboard\.writeText\(subscriptionUrl\)/);
+assert.match(portal,/Qr\.encodeText\(subscriptionUrl/);
 assert.match(portal,/search\?\.addEventListener\('input',searchApps\)/);
-assert.match(portal,/selectedPlatform==='all'\|\|platform\.includes\(selectedPlatform\)/);
 assert.match(studioSource,/applyPreviewFilter\(\)/);
-assert.match(studioSource,/window\.qrcodegen\?\.QrCode/,'Demo QR should use the real bundled encoder');
 assert.match(css,/container:cabinet\/inline-size/);
 assert.match(css,/@container cabinet \(max-width:900px\)/);
 assert.match(css,/@container cabinet \(max-width:560px\)/);
@@ -61,4 +43,4 @@ for(const tag of ['div','section','span','nav','article','aside']){
   const close=(preview.match(new RegExp('</'+tag+'>','g'))||[]).length;
   assert.equal(open,close,'Studio HTML must balance '+tag);
 }
-console.log('Subscription personal cabinet: real tabs, privacy, filters and preview parity OK');
+console.log('Subscription personal cabinet: one-page setup, privacy, filters and preview parity OK');

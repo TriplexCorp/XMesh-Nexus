@@ -18,7 +18,7 @@
         brandNote:'Your subscription',copyAction:'Copy subscription link',trafficLabel:'Data used',
         linkLabel:'Your subscription link',
         linkNote:'Paste this link into your connection app. Keep it private.',
-        endpointLabel:'Add your subscription',
+        endpointLabel:'2. Add your subscription',
         endpointNote:'Copy your link, then open your app and choose “Add subscription” or “Import from clipboard”.',
         statusLabel:'Subscription status',
         statusNote:'Traffic, expiry and service availability.',
@@ -33,7 +33,7 @@
         brandNote:'Ваша подписка',copyAction:'Скопировать ссылку',trafficLabel:'Использовано трафика',
         linkLabel:'Ссылка на подписку',
         linkNote:'Добавьте ссылку в приложение для подключения. Не передавайте её посторонним.',
-        endpointLabel:'Добавьте подписку',
+        endpointLabel:'2. Добавьте подписку',
         endpointNote:'Скопируйте ссылку. В приложении выберите «Добавить подписку» или «Импорт из буфера».',
         statusLabel:'Статус подписки',
         statusNote:'Трафик, срок действия и доступность сервиса.',
@@ -106,8 +106,8 @@
     notes:['Install an app for your phone or computer','Copy your link from this page into the app','Tap Connect in the app. You’re ready to go.'],
     guideTitle:'What to do next',guideDescription:'After adding the subscription, choose a server in your app and tap Connect. Return here whenever you need your link.',
     guideHint:'Your personal link grants access to the subscription. Never share it.',
-    appsKicker:'CLIENT LIBRARY',appsHeading:'Connection apps',
-    appsNote:'Choose your device, then install one of the apps below.',
+    appsKicker:'CLIENT LIBRARY',appsHeading:'1. Install an app',
+    appsNote:'Choose your device. Tap an app to install it.',
     appsSearch:'Search applications…',appsEmpty:'No applications match these filters.',
     devicesKicker:'YOUR DEVICES',devicesHeading:'Connected devices',
     devicesNote:'Your registered device count and allowance.',
@@ -125,8 +125,8 @@
     notes:['Установите приложение на телефон или компьютер','Скопируйте ссылку с этой страницы в приложение','Нажмите кнопку подключения в приложении. Готово!'],
     guideTitle:'Что делать дальше',guideDescription:'После добавления подписки выберите сервер в приложении и включите подключение. Ссылка всегда будет на этой странице.',
     guideHint:'Персональная ссылка открывает доступ к подписке. Не передавайте её посторонним.',
-    appsKicker:'КАТАЛОГ',appsHeading:'Приложения для подключения',
-    appsNote:'Выберите ваше устройство и установите одно из приложений.',
+    appsKicker:'КАТАЛОГ',appsHeading:'1. Установите приложение',
+    appsNote:'Выберите устройство. Нажмите на приложение, чтобы установить его.',
     appsSearch:'Найти приложение…',appsEmpty:'По вашему запросу приложений не найдено.',
     devicesKicker:'ВАШИ УСТРОЙСТВА',devicesHeading:'Подключённые устройства',
     devicesNote:'Количество зарегистрированных устройств и лимит.',
@@ -157,7 +157,7 @@
   cabinetText.steps.forEach((v,i)=>setCabinetCopy(['cabinet-step-one','cabinet-step-two','cabinet-step-three'][i],v));
   cabinetText.notes.forEach((v,i)=>setCabinetCopy(['cabinet-step-one-note','cabinet-step-two-note','cabinet-step-three-note'][i],v));
   const appHeading = document.querySelector('.subscription-preview-apps>header');
-  if (appHeading) setCabinetCopy('cabinet-apps-heading',appHeading.textContent);
+  if (appHeading) appHeading.hidden=true;
   const search = document.getElementById('cabinet-app-search');
   if (search) {search.placeholder=cabinetText.appsSearch;search.setAttribute('aria-label',cabinetText.appsSearch)}
   setCabinetCopy('cabinet-apps-empty',cabinetText.appsEmpty);
@@ -166,60 +166,17 @@
   document.getElementById('cabinet-platform-filters')?.setAttribute('aria-label',cabinetText.platformLabel);
   document.getElementById('cabinet-tabs')?.setAttribute('aria-label',cabinetText.navLabel);
 
-  const tabButtons=[...document.querySelectorAll('[data-cabinet-tab]')];
-  const tabPanels=[...document.querySelectorAll('[data-cabinet-panel]')];
-  const available={
-    overview:true,
-    connect:!!input,
-    apps:!!document.querySelector('.subscription-preview-app'),
-    devices:!!document.getElementById('subscription-devices'),
-    support:!!document.querySelector('.subscription-preview-support')
-  };
-  const startButton=document.getElementById('cabinet-start');
-  if(startButton){
-    startButton.dataset.cabinetOpen=available.connect?(available.apps?'apps':'connect'):'support';
-    if(!available.connect)startButton.textContent=language==='en'?'Contact support':'Написать в поддержку';
-  }
-  const checklist=document.querySelector('.subscription-cabinet-checklist');
-  if(checklist)checklist.hidden=!available.connect;
-  for(const button of tabButtons)button.hidden=!available[button.dataset.cabinetTab];
-  for(const button of document.querySelectorAll('[data-cabinet-open]')) {
-    button.hidden=!available[button.dataset.cabinetOpen];
-  }
-  function selectCabinetTab(key,{focus=false}={}) {
-    const name=available[key]?key:'overview';
-    tabButtons.forEach(button=>{
-      const selected=button.dataset.cabinetTab===name;
-      button.setAttribute('aria-selected',String(selected));
-      button.tabIndex=selected?0:-1;
-      if(selected&&focus)button.focus();
-    });
-    tabPanels.forEach(panel=>{panel.hidden=panel.dataset.cabinetPanel!==name});
-    if(name==='devices'){
-      const deviceSummary=document.getElementById('subscription-devices');
-      if(deviceSummary)deviceSummary.hidden=false;
-    }
-  }
-  const tabList=document.getElementById('cabinet-tabs');
-  tabList?.addEventListener('click',event=>{
-    const button=event.target.closest('[data-cabinet-tab]');
-    if(button&&!button.hidden)selectCabinetTab(button.dataset.cabinetTab);
-  });
-  tabList?.addEventListener('keydown',event=>{
-    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-    const visible=tabButtons.filter(button=>!button.hidden);
-    const index=visible.indexOf(document.activeElement);
-    if(index<0)return;
-    event.preventDefault();
-    const next=event.key==='Home'?0:event.key==='End'?visible.length-1:
-      (index+(event.key==='ArrowRight'?1:-1)+visible.length)%visible.length;
-    selectCabinetTab(visible[next].dataset.cabinetTab,{focus:true});
-  });
-  document.querySelectorAll('[data-cabinet-open]').forEach(button=>{
-    button.addEventListener('click',()=>selectCabinetTab(button.dataset.cabinetOpen,{focus:true}));
-  });
-  selectCabinetTab('overview');
-
+  // Every available task stays on the same page; optional features disappear.
+  const available={connect:!!input,apps:!!input&&!!document.querySelector('.subscription-preview-app'),devices:!!document.getElementById('subscription-devices'),support:!!document.querySelector('.subscription-preview-support')};
+  document.querySelectorAll('[data-setup-section]').forEach(section=>{section.hidden=!available[section.dataset.setupSection]});
+  const devices=document.getElementById('subscription-devices');if(devices)devices.hidden=false;
+  document.getElementById('copy-link')?.remove();
+  document.getElementById('toggle-devices')?.remove();
+  const heading=document.querySelector('.subscription-preview-hero h1');
+  const status=document.querySelector('.subscription-preview-ok');
+  if(status&&/^(Подписка (не)?активна|Subscription (in)?active)$/i.test(heading?.textContent.trim()||''))status.hidden=true;
+  const description=document.querySelector('.subscription-preview-hero p');
+  if(description&&['Настройки подключения и информация о подписке.','Connection setup and subscription information.'].includes(description.textContent.trim()))description.hidden=true;
   let selectedPlatform='all';
   const appTiles=[...document.querySelectorAll('.subscription-preview-app')];
   const searchApps=()=>{
@@ -236,6 +193,13 @@
     const empty=document.getElementById('cabinet-apps-empty');
     if(empty)empty.hidden=count>0;
   };
+  const ua=navigator.userAgent;
+  const detected=/iphone|ipad|ipod/i.test(ua)?'ios':/android/i.test(ua)?'android':/windows/i.test(ua)?'windows':/macintosh|mac os/i.test(ua)?'macos':/linux/i.test(ua)?'linux':'all';
+  if(appTiles.some(tile=>(tile.querySelector('small')?.textContent||'').toLowerCase().includes(detected))){
+    selectedPlatform=detected;
+    document.querySelectorAll('[data-app-filter]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.appFilter===detected)));
+    searchApps();
+  }
   document.getElementById('cabinet-platform-filters')?.addEventListener('click',event=>{
     const button=event.target.closest('[data-app-filter]');
     if(!button)return;
@@ -391,7 +355,7 @@
   });
 
   document.getElementById('toggle-devices')?.addEventListener('click', event => {
-    selectCabinetTab('devices',{focus:true});
+    document.querySelector('[data-setup-section="devices"]')?.scrollIntoView({block:'nearest'});
     event.currentTarget.setAttribute('aria-expanded','true');
   });
 })();

@@ -39,29 +39,27 @@ function fixture(url){
   for(const [width,height] of [[320,780],[390,844],[768,1024],[1440,1000],[1920,1080]])for(const lang of ['ru','en']){
    await page.setViewportSize({width,height});await page.goto(base+'/?lang='+lang+'&theme='+(lang==='en'?'light':'dark'));await page.waitForFunction(()=>!!document.querySelector('[role="meter"]'));
    assert(await page.locator('#subscription-link-card').isHidden(),'Personal link must start hidden');
-   const g=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth,body:innerWidth,title:parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),minTap:Math.min(...[...document.querySelectorAll('.subscription-cabinet-tab:not([hidden]),.subscription-preview-languages a,.cabinet-feature-actions button:not([hidden])')].map(el=>el.getBoundingClientRect().height))}));
+   const g=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth,body:innerWidth,title:parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),minTap:Math.min(...[...document.querySelectorAll('.subscription-cabinet-tab:not([hidden]),.subscription-preview-languages a,.subscription-preview-cta')].map(el=>el.getBoundingClientRect().height))}));
    assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=30,'Readable heading');assert(g.minTap>=44,'Touch target too small');
-   if(width<=390)assert((await page.locator('#cabinet-start').boundingBox()).y+(await page.locator('#cabinet-start').boundingBox()).height<=height,'Setup action must be visible without scrolling');
+   assert.equal(await page.locator('[role="tab"]').count(),0,'No tab navigation');assert(await page.locator('[data-setup-section="apps"]').isVisible());assert(await page.locator('[data-setup-section="connect"]').isVisible());assert.equal(await page.locator('#copy-link').count(),0,'Only one copy button');
    assert.equal(await page.locator('[role="meter"]').getAttribute('aria-valuenow'),'34.5');
    if(width===390||width===1440)await page.screenshot({path:path.join(out,'portal-overview-'+width+'-'+lang+'.png'),fullPage:true,animations:'disabled'});
-   await page.locator('#cabinet-start').click();assert.equal(await page.locator('[data-cabinet-tab="apps"]').getAttribute('aria-selected'),'true','Beginner path must start with an app');
    await page.locator('[data-app-filter="android"]').click();assert.equal(await page.locator('.subscription-preview-app:visible').count(),2);
-   await page.locator('#cabinet-app-search').fill('missing-application');assert(await page.locator('#cabinet-apps-empty').isVisible());await page.locator('#cabinet-app-search').fill('');
-   await page.locator('#portal-app-next').click();await page.locator('#connect-link').click();
+
+   await page.locator('#connect-link').click();
    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),base+'/s/disposable-test-token-0123456789abcdef');
    assert((await page.locator('#subscription-action-status').innerText()).length>10);
    await page.locator('#toggle-qr').click();assert.equal(await page.locator('#subscription-qr svg').count(),1);assert.equal(await page.locator('#subscription-qr').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');assert.equal(await page.locator('.subscription-preview-languages').getAttribute('aria-label'),lang==='en'?'Language':'Язык');assert.equal(await page.locator('#subscription-qr svg').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');
    await page.locator('#toggle-link').click();assert(await page.locator('#subscription-link-card').isVisible());await page.locator('#toggle-link').click();assert(await page.locator('#subscription-link-card').isHidden());
-   await page.locator('[data-cabinet-tab="overview"]').focus();await page.keyboard.press('End');assert.equal(await page.locator('[data-cabinet-tab="support"]').getAttribute('aria-selected'),'true');
-   await page.keyboard.press('Home');assert.equal(await page.locator('[data-cabinet-tab="overview"]').getAttribute('aria-selected'),'true');
+   await page.locator('#connect-link').focus();await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr','Keyboard order follows setup');
    if(lang==='en')assert(!/[А-Яа-яЁё]/.test(await page.locator('body').innerText()),'English portal has untranslated copy');checks++;
   }
-  await page.goto(base+'/?lang=en&accent=dark');await page.waitForSelector('#cabinet-start');assert.equal(await page.locator('#cabinet-start').evaluate(el=>getComputedStyle(el).color),'rgb(255, 255, 255)','Dark custom accent needs contrasting button text');checks++;
-  await page.goto(base+'/?lang=en&apps=0');await page.waitForFunction(()=>document.querySelector('[data-cabinet-tab="apps"]').hidden);await page.locator('#cabinet-start').click();assert.equal(await page.locator('[data-cabinet-tab="connect"]').getAttribute('aria-selected'),'true','Setup must fall back to connection when catalog is disabled');checks++;
+  await page.goto(base+'/?lang=en&accent=dark');await page.waitForSelector('#connect-link');assert.equal(await page.locator('#connect-link').evaluate(el=>getComputedStyle(el).color),'rgb(255, 255, 255)','Dark custom accent needs contrasting button text');checks++;
+  await page.goto(base+'/?lang=en&apps=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="apps"]').hidden);assert(await page.locator('#connect-link').isVisible());checks++;
   await page.goto(base+'/?lang=en&metrics=0');await page.waitForFunction(()=>document.querySelector('.subscription-public-info-panel').hidden);checks++;
-  await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#cabinet-start');assert(await page.locator('.subscription-preview-progress').isHidden(),'Unlimited usage must not imply a percentage');checks++;
-  await page.goto(base+'/?lang=en&active=0');await page.waitForFunction(()=>document.querySelector('[data-cabinet-tab="connect"]').hidden);for(const key of ['connect','apps','devices'])assert(await page.locator('[data-cabinet-tab="'+key+'"]').isHidden(),'Inactive subscription exposes action '+key);assert(await page.locator('.subscription-cabinet-checklist').isHidden(),'Inactive subscribers must not receive setup instructions');await page.locator('#cabinet-start').click();assert.equal(await page.locator('[data-cabinet-tab="support"]').getAttribute('aria-selected'),'true');checks++;
-  await page.emulateMedia({reducedMotion:'reduce'});await page.goto(base+'/?lang=en');await page.waitForSelector('#cabinet-start');assert.equal(await page.locator('.subscription-cabinet-panel:not([hidden])').evaluate(el=>getComputedStyle(el).animationName),'none');checks++;
+  await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#connect-link');assert(await page.locator('.subscription-preview-progress').isHidden(),'Unlimited usage must not imply a percentage');checks++;
+  await page.goto(base+'/?lang=en&active=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="connect"]').hidden);assert(await page.locator('[data-setup-section="apps"]').isHidden());assert(await page.locator('[data-setup-section="support"]').isVisible());checks++;
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto(base+'/?lang=en');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[data-setup-section="connect"]').evaluate(el=>getComputedStyle(el).animationName),'none');checks++;
   assert.deepEqual(errors,[]);console.log('Public portal: '+checks+' viewport/locale/state cases, onboarding, copy, QR, filters, keyboard, English, real usage and reduced motion passed');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1});
