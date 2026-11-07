@@ -2403,17 +2403,19 @@ mod provision_tests {
             1
         );
         assert_eq!(inbounds[0]["settings"]["clients"][0]["id"], uuid);
-        assert!(
+        assert_eq!(
             inbounds[1]["settings"]["clients"]
                 .as_array()
                 .unwrap()
-                .is_empty()
+                .as_slice(),
+            &[]
         );
-        assert!(
+        assert_eq!(
             inbounds[2]["settings"]["clients"]
                 .as_array()
                 .unwrap()
-                .is_empty()
+                .as_slice(),
+            &[]
         );
         // No synthetic client is provisioned; the authorization boundary is
         // the real client list produced by the signed desired configuration.
@@ -2431,7 +2433,7 @@ mod provision_tests {
             json!({"id":4,"xrayId":"550e8400-e29b-41d4-a716-446655440003","squads":[4],"expireAt":now-1}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["SE"]})];
-        provision_proxy_users(&mut config, &users, &squads, now, &Default::default()).unwrap();
+        provision_proxy_users(&mut config, &users, &squads, now, &std::collections::HashSet::default()).unwrap();
         let settings = &config["inbounds"][0]["settings"];
         assert!(settings.get("users").is_none());
         assert_eq!(settings["clients"].as_array().unwrap().len(), 1);
@@ -2466,7 +2468,7 @@ mod provision_tests {
                 "squads":[4],"hold":true,"holdDays":0}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]})];
-        provision_proxy_users(&mut config, &users, &squads, now, &Default::default()).unwrap();
+        provision_proxy_users(&mut config, &users, &squads, now, &std::collections::HashSet::default()).unwrap();
         let clients = config["inbounds"][0]["settings"]["clients"]
             .as_array()
             .unwrap();
@@ -2492,7 +2494,7 @@ mod provision_tests {
             &users,
             &squads,
             1_800_000_000_000,
-            &Default::default(),
+            &std::collections::HashSet::default(),
         )
         .unwrap();
         assert_eq!(
@@ -2541,7 +2543,7 @@ mod provision_tests {
             &[active, blocked],
             &squads,
             1_800_000_000_000,
-            &Default::default(),
+            &std::collections::HashSet::default(),
         )
         .unwrap();
         for (i, expected) in ["id", "password", "password", "password", "auth", "pass"]
@@ -2578,7 +2580,7 @@ mod provision_tests {
             &users,
             &squads,
             1_800_000_000_000,
-            &Default::default(),
+            &std::collections::HashSet::default(),
         )
         .unwrap();
         assert_eq!(
