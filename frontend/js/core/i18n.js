@@ -15,6 +15,9 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Ожидает подключения":"Awaiting connection",
+    "Ожидает первого подключения":"Awaiting first connection",
+    "{days} дн. с первого подключения":"{days} days after first connection",
     "МОЙ КАБИНЕТ":"MY ACCOUNT",
     "МОЙ КАБИНЕТ / VPN ACCESS":"MY ACCOUNT / VPN ACCESS",
     "Подключение":"Connection",
