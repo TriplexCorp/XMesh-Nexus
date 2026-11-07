@@ -1569,7 +1569,11 @@ pub async fn preview_routing(
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX);
-    let cdn_tags = crate::cdn_quota::tags(&crate::read_settings(&state.pool).await?)?;
+    let settings = crate::read_settings(&state.pool).await?;
+    let inbound_tags = config.get("inbounds").and_then(Value::as_array).into_iter().flatten()
+        .filter_map(|inbound| inbound.get("tag").and_then(Value::as_str))
+        .map(str::to_owned).collect::<Vec<_>>();
+    let cdn_tags = crate::cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?;
     provision_proxy_users(&mut config, &users, &squads, now, &cdn_tags)?;
     let geo = crate::node_geodata::apply(&node, &mut config)?;
     let nodes = crate::load_records(&state.pool, "nodes").await?;
@@ -2012,7 +2016,11 @@ async fn compile_node_profile(
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX);
-    let cdn_tags = crate::cdn_quota::tags(&crate::read_settings(&state.pool).await?)?;
+    let settings = crate::read_settings(&state.pool).await?;
+    let inbound_tags = config.get("inbounds").and_then(Value::as_array).into_iter().flatten()
+        .filter_map(|inbound| inbound.get("tag").and_then(Value::as_str))
+        .map(str::to_owned).collect::<Vec<_>>();
+    let cdn_tags = crate::cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?;
     provision_proxy_users(&mut config, &users, &squads, now, &cdn_tags)?;
     // Keep the source XRAY STUDIO profile immutable: every source node gets
     // its own GeoData assets and its own validated routing/exit graph.
@@ -2382,6 +2390,20 @@ mod provision_tests {
         assert_eq!(policy["users"][0]["panelUsedBytes"], 536_870_912);
         assert_eq!(policy["nodeId"], 12);
     }
+    #[test]
+    fn limited_node_scopes_exhaustion_without_leaking_to_regular_node() {
+        let settings = json!({"cdnInboundTags":[]});
+        let sample_tags = vec!["PL_LTE".to_owned(), "MAIN_DE".to_owned()];
+        let standard = json!({"cdnMode":"standard"});
+        let limited = json!({"cdnMode":"selected","cdnInboundTags":["PL_LTE"]});
+        let normal_tags = crate::cdn_quota::tags_for_node(&settings, &standard, &sample_tags).unwrap();
+        let limited_tags = crate::cdn_quota::tags_for_node(&settings, &limited, &sample_tags).unwrap();
+        let user = json!({"cdnLimitGb":5,"cdnUsedBytes":5_i64*1_073_741_824});
+        assert!(!crate::cdn_quota::exhausted(&user, "PL_LTE", &normal_tags));
+        assert!(crate::cdn_quota::exhausted(&user, "PL_LTE", &limited_tags));
+        assert!(!crate::cdn_quota::exhausted(&user, "MAIN_DE", &limited_tags));
+    }
+
     #[test]
     fn cdn_quota_drops_only_cdn_accounts_without_revoking_main_access() {
         let uuid = "550e8400-e29b-41d4-a716-446655440000";
