@@ -2610,48 +2610,13 @@ async fn persist_verified_traffic_deltas(
     Ok(())
 }
 
-async fn persist_user_traffic(
+async fn activate_waiting_users_on_traffic(
     conn: &mut sqlx::PgConnection,
     node_id: i64,
-    user_traffic: &[UserTrafficSample],
+    samples: &Value,
     sampled_at: i64,
     source_ms: i64,
 ) -> Result<(), ApiError> {
-    if !user_traffic.is_empty() {
-        // One atomic UPSERT for the full node batch. Initial samples establish a
-        // baseline instead of spuriously counting traffic from before collection.
-        // Counter resets start a new baseline, never subtract or fabricate usage.
-        let serialized = serde_json::to_value(user_traffic)
-            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userTraffic."))?;
-        // Only a positive delta from an authenticated per-user Xray counter
-        // constitutes activity. Repeated idle samples must NOT refresh onlineAt.
-        // Preserve the last activity timestamp across node restarts and resets.
-        sqlx::query(
-            "UPDATE panel_records AS u
-             SET data=jsonb_set(
-                   u.data,'{onlineAt}',
-                   to_jsonb(GREATEST(
-                     CASE WHEN (u.data->>'onlineAt') ~ '^[0-9]{1,16}$'
-                       THEN (u.data->>'onlineAt')::BIGINT ELSE 0 END,
-                     LEAST($3::BIGINT,$4::BIGINT))),true),
-                 updated_at=NOW()
-             FROM jsonb_to_recordset($2::jsonb)
-                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-             LEFT JOIN user_node_traffic_totals AS previous
-                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
-             WHERE u.collection='users' AND u.id=sample.user_id
-               AND previous.user_id IS NOT NULL
-               AND sample.uplink_bytes >= previous.last_uplink_bytes
-               AND sample.downlink_bytes >= previous.last_downlink_bytes
-               AND (sample.uplink_bytes>previous.last_uplink_bytes
-                    OR sample.downlink_bytes>previous.last_downlink_bytes)",
-        )
-        .bind(node_id)
-        .bind(&serialized)
-        .bind(sampled_at)
-        .bind(source_ms)
-        .execute(&mut *conn)
-        .await?;
         // Only authenticated, accepted, positive per-user traffic starts the
         // timer. Imports and zero-only initial counter baselines cannot.
         // A conditional update ensures idempotence across parallel nodes.
@@ -2714,7 +2679,7 @@ async fn persist_user_traffic(
              RETURNING u.id",
         )
         .bind(node_id)
-        .bind(&serialized)
+        .bind(samples)
         .bind(sampled_at)
         .bind(source_ms)
         .fetch_all(&mut *conn)
@@ -2726,6 +2691,53 @@ async fn persist_user_traffic(
                 "First verified VPN traffic activated waiting subscription"
             );
         }
+    Ok(())
+}
+
+async fn persist_user_traffic(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    user_traffic: &[UserTrafficSample],
+    sampled_at: i64,
+    source_ms: i64,
+) -> Result<(), ApiError> {
+    if !user_traffic.is_empty() {
+        // One atomic UPSERT for the full node batch. Initial samples establish a
+        // baseline instead of spuriously counting traffic from before collection.
+        // Counter resets start a new baseline, never subtract or fabricate usage.
+        let serialized = serde_json::to_value(user_traffic)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userTraffic."))?;
+        // Only a positive delta from an authenticated per-user Xray counter
+        // constitutes activity. Repeated idle samples must NOT refresh onlineAt.
+        // Preserve the last activity timestamp across node restarts and resets.
+        sqlx::query(
+            "UPDATE panel_records AS u
+             SET data=jsonb_set(
+                   u.data,'{onlineAt}',
+                   to_jsonb(GREATEST(
+                     CASE WHEN (u.data->>'onlineAt') ~ '^[0-9]{1,16}$'
+                       THEN (u.data->>'onlineAt')::BIGINT ELSE 0 END,
+                     LEAST($3::BIGINT,$4::BIGINT))),true),
+                 updated_at=NOW()
+             FROM jsonb_to_recordset($2::jsonb)
+                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+             LEFT JOIN user_node_traffic_totals AS previous
+                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
+             WHERE u.collection='users' AND u.id=sample.user_id
+               AND previous.user_id IS NOT NULL
+               AND sample.uplink_bytes >= previous.last_uplink_bytes
+               AND sample.downlink_bytes >= previous.last_downlink_bytes
+               AND (sample.uplink_bytes>previous.last_uplink_bytes
+                    OR sample.downlink_bytes>previous.last_downlink_bytes)",
+        )
+        .bind(node_id)
+        .bind(&serialized)
+        .bind(sampled_at)
+        .bind(source_ms)
+        .execute(&mut *conn)
+        .await?;
+        activate_waiting_users_on_traffic(conn, node_id, &serialized, sampled_at, source_ms)
+            .await?;
         persist_verified_traffic_deltas(conn, node_id, &serialized, sampled_at, false).await?;
         sqlx::query(
             "INSERT INTO user_node_traffic_totals AS totals (
