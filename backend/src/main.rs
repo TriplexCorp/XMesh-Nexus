@@ -1,5 +1,6 @@
 mod admin_accounts;
 mod auth;
+mod cdn_quota;
 mod client_routing;
 mod core;
 mod mfa;
@@ -1300,6 +1301,7 @@ async fn update_record(
         // usage after an edit so a quota-only PATCH cannot appear to reset
         // the user's already accumulated authenticated traffic in the UI.
         add_metered_usage(&mut result, user_metered_bytes(&state.pool, id).await?);
+        cdn_quota::attach_usage(&state.pool, std::slice::from_mut(&mut result)).await?;
     }
     audit(
         &state.pool,
@@ -1495,6 +1497,7 @@ fn validate_settings_keys(object: &serde_json::Map<String, Value>) -> Result<(),
                 | "subscriptionShowDevices"
                 | "subscriptionJson"
                 | "clientBalancers"
+                | "cdnInboundTags"
                 | "clientRoutingProfiles"
                 | "subscriptionClients"
                 | "subscriptionClientLinks"
@@ -1714,6 +1717,9 @@ fn validate_settings_announcements(
 
 fn validate_settings_integrations(object: &serde_json::Map<String, Value>) -> Result<(), ApiError> {
     subscription_settings::validate(object)?;
+    if let Some(tags) = object.get("cdnInboundTags") {
+        cdn_quota::validate_settings(&json!({"cdnInboundTags":tags}))?;
+    }
     if let Some(groups) = object.get("clientBalancers") {
         subscription_json::validate_client_balancers(groups)
             .map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
@@ -4005,6 +4011,7 @@ async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, Api
                 add_metered_usage(user, *traffic.get(&id).unwrap_or(&0));
             }
         }
+        cdn_quota::attach_usage(pool, &mut records).await?;
     }
     Ok(records)
 }
@@ -4448,6 +4455,7 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
         }
     }
     if collection == "users" {
+        cdn_quota::validate_user(data)?;
         if let Some(personal) = object.get("clientRouting") {
             client_routing::validate_user_override(personal)
                 .map_err(|detail| ApiError::new(StatusCode::BAD_REQUEST, detail))?;
