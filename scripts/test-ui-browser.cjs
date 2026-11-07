@@ -173,6 +173,43 @@ async function main() {
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
+    await checked('Settings composition: bounded, aligned desktop workspace and compact navigation',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      for(const section of ['general','layout','colors','integrations','system','data']){
+        await navigate('set/'+section);
+        const g=await page.evaluate(()=>{
+          const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,y:r.y,bottom:r.bottom,width:r.width,height:r.height}};
+          const shell=document.querySelector('.settings-center'),main=document.querySelector('.settings-center-main');
+          const heading=document.querySelector('.settings-center-heading'),grid=document.querySelector('.settings-center-grid');
+          return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),shell:box(shell),main:box(main),heading:box(heading),grid:box(grid),nav:[...document.querySelectorAll('.settings-center-link')].map(box),cards:[...grid.querySelectorAll('.card')].map(box),single:main.dataset.single};
+        });
+        assert(g.scrollWidth<=g.viewport+1,'Settings must not create horizontal page scrolling');
+        assert(g.shell.width<=g.rem*96+2,'Settings must not spread across an ultrawide dashboard');
+        assert(g.nav.every(n=>n.height<=g.rem*3.55),'Navigation descriptions must not stretch every sidebar item');
+        assert(g.main.x>=g.shell.x+g.rem*10,'Settings content must stay beside secondary navigation');
+        assert(g.cards.every(c=>c.width>=g.rem*20),'Cards must remain usable, not squeezed by the navigation rail');
+        if(g.single==='true'){
+          assert(g.main.width<=g.rem*54+2,'Sparse settings content must remain bounded');
+          assert(Math.abs(g.cards[0].x-g.heading.x)<3,'Single card and heading must share the same left edge');
+        }
+        if(section==='layout')await screenshot(page,'settings-composition-compact-desktop');
+      }
+    });
+    await checked('Settings composition: narrow screens retain usable subpages without overflow',async()=>{
+      await page.setViewportSize({width:390,height:844});
+      await navigate('set/layout');
+      const g=await page.evaluate(()=>{
+        const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width}};
+        const shell=document.querySelector('.settings-center'),nav=document.querySelector('.settings-center-nav'),grid=document.querySelector('.settings-center-grid');
+        const cards=[...grid.querySelectorAll('.card')];
+        return{viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,shell:box(shell),navDisplay:getComputedStyle(nav).display,cards:cards.map(box)};
+      });
+      assert(g.scrollWidth<=g.viewport+1,'Mobile Settings must not cause document overflow');
+      assert(g.navDisplay==='flex','Mobile Settings navigation must become a horizontal strip');
+      assert(g.cards.every(card=>card.width>=g.shell.width*.85),'Mobile cards must use available width');
+      await screenshot(page,'settings-composition-compact-mobile');
+    });
+
     await checked('Settings: deep links show one category, survive reload and preserve browser navigation',async()=>{
       await page.setViewportSize({width:1440,height:900});
       const content={
