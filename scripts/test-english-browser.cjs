@@ -8,7 +8,7 @@ const base=(process.env.XMESH_TEST_URL||'http://127.0.0.1:8080').replace(/\/$/,'
 assert(password&&process.env.XMESH_UI_DISPOSABLE==='1','Use an isolated API with ADMIN_PASSWORD and XMESH_UI_DISPOSABLE=1.');
 const output=path.resolve(process.env.XMESH_BROWSER_OUTPUT||'/tmp/xmesh-english-results');fs.mkdirSync(output,{recursive:true});
 const report={checks:[],failures:[]},fixtures=[],prefix='ui-en-'+Date.now().toString(36),dataNames=[];
-const routes=['home','statistics','users','squads','hosts','nodes','templates','profiles','subscription','balancers','clientrouting','tools','admins','security','set'];
+const routes=['home','statistics','users','squads','hosts','nodes','templates','profiles','subscription','balancers','clientrouting','tools','set/admins','set/security','set'];
 async function check(label,fn){try{await fn();report.checks.push(label)}catch(e){report.failures.push({label,error:e.message});console.error(label+': '+e.message)}}
 async function scan(page,label){await page.waitForTimeout(300);const leaks=await page.evaluate(names=>{
  const found=[],ignored='script,style,pre,code,textarea,[contenteditable],[data-subscription-preview]';
@@ -34,7 +34,7 @@ async function main(){const browser=await chromium.launch({headless:true,executa
   await create('hosts',{remark:prefix+' Хост',profileId:profile.id,tag:prefix,address:'ui.example.invalid',port:443,nodes:[node.id]});
   const user=await create('users',{username:prefix+'-client',squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
   for(const route of routes)await check('English route: '+route,async()=>{await navigate(route);await scan(page,route)});
-  const dialogs=[['nodes','[data-ne="nodes"]'],['nodes',`[data-ne="nodes:${node.id}"]`],['hosts','[data-ne="hosts"]'],['squads','[data-ne="squads"]'],['users','[data-nu]'],['users',`tr[data-id="${user.id}"]`],['templates','[data-ne="tpls"]'],['admins','[data-ne="admins"]'],['balancers','#balancer-add'],['clientrouting','[data-cr-add]']];
+  const dialogs=[['nodes','[data-ne="nodes"]'],['nodes',`[data-ne="nodes:${node.id}"]`],['hosts','[data-ne="hosts"]'],['squads','[data-ne="squads"]'],['users','[data-nu]'],['users',`tr[data-id="${user.id}"]`],['templates','[data-ne="tpls"]'],['set/admins','[data-ne="admins"]'],['balancers','#balancer-add'],['clientrouting','[data-cr-add]']];
   for(const [route,selector]of dialogs)await check('English dialog: '+selector,async()=>{await navigate(route);await page.locator(selector).first().click();if(route!=='balancers')await page.locator('dialog[open]').waitFor();await scan(page,selector);if(route==='clientrouting')for(const tab of ['rules','json']){await page.locator('[data-cr-tab="'+tab+'"]').click();await scan(page,'routing '+tab)}await page.keyboard.press('Escape')});
   await check('English User details tabs',async()=>{
    await navigate('users');await page.locator(`tr[data-id="${user.id}"]`).click();
