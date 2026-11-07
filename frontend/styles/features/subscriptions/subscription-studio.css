@@ -59,7 +59,7 @@
 .subscription-role .subscription-field{max-width:10rem}
 .subscription-role .subscription-field>span{display:none}
 .subscription-role .subscription-field select{min-height:2.4rem}
-.subscription-topology{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
+.subscription-topology{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:.65rem}
 .subscription-topology-item{
   border:1px solid var(--st-border);border-radius:var(--nx-control-radius);
   padding:.85rem;display:grid;gap:.3rem;min-width:0
