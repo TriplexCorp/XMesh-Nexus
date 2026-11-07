@@ -1477,6 +1477,10 @@ fn preview_routing_counts(node: &Value) -> (usize, usize) {
     (rule_count, exit_count)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The routing preview compiles the same full signed policy and LTE admission rules as live provisioning"
+)]
 pub async fn preview_routing(
     State(state): State<AppState>,
     Path(node_id): Path<i64>,
