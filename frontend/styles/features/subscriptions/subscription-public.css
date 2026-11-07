@@ -200,7 +200,7 @@ body.subscription-public{
   align-items:start;gap:clamp(14px,1.7vw,22px);
   padding:0;margin:0;
 }
-.subscription-public .subscription-public-grid:has(>.subscription-public-catalog:empty){
+.subscription-public .subscription-public-grid:not(:has(.subscription-preview-apps)){
   grid-template-columns:minmax(0,1fr);
 }
 .subscription-public .subscription-public-access-panel,
