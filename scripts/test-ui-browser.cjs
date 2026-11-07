@@ -2216,7 +2216,11 @@ async function main() {
           assert.equal(await form.locator('[name="remark"]').inputValue(),'🇳🇱 '+hostPresetNode.name,'Explicit preset must replace the remark');
           assert.equal(await form.locator('[name="countryCode"]').inputValue(),'NL');
           assert.equal(await form.locator('[name="profileId"]').inputValue(),String(hostTlsProfile.id));
+          // Preview is intentionally inert while Connection is selected. Read the
+          // visible Preview task rather than innerText of a hidden tab panel.
+          await form.locator('[data-host-editor-tab="preview"]').click();
           assert((await form.locator('[data-host-resolved]').innerText()).includes(hostPresetNode.addr),'Client preview must follow preset changes');
+          await form.locator('[data-host-editor-tab="connection"]').click();
           await form.locator('[name="remark"]').focus();await page.keyboard.press('Tab');
           assert(await form.locator('[name="address"]').evaluate(input=>input===document.activeElement),'Keyboard order must remain remark → address');
           assert.equal(await page.locator('html').getAttribute('data-surface'),surface);
