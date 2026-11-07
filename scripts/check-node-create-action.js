@@ -175,6 +175,24 @@ assert.match(sharingJs,/dataset\.sharingHead='risk'/,'Users table must gain the 
 assert.match(sharingCss,/\.xm-risk-pill\.is-high/,'High-risk table state must be visually distinct');
 assert.match(sharingCss,/\.xm-sharing-dialog\{/,'Risk details must use a dedicated explainable dialog');
 
+// Device access is a shared workspace, not a cramped one-column diagnostic.
+// Guard semantics, original server-enforced limits and scoped Nexus surfaces.
+assert.match(sharingJs,/const riskPanel=`<section id="xm-assessment-panel"/,
+ 'Access assessment must own a structured, explainable panel');
+assert.match(sharingJs,/xm-sharing-overview-action.*data-sharing-detail/,
+ 'Risk summary must expose an actionable link to a flagged account');
+assert.match(sharingJs,/class="xm-assessment-meter.*role="meter"/,
+ 'Risk index must be an accessible scale, not a fabricated probability');
+assert.match(sharingJs,/data-device-view-devices/,
+ 'Assessment must link back to registered devices');
+assert.match(sharingCss,/\.xm-assessment-columns\{display:grid/,
+ 'Evidence and reasons must have independent layout zones');
+assert.match(sharingCss,/@container sharing-content \(max-width:52rem\)/,
+ 'Embedded device workspace must respond to its available width');
+assert.match(sharingCss,/html\[data-motion=off\] \.xm-assessment-meter>span/,
+ 'Score animation must honor the global motion setting');
+
+
 assertPackaged(assert,['node-dialogs.css','user-editor.css','user-sharing-risk.css','node-dialogs.js']);
 assertPackaged(assert,['diagnostics.js', 'diagnostics.css', 'user-sharing-context.js', 'user-sharing-risk.js']);
 assertPackaged(assert,['app.js', 'user-fingerprint-override.js', 'node-bootstrap-v6.js', 'unified-selects.js']);
