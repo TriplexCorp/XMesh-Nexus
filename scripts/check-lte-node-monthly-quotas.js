@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+const api=fs.readFileSync('backend/src/main.rs','utf8');
+const pool=fs.readFileSync('backend/src/cdn_quota.rs','utf8');
+const runtime=fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
+const ui=fs.readFileSync('frontend/js/core/app.js','utf8');
+const migration=fs.readFileSync('backend/migrations/0113_cdn_monthly_inbound_traffic.sql','utf8');
+const integration=fs.readFileSync('scripts/test-node-auth-integration.py','utf8');
+assert.match(api,/cdn_quota::validate_node\(data\)/,'Node mode must be validated server-side');
+assert.match(pool,/pub fn tags_for_node/,'Node-specific inbound policy must be evaluated by the server');
+assert.match(pool,/node\.data->>'cdnMode'='all'/,'Lifetime accounting must consider limited nodes');
+assert.match(pool,/node\.data->'cdnInboundTags' \? totals\.inbound_tag/,'Selected inbound tags must remain node-scoped');
+assert.match(pool,/cdnResetPeriod/,'Quota mode must be configured explicitly');
+assert.match(pool,/FROM user_inbound_traffic_monthly/,'Monthly usage cannot use lifetime cumulative totals');
+assert.match(api,/INSERT INTO user_inbound_traffic_monthly AS monthly/,'Monthly increments must be accepted with verified inbound telemetry');
+assert.match(api,/JOIN user_inbound_traffic_totals AS previous/,'Signed monotonic delta must be used as monthly baseline');
+assert.match(api,/quota_uplink_bytes=monthly\.quota_uplink_bytes\+EXCLUDED\.quota_uplink_bytes/,'Durable atomic accumulation required');
+assert.match(api,/UPDATE user_inbound_traffic_monthly SET quota_uplink_bytes=0/,'Manual per-user reset must clear monthly counters');
+assert.match(migration,/PRIMARY KEY \(month_start, node_id, user_id, inbound_tag\)/,'Monthly history must preserve node and inbound identity');
+assert.match(runtime,/cdn_quota::tags_for_node\(&settings, &node, &inbound_tags\)/,'Only limited node inbounds may be blocked in signed configs');
+assert.match(ui,/data-node-editor-pane="traffic"/,'Node editor needs real LTE traffic tab');
+assert.match(ui,/name="cdnResetPeriod"/,'Owner needs a monthly quota period selector');
+assert.match(integration,/node-scoped LTE cutoff in signed config/,'Signed desired config must exercise node-scoped policy');
+assert.match(integration,/enable per-user UTC monthly LTE quota/,'Real API integration must cover period selection');
+console.log('LTE node policy / monthly signed counter contract passed');
