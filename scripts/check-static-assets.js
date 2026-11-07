@@ -77,8 +77,8 @@ for(const selector of ['subscription-public-grid','subscription-public-catalog',
 }
 assert(!subscriptionSurface.includes('.subscription-public .subscription-public-catalog{'),
   'Shared surface must never override visitor catalog geometry');
-assert.match(nexusCss,/subscription-public[.]css[?]v=[a-f0-9]{12}/,
-  'Studio must import the real portal stylesheet for an accurate preview');
+assert(!nexusCss.includes('subscription-public.css'),
+  'Production visitor CSS must never enter authenticated panel graph');
 assert.match(userViewport,/grid-template-rows:auto auto minmax\(0,1fr\) auto/,'User drawer must keep header/overview/body/footer as separate viewport rows');
 assert.match(userViewport,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,21rem\),1fr\)\)/,'User drawer must reflow by available scaled width');
 assert.match(nexusCss,/#stats-user-modal\{[\s\S]*--dialog-width:96rem/,'User Intelligence must remain a workstation-sized dialog');
