@@ -87,7 +87,7 @@
 .settings-center-link{display:flex;align-items:center;gap:.7rem;min-width:0;padding:.68rem .7rem;border:1px solid transparent;border-radius:var(--nx-control-radius);color:var(--mu);text-decoration:none;transition:background var(--nx-duration),border-color var(--nx-duration),color var(--nx-duration)}
 .settings-center-link:hover{background:var(--nx-hover-bg);color:var(--tx)}
 .settings-center-link.is-active{background:var(--nx-selected-bg);border-color:var(--nx-selected-border);color:var(--tx)}
-.settings-center-link:focus-visible,.settings-center-related a:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
+.settings-center-link:focus-visible,.settings-center-related :is(a,button):focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
 .settings-center-link-icon{display:grid;place-items:center;flex:none;width:2rem;height:2rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
 .settings-center-link-icon .ic{width:1rem;height:1rem}
 .settings-center-link.is-active .settings-center-link-icon{color:var(--a);border-color:var(--nx-selected-border)}
@@ -95,8 +95,8 @@
 .settings-center-link-copy strong{font-size:.82rem;font-weight:730;line-height:1.32}
 .settings-center-link-copy small{color:var(--mu);font-size:.69rem;line-height:1.4}
 .settings-center-related{display:grid;gap:.15rem;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--nx-separator)}
-.settings-center-related a{display:flex;align-items:center;gap:.55rem;min-height:2.25rem;padding:.4rem .7rem;border-radius:var(--nx-control-radius);color:var(--mu);font-size:.76rem;text-decoration:none}
-.settings-center-related a:hover{color:var(--tx);background:var(--nx-hover-bg)}
+.settings-center-related :is(a,button){display:flex;align-items:center;gap:.55rem;min-height:2.25rem;padding:.4rem .7rem;border:0;border-radius:var(--nx-control-radius);background:transparent;color:var(--mu);font:inherit;font-size:.76rem;text-decoration:none;text-align:left;cursor:pointer}
+.settings-center-related :is(a,button):hover{color:var(--tx);background:var(--nx-hover-bg)}
 .settings-center-related .ic{width:.95rem;height:.95rem;flex:none}
 .settings-center-main{display:grid;gap:var(--nx-page-gap);min-width:0;align-content:start}
 .settings-center-heading{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:.8rem;padding:.16rem .08rem .7rem;border-bottom:1px solid var(--nx-separator)}
@@ -114,7 +114,7 @@
  .settings-center-link-icon{width:1.7rem;height:1.7rem}
  .settings-center-link-copy small{display:none}
  .settings-center-related{display:flex;gap:.3rem;flex-wrap:wrap;padding-top:.35rem}
- .settings-center-related a{min-height:2rem}
+ .settings-center-related :is(a,button){min-height:2rem}
 }
 @container settings-workspace (max-width:48rem){
  .settings-center-grid{grid-template-columns:minmax(0,1fr)}
