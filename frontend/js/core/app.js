@@ -4624,7 +4624,7 @@ async function setP(){
     <aside class="settings-center-rail" aria-label="Разделы настроек">
       <nav class="settings-center-nav" aria-label="Разделы настроек">${navigation}</nav>
       <div class="settings-center-related">
-        <a href="#security">${ic('shield')} Безопасность</a>
+        <button type="button" data-settings-jump="security">${ic('shield')} Безопасность</button>
         <a href="#subscription">${ic('link')} SUBSCRIPTION STUDIO</a>
       </div>
     </aside>
@@ -4790,6 +4790,7 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(g('.sw')||g('[data-sel]')&&0)return;
+  if(b=g('[data-settings-jump]')){location.hash=b.dataset.settingsJump;return;}
   if(b=g('[data-scroll-target]')){
     e.preventDefault();
     pendingScrollTarget=b.dataset.scrollTarget;
