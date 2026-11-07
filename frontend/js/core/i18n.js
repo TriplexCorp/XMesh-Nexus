@@ -15,6 +15,19 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Версия панели":"Panel version",
+    "Проверить обновления":"Check for updates",
+    "Проверка GitHub…":"Checking GitHub…",
+    "Нажмите «Проверить обновления», чтобы сравнить сборку с main.":"Select “Check for updates” to compare your build with main.",
+    "Установлена актуальная сборка.":"This build is up to date.",
+    "Доступно обновление панели.":"A panel update is available.",
+    "Установленная сборка новее текущей ветки main.":"The installed build is ahead of upstream main.",
+    "Ревизия этой сборки неизвестна — сравнение недоступно.":"This build has no revision identifier; comparison is unavailable.",
+    "Ветки различаются или сравнение недоступно. Нужна ручная проверка.":"Branches differ or cannot be compared. Check manually.",
+    "Не удалось связаться с GitHub. Актуальность не подтверждена.":"GitHub could not be reached. Update status is unverified.",
+    "Открыть обновление в настройках":"Open update settings",
+    "Ревизия сборки неизвестна":"Build revision unavailable",
+    "Проверка обновлений доступна владельцу панели.":"Only the panel owner can check for updates.",
     "Показать ссылку":"Show private link",
     "Скрыть ссылку":"Hide private link",
     "● Активна":"● Active",
