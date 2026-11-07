@@ -2710,6 +2710,7 @@ async fn persist_user_traffic(
                AND (eligible.quota<=0 OR eligible.consumed<eligible.quota)
                AND (eligible.expiry<=0 OR eligible.expiry>=$3::BIGINT)
                AND u.data->>'hold'='true'
+               AND u.data->>'firstConnectedAt' IS NULL
              RETURNING u.id",
         )
         .bind(node_id)
