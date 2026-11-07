@@ -1221,7 +1221,7 @@ async function render(soft){
   }
   if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   v.dataset.workspace=PAGE_WORKSPACES[cur];v.dataset.page=cur;
-  $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
+  $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
   try{
     const [h,i]=await f();if(rt!==RT)return;
