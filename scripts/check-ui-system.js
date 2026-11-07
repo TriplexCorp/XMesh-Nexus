@@ -129,7 +129,7 @@ assert.match(app,/xmeshNexusCollectionView:/,'Density choice must persist by col
 for(const kind of ['squads','hosts','balancers'])
  assert(app.includes('data-workspace-grid="'+kind+'"'),'Missing grid mode on '+kind);
 assert.match(app,/balancer-card-details/,'Balancer editing must live inside a compact summary card');
-assert.match(app,/workspaceGridControls\('balancers'\)[\s\S]*?balancer-toolbar-save[\s\S]*?id=\\"balancer-save\\"[\s\S]*?workspaceCreateButton\('balancers'/,
+assert.match(app,/workspaceGridControls\('balancers'\)[\s\S]*?balancer-toolbar-save[\s\S]*?id="balancer-save"[\s\S]*?workspaceCreateButton\('balancers'/,
  'Balancers save action must live beside density and create controls in the toolbar');
 assert.doesNotMatch(app,/balancer-savebar/,'Balancer save must not be stranded under the card grid');
 assert.match(app,/const rows=read\(\)\.map\(\(\{_expanded,\.\.\.row\}\)=>row\)/,
