@@ -78,7 +78,11 @@ function fixture(url){
    await page.locator('#toggle-qr').click();assert.equal(await page.locator('#subscription-qr svg').count(),1);assert.equal(await page.locator('#subscription-qr').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');assert.equal(await page.locator('.subscription-preview-languages').getAttribute('aria-label'),lang==='en'?'Language':'Язык');assert.equal(await page.locator('#subscription-qr svg').getAttribute('aria-label'),lang==='en'?'Subscription QR code':'QR-код подписки');
 
    await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr');
-   await page.locator('#connect-link').focus();await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'toggle-qr','Keyboard order follows setup: '+width+'px '+lang);
+   await page.locator('#connect-link').focus();
+   const focusBefore=await page.evaluate(()=>({tag:document.activeElement.tagName,id:document.activeElement.id,dialogs:[...document.querySelectorAll('dialog')].map(d=>({open:d.open,modal:d.matches(':modal')}))}));
+   await page.keyboard.press('Tab');
+   const focusAfter=await page.evaluate(()=>({tag:document.activeElement.tagName,id:document.activeElement.id,html:document.activeElement.outerHTML.slice(0,300),buttons:[...document.querySelectorAll('.subscription-public-primary-action button')].map(b=>({id:b.id,tabIndex:b.tabIndex,disabled:b.disabled,hidden:b.hidden,display:getComputedStyle(b).display}))}));
+   assert.equal(focusAfter.id,'toggle-qr','Keyboard order follows setup: '+width+'px '+lang+' '+JSON.stringify({before:focusBefore,after:focusAfter}));
    if(lang==='en')assert(!/[А-Яа-яЁё]/.test(await page.locator('body').innerText()),'English portal has untranslated copy');checks++;
   }
   for(const [state,title]of [['EXPIRED','Your subscription has expired'],['LIMITED','Data allowance reached'],['DISABLED','Subscription paused'],['ON_HOLD','Ready for your first connection']]){

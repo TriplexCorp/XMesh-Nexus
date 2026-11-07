@@ -54,6 +54,31 @@ jobs:
           XRAY_TEST_BINARY: /tmp/xmesh-xray-test/xray
         run: node scripts/test-subscription-loopback.cjs
 
+  public-subscription-browser:
+    name: Public subscription browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Install pinned browser and dependencies
+        run: |
+          npm ci --prefix scripts/browser
+          scripts/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify public portal and Studio interactions independently
+        env:
+          XMESH_BROWSER_OUTPUT: browser-results
+        run: node scripts/test-public-subscription-browser.cjs
+      - name: Retain public portal geometry report and review captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-subscription-browser-results
+          path: browser-results
+          if-no-files-found: ignore
+
   rust:
     runs-on: ubuntu-latest
     steps:
@@ -300,7 +325,6 @@ jobs:
           XMESH_BROWSER_OUTPUT: browser-results
           XMESH_UI_DISPOSABLE: "1"
         run: |
-          node scripts/test-public-subscription-browser.cjs
           node scripts/test-templates-browser.cjs
           node scripts/test-statistics-chart-hit-targets.cjs
           node scripts/test-ui-browser.cjs
