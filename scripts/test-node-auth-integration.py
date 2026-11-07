@@ -256,7 +256,7 @@ def main():
         code,feed,_=request("GET",f"/sub/{token}",
             headers={"User-Agent":"Happ/26.7.28 (Windows NT 10.0; Win64; x64)"})
         assert_status(code,200,"Happ imports pending subscription without 403")
-        assert isinstance(feed,dict),f"pending native feed should be JSON: {type(feed)}"
+        assert isinstance(feed,list),f"pending native feed should be a JSON list: {type(feed)}"
         code,waiting_portal,_=request("GET",f"/portal/{token}",
             headers={"Accept":"text/html","User-Agent":"Mozilla/5.0"})
         assert_status(code,200,"first-connection portal remains available")
