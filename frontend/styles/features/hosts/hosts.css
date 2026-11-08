@@ -109,7 +109,7 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:2.6
    grid-template-columns:minmax(0,1fr) max-content max-content max-content
  }
  .host-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
- .host-directory-toolbar>.nx-bulk-toolbar{grid-column:2;grid-row:1;justify-self:start}
+ .host-directory-toolbar>.nx-bulk-toolbar{grid-column:1;grid-row:3;justify-self:start}
  .host-directory-toolbar>.nx-workspace-grid-controls{grid-column:3;grid-row:1}
  .host-directory-toolbar>.nx-workspace-create{grid-column:4;grid-row:1}
  .host-directory-toolbar>.host-directory-summary{
@@ -120,9 +120,9 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:2.6
  .host-directory-toolbar.host-directory-toolbar{grid-template-columns:minmax(0,1fr) max-content}
  .host-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
  .host-directory-toolbar>.nx-workspace-create{grid-column:2;grid-row:1}
- .host-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:2;justify-self:start}
+ .host-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:3;justify-self:start}
  .host-directory-toolbar>.host-directory-summary{
-   grid-column:1/-1;grid-row:3;flex-wrap:wrap;gap:.5rem 1rem
+   grid-column:1/-1;grid-row:2;flex-wrap:wrap;gap:.5rem 1rem
  }
  .host-directory-toolbar>.nx-workspace-grid-controls{grid-column:1/-1;grid-row:4;justify-self:start}
 }
