@@ -835,30 +835,27 @@ async function main() {
           const search=toolbar.querySelector('.node-explorer-search,.nx-directory-search').getBoundingClientRect();
           const bulk=toolbar.querySelector('[data-bulk-toolbar]').getBoundingClientRect();
           const density=toolbar.querySelector('.node-grid-controls,.nx-workspace-grid-controls').getBoundingClientRect();
-          const t=toolbar.getBoundingClientRect();
+          const frame=toolbar.getBoundingClientRect();
           return{searchRight:search.right,bulkLeft:bulk.left,bulkRight:bulk.right,
-            bulkBottom:bulk.bottom,densityLeft:density.left,densityBottom:density.bottom,
-            toolbarHeight:t.height};
+            densityLeft:density.left,toolbarLeft:frame.left,toolbarRight:frame.right};
         });
-        assert(Math.abs(geometry.bulkBottom-geometry.densityBottom)<12,
-          route+' bulk trigger must align with density in the main toolbar');
-        assert(geometry.bulkLeft>=geometry.searchRight-2&&geometry.bulkRight<=geometry.densityLeft+2,
-          route+' bulk entry must belong to the action cluster, before grid density');
+        assert(geometry.bulkLeft>=geometry.toolbarLeft-1&&geometry.bulkRight<=geometry.toolbarRight+1,
+          route+' bulk trigger must remain inside the main toolbar');
+        assert(geometry.bulkRight<=geometry.densityLeft+2,
+          route+' bulk trigger must precede density controls');
         await mode.click();
-        const selectionGeometry=await scope.evaluate(area=>{
+        const selection=await scope.evaluate(area=>{
           const toolbar=area.querySelector('.nodes-toolbar,.host-directory-toolbar,.squad-directory-toolbar');
-          const context=area.querySelector(':scope > .nx-bulk-context');
-          return{height:toolbar.getBoundingClientRect().height,
-            contextTop:context.getBoundingClientRect().top,
-            toolbarBottom:toolbar.getBoundingClientRect().bottom,
-            contextInsideToolbar:toolbar.contains(context)};
+          const controls=area.querySelector('[data-bulk-toolbar]');
+          return{inside:toolbar.contains(controls),visible:controls.getClientRects().length>0,
+            separate:!!area.querySelector(':scope > .nx-bulk-context'),
+            hasCount:!!controls.querySelector('.nx-bulk-count'),
+            hasActions:!!controls.querySelector('.nx-bulk-actions')};
         });
-        assert(!selectionGeometry.contextInsideToolbar,
-          route+' selection controls must be outside the main toolbar');
-        assert(selectionGeometry.contextTop>=selectionGeometry.toolbarBottom-2,
-          route+' selection strip must appear underneath the toolbar');
-        assert(selectionGeometry.height<=geometry.toolbarHeight+3,
-          route+' selection must not make the main toolbar jump in height');
+        assert(selection.inside&&selection.visible&&!selection.separate&&selection.hasCount&&selection.hasActions,
+          route+' selection, count and actions must all stay in the original toolbar');
+        assert((await scope.locator('[data-bulk-toolbar] svg.ic').count())>=4,
+          route+' bulk operations must use recognizable semantic icons');
         assert.match((await mode.innerText()).trim(),/^(Завершить выбор|Finish selection)$/);
         const first=scope.locator(card+' [data-bulk-check]').first();
         assert(await first.isVisible(),route+' must expose a selection checkbox on each card');
@@ -1009,7 +1006,9 @@ async function main() {
           const add=box(toolbar.querySelector('.nx-workspace-create'));
           const metrics=[...toolbar.querySelectorAll('.host-summary-metric')].map(box);
           const bar=box(toolbar);
-          return{bar,search,summary,bulk,density,add,metrics,overflow:document.documentElement.scrollWidth>innerWidth+1,
+          return{bar,search,summary,bulk,density,add,metrics,
+            columns:getComputedStyle(toolbar).gridTemplateColumns.split(/\s+/).length,
+            overflow:document.documentElement.scrollWidth>innerWidth+1,
             separate:!!document.querySelector('.host-directory > .host-directory-summary')};
         });
         assert.equal(result.separate,false,'Hosts stats must not make a second standalone surface');
@@ -1021,7 +1020,9 @@ async function main() {
             'Every toolbar control must fit within its framed surface');
         assert(Math.abs(result.search.mid-result.add.mid)<3,
           'Search and create should remain aligned in one leading row');
-        if(width>=1366){
+        // The host directory can enter its container-based compact layout
+        // even at desktop viewport widths if scale/sidebar reduce content area.
+        if(result.columns===5){
           assert(Math.abs(result.search.mid-result.summary.mid)<3,
             'Desktop counts must share the same toolbar row as search');
           assert(Math.abs(result.search.mid-result.bulk.mid)<3,
@@ -1031,6 +1032,27 @@ async function main() {
           assert(result.bar.height<=95,'Hosts desktop toolbar must not waste space on stacked metrics');
         }
       }
+    });
+
+    await checked('Squad bulk selection: 768px card buttons never escape their cards',async()=>{
+      await page.setViewportSize({width:768,height:1024});
+      await navigate('squads');
+      await page.locator('.squad-directory-toolbar [data-bulk-action="mode"]').click();
+      const select=page.locator('.squad-card [data-bulk-check]').first();
+      await select.check();
+      const bounds=await page.locator('.squad-card').first().evaluate(card=>{
+        const h=card.querySelector('.squad-card-head').getBoundingClientRect();
+        const r=card.getBoundingClientRect();
+        const icon=card.querySelector('.squad-card-emblem').getBoundingClientRect();
+        const label=card.querySelector('.squad-card-identity').getBoundingClientRect();
+        return{cardRight:r.right,headerRight:h.right,iconRight:icon.right,labelRight:label.right,
+          editHidden:getComputedStyle(card.querySelector('.squad-card-head-actions')).display==='none',
+          overflow:document.documentElement.scrollWidth>innerWidth+1};
+      });
+      assert(bounds.editHidden,'Per-card editing controls must not compete with a bulk checkbox');
+      assert(bounds.iconRight<=bounds.cardRight+1&&bounds.labelRight<=bounds.cardRight+1,
+        'Squad identity must remain inside its card when selection is active');
+      assert(!bounds.overflow,'Bulk selection must not overflow 768px viewports');
     });
 
     await checked('Squad directory: instant search by name, description and inbound',async()=>{
