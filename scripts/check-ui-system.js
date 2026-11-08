@@ -147,6 +147,10 @@ assert.match(app,/history\.replaceState\(history\.state,\x27\x27,location\.pathn
  'Legacy Security/Admins direct links must be retained');
 assert.match(app,/route\.startsWith\('set\/'\)\?'set':route/,'Settings deep links must share the authorized settings page');
 assert.match(app,/function settingsPageFromHash\(\)/,'Settings subpage must survive a reload');
+assert(app.includes("const staysInSettings=targetHash==='#set'||targetHash.startsWith('#set/');"),
+ 'Only Settings hash routes may be handled as local Settings focus changes');
+assert(app.includes("if(staysInSettings&&cur==='set'){"),
+ 'Global sidebar navigation must never be swallowed by a Settings focus switch');
 assert.match(app,/source\.content\.querySelectorAll\('\[data-settings-group\]'\)/,'Only cards within the active grouped workspace should be mounted');
 assert.match(app,/id="settings-subpage"/,'Settings subpage must have a real content region');
 assert.match(app,/href="#set\/\$\{key\}"/,'Settings category links must be addressable');

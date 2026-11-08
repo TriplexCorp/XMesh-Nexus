@@ -423,6 +423,12 @@ persisted Squad data to achieve visual compactness.
   scrolls within its own framed strip, not the document. The active tab must
   retain `aria-current=page`, a visible focus state and correct navigation
   via Back/Forward without replacing the entire toolbar.
+- Settings focus is a **local hash navigation optimization only for** `#set`
+  and `#set/...` routes. Global sidebar links (`#users`, `#nodes`,
+  `#hosts`, `#home`, etc.) must always run the main router, even while
+  the current Settings group is `general`. Falling back unknown hashes
+  to `general` must never swallow navigation and leave the page stuck
+  until refresh. Cover this with real sidebar clicks in the browser suite.
 
 ### Dedicated CDN inbound traffic quota (stage 1)
 
