@@ -202,7 +202,9 @@
     location.hash='set/system';
     window.setTimeout(()=>document.getElementById('panel-update-card')?.scrollIntoView({behavior:'smooth',block:'center'}),120);
   });
-  document.addEventListener('click',event=>{if(open&&!root.contains(event.target))toggle(false)});
+  // The shared confirmation dialog lives outside the popover. Do not dismiss
+  // the version menu while the user is confirming an upgrade.
+  document.addEventListener('click',event=>{if(open&&!root.contains(event.target)&&!requesting)toggle(false)});
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&open){toggle(false);trigger.focus()}
   });
