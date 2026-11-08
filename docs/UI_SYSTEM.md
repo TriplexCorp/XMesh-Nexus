@@ -174,7 +174,7 @@ Composite controls have one material shell; inner native inputs remain transpare
 
 ### Settings
 
-Settings uses two real workspace columns on wide desktop: approximately 54/46 rather than six independently positioned cards.
+Settings uses two real workspace columns when multiple cards are visible. Content is scoped to a meaningful in-category group instead of accumulating long, uneven stacks; single-card groups use the full track and never reserve an empty second column.
 
 Requirements:
 
@@ -389,10 +389,16 @@ persisted Squad data to achieve visual compactness.
   Non-owners never see Administrators and are prevented from opening its deep
   link. Subscription Studio remains a separate functional workbench.
 - Each workspace mounts **all existing cards belonging to its related feature
-  groups**, and no unrelated cards. A pair of independent column stacks keeps
-  short cards compact even beside long font or palette editors. The existing
-  save handlers, IDs and authorization checks remain authoritative; no parallel
-  forms or blank placeholder surfaces are introduced.
+  groups**, and no unrelated cards. Panel has **General / Integrations & alerts**,
+  Appearance has **Colors & theme / Layout / Type & effects**, and System & traffic
+  has **Updates / Traffic & CDN**. Only one of those meaningful groups is visible
+  at a time; a compact control strip selects it in place without unmounting forms,
+  discarding unsaved drafts, or issuing redundant API requests. Direct legacy
+  group links remain addressable via their existing hash URLs. Security retains
+  its own real task tabs; Admins and Data remain compact functional pages.
+  Short groups use two independent content-height columns, while one-card
+  groups expand into the available width instead of reserving a blank track.
+  Save handlers, IDs, permission checks and API boundaries remain authoritative.
 - Appearance choices save with the existing browser-local behavior; brand
   fields save through their existing form; webhook toggles persist immediately.
   Xray-core and panel-update operations retain their authenticated backend
@@ -402,11 +408,13 @@ persisted Squad data to achieve visual compactness.
   target the System subpage; destructive actions remain separately authorized.
 - **Composition and empty-space budget:** Settings is left-aligned and fills
   the available dashboard workspace rather than being centered within a 96rem
-  cap or restricting single-card pages to 54rem. The secondary navigation has
-  compact, single-line rows; explanations live in the active page heading.
-  Existing cards and controls use the shared density/layout tokens. Two-card
-  pages collapse naturally on narrow viewports. Empty cards, fabricated metrics
-  and oversized spacer blocks are forbidden.
+  cap or restricting single-card pages to 54rem. The secondary navigation is
+  compact, and active group controls fit directly below the page heading.
+  Feature-scoped tokens compress card padding, row heights, text notes and
+  desktop gaps consistently across all six categories. At narrower widths the
+  columns reflow into one track. There must be no empty reserved column,
+  offscreen inactive controls, duplicated forms, fabricated metrics, or large
+  dead gaps under an unrelated taller group.
 - The shell and cards inherit `nexus-v3` material, density and spacing tokens.
   Secondary navigation must remain usable on narrow/mobile viewports and must
   not create horizontal document overflow.
