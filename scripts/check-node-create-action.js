@@ -151,6 +151,18 @@ assert.match(dialogJs,/class="user-create-close" data-x aria-label="Закрыт
  'New-user close control must use the shared data-x close contract');
 assert.match(dialogJs,/user-create-workspace/,'Create-user form must use the enterprise workspace wrapper');
 assert.match(dialogJs,/Умный лимит устройств/,'Device limit behavior must be explained in the creation flow');
+assert.match(userCss,/Premium creation dialog — approved visual concept/,
+ 'Approved user-create concept must live in canonical feature-owned styles');
+assert.match(userCss,/#dlg\.user-create-modal\{\s*width:min\(1140px/,
+ 'Premium modal must have a balanced desktop width');
+assert.match(userCss,/#dlg\.user-create-modal \.user-create-workspace\{[\s\S]*grid-template-columns:minmax\(0,1\.43fr\) minmax\(0,1fr\)/,
+ 'Identity and limits must have balanced two-column proportions');
+assert.match(userCss,/#dlg\.user-create-modal \.user-create-head h2\{[\s\S]*font-size:clamp\(23px/,
+ 'Primary title must remain readable on desktop');
+assert.match(userCss,/#dlg\.user-create-modal \.user-create-footer\{[\s\S]*min-height:4\.7rem/,
+ 'Primary create/cancel actions must remain in a readable fixed footer');
+assert.match(dialogJs,/placeholder=\\"Введите имя пользователя\\"/,
+ 'Username must provide the concept placeholder without modifying its submission name');
 assert.match(userCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1380px/,
  'New-user dialog must use the quieter v5 desktop surface');
 assert.match(userCss,/\.user-create-workspace\{[\s\S]*grid-template-columns:minmax\(0,1\.72fr\) minmax\(360px,\.78fr\)/,
