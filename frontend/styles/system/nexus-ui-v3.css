@@ -6,7 +6,7 @@
 /* Scoped panel features. The public subscription portal has its own document entrypoint. */
 @import url("../features/access/access.css?v=c9b134b8a0bd");
 @import url("../features/balancers/balancers.css?v=78e756c1e123");
-@import url("../features/hosts/hosts.css?v=dde973082a88");
+@import url("../features/hosts/hosts.css?v=74437a6d3191");
 @import url("../features/nodes/diagnostics.css?v=88108462f070");
 @import url("../features/nodes/node-dialogs.css?v=56d227cd5200");
 @import url("../features/nodes/node-editor.css?v=5a99df72a6ca");
@@ -22,7 +22,7 @@
 @import url("../features/settings/panel-version-topbar.css?v=9bb51df093d1");
 @import url("../features/settings/settings.css?v=8c694074c996");
 @import url("../features/squads/squad-editor-premium-v5.css?v=43df105290d2");
-@import url("../features/squads/squad-cards.css?v=30c80326fc71");
+@import url("../features/squads/squad-cards.css?v=62795ccf10d0");
 @import url("../features/statistics/statistics.css?v=0d6a72c8409d");
 @import url("../features/subscriptions/subscription-studio.css?v=6fc2d828fd52");
 @import url("../features/subscriptions/subscription-surface.css?v=0a79377d5733");
