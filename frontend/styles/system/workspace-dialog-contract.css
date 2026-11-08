@@ -101,25 +101,26 @@ dialog#dlg.node-wide>form.box{
   background:var(--nx-dialog-bg);
 }
 
-/* User details is one wide workspace surface, not a dialog wrapped around a
- * second card. The native dialog owns the material edge/shadow; .user-canvas
- * only owns spacing and internal layout. `dialog#dlg` intentionally matches the
- * legacy users.css selector specificity so this canonical contract wins by load order. */
+/* User Details: canonical fixed-size workspace. The native dialog is a stable
+ * 64 × 38.5rem frame on desktops (clamped to the viewport). The same frame
+ * persists across all five mounted tabs; ONLY the central content scrolls.
+ * Do not reintroduce fit-content or viewport-height canvas sizing. */
 dialog#dlg.user-modal{
-  --dialog-width:84rem;
+  --dialog-width:64rem;
   --modal-off:translateY(22px) scale(.972);
   box-sizing:border-box;
-  width:min(var(--dialog-width),calc(100vw - 1.5rem));
-  inline-size:min(var(--dialog-width),calc(100vw - 1.5rem));
+  width:min(var(--dialog-width),calc(100vw - 2rem));
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
   min-width:0;
   min-inline-size:0;
-  max-width:calc(100vw - 1.5rem);
-  max-inline-size:calc(100vw - 1.5rem);
+  max-width:calc(100vw - 2rem);
+  max-inline-size:calc(100vw - 2rem);
   min-height:0;
   min-block-size:0;
-  height:fit-content;
-  max-height:calc(100dvh - 1.5rem);
-  max-block-size:calc(100dvh - 1.5rem);
+  height:min(38.5rem,calc(100dvh - 2rem));
+  block-size:min(38.5rem,calc(100dvh - 2rem));
+  max-height:calc(100dvh - 2rem);
+  max-block-size:calc(100dvh - 2rem);
   overflow:hidden;
   border:1px solid var(--nx-border-strong);
   border-radius:var(--nx-card-radius);
@@ -148,15 +149,16 @@ dialog#dlg.user-modal>.user-canvas{
   inline-size:100%;
   max-width:100%;
   max-inline-size:100%;
-  block-size:auto;
-  height:fit-content;
+  block-size:100%;
+  height:100%;
   min-block-size:0;
   min-height:0;
-  max-block-size:calc(100dvh - 1.5rem);
-  max-height:calc(100dvh - 1.5rem);
-  display:flex;
-  flex-direction:column;
-  gap:var(--nx-space-3);
+  max-block-size:100%;
+  max-height:100%;
+  display:grid;
+  grid-template-rows:auto auto auto minmax(0,1fr) auto auto auto;
+  align-content:stretch;
+  gap:0;
   overflow:hidden;
   border:0;
   border-radius:0;
@@ -166,17 +168,14 @@ dialog#dlg.user-modal>.user-canvas{
   -webkit-backdrop-filter:none;
 }
 
-#dlg.user-modal :is(.user-head,.user-overview-band){
-  flex:0 0 auto;
-}
-
 #dlg.user-modal .user-canvas-grid{
-  grid-auto-rows:max-content;
-  scrollbar-gutter:stable;
-  align-items:start;
-  flex:0 1 auto;
   min-height:0;
-  overflow:auto;
+  min-block-size:0;
+  min-width:0;
+  height:100%;
+  overflow-y:auto;
+  overflow-x:hidden;
+  scrollbar-gutter:stable;
   overscroll-behavior:contain;
   align-content:start;
 }
@@ -269,12 +268,16 @@ dialog#dlg.user-modal>.user-canvas{
     max-inline-size:calc(100vw - 1rem);
     min-height:0;
     min-block-size:0;
+    height:min(38.5rem,calc(100dvh - 1rem));
+    block-size:min(38.5rem,calc(100dvh - 1rem));
     max-height:calc(100dvh - 1rem);
     max-block-size:calc(100dvh - 1rem);
   }
   dialog#dlg.user-modal>.user-canvas{
-    max-height:calc(100dvh - 1rem);
-    max-block-size:calc(100dvh - 1rem);
+    height:100%;
+    block-size:100%;
+    max-height:100%;
+    max-block-size:100%;
   }
 }
 
