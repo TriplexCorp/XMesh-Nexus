@@ -6,7 +6,7 @@
 /* Scoped panel features. The public subscription portal has its own document entrypoint. */
 @import url("../features/access/access.css?v=c9b134b8a0bd");
 @import url("../features/balancers/balancers.css?v=78e756c1e123");
-@import url("../features/hosts/hosts.css?v=4afca02e5042");
+@import url("../features/hosts/hosts.css?v=dde973082a88");
 @import url("../features/nodes/diagnostics.css?v=88108462f070");
 @import url("../features/nodes/node-dialogs.css?v=56d227cd5200");
 @import url("../features/nodes/node-editor.css?v=5a99df72a6ca");
@@ -22,7 +22,7 @@
 @import url("../features/settings/panel-version-topbar.css?v=9bb51df093d1");
 @import url("../features/settings/settings.css?v=8c694074c996");
 @import url("../features/squads/squad-editor-premium-v5.css?v=43df105290d2");
-@import url("../features/squads/squad-cards.css?v=b069e0b05095");
+@import url("../features/squads/squad-cards.css?v=30c80326fc71");
 @import url("../features/statistics/statistics.css?v=0d6a72c8409d");
 @import url("../features/subscriptions/subscription-studio.css?v=6fc2d828fd52");
 @import url("../features/subscriptions/subscription-surface.css?v=0a79377d5733");
@@ -351,9 +351,20 @@ html[data-motion=off] dialog[open]:not(#dlg){transform:none}
 #view .users-toolbar #bulk.on{display:flex;transform:none}
 #view .users-toolbar #bulk button{min-height:var(--nx-control-h-sm)}
 @media(max-width:760px){
- #view .nx-bulk-toolbar{flex:1 1 100%;order:3}
+ #view .nx-bulk-toolbar{flex:0 1 auto;order:0}
  #view .nx-bulk-actions-menu{inset-inline-start:auto;inset-inline-end:0}
 }
 
 /* Keep the unified toolbar inside its surface before it must overflow. */
 #view .templates-workspace .template-section-tools{flex-wrap:wrap}
+
+/* A single batch toolbar grammar in every directory: selection follows search. */
+#view .nx-bulk-toolbar{justify-self:start;flex:0 1 auto;order:0}
+#view .nx-bulk-report{flex:1 1 100%;min-width:0;display:grid;gap:.4rem;padding:.65rem .75rem;border-top:1px solid var(--nx-border);font-size:.75rem}
+#view .nx-bulk-report>strong{font-size:.78rem;color:var(--tx);font-variant-numeric:tabular-nums}
+#view .nx-bulk-report-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:.3rem;max-height:13rem;overflow-y:auto}
+#view .nx-bulk-report-row{display:grid;gap:.15rem;min-width:0;padding:.35rem .5rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
+#view .nx-bulk-report-row>b{overflow-wrap:anywhere}
+#view .nx-bulk-report-row>span{color:var(--mu);overflow-wrap:anywhere}
+#view .nx-bulk-report-row.is-success>span{color:var(--ok)}
+#view .nx-bulk-report-row.is-error>span{color:var(--er)}
