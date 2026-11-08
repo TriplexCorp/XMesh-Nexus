@@ -300,7 +300,7 @@ async function main() {
       await page.reload({waitUntil:'domcontentloaded'});
       await page.locator('#palette-apply').waitFor({state:'visible'});
       assert.equal(new URL(page.url()).hash,'#set/colors','Direct settings link must survive reload');
-      await page.locator('a[href="#set/system"]').click();
+      await page.locator('.settings-center-nav a.settings-center-link[href="#set/system"]').click();
       await page.locator('#core-panel').waitFor({state:'visible'});
       await page.goBack({waitUntil:'domcontentloaded'});
       await page.locator('#palette-apply').waitFor({state:'visible'});
