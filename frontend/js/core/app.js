@@ -3398,10 +3398,13 @@ async function templatesP(){
       '<p class="template-card-note">'+ic('info')+' Сохранённая заготовка. Не применяется к подпискам автоматически.</p>'+
       actions('subs',item)+'</article>';
   };
+  const tabs='<nav class="templates-tabs" role="tablist" aria-label="Тип шаблонов">'+
+    [['tpls','Пользовательские',users.items.length],['subs','Подписки',subscriptions.items.length]].map(([kind,label,count])=>
+      '<button type="button" role="tab" id="templates-tab-'+kind+'" aria-controls="templates-panel-'+kind+'" aria-selected="'+(templateTab===kind)+'" tabindex="'+(templateTab===kind?'0':'-1')+'" data-template-tab="'+kind+'">'+label+'<span>'+count+'</span></button>').join('')+'</nav>';
   const section=(kind,items,renderItem)=>{
     const filter=templateFilters[kind]||'';
     return '<section class="template-section" role="tabpanel" id="templates-panel-'+kind+'" aria-labelledby="templates-tab-'+kind+'" data-template-section="'+kind+'" '+(templateTab===kind?'':'hidden inert')+'>'+
-      '<div class="template-section-tools nx-workspace-toolbar" data-ui-toolbar="filters">'+(items.length?'<div class="nx-directory-search template-search">'+ic('search')+
+      '<div class="template-section-tools nx-workspace-toolbar" data-ui-toolbar="filters">'+(templateTab===kind?tabs:'')+(items.length?'<div class="nx-directory-search template-search">'+ic('search')+
         '<input type="search" data-template-search="'+kind+'" aria-label="Поиск шаблонов" placeholder="Найти шаблон…" autocomplete="off" value="'+text(filter)+'">'+
         '<button type="button" class="nx-directory-search-clear" data-template-clear="'+kind+'" aria-label="Очистить поиск" '+(filter?'':'hidden')+'>'+ic('x')+'</button></div><span class="template-filter-count" data-template-count="'+kind+'" aria-live="polite"></span>':'')+
         '<div class="nx-workspace-actions">'+workspaceGridControls(kind)+workspaceCreateButton(kind,'Шаблон')+'</div></div>'+
@@ -3410,14 +3413,18 @@ async function templatesP(){
         '<div class="template-empty"><span class="template-empty-icon">'+ic(kind==='tpls'?'users':'code')+'</span><div><strong>'+(kind==='tpls'?'Пока нет шаблонов пользователей':'Шаблонов подписки пока нет')+'</strong><p>'+(kind==='tpls'?'Сохраните тарифные параметры для повторного использования.':'Сохранённые заготовки. Выдачей управляет SUBSCRIPTION STUDIO.')+'</p></div></div>')+'</section>';
   };
   const html='<div class="templates-workspace" data-ui-page="templates">'+
-    '<nav class="templates-tabs" role="tablist" aria-label="Тип шаблонов">'+[['tpls','Пользовательские',users.items.length],['subs','Подписки',subscriptions.items.length]].map(([kind,label,count])=>
-      '<button type="button" role="tab" id="templates-tab-'+kind+'" aria-controls="templates-panel-'+kind+'" aria-selected="'+(templateTab===kind)+'" tabindex="'+(templateTab===kind?'0':'-1')+'" data-template-tab="'+kind+'">'+label+'<span>'+count+'</span></button>').join('')+'</nav>'+
     section('tpls',users.items,templateCard)+section('subs',subscriptions.items,subscriptionCard)+'</div>';
   return [html,()=>{
     const root=document.querySelector('.templates-workspace');
      mountWorkspaceGrid(root);
     if(!root)return;
     function selectTab(kind,focus=false){
+      if(!['tpls','subs'].includes(kind))return;
+      const toolbar=root.querySelector('[data-template-section="'+kind+'"] .template-section-tools');
+      const navigation=root.querySelector('.templates-tabs');
+      // Preserve one tablist (unique IDs and keyboard focus) while moving it
+      // into the toolbar of the active collection; no duplicate search/actions.
+      if(toolbar&&navigation&&navigation.parentElement!==toolbar)toolbar.prepend(navigation);
       templateTab=kind;
       root.querySelectorAll('[data-template-tab]').forEach(button=>{
         const selected=button.dataset.templateTab===kind;
