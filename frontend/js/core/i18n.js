@@ -16,6 +16,12 @@ window.XMeshI18n=(()=>{
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
     "Массовые операции": "Bulk operations",
+    "Выбрано:": "Selected:",
+    "» к": "” to",
+    "элементам?": "items?",
+    "Связанные хосты:": "Linked hosts:",
+    "Ошибка массовой операции:": "Bulk action failed:",
+    "Обработано:": "Completed:",
     "Выбрано: ": "Selected: ",
     "Все видимые": "All visible",
     "Применяется после сохранения": "Applies after saving",
