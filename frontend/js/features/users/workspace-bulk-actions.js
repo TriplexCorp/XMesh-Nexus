@@ -82,6 +82,7 @@
       const action=button.dataset.bulkAction,st=selection(spec.kind);
       if(action==='mode'){
        st.mode=!st.mode;
+       if(st.mode&&st.batch)st.batch=null;
        if(!st.mode){st.ids.clear();st.batch=null;}
        update(area,spec);
       }else if(action==='all'){
@@ -230,6 +231,11 @@
   try{
    await Promise.all(Array.from({length:Math.min(2,items.length)},()=>worker()));
   }finally{
+   // A fully successful upgrade exits selection automatically; retain its
+   // collapsed result summary so the user can inspect all four outcomes.
+   if(items.length&&items.every(item=>item.status==='success')){
+    st.mode=false;st.ids.clear();
+   }
    st.busy=false;
    update(area,spec);
   }
