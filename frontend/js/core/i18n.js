@@ -15,6 +15,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "CDN: лимит должен быть от 0 до 1000000 ГБ.": "CDN: quota must be between 0 and 1,000,000 GB.",
+
     "Лимит CDN, ГБ": "CDN limit, GB",
     "CDN-трафик": "CDN traffic",
     "CDN-трафик · весь узел": "CDN traffic · entire node",
