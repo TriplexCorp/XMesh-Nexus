@@ -123,6 +123,15 @@ assert.match(dialogJs,/window\.XMeshSelects\?\.refresh\?\.\(dlg\)/,
 assert.match(dialogJs,/id="tplsel"/,'Template handler must keep its existing selector');
 assert.match(dialogJs,/data-generate-username/,'Username generator action must be preserved');
 assert.match(dialogJs,/decorate\('xrayProfileId'/,'Xray profile assignment must remain in the form');
+assert.match(app,/\{k:'cdnLimitGb',l:'Трафик обхода, ГиБ',t:'num'/,
+ 'Separate bypass quota must use the shared numeric user field');
+assert.match(dialogJs,/const cdnLimit=decorate\('cdnLimitGb',0,'user-create-cdn-limit'\)/,
+ 'Redesigned create form must render the independent bypass quota');
+assert.match(app,/set\('cdnLimitGb',p\.cdnLimitGb\|\|0\)/,
+ 'Templates must prefill the bypass quota');
+assert.match(app,/cdnLimitGb:d\.cdnLimitGb/,
+ 'Create-user payload must persist the quota');
+
 
 assert.match(dialogJs,/const cdnLimit=decorate\('cdnLimitGb',0,'user-create-cdn-limit'\)/,
  'Redesigned user form must render the CDN quota using the canonical numeric field definition');
