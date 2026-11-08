@@ -28,6 +28,8 @@
   delete:trans('Удалить','Delete'),
   'agent-update':trans('Обновить Agent','Update Agent')
  })[action];
+ const bulkIcon=(name,label)=>ic(name)+'<span class="nx-bulk-action-label">'+label+'</span>';
+ const actionIcon=action=>({enable:'play',disable:'pause',delete:'trash','agent-update':'refresh-cw'})[action]||'sliders';
  const cardName=(kind,id)=>{
   if(kind==='balancers')return '#'+id;
   const record=(DB[kind]||[]).find(row=>String(row.id)===String(id));
@@ -54,15 +56,9 @@
      const actions=toolbar.querySelector('.node-grid-controls,.nx-workspace-grid-controls,.nx-workspace-actions,.node-create-action,.nx-workspace-create');
      toolbar.insertBefore(group,actions||null);
     }
-    // Context controls and long-running results must never stretch the main
-    // search/filter toolbar, or cause the search to jump between rows.
-    if(!area.querySelector(':scope > .nx-bulk-context')){
-     const context=document.createElement('div');
-     context.className='nx-bulk-context';
-     context.dataset.bulkContext=spec.kind;
-     context.hidden=true;
-     toolbar.after(context);
-    }
+    // A single framed toolbar owns every batch action. Never create an
+    // extra floating selection toolbar between controls and cards.
+    area.querySelector(':scope > .nx-bulk-context')?.remove();
     if(!bound.has(area)){
      bound.add(area);
      area.addEventListener('change',event=>{
@@ -127,61 +123,49 @@
    card.classList.toggle('nx-bulk-selected',st.mode&&box.checked);
   }
   area.classList.toggle('nx-bulk-selecting',st.mode);
-  const n=st.ids.size;
-  const show=cards.length>0;
+  const n=st.ids.size,show=cards.length>0;
   bar.hidden=!show;
-  const context=area.querySelector(':scope > .nx-bulk-context');
-  if(!show){
-   if(context)context.hidden=true;
-   return;
-  }
-  // This is intentionally the ONLY content in the primary toolbar.
-  bar.innerHTML='<button type="button" class="gh sm nx-bulk-mode" data-bulk-action="mode" aria-pressed="'+st.mode+'"'+(st.busy?' disabled':'')+'>'+
-   (st.mode?trans('Завершить выбор','Finish selection'):trans('Массовые действия','Bulk actions'))+'</button>';
-  if(st.busy)bar.setAttribute('aria-busy','true');else bar.removeAttribute('aria-busy');
-  if(!context)return;
-  const reportOpen=context.querySelector('details.nx-bulk-report')?.open||false;
-  context.hidden=!st.mode&&!st.batch;
-  if(context.hidden){context.replaceChildren();return}
-  context.setAttribute('role','region');
-  context.setAttribute('aria-label',trans('Массовые операции','Bulk operations'));
-  // A shallow row keeps the selection count and actions readable while
-  // preventing any selection/progress state from reflowing search controls.
-  context.innerHTML=st.mode?
-   '<div class="nx-bulk-context-controls">'+
-    '<span class="nx-bulk-count" aria-live="polite">'+trans('Выбрано: ','Selected: ')+n+'</span>'+
-    '<button type="button" class="gh sm nx-bulk-select-all" data-bulk-action="all"'+(st.busy?' disabled':'')+'>'+trans('Все видимые','All visible')+'</button>'+
-    '<button type="button" class="gh sm nx-bulk-clear" data-bulk-action="clear"'+(!n||st.busy?' disabled':'')+'>'+trans('Снять выбор','Clear')+'</button>'+
-    '<details class="nx-bulk-actions"><summary class="gh sm" aria-label="'+trans('Массовые операции','Bulk operations')+'"'+(!n||st.busy?' aria-disabled="true"':'')+'>'+trans('Действия','Actions')+' <span aria-hidden="true">▾</span></summary>'+
-    '<div class="nx-bulk-actions-menu">'+spec.actions.map(action=>'<button type="button" data-bulk-action="'+action+'" class="'+(action==='delete'?'is-danger':'')+'"'+(st.busy||!n?' disabled':'')+'>'+actionText(action)+'</button>').join('')+'</div></details>'+
-    (spec.draft?'<span class="nx-bulk-draft">'+trans('Применяется после сохранения','Save to apply')+'</span>':'')+
-   '</div>':'';
+  if(!show)return;
+  const reportOpen=bar.querySelector('details.nx-bulk-report')?.open||false;
+  const menuOpen=bar.querySelector('details.nx-bulk-actions')?.open||false;
+  bar.classList.toggle('is-selecting',st.mode);
+  const modeLabel=st.mode?trans('Завершить выбор','Finish selection'):trans('Массовые действия','Bulk actions');
+  bar.innerHTML='<button type="button" class="gh sm nx-bulk-mode" data-bulk-action="mode" aria-pressed="'+st.mode+'"'+(st.busy?' disabled':'')+
+    ' title="'+modeLabel+'">'+bulkIcon(st.mode?'check':'layers',modeLabel)+'</button>'+
+    (st.mode?'<div class="nx-bulk-inline-controls">'+
+      '<span class="nx-bulk-count" aria-live="polite">'+ic('check')+trans('Выбрано: ','Selected: ')+n+'</span>'+
+      '<button type="button" class="gh sm nx-bulk-select-all" data-bulk-action="all" aria-label="'+trans('Все видимые','All visible')+'" title="'+trans('Все видимые','All visible')+'"'+(st.busy?' disabled':'')+'>'+bulkIcon('check',trans('Все видимые','All visible'))+'</button>'+
+      '<button type="button" class="gh sm nx-bulk-clear" data-bulk-action="clear" aria-label="'+trans('Снять выбор','Clear')+'" title="'+trans('Снять выбор','Clear')+'"'+(!n||st.busy?' disabled':'')+'>'+bulkIcon('x',trans('Снять выбор','Clear'))+'</button>'+
+      '<details class="nx-bulk-actions"'+(menuOpen&&n&&!st.busy?' open':'')+'><summary class="gh sm" aria-label="'+trans('Массовые операции','Bulk operations')+'"'+(!n||st.busy?' aria-disabled="true"':'')+'>'+bulkIcon('sliders',trans('Действия','Actions'))+ic('down')+'</summary>'+
+      '<div class="nx-bulk-actions-menu">'+spec.actions.map(action=>'<button type="button" data-bulk-action="'+action+'" class="'+(action==='delete'?'is-danger':'')+'"'+(st.busy||!n?' disabled':'')+'>'+bulkIcon(actionIcon(action),actionText(action))+'</button>').join('')+'</div></details>'+
+      (spec.draft?'<span class="nx-bulk-draft">'+trans('Применяется после сохранения','Save to apply')+'</span>':'')+
+    '</div>':'');
   if(st.batch){
-   const report=document.createElement('details');
-   report.className='nx-bulk-report';
-   report.open=reportOpen;
-   report.setAttribute('aria-label',trans('Ход обновления Agent','Agent update progress'));
-   const total=st.batch.items.length,done=st.batch.items.filter(item=>['success','error'].includes(item.status)).length;
-   const failed=st.batch.items.filter(item=>item.status==='error').length;
-   const title=document.createElement('summary');
-   title.className='nx-bulk-report-summary';
-   title.textContent=trans('Обновление Agent: ','Agent update: ')+done+' / '+total+
-    (failed?' · '+trans('ошибок: ','failed: ')+failed:'');
-   const list=document.createElement('div');
-   list.className='nx-bulk-report-list';
-   for(const item of st.batch.items){
-    const row=document.createElement('div');
-    row.className='nx-bulk-report-row is-'+item.status;
-    const name=document.createElement('b');
-    name.textContent=item.name;
-    const status=document.createElement('span');
-    status.textContent=item.message||trans('Ожидает','Pending');
-    row.append(name,status);list.append(row);
-   }
-   report.append(title,list);context.append(report);
+    const report=document.createElement('details');
+    report.className='nx-bulk-report';report.open=reportOpen;
+    report.setAttribute('aria-label',trans('Ход обновления Agent','Agent update progress'));
+    const total=st.batch.items.length,done=st.batch.items.filter(item=>['success','error'].includes(item.status)).length;
+    const failed=st.batch.items.filter(item=>item.status==='error').length;
+    const title=document.createElement('summary');
+    title.className='nx-bulk-report-summary';
+    title.innerHTML=ic('refresh-cw');
+    const titleText=document.createElement('span');
+    titleText.textContent=trans('Обновление Agent: ','Agent update: ')+done+' / '+total+
+      (failed?' · '+trans('ошибок: ','failed: ')+failed:'');
+    title.append(titleText);
+    const list=document.createElement('div');
+    list.className='nx-bulk-report-list';
+    for(const item of st.batch.items){
+      const row=document.createElement('div');
+      row.className='nx-bulk-report-row is-'+item.status;
+      const name=document.createElement('b');name.textContent=item.name;
+      const status=document.createElement('span');status.textContent=item.message||trans('Ожидает','Pending');
+      row.append(name,status);list.append(row);
+    }
+    report.append(title,list);bar.append(report);
   }
-  if(st.busy)context.setAttribute('aria-busy','true');
-  else context.removeAttribute('aria-busy');
+  if(st.busy)bar.setAttribute('aria-busy','true');
+  else bar.removeAttribute('aria-busy');
  }
  async function updateNodeAgents(area,spec,eligible){
   const st=selection(spec.kind);
