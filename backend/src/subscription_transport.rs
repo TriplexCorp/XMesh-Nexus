@@ -659,6 +659,26 @@ mod tests {
         assert!(result["kcpSettings"].get("acceptProxyProtocol").is_none());
     }
     #[test]
+    fn ech_client_config_is_exported_without_secret_server_keys() {
+        let inbound = json!({"protocol":"vless","streamSettings":{
+            "network":"xhttp","security":"tls",
+            "tlsSettings":{
+                "serverName":"inner.example.org",
+                "echServerKeys":"SENSITIVE-ECH-SERVER-KEY",
+                "certificates":[{"certificateFile":"/etc/private.crt","keyFile":"/etc/private.key"}]
+            },
+            "xhttpSettings":{"path":"/xhttp","mode":"auto"}
+        },"xmesh":{"clientTlsSettings":{"echConfigList":"PUBLIC-ECH-CONFIG"}}});
+        let host = json!({"address":"vpn.example.org"});
+        let client = client_stream(&inbound, &host, "auto").unwrap();
+        assert_eq!(client["tlsSettings"]["echConfigList"], "PUBLIC-ECH-CONFIG");
+        assert!(client["tlsSettings"].get("echServerKeys").is_none());
+        assert!(!client.to_string().contains("SENSITIVE-ECH-SERVER-KEY"));
+        assert!(!client.to_string().contains("private.key"));
+        assert_eq!(client["xhttpSettings"]["path"], "/xhttp");
+    }
+
+    #[test]
     fn transports_strip_inbound_only_keys() {
         for (method, key) in [
             ("ws", "wsSettings"),

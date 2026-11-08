@@ -25,7 +25,7 @@ assert.equal((page.match(/data-action="outline"/g)||[]).length,2,'Inspector has 
 assert(page.indexOf('sv-inline-tools')<page.indexOf('sv-codesurface'),'Tools precede editor');
 assert(page.indexOf('sv-codepanel')<page.indexOf('sv-outline'),'Editor remains primary');
 assert.match(tools,/function contextualToolGroups\(/,'Commands must derive from inbound configuration');
-assert.match(tools,/specialized.push\('hysteria-config','tls','protocol-config'\)/,'Hysteria2 must have protocol-specific commands');
+assert.match(tools,/specialized.push\('hysteria-config','tls','ech','protocol-config'\)/,'Hysteria2 must expose TLS and ECH commands');
 assert.match(tools,/host.addEventListener\('change'/,'Inbound selection must update tools');
 assert.match(js,/toolPaletteHandle\?\.refresh\(\)/,'Template changes must refresh tools');
 assert.match(css,/--vround:var\(--ui-control-radius/,'Global corner radius inherited');

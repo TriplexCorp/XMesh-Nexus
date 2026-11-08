@@ -41,7 +41,7 @@ const sample=()=>({
  outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}
 });
 
-function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,realityKeys,selectorUI=false}={}){
+function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,realityKeys,apiRequest,selectorUI=false}={}){
  const calls=[],listeners={},confirmCalls=[],clipboard=[],requests=[];
  const area={
    value:JSON.stringify(documentValue,null,2),selectionStart:0,selectionEnd:0,
@@ -82,7 +82,8 @@ function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,r
  vm.runInNewContext(source,environment,{filename:'xray-studio-tools.js'});
  const toolHandle=win.XMeshJsonTools.setup(root,{
    toast:text=>calls.push(text),
-   realityKeys:realityKeys||(async()=>({privateKey:NEW_PRIVATE,publicKey:NEW_PUBLIC}))
+   realityKeys:realityKeys||(async()=>({privateKey:NEW_PRIVATE,publicKey:NEW_PUBLIC})),
+   apiRequest
  });
  return {
    area,host,status,issue,issueMessage,calls,confirmCalls,clipboard,requests,
@@ -116,6 +117,43 @@ async function run(){
  await ssEdited.run('reality');
  assert.equal(ssEdited.doc().inbounds[0].streamSettings.realitySettings.target,'alternate.example.org:443','REALITY dialog also works on Shadowsocks');
  assert.equal(ssEdited.doc().inbounds[0].settings.password,'local-secret','REALITY edit preserves Shadowsocks credentials');
+
+
+ // ECH generation is available on TLS (including XHTTP), not REALITY.
+ const tlsECH=sample();
+ tlsECH.inbounds[0].streamSettings={
+  network:'xhttp',security:'tls',xhttpSettings:{path:'/xhttp',mode:'auto'},
+  tlsSettings:{serverName:'inner.example.org',certificates:[{certificateFile:'/etc/xray/cert.pem',keyFile:'/etc/xray/key.pem'}]}
+ };
+ const fakeSecret='QUJDRA==',fakePublic='RUNIT05GSUc=';
+ const requestLog=[];
+ const echUI=harness(tlsECH,{
+  requestValues:{publicName:'outer.example.org'},
+  apiRequest:async(url,init)=>{
+   requestLog.push({url,init});
+   return {echServerKeys:fakeSecret,echConfigList:fakePublic};
+  }
+ });
+ assert(echUI.host.innerHTML.includes('data-tool="ech"'),'TLS inbound must show ECH generator');
+ await echUI.run('ech');await tick();
+ const echInbound=echUI.doc().inbounds[0];
+ assert.equal(requestLog.length,1,'ECH should be generated once');
+ assert.equal(requestLog[0].url,'/api/v1/core/ech');
+ assert.deepEqual(JSON.parse(requestLog[0].init.body),{public_name:'outer.example.org'});
+ assert.equal(echInbound.streamSettings.tlsSettings.echServerKeys,fakeSecret);
+ assert.equal(echInbound.xmesh.clientTlsSettings.echConfigList,fakePublic);
+ assert.equal(echInbound.streamSettings.tlsSettings.certificates[0].certificateFile,'/etc/xray/cert.pem','ECH must preserve certificates');
+ assert.equal(echInbound.streamSettings.xhttpSettings.path,'/xhttp','ECH must preserve transport');
+ assert(!JSON.stringify(echInbound.xmesh).includes(fakeSecret),'Secret ECH material must never enter client metadata');
+ const rejected=harness(tlsECH,{requestValues:{publicName:'https://bad.example'},apiRequest:async()=>{throw Error('Must not call API')}});
+ const rejectedBefore=rejected.area.value;await rejected.run('ech');await tick();
+ assert.equal(rejected.area.value,rejectedBefore,'Invalid outer SNI does not modify document');
+ const errorECH=harness(tlsECH,{
+  requestValues:{publicName:'outer.example.org'},
+  apiRequest:async()=>{throw Error('generation failed')}
+ });
+ await errorECH.run('ech');await tick();
+ assert.equal(errorECH.area.value,JSON.stringify(tlsECH,null,2),'ECH generation failure must not alter JSON');
 
  const hysteria=sample();
  hysteria.inbounds=[{tag:'hysteria-main',port:443,protocol:'hysteria',

@@ -66,14 +66,14 @@ const snippets={
 };
 const tools=[
  ['reality','REALITY'],['shortid','Short ID'],['vlessens','VLESS Encryption'],['vision','XTLS Vision'],
- ['tls','TLS'],['hysteria-config','Hysteria2'],['protocol-config','Параметры протокола'],['transport-config','Параметры транспорта'],
+ ['tls','TLS'],['ech','Сгенерировать ECH'],['hysteria-config','Hysteria2'],['protocol-config','Параметры протокола'],['transport-config','Параметры транспорта'],
  ['dns','DNS'],['routing','Routing'],['outbounds','Outbounds'],['inbound','Новый inbound'],
  ['xhttp','XHTTP'],['finalmask','FinalMask']
 ];
 const details={
  reality:'REALITY: target, SNI, Short ID и X25519',shortid:'Сгенерировать Short ID для REALITY',
  vlessens:'Сгенерировать VLESS Encryption',vision:'Добавить XTLS Vision',
- tls:'Редактировать серверные TLS settings', 'hysteria-config':'Настройки транспорта Hysteria2',
+ tls:'Редактировать серверные TLS settings',ech:'Сгенерировать ECH для TLS и клиентских подписок', 'hysteria-config':'Настройки транспорта Hysteria2',
  'protocol-config':'Редактировать параметры текущего inbound', 'transport-config':'Настройки транспорта',
  dns:'Открыть или добавить DNS',routing:'Открыть или добавить Routing',
  outbounds:'Добавить базовые outbounds',inbound:'Создать inbound',xhttp:'Открыть или добавить настройки XHTTP',
@@ -85,6 +85,7 @@ const icons={
  vlessens:'<path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4Z"/><path d="M8 12h8M12 8v8"/>',
  vision:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
  tls:'<path d="M12 2 4 6v6c0 5 3 8 8 10 5-2 8-5 8-10V6l-8-4Z"/><path d="M8 12h8M12 8v8"/>',
+ ech:'<path d="M12 3v3M5 5l2 2M19 5l-2 2M4 12h16M6 12v8h12v-8M10 16h4"/>',
  'hysteria-config':'<path d="M3 12a9 9 0 0 1 18 0"/><path d="M6 12a6 6 0 0 1 12 0"/><path d="M9 12a3 3 0 0 1 6 0"/><path d="M12 12v9"/>',
  'protocol-config':'<path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h4"/>',
  'transport-config':'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
@@ -125,11 +126,11 @@ function contextualToolGroups(inbound,hasInbound){
  const specialized=[];
  const networkTools=[];
  if(hysteria){
-  specialized.push('hysteria-config','tls','protocol-config');
+  specialized.push('hysteria-config','tls','ech','protocol-config');
  }else if(protocol==='vless'){
   if(security==='reality'||security==='none'&&['raw','xhttp','grpc'].includes(network))specialized.push('reality');
   if(security==='reality')specialized.push('shortid');
-  if(security==='tls')specialized.push('tls');
+  if(security==='tls')specialized.push('tls','ech');
   specialized.push('vlessens');
   if(supportsVision(inbound))specialized.push('vision');
  }else{
@@ -138,7 +139,7 @@ function contextualToolGroups(inbound,hasInbound){
   if(security==='reality')specialized.push('reality','shortid');
   else if(['vmess','trojan','shadowsocks'].includes(protocol)&&security==='none'&&['raw','xhttp','grpc'].includes(network))
    specialized.push('reality');
-  if(security==='tls')specialized.push('tls');
+  if(security==='tls')specialized.push('tls','ech');
   specialized.push('protocol-config');
  }
  if(!hysteria){
@@ -567,6 +568,55 @@ const operations={
      throw Error('У выбранного inbound не включён TLS.');
    }
   })}catch(e){status('Ошибка TLS: '+e.message);notify(e.message)}
+ },
+ async ech(){
+  try{
+   ensureDialogs();
+   const selected=await chooseInbound();if(!selected)return;
+   const inbound=getInbound(parse(),selected.index);
+   if(inbound.streamSettings?.security!=='tls')throw Error('ECH доступен только для TLS inbound.');
+   const tls=inbound.streamSettings.tlsSettings||{};
+   if(!tls||typeof tls!=='object'||Array.isArray(tls))throw Error('tlsSettings должен быть JSON-объектом.');
+   const currentServerKey=typeof tls.echServerKeys==='string'?tls.echServerKeys:'';
+   const clientTls=inbound.xmesh?.clientTlsSettings||{};
+   const oldConfig=typeof clientTls.echConfigList==='string'?clientTls.echConfigList:'';
+   if(typeof apiRequest!=='function')throw Error('API генерации ECH недоступен.');
+   const response=await dialog.request({
+    eyebrow:'XRAY STUDIO / TLS',title:'Сгенерировать ECH',
+    description:'Будут созданы ECH Server Keys для inbound и публичный ECH Config для Xray JSON-подписки. Сам TLS-сертификат и FinalMask не изменятся.',
+    confirmLabel:'Сгенерировать и вставить в JSON',
+    notice:'Внешний SNI остаётся виден DPI. После сохранения профиля проверьте Xray и поддержку ECH клиентом. Не публикуйте серверный ECH Key.',
+    fields:[{name:'publicName',label:'Внешний SNI (публичный домен)',wide:true,required:true,
+     value:typeof tls.serverName==='string'?tls.serverName:'',placeholder:'public.example.com',
+     help:'Это открытое имя в ClientHelloOuter; оно не обязано совпадать с реальным SNI. Укажите допустимый домен без https:// и порта.',
+     validate:value=>/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$/.test(value)?'':'Укажите корректный ASCII-домен без схемы и порта.'}]
+   });
+   if(!response)return;
+   if(!/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$/.test(response.publicName))throw Error('Некорректное внешнее имя ECH.');
+   if(currentServerKey||oldConfig){
+    const approved=await dialog.confirm({
+     title:'Перегенерировать существующие ECH-ключи?',
+     description:'Новая пара ECH заменит прежние значения. Клиенты со старой конфигурацией могут потерять соединение до обновления подписки.',
+     confirmLabel:'Заменить ECH-ключи',cancelLabel:'Отмена',danger:true
+    });
+    if(!approved)return;
+   }
+   if(area.value!==selected.source)throw Error('JSON изменился. Повторите генерацию ECH.');
+   status('Xray-core генерирует ECH…');
+   const generated=await apiRequest('/api/v1/core/ech',{method:'POST',body:JSON.stringify({public_name:response.publicName})});
+   const server=generated?.echServerKeys,client=generated?.echConfigList;
+   if(typeof server!=='string'||typeof client!=='string'||!server.length||!client.length||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(server)||!/^[A-Za-z0-9+/]+={0,2}$/.test(client))
+    throw Error('Xray-core вернул некорректную пару ECH.');
+   if(area.value!==selected.source)throw Error('JSON изменился во время генерации ECH. Новые ключи не применены.');
+   const applied=mutate(doc=>{
+    const ib=getInbound(doc,selected.index);
+    if(ib.tag!==selected.tag||ib.streamSettings?.security!=='tls')throw Error('Выбранный TLS inbound изменился.');
+    (ib.streamSettings.tlsSettings??={}).echServerKeys=server;
+    ((ib.xmesh??={}).clientTlsSettings??={}).echConfigList=client;
+   },'ECH сгенерирован: серверный ключ и клиентская конфигурация добавлены в JSON');
+   if(applied)status('ECH готов. Проверьте конфигурацию и сохраните профиль.');
+  }catch(e){status('Ошибка ECH: '+e.message);notify(e.message)}
  },
  async 'protocol-config'(){
   try{await editInboundJsonSection({name:'settings',label:'Параметры протокола',parent:'inbound',initial:{}})}

@@ -440,6 +440,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
             post(request_panel_update).get(get_panel_update_status),
         )
         .route("/core/vlessenc", post(generate_vless_encryption))
+        .route("/core/ech", post(generate_ech))
         .route("/core/validate", post(validate_xray_configuration))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
@@ -3756,6 +3757,35 @@ async fn validate_xray_configuration(
         "stdout": stdout, "stderr": stderr,
         "message": if valid { "Конфигурация принята установленным Xray-core." } else { "Xray-core отклонил конфигурацию." }
     })))
+}
+
+#[derive(Deserialize)]
+struct EchGenerateRequest {
+    public_name: String,
+}
+
+async fn generate_ech(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<EchGenerateRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    let generated = state
+        .core
+        .generate_ech(&body.public_name)
+        .await
+        .map_err(|message| ApiError::new(StatusCode::BAD_REQUEST, message))?;
+    // Audit only the external public name, never the secret ECH server key.
+    audit(
+        &state.pool,
+        &actor.username,
+        "xray_core.ech_generated",
+        None,
+        None,
+        json!({"public_name": body.public_name}),
+    )
+    .await;
+    Ok(Json(generated))
 }
 
 async fn generate_vless_encryption(
