@@ -403,9 +403,9 @@ def main():
         assert traffic["totalUplinkBytes"]==60
         assert traffic["totalDownlinkBytes"]==60
         code,users,_=request("GET","/collections/users",cookie=cookie)
-        assert_status(code,200,"panel exposes metered user GiB")
+        assert_status(code,200,"panel exposes metered user decimal GB")
         metered=next(u for u in users["items"] if u["id"]==user_id)
-        assert abs(metered["used"]-(120/(1024**3)))<1e-9
+        assert abs(metered["used"]-(120/(1000**3)))<1e-9
 
         # CDN-specific quota: the CDN meter sums only selected signed inbound
         # counters and must never revoke access to an unselected main inbound.
@@ -414,7 +414,7 @@ def main():
         assert_status(code,200,"owner configures CDN pool from inbound tags")
         assert settings["cdnInboundTags"]==["CDN_DE"]
         code,updated,_=request("PATCH",f"/collections/users/{user_id}",
-            {"cdnLimitGb":30/(1024**3)},cookie=cookie,origin=BASE)
+            {"cdnLimitGb":30/(1000**3)},cookie=cookie,origin=BASE)
         assert_status(code,200,"assign a small CDN quota independent of global user limit")
         assert updated["cdnUsedBytes"]==40,("CDN pool must count only CDN_DE signed traffic",updated)
         code,desired,_=signed_post("/node/desired-config",{"node_id":node})
@@ -519,7 +519,7 @@ def main():
         assert_status(report_signed((150,170),(45,95))[0],201,"next Xray delta after reset")
         code,users,_=request("GET","/collections/users",cookie=cookie)
         used=next(u["used"] for u in users["items"] if u["id"]==user_id)
-        assert abs(used-(140/(1024**3)))<1e-9
+        assert abs(used-(140/(1000**3)))<1e-9
 
         # Old snapshots must not replay traffic or extend the user's presence.
         code,presence,_=request("GET","/users/presence",cookie=cookie)
@@ -552,7 +552,7 @@ def main():
         assert monthly_user["cdnUsedBytes"]==20,(
             "Only DE_VLESS delta (10 up + 10 down) is charged",monthly_user)
         code,_,_=request("PATCH",f"/collections/users/{user_id}",
-            {"cdnLimitGb":10/(1024**3)},cookie=cookie,origin=BASE)
+            {"cdnLimitGb":10/(1000**3)},cookie=cookie,origin=BASE)
         assert_status(code,200,"apply 10-byte LTE-only cutoff")
         code,desired,_=signed_post("/node/desired-config",{"node_id":node})
         assert_status(code,200,"cutoff signed LTE config after verified 20-byte spend")
