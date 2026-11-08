@@ -149,12 +149,15 @@ assert.match(app,/route\.startsWith\('set\/'\)\?'set':route/,'Settings deep link
 assert.match(app,/function settingsPageFromHash\(\)/,'Settings subpage must survive a reload');
 assert.match(app,/source\.content\.querySelectorAll\('\[data-settings-group\]'\)/,'Only cards within the active grouped workspace should be mounted');
 assert.match(app,/id="settings-subpage"/,'Settings subpage must have a real content region');
-assert.match(app,/href="#set\/\$\{key\}"/,'Settings sidebar links must be addressable');
+assert.match(app,/href="#set\/\$\{key\}"/,'Settings category links must be addressable');
 assert.match(app,/location\.hash='set\/system'/,'Xray-core rail action must open its settings category');
 const settingsCss=read('frontend/styles/features/settings/settings.css');
-assert.match(settingsCss,/\.settings-center-rail\{/,'Settings must have a secondary navigation rail');
-assert.match(settingsCss,/@container settings-workspace \(max-width:70rem\)/,'Settings navigation must reflow at narrow sizes');
+assert.match(settingsCss,/\.settings-center-rail\{/,'Settings must have one toolbar frame');
+assert.match(settingsCss,/\.settings-center-nav\{\s*display:flex/,'Settings category navigation must be horizontal');
+assert.match(settingsCss,/overflow-x:auto;overflow-y:hidden/,'Narrow Settings toolbar must scroll inside its own frame');
+assert.match(settingsCss,/@container settings-workspace \(max-width:44rem\)/,'Toolbar must remain compact on narrow screens');
 assert.match(settingsCss,/width:100%;max-width:none;margin:0/,'Settings should use the full available width and left alignment');
+assert.doesNotMatch(app,/class="settings-center-heading"/,'The duplicate category title and description must not return');
 assert.match(settingsCss,/\.settings-center-embedded/,'Dedicated feature screens should mount inside the Settings workspace');
 
 // Functional settings must affect real runtime behavior, persist, and be translated.
