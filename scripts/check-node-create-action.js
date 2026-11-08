@@ -137,7 +137,7 @@ assert.match(dialogJs,/const cdnLimit=decorate\('cdnLimitGb',0,'user-create-cdn-
  'Redesigned user form must render the CDN quota using the canonical numeric field definition');
 assert.match(dialogJs,/<div class="user-create-limits-grid">\$\{limit\}\$\{cdnLimit\}\$\{days\}\$\{strategy\}\$\{hwid\}/,
  'CDN quota must sit beside total traffic in the visible limits section');
-assert.match(app,/\{k:'cdnLimitGb',l:'Лимит CDN, ГиБ',t:'num'/,
+assert.match(app,/\{k:'cdnLimitGb',l:'Трафик обхода, ГиБ',t:'num'/,
  'CDN field must retain its existing numeric user schema');
 assert.match(app,/set\('cdnLimitGb',p\.cdnLimitGb\|\|0\)/,
  'Selecting a template must populate the visible CDN limit field');
