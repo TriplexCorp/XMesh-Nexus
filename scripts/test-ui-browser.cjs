@@ -833,17 +833,31 @@ async function main() {
           const toolbar=area.querySelector('.nodes-toolbar,.host-directory-toolbar,.squad-directory-toolbar');
           const search=toolbar.querySelector('.node-explorer-search,.nx-directory-search').getBoundingClientRect();
           const bulk=toolbar.querySelector('[data-bulk-toolbar]').getBoundingClientRect();
+          const density=toolbar.querySelector('.node-grid-controls,.nx-workspace-grid-controls').getBoundingClientRect();
           const t=toolbar.getBoundingClientRect();
-          return{searchRight:search.right,searchTop:search.top,searchBottom:search.bottom,
-            bulkLeft:bulk.left,bulkTop:bulk.top,bulkBottom:bulk.bottom,
-            toolbarBottom:t.bottom,toolbarTop:t.top};
+          return{searchRight:search.right,bulkLeft:bulk.left,bulkRight:bulk.right,
+            bulkBottom:bulk.bottom,densityLeft:density.left,densityBottom:density.bottom,
+            toolbarHeight:t.height};
         });
-        assert(Math.abs(geometry.searchTop-geometry.bulkTop)<15||
-          Math.abs(geometry.searchBottom-geometry.bulkBottom)<12,
-          route+' bulk trigger must share the leading toolbar row');
-        assert(geometry.bulkLeft>=geometry.searchRight-2&&geometry.bulkLeft-geometry.searchRight<=80,
-          route+' bulk actions must follow the left search, not float to the right');
+        assert(Math.abs(geometry.bulkBottom-geometry.densityBottom)<12,
+          route+' bulk trigger must align with density in the main toolbar');
+        assert(geometry.bulkLeft>=geometry.searchRight-2&&geometry.bulkRight<=geometry.densityLeft+2,
+          route+' bulk entry must belong to the action cluster, before grid density');
         await mode.click();
+        const selectionGeometry=await scope.evaluate(area=>{
+          const toolbar=area.querySelector('.nodes-toolbar,.host-directory-toolbar,.squad-directory-toolbar');
+          const context=area.querySelector(':scope > .nx-bulk-context');
+          return{height:toolbar.getBoundingClientRect().height,
+            contextTop:context.getBoundingClientRect().top,
+            toolbarBottom:toolbar.getBoundingClientRect().bottom,
+            contextInsideToolbar:toolbar.contains(context)};
+        });
+        assert(!selectionGeometry.contextInsideToolbar,
+          route+' selection controls must be outside the main toolbar');
+        assert(selectionGeometry.contextTop>=selectionGeometry.toolbarBottom-2,
+          route+' selection strip must appear underneath the toolbar');
+        assert(selectionGeometry.height<=geometry.toolbarHeight+3,
+          route+' selection must not make the main toolbar jump in height');
         assert.match((await mode.innerText()).trim(),/^(Завершить выбор|Finish selection)$/);
         const first=scope.locator(card+' [data-bulk-check]').first();
         assert(await first.isVisible(),route+' must expose a selection checkbox on each card');
