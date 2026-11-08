@@ -332,7 +332,8 @@ async function main() {
           await page.locator('#settings-subpage [data-settings-focus="'+group+'"]').click();
           assert.equal(await page.locator('[data-settings-focus="'+group+'"]').getAttribute('aria-pressed'),'true');
           assert.equal(new URL(page.url()).hash,'#set/'+group,'Group links must remain shareable');
-          assert(await page.locator(control).isVisible(),'Active group control must be visible: '+group);
+          assert(await page.locator(control).evaluateAll(elements=>elements.some(el=>
+            el.getClientRects().length>0)),'Active group control must be visible: '+group);
           const layout=await page.evaluate(()=>{
             const grid=document.querySelector('.settings-center-grid');
             const visible=el=>el.getClientRects().length>0;
