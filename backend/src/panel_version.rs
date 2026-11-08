@@ -17,9 +17,9 @@ fn installed_panel_version() -> &'static str {
     let version = DISPLAY_VERSION.trim();
     let parts = version.split('.').collect::<Vec<_>>();
     if parts.len() == 3
-        && parts.iter().all(|part| {
-            !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
-        })
+        && parts
+            .iter()
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
     {
         version
     } else {
