@@ -1281,6 +1281,31 @@ async function main() {
         for(const [width,height] of [[1920,1080],[1366,768],[768,1024],[390,844]]){
           await page.setViewportSize({width,height});
           await page.locator('[data-cr-profile="ui-route-main"]').waitFor();
+          const compact=await page.locator('#client-route-root').evaluate(root=>{
+            const rect=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,mid:(r.top+r.bottom)/2}};
+            const bar=root.querySelector('.crx-page-head'),title=bar.querySelector('.crx-toolbar-label');
+            const count=bar.querySelector('[data-cr-counter]'),create=bar.querySelector('[data-cr-add]');
+            const grid=root.querySelector('.crx-list'),cards=[...grid.querySelectorAll('[data-cr-profile]')];
+            return{
+              toolbar:rect(bar),heading:rect(title),create:rect(create),count:count.textContent.trim(),
+              repeatedTitle:bar.querySelectorAll('h2').length,
+              list:rect(grid),cards:cards.map(rect),
+              rootWidth:rect(root).width,overflow:document.documentElement.scrollWidth>innerWidth+1
+            };
+          });
+          assert.equal(compact.count,'3','Routing toolbar must show the real number of templates');
+          assert.equal(compact.repeatedTitle,0,'Remove the oversized redundant Templates page heading');
+          assert(compact.toolbar.height<90,'Routing controls should occupy one compact toolbar');
+          assert(Math.abs(compact.heading.mid-compact.create.mid)<5,
+            'Routing count and create action must stay on the same toolbar row');
+          assert(compact.create.right<=compact.toolbar.right+1,
+            'Create action must remain inside the toolbar frame');
+          assert.equal(compact.cards.length,3,'All routing templates remain visible');
+          if(width>=1366)assert(compact.cards[2].right>=compact.list.right-48,
+            'Three cards should fill the desktop gallery, without an unused fourth column');
+          if(width>=1920)assert(compact.cards[0].height<500,
+            'Routing assignment and three ordered rules should not need a tall card');
+          assert(!compact.overflow,'Compact routing gallery must not overflow the document');
           assert(await page.locator('[data-cr-bottom]').isHidden(),'Clean routing list must not show a disabled save bar');
           const g=await geometry(page);assert(g.scrollWidth<=width+1,'Populated routing rows must not overflow');
           assert.equal(g.outside.length,0,'Routing controls must stay inside the viewport');
