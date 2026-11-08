@@ -158,8 +158,9 @@
 (()=>{
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-  // Single-card and fleet Agent upgrades use the exact same authenticated
-  // backend command. The server determines eligibility from the heartbeat.
+  // No client-side version allow-list. Single-card and fleet Agent upgrades
+  // use the exact same authenticated backend command. The server determines
+  // eligibility from the live signed heartbeat.
   const pendingAgentUpdates=new Set();
   async function updateOneAgent(id,{confirm=true,notify=true,onStage=()=>{}}={}){
     id=Number(id);
