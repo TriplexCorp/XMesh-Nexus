@@ -121,9 +121,14 @@ assert.match(app,/def:\(\)=>\(\{port:443,fp:'chrome',order:DB\.hosts\.length\+1/
 assert.match(app,/input\.value=key==='fp'\?'chrome':''/,
  'Resetting Host overrides must leave the single chrome choice selected');
 
-// Settings navigation is a real hash-routed workspace, not a hidden long page.
-for(const name of ['general','colors','layout','typography','integrations','system','data','admins','security'])
- assert(app.includes("'"+name+"'"),'Settings subpage missing: '+name);
+// Settings navigation contains six actual workspaces; old small-page routes
+// remain aliases, not extra tabs or duplicate mounted forms.
+for(const name of ['general','appearance','system','security','admins','data'])
+ assert(app.includes("['"+name+"'"),'Settings workspace missing: '+name);
+assert.match(app,/const SETTINGS_PAGE_ALIASES=Object\.freeze\(/,'Legacy settings routes must resolve into consolidated pages');
+assert.match(app,/colors:'appearance',layout:'appearance',typography:'appearance'/);
+assert.match(app,/integrations:'general',traffic:'system/);
+assert.match(app,/groups\.includes\(card\.dataset\.settingsGroup\)/,'Grouped page must mount its existing cards');
 const nav=app.slice(app.indexOf('const NAV='),app.indexOf('const FLAT='));
 assert(!nav.includes("['admins'")&&!nav.includes("['security'"),
  'Admin and Security must be removed from the top-level sidebar');
@@ -142,7 +147,7 @@ assert.match(app,/history\.replaceState\(history\.state,\x27\x27,location\.pathn
  'Legacy Security/Admins direct links must be retained');
 assert.match(app,/route\.startsWith\('set\/'\)\?'set':route/,'Settings deep links must share the authorized settings page');
 assert.match(app,/function settingsPageFromHash\(\)/,'Settings subpage must survive a reload');
-assert.match(app,/source\.content\.querySelectorAll\('\[data-settings-group\]'\)/,'Only active settings cards should be mounted');
+assert.match(app,/source\.content\.querySelectorAll\('\[data-settings-group\]'\)/,'Only cards within the active grouped workspace should be mounted');
 assert.match(app,/id="settings-subpage"/,'Settings subpage must have a real content region');
 assert.match(app,/href="#set\/\$\{key\}"/,'Settings sidebar links must be addressable');
 assert.match(app,/location\.hash='set\/system'/,'Xray-core rail action must open its settings category');
