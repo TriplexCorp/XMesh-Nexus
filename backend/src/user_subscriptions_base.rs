@@ -1032,12 +1032,8 @@ fn add_subscription_profile_headers(response: &mut Response, settings: &Value) {
     );
 }
 
-fn subscription_gib_to_bytes(gib: f64) -> u64 {
-    if !gib.is_finite() || gib <= 0.0 {
-        return 0;
-    }
-    let bytes = (gib * 1_073_741_824.0).floor();
-    bytes.to_string().parse::<u64>().unwrap_or(u64::MAX)
+fn subscription_gb_to_bytes(gb: f64) -> u64 {
+    crate::gb_to_bytes_i64(gb) as u64
 }
 
 pub async fn serve(
@@ -1103,9 +1099,9 @@ pub async fn serve(
         .headers_mut()
         .insert(header::VARY, "User-Agent, Accept".parse().unwrap());
     add_subscription_profile_headers(&mut response, &settings);
-    // User limits are expressed in GiB in panel records; the conventional subscription-userinfo
+    // User limits are expressed in decimal GB in panel records; the conventional subscription-userinfo
     // header expects bytes and Unix seconds.
-    let consumed_gib = user
+    let consumed_gb = user
         .get("used")
         .and_then(Value::as_f64)
         .unwrap_or(0.0)
@@ -1116,10 +1112,10 @@ pub async fn serve(
         .unwrap_or(0.0)
         .max(0.0);
     let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
-    let to_bytes = subscription_gib_to_bytes;
+    let to_bytes = subscription_gb_to_bytes;
     let info = format!(
         "upload=0; download={}; total={}; expire={}",
-        to_bytes(consumed_gib),
+        to_bytes(consumed_gb),
         to_bytes(limit),
         if expiry > 1_000_000_000_000 {
             expiry / 1000
@@ -1308,7 +1304,7 @@ pub async fn portal_route(
     .await
 }
 fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
-    let consumed_gib = user
+    let consumed_gb = user
         .get("used")
         .and_then(Value::as_f64)
         .unwrap_or(0.0)
@@ -1323,14 +1319,14 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
         let remaining = if limit > 0.0 {
             format!(
                 "{:.2} / {:.2} {}",
-                consumed_gib,
+                consumed_gb,
                 limit,
                 if en { "GB" } else { "ГБ" }
             )
         } else {
             format!(
                 "{:.2} {} / {}",
-                consumed_gib,
+                consumed_gb,
                 if en { "GB" } else { "ГБ" },
                 if en {
                     "Unlimited"
@@ -1340,13 +1336,13 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
             )
         };
         let pct = if limit > 0.0 {
-            (consumed_gib / limit * 100.0).clamp(0.0, 100.0)
+            (consumed_gb / limit * 100.0).clamp(0.0, 100.0)
         } else {
             0.0
         };
         let _ = write!(
             metrics,
-            "<div data-subscription-traffic data-used-gib=\"{consumed_gib}\" data-limit-gib=\"{limit}\"><small>{}</small><b>{}</b><div class=\"subscription-preview-progress\"><i style=\"width:{pct:.1}%\"></i></div></div>",
+            "<div data-subscription-traffic data-used-gib=\"{consumed_gb}\" data-limit-gib=\"{limit}\"><small>{}</small><b>{}</b><div class=\"subscription-preview-progress\"><i style=\"width:{pct:.1}%\"></i></div></div>",
             if en { "Traffic" } else { "Трафик" },
             escape_html(&remaining)
         );
