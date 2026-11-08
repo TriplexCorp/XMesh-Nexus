@@ -271,7 +271,9 @@ impl CoreManager {
         validate_ech_public_name(public_name)?;
         let binary = self.root.join("current").join("xray");
         if !binary.is_file() {
-            return Err("Xray-core ещё не установлен в панели. Установите ядро в настройках.".to_owned());
+            return Err(
+                "Xray-core ещё не установлен в панели. Установите ядро в настройках.".to_owned(),
+            );
         }
         let output = timeout(
             Duration::from_secs(20),
@@ -600,7 +602,9 @@ fn validate_ech_public_name(value: &str) -> Result<(), String> {
                 && part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
         });
     if !valid {
-        return Err("Внешний ECH SNI должен быть корректным ASCII-доменом без схемы и порта.".to_owned());
+        return Err(
+            "Внешний ECH SNI должен быть корректным ASCII-доменом без схемы и порта.".to_owned(),
+        );
     }
     Ok(())
 }
@@ -611,33 +615,56 @@ fn parse_ech_output(output: &str) -> Result<Value, String> {
     let mut keys = None;
     for line in output.lines().map(str::trim) {
         if let Some(value) = line.strip_prefix("ECH config list:") {
-            if !value.trim().is_empty() { config = Some(value.trim()); }
+            if !value.trim().is_empty() {
+                config = Some(value.trim());
+            }
         } else if let Some(value) = line.strip_prefix("ECH server keys:") {
-            if !value.trim().is_empty() { keys = Some(value.trim()); }
-        } else if config.is_none() && !line.is_empty() && line.bytes().all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b)) {
+            if !value.trim().is_empty() {
+                keys = Some(value.trim());
+            }
+        } else if config.is_none()
+            && !line.is_empty()
+            && line
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b))
+        {
             config = Some(line);
-        } else if config.is_some() && keys.is_none() && !line.is_empty() && line.bytes().all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b)) {
+        } else if config.is_some()
+            && keys.is_none()
+            && !line.is_empty()
+            && line
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b))
+        {
             keys = Some(line);
         }
     }
     let error = || "Xray-core вернул некорректную пару ECH; конфигурация не изменена.".to_owned();
     let config = config.ok_or_else(error)?;
     let keys = keys.ok_or_else(error)?;
-    if config.len() > 8192 || keys.len() > 8192 { return Err(error()); }
+    if config.len() > 8192 || keys.len() > 8192 {
+        return Err(error());
+    }
     let config_bytes = STANDARD.decode(config).map_err(|_| error())?;
     let key_bytes = STANDARD.decode(keys).map_err(|_| error())?;
-    if config_bytes.len() < 22 || key_bytes.len() < 26 { return Err(error()); }
+    if config_bytes.len() < 22 || key_bytes.len() < 26 {
+        return Err(error());
+    }
     let config_len = usize::from(u16::from_be_bytes([config_bytes[0], config_bytes[1]]));
     let secret_len = usize::from(u16::from_be_bytes([key_bytes[0], key_bytes[1]]));
-    if config_len < 20 || config_len + 2 != config_bytes.len() || !(16..=512).contains(&secret_len) {
+    if config_len < 20 || config_len + 2 != config_bytes.len() || !(16..=512).contains(&secret_len)
+    {
         return Err(error());
     }
     let pos = secret_len + 2;
-    if key_bytes.len() < pos + 2 { return Err(error()); }
+    if key_bytes.len() < pos + 2 {
+        return Err(error());
+    }
     let embedded_len = usize::from(u16::from_be_bytes([key_bytes[pos], key_bytes[pos + 1]]));
     if embedded_len != config_len
         || key_bytes.len() != pos + 2 + embedded_len
-        || key_bytes[pos + 2..] != config_bytes[2..] {
+        || key_bytes[pos + 2..] != config_bytes[2..]
+    {
         return Err(error());
     }
     Ok(serde_json::json!({"echConfigList":config,"echServerKeys":keys}))
@@ -786,12 +813,23 @@ fn chrono_free_timestamp() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_version, parse_ech_output, parse_vless_encryption_output, validate_ech_public_name};
+    use super::{
+        normalize_version, parse_ech_output, parse_vless_encryption_output,
+        validate_ech_public_name,
+    };
 
     #[test]
     fn ech_public_name_is_validated_as_a_domain_not_shell_input() {
         assert!(validate_ech_public_name("public.example.com").is_ok());
-        for name in ["", "https://example.org", "bad name", "example.com:443", "-example.org", "a..b", "example.org\\n--pem"] {
+        for name in [
+            "",
+            "https://example.org",
+            "bad name",
+            "example.com:443",
+            "-example.org",
+            "a..b",
+            "example.org\\n--pem",
+        ] {
             assert!(validate_ech_public_name(name).is_err(), "{name:?}");
         }
     }
@@ -806,13 +844,21 @@ mod tests {
         server.extend_from_slice(&[42_u8; 32]);
         server.extend_from_slice(&[0_u8, 40_u8]);
         server.extend_from_slice(&ech_config);
-        let output = format!("ECH config list: \n{}\nECH server keys: \n{}\n", STANDARD.encode(&config), STANDARD.encode(&server));
+        let output = format!(
+            "ECH config list: \n{}\nECH server keys: \n{}\n",
+            STANDARD.encode(&config),
+            STANDARD.encode(&server)
+        );
         let result = parse_ech_output(&output).unwrap();
         assert_eq!(result["echConfigList"], STANDARD.encode(config));
         assert_eq!(result["echServerKeys"], STANDARD.encode(&server));
         let last = server.len() - 1;
         server[last] ^= 1;
-        let corrupt = format!("ECH config list: \n{}\nECH server keys: \n{}\n", result["echConfigList"].as_str().unwrap(), STANDARD.encode(server));
+        let corrupt = format!(
+            "ECH config list: \n{}\nECH server keys: \n{}\n",
+            result["echConfigList"].as_str().unwrap(),
+            STANDARD.encode(server)
+        );
         assert!(parse_ech_output(&corrupt).is_err());
         assert!(parse_ech_output("ECH config list: \nnot-base64").is_err());
     }
