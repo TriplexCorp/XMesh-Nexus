@@ -33,6 +33,7 @@
   return String(record?.name||record?.remark||record?.username||id);
  };
  function mount(root=document,config={}){
+  if(typeof viewerMode==='function'&&viewerMode())return;
   for(const spec of specs){
    const contexts=[];
    if(root.matches?.(spec.root))contexts.push(root);
