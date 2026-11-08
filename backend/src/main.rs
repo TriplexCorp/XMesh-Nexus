@@ -3982,7 +3982,7 @@ async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
 
 /// Convert a decimal GB quantity to an exact whole-byte quota.
 /// Parse the shortest base-10 representation to avoid floating-point
-/// underflow at byte boundaries (e.g. 0.000_000_03 GB is exactly 30 bytes).
+/// underflow at byte boundaries (e.g. `0.000_000_03` GB is exactly 30 bytes).
 pub(crate) fn gb_to_bytes_i64(gb: f64) -> i64 {
     if gb <= 0.0 || gb.is_nan() {
         return 0;
