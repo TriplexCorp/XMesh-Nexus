@@ -816,6 +816,42 @@ async function main() {
       }
     });
 
+    await checked('Catalogue bulk toolbars: select, count and clear without mutating records',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      for(const [route,root,card] of [
+        ['nodes','.nodes-page','[data-node-card-id]'],
+        ['hosts','.host-directory','[data-host-card-id]'],
+        ['squads','.squad-directory','[data-squad-card]']
+      ]){
+        await navigate(route);
+        const scope=page.locator(root);
+        assert(await scope.locator(card).count()>0,route+' requires a persisted fixture');
+        const mode=scope.locator('[data-bulk-action="mode"]');
+        assert(await mode.isVisible(),route+' must have bulk actions in its existing toolbar');
+        await mode.click();
+        const first=scope.locator(card+' [data-bulk-check]').first();
+        assert(await first.isVisible(),route+' must expose a selection checkbox on each card');
+        await first.check();
+        assert.match(await scope.locator('.nx-bulk-count').innerText(),/\b1\b/);
+        await scope.locator('[data-bulk-action="all"]').click();
+        const visible=await scope.locator(card+':visible').count();
+        assert.equal(await scope.locator('[data-bulk-check]:checked').count(),visible,
+          route+' select visible must target only visible cards');
+        await scope.locator('[data-bulk-action="clear"]').click();
+        assert.equal(await scope.locator('[data-bulk-check]:checked').count(),0);
+        await mode.click();
+        assert.equal(await scope.locator('[data-bulk-check]:visible').count(),0);
+      }
+      await navigate('users');
+      assert.equal(await page.locator('.users-toolbar #bulk').count(),1,
+        'Existing User bulk actions must live inside the main toolbar');
+      const checkbox=page.locator('#ut [data-sel]').first();
+      await checkbox.check();
+      assert(await page.locator('.users-toolbar #bulk.on').isVisible(),
+        'User bulk toolbar should activate as soon as a row is selected');
+      await page.locator('[data-bk="clr"]').click();
+    });
+
     await checked('Host directory: cards, layout, active state and existing controls',async()=>{
       for(const [width,height] of [[1920,1080],[1366,768],[390,844]]){
         await page.setViewportSize({width,height});
