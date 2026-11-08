@@ -25,6 +25,7 @@ assert.match(docker,/PANEL_DISPLAY_VERSION="\$\(cat \/build\/PANEL_DISPLAY_VERSI
 
 const listeners=new Map(),elements=new Map();
 function element(id) {
+ if(elements.has(id))return elements.get(id);
  const node={
   id,hidden:false,disabled:false,textContent:'',title:'',dataset:{},attributes:{},listeners:{},
   addEventListener(name,callback){this.listeners[name]=callback},
