@@ -21,6 +21,14 @@ assert.match(api,/UPDATE user_inbound_traffic_monthly SET quota_uplink_bytes=0/,
 assert.match(migration,/PRIMARY KEY \(month_start, node_id, user_id, inbound_tag\)/,'Monthly history must preserve node and inbound identity');
 assert.match(runtime,/cdn_quota::tags_for_node\(&settings, &node, &inbound_tags\)/,'Only limited node inbounds may be blocked in signed configs');
 assert.match(ui,/data-node-editor-pane="traffic"/,'Node editor needs real LTE traffic tab');
+assert.match(ui,/data-node-cdn-kind="standard"/,'Ordinary traffic must be a first-class node action');
+assert.match(ui,/data-node-cdn-kind="bypass"/,'Bypass traffic must be a first-class node action');
+assert.match(ui,/data-node-cdn-scope/,'Selected inbound scope must remain available as an advanced option');
+assert.match(ui,/mode\.value=button\.dataset\.nodeCdnKind==='standard'\?'standard':'all'/,
+ 'Simple node action must preserve backend quota contract');
+assert.match(ui,/mode\.value=event\.target\.checked\?'selected':'all'/,
+ 'Scoped node option must preserve selected mode without backend changes');
+
 assert.match(ui,/name="cdnResetPeriod"/,'Owner needs a monthly quota period selector');
 assert.match(integration,/node-scoped LTE cutoff in signed config/,'Signed desired config must exercise node-scoped policy');
 assert.match(integration,/enable per-user UTC monthly LTE quota/,'Real API integration must cover period selection');

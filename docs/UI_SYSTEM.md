@@ -430,55 +430,15 @@ persisted Squad data to achieve visual compactness.
   to `general` must never swallow navigation and leave the page stuck
   until refresh. Cover this with real sidebar clicks in the browser suite.
 
-### Dedicated CDN inbound traffic quota (stage 1)
+### «Трафик обхода»: единая квота и интерфейс
 
-- Settings → **Лимиты CDN** controls one shared pool of inbound tags.
-  Any tag added to that group is metered across every node that runs the
-  inbound. All unselected inbounds remain outside the CDN quota.
-- Each user/template can specify `cdnLimitGb` (GiB, zero = unlimited) in
-  addition to the existing global account `limit`. The ordinary unlimited
-  user plan remains unaffected by exhausting their CDN pool.
-- The panel derives `cdnUsedBytes` from verified, monotonic Xray stats in
-  `user_inbound_traffic_totals`. Do not accept client-supplied usage or
-  derive per-user quotas from node NIC totals, inbound aggregate statistics,
-  or feed download counts. Counter resets retain their existing baselines.
-- Once a user's CDN pool is exhausted, signed desired-config provisioning
-  excludes that user's client from **only the chosen CDN inbounds**, leaving
-  the original UUID and other authorized inbounds unchanged. Existing
-  `user.limit` and expiry constraints still apply independently.
-- **Enforcement limitation:** this stage uses normal node reconciliation;
-  it does not promise instantaneous cutoff of live sessions and is not an
-  offline-enforced hard quota. Production hard-cutoff requires a separate
-  signed Agent policy extension with local inbound counters, reconnect
-  denial, shared budget allocation, restart handling and fail-closed
-  telemetry safeguards. Do not describe it as an exact realtime limit.
-- **Node-scoped LTE policy:** Nodes → edit → Traffic supports `cdnMode=standard`
-  (no node-specific limit), `all` (every inbound on the node), or `selected`
-  with explicit node `cdnInboundTags`. The legacy global inbound list is
-  additive for backwards compatibility. A regular node with the same inbound
-  tag is not limited merely because a *different* node is marked LTE.
-- **Monthly accounting:** Settings → CDN traffic limits → `cdnResetPeriod=monthly`
-  activates a calendar-month UTC meter. Signed positive per-user/per-node/
-  per-inbound counter deltas are written transactionally during telemetry
-  ingestion to `user_inbound_traffic_monthly`. The timestamp source is the
-  server's accepted observation time, not a user- or node-supplied date.
-  The current month starts at 00:00 UTC on day 1. Historic lifetime totals
-  cannot be reliably split into months and are **not backfilled**. Switching
-  to monthly mode starts with deltas captured after this migration is installed;
-  it does not erase lifetime history. Manually resetting a user's counters also
-  resets their monthly ledger totals while preserving the last signed baselines.
-- **Single-link use case:** German and Norwegian ordinary nodes plus Polish
-  LTE node can share the same subscription, UUID and user: regular user
-  `limit=0`, `cdnLimitGb=5`, monthly mode, and Polish node marked `all`
-  or `selected`. Hosts and squad access must include all desired entries.
-  All limited nodes draw from a shared 5 GiB pool per user; there is no
-  per-node 5 GiB allocation.
-- **No hard real-time guarantee:** node desired-config reconciliation remains
-  asynchronous; an existing Xray connection can outlive reaching the quota.
-  Missing/offline telemetry may delay enforcement. If a counter report spans
-  the UTC month boundary, its positive delta is attributed to the acceptance
-  month; exact within-interval division cannot be reconstructed. Do not
-  advertise immediate on-node disconnects or an exact 5.000 GiB hard cap.
+- **Пользователи → Новый пользователь → Ограничения**: поле «Трафик обхода, ГиБ» задаёт независимую квоту. Поле существует также в шаблонах и настройках пользователя, ноль означает безлимит. Общий лимит пользователя не меняется.
+- **Узлы → Изменить → Трафик**: основной выбор состоит из «Основной сервер» и «Трафик обхода». Первый оставляет узел без отдельной квоты, второй считает все его inbound. Для смешанных узлов чекбокс «Только выбранные inbound» раскрывает расширенный выбор.
+- **Настройки → Система и трафик**: период общей квоты и глобальные совместимые правила находятся на одной странице с обновлениями, без отдельного маленького подраздела CDN/LTE. Старые глобальные inbound-теги остаются в раскрываемом блоке и не сбрасываются при сохранении.
+- **Совместимость**: существующие ключи cdnMode, cdnInboundTags, cdnLimitGb, cdnResetPeriod и все значения API/БД сохраняются. Глобальные теги добавляются к политике узла; если глобальный тег совпадает с inbound основного узла, тот inbound тоже ограничивается. Интерфейс предупреждает об этом.
+- **Единая подписка**: Германия и Норвегия — основные серверы без отдельной квоты, Польша — трафик обхода, например 5 ГиБ в месяц на пользователя. Один UUID, одна подписка и отдельный счётчик.
+
+**Действующий механизм квоты не переписывается:** подтверждённые Xray-счётчики на пользователя/узел/inbound сохраняют историю в user_inbound_traffic_totals и user_inbound_traffic_monthly, включая оба направления. Доступ при исчерпании лимита отзывается только у ограниченных inbound через синхронизацию конфигурации узлов. Это не немедленная отсечка действующих соединений и не строгий realtime cap; эти функции не входят в задачу.
 
 
 ### Catalog toolbars and collection actions
