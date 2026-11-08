@@ -88,3 +88,43 @@
 .squad-card-grid[data-grid-mode=compact]{grid-template-columns:repeat(auto-fill,minmax(min(100%,21.5rem),1fr));gap:var(--nx-space-3)}
 .squad-card-grid[data-grid-mode=compact]>.squad-card{padding:var(--nx-space-4);gap:var(--nx-space-3)}
 .squad-card-grid[data-grid-mode=spacious]{grid-template-columns:repeat(auto-fill,minmax(min(100%,37rem),1fr))}
+
+/* Squad toolbar: fixed left-to-right order, search then bulk operations.
+ * Layout rather than DOM append order controls the composition. */
+.squad-directory-toolbar.squad-directory-toolbar{
+  grid-template-columns:minmax(11rem,19rem) max-content minmax(0,1fr) max-content max-content;
+  align-items:center;gap:.5rem .8rem;
+}
+.squad-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
+.squad-directory-toolbar>.nx-bulk-toolbar{grid-column:2;grid-row:1;justify-self:start}
+.squad-directory-toolbar>.nx-directory-toolbar-note{grid-column:3;grid-row:1;min-width:0}
+.squad-directory-toolbar>.nx-workspace-grid-controls{grid-column:4;grid-row:1;justify-self:end}
+.squad-directory-toolbar>.nx-workspace-create{grid-column:5;grid-row:1;justify-self:end}
+@media(max-width:1100px){
+ .squad-directory-toolbar.squad-directory-toolbar{grid-template-columns:minmax(0,1fr) max-content max-content max-content}
+ .squad-directory-toolbar>.nx-bulk-toolbar{grid-column:2;grid-row:1}
+ .squad-directory-toolbar>.nx-workspace-grid-controls{grid-column:3;grid-row:1}
+ .squad-directory-toolbar>.nx-workspace-create{grid-column:4;grid-row:1}
+ .squad-directory-toolbar>.nx-directory-toolbar-note{grid-column:1/-1;grid-row:2}
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:2}
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar>.nx-directory-toolbar-note{grid-row:3}
+}
+@media(min-width:1101px){
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar.squad-directory-toolbar{
+   grid-template-columns:minmax(11rem,19rem) minmax(0,1fr) max-content max-content
+ }
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:2}
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar>.nx-directory-toolbar-note{grid-column:2;grid-row:1}
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar>.nx-workspace-grid-controls{grid-column:3;grid-row:1}
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar>.nx-workspace-create{grid-column:4;grid-row:1}
+}
+@media(max-width:680px){
+ .squad-directory-toolbar.squad-directory-toolbar{grid-template-columns:minmax(0,1fr) max-content}
+ .squad-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
+ .squad-directory-toolbar>.nx-workspace-create{grid-column:2;grid-row:1}
+ .squad-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:2}
+ .squad-directory-toolbar>.nx-workspace-grid-controls{grid-column:1/-1;grid-row:3;justify-self:start}
+ .squad-directory-toolbar>.nx-directory-toolbar-note{grid-column:1/-1;grid-row:4}
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar>.nx-bulk-toolbar{grid-row:2}
+ .squad-directory.nx-bulk-selecting .squad-directory-toolbar>.nx-directory-toolbar-note{grid-row:4}
+}
