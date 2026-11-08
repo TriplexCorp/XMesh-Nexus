@@ -56,8 +56,8 @@ assert.match(panel,/window\.XMeshMfa\?\.panel/);
 assert.match(panel,/window\.XMeshMfa\?\.mount/);
 assert.doesNotMatch(panel,/\['security','shield-check','Безопасность'\]/,
  'Security must not remain as a standalone global sidebar item');
-assert.match(panel,/\['security','Безопасность','Авторизация, двухфакторная защита, сессии и аудит','shield-check'\]/,
- 'Security must appear as a dedicated Settings subpage');
+assert.match(panel,/\['security','Безопасность','Авторизация, 2FA, сессии и аудит','shield-check',\['security'\]\]/,
+ 'Security must remain a dedicated workspace with the original MFA implementation');
 assert.match(panel,/settingsPage==='security'\?securityP\(\)/,
  'Settings security subpage must render the existing protected MFA workspace');
 assert.match(panel,/security:\['Безопасность',securityP\]/,
