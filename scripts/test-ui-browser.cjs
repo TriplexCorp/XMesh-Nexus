@@ -1653,7 +1653,8 @@ async function main() {
         return {dialog:box(dialog),header:box(q('.user-head')),footer:box(q('.user-canvas-foot')),body:box(body),scrollTop:body.scrollTop,scrollHeight:body.scrollHeight,clientHeight:body.clientHeight,
           panes:[...body.children].map(box),headings:[...body.querySelectorAll('[data-active=true] .user-pane-heading:first-child')].map(box),
           controls:[...q('.user-head-actions').children].map(box),usage:box(q('.user-usage-line')),identity:box(q('.user-identity-row')),
-          maxHeight:getComputedStyle(dialog).maxHeight,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),
+          maxHeight:getComputedStyle(dialog).maxHeight,cssHeight:getComputedStyle(dialog).height,
+          zoom:getComputedStyle(document.body).zoom,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),
           paneScrolls:[...body.children].filter(p=>getComputedStyle(p).overflowY==='auto'||getComputedStyle(p).overflowY==='scroll').length};
       });
       assert.equal(g.scrollTop,0,'Body must start at top');
@@ -1669,7 +1670,7 @@ async function main() {
       assert(g.clientHeight>0,'Fixed-size frame must retain a scrollable content region');
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
       assert(Math.abs(g.dialog.height-Math.min(38.5*g.rem,height-2*g.rem))<=4,
-        'Desktop User Details must keep the compact fixed frame');
+        'Desktop User Details must keep the compact fixed frame: '+JSON.stringify({actual:g.dialog.height,expected:Math.min(38.5*g.rem,height-2*g.rem),css:g.cssHeight,rem:g.rem,zoom:g.zoom}));
       assert(g.dialog.height<=40*g.rem,'User Details must not occupy nearly the entire screen');
       const layout=await page.locator('#dlg').evaluate(d=>{
         const b=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}};
@@ -1770,7 +1771,7 @@ async function main() {
       assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.right<=width+1,'Mobile dialog must fit viewport');
       const rem=await page.evaluate(()=>parseFloat(getComputedStyle(document.documentElement).fontSize));
       assert(g.dialog.height<=Math.min(38.5*rem,height-rem)+3,
-        'Mobile User Details frame must be compact and viewport-clamped');
+        'Mobile User Details frame must be compact and viewport-clamped: '+JSON.stringify({actual:g.dialog.height,limit:Math.min(38.5*rem,height-rem),rem}));
       assert.equal(g.scrollTop,0);
       assert.equal(g.panes.length,5,'All task panels must stay mounted');
       assert.equal(await page.locator('[data-user-editor-pane][data-active=true]').count(),1);
