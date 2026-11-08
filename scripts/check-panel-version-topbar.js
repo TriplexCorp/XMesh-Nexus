@@ -34,7 +34,11 @@ assert.match(html,/data-panel-version-reload hidden/);
 assert.match(html,/data-panel-version-installed/);
 assert.match(html,/data-panel-version-close[^>]*aria-label="Закрыть"/);
 assert.match(script,/close\.addEventListener\('click'/);
-assert.match(script,/const successful=stage==='success'/);
+assert.match(script,/const successful=stage==='success'&&observedUpdate/);
+assert.match(script,/if\(active\(\)\)observedUpdate=true/);
+assert.match(script,/checked=null;\s*systemState=\{status:'queued'\}/);
+assert.match(script,/if\(!checked&&!checking\)void checkUpdates\(\)/,
+  'Opening the popover must recover from a prior persisted host success');
 assert.match(script,/menu\.dataset\.actionMode=successful\?'reload':canUpdate\?'update':'check'/);
 assert.match(script,/update\.hidden=!canUpdate/);
 assert.match(script,/reload\.hidden=!owner\|\|!successful/);
