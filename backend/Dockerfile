@@ -14,11 +14,13 @@ COPY backend/migrations ./migrations
 # Resolve provenance in its own step: the checkout bind is gone before Cargo
 # executes dependency build scripts or proc macros.
 RUN --mount=type=bind,source=.,target=/source,readonly \
-    sh /source/scripts/resolve-panel-build-revision.sh "$PANEL_BUILD_REVISION" /source > /build/PANEL_BUILD_REVISION
+    sh /source/scripts/resolve-panel-build-revision.sh "$PANEL_BUILD_REVISION" /source > /build/PANEL_BUILD_REVISION \
+    && sh /source/scripts/resolve-panel-display-version.sh "$(cat /build/PANEL_BUILD_REVISION)" /source > /build/PANEL_DISPLAY_VERSION
 RUN --mount=type=cache,id=xmesh-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=xmesh-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=xmesh-cargo-target,target=/build/backend/target,sharing=locked \
-    PANEL_BUILD_REVISION="$(cat /build/PANEL_BUILD_REVISION)" cargo build --release \
+    PANEL_BUILD_REVISION="$(cat /build/PANEL_BUILD_REVISION)" \
+    PANEL_DISPLAY_VERSION="$(cat /build/PANEL_DISPLAY_VERSION)" cargo build --release \
     && mkdir -p /build/output \
     && cp target/release/xmesh-api /build/output/xmesh-api
 
