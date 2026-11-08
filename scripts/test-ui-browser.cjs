@@ -175,7 +175,7 @@ async function main() {
 
     await checked('Settings composition: full-width, left-aligned desktop workspace and compact navigation',async()=>{
       await page.setViewportSize({width:1920,height:1080});
-      for(const section of ['general','layout','colors','integrations','system','data']){
+      for(const section of ['general','appearance','system','data']){
         await navigate('set/'+section);
         const g=await page.evaluate(()=>{
           const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,y:r.y,bottom:r.bottom,width:r.width,height:r.height}};
@@ -192,12 +192,12 @@ async function main() {
         assert(g.cards.every(c=>c.width>=g.rem*20),'Cards must remain usable, not squeezed by the navigation rail');
         if(g.single==='true')assert(Math.abs(g.cards[0].x-g.heading.x)<3,
           'Single card and heading must share the same left edge');
-        if(section==='layout')await screenshot(page,'settings-composition-compact-desktop');
+        if(section==='appearance')await screenshot(page,'settings-appearance-consolidated-desktop');
       }
     });
     await checked('Settings composition: narrow screens retain usable subpages without overflow',async()=>{
       await page.setViewportSize({width:390,height:844});
-      await navigate('set/layout');
+      await navigate('set/appearance');
       const g=await page.evaluate(()=>{
         const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width}};
         const shell=document.querySelector('.settings-center'),nav=document.querySelector('.settings-center-nav'),grid=document.querySelector('.settings-center-grid');
@@ -243,31 +243,46 @@ async function main() {
         await page.locator('[data-cdn-tags-save]').click();
       }
       assert.equal(new URL(page.url()).hash,'#set/traffic');
+      assert.equal(await page.locator('[data-settings-section="system"]').count(),1,'Legacy CDN link resolves to the grouped System page');
+      assert.equal(await page.locator('#core-panel').count(),1,'The same page also provides core updates');
       await screenshot(page,'settings-cdn-inbound-quota');
     });
 
     await checked('Settings: deep links show one category, survive reload and preserve browser navigation',async()=>{
       await page.setViewportSize({width:1440,height:900});
       const content={
-        general:'#brand-panel',
-        colors:'#palette-apply',
-        layout:'#content-width',
-        typography:'#ts',
-        integrations:'[data-hk]',
-        system:'#core-panel',
-        traffic:'[data-cdn-tags-save]',
-        security:'#security-tab-auth',
-        admins:'[data-ne="admins"]',
-        data:'#gx'
+        general:['#brand-panel','#start-page','[data-hk]','#toast-duration'],
+        appearance:['#palette-apply','#content-width','#ts','[data-ui="motion"]'],
+        system:['#core-panel','[data-cdn-tags-save]'],
+        security:['#security-tab-auth'],
+        admins:['[data-ne="admins"]'],
+        data:['#gx','#appearance-import']
       };
-      for(const [category,selector] of Object.entries(content)){
+      const expectedCards={general:5,appearance:6,system:3,security:1,admins:1,data:2};
+      const expectedGroups={
+        general:['general','integrations'],
+        appearance:['colors','layout','typography'],
+        system:['system','traffic'],
+        security:['security'],admins:['admins'],data:['data']
+      };
+      assert.equal(await page.locator('.settings-center-link').count(),6,
+        'Only six meaningful settings categories should appear in navigation');
+      for(const [category,selectors] of Object.entries(content)){
         await navigate('set/'+category);
-        assert.equal(await page.locator('.settings-center-link[aria-current="page"]').count(),1,'Exactly one settings subpage must be active');
-        assert(await page.locator(selector).count()>0,'Missing settings control '+category);
-        const expectedCards={general:2,colors:2,layout:2,typography:2,integrations:3,system:2,traffic:1,security:1,admins:1,data:2};
+        assert.equal(await page.locator('.settings-center-link[aria-current="page"]').count(),1,'Exactly one settings page must be active');
+        for(const selector of selectors)assert(await page.locator(selector).count()>0,'Missing working settings control '+selector+' on '+category);
         assert.equal(await page.locator('[data-settings-group]').count(),expectedCards[category],
-          'Settings '+category+' must mount its active functional cards without hiding new options');
-        assert.equal(await page.locator('[data-settings-group]:not([data-settings-group="'+category+'"])').count(),0,'Inactive settings must not remain mounted');
+          'Settings '+category+' must mount its complete grouped functional cards');
+        assert.equal(await page.locator('[data-settings-group]').evaluateAll(items=>new Set(items.map(item=>item.dataset.settingsGroup)).size),expectedGroups[category].length,
+          'The page must contain all source feature groups exactly once');
+        const mounted=await page.locator('[data-settings-group]').evaluateAll(items=>items.map(item=>item.dataset.settingsGroup));
+        assert(mounted.every(group=>expectedGroups[category].includes(group)),'Only relevant grouped settings may be mounted');
+      }
+      const aliases={colors:'appearance',layout:'appearance',typography:'appearance',integrations:'general',traffic:'system'};
+      for(const [legacy,canonical] of Object.entries(aliases)){
+        await navigate('set/'+legacy);
+        assert.equal(await page.locator('#settings-subpage').getAttribute('data-settings-section'),canonical,
+          'Legacy settings links must resolve to their new group');
       }
       assert.equal(await page.locator('#nav a[href="#admins"],#nav a[href="#security"]').count(),0,
         'Admin and Security must not occupy the global sidebar');
@@ -285,12 +300,13 @@ async function main() {
       await page.reload({waitUntil:'domcontentloaded'});
       await page.locator('#palette-apply').waitFor({state:'visible'});
       assert.equal(new URL(page.url()).hash,'#set/colors','Direct settings link must survive reload');
-      await page.locator('a[href="#set/layout"]').click();
-      await page.locator('#content-width').waitFor({state:'visible'});
+      await page.locator('a[href="#set/system"]').click();
+      await page.locator('#core-panel').waitFor({state:'visible'});
       await page.goBack({waitUntil:'domcontentloaded'});
       await page.locator('#palette-apply').waitFor({state:'visible'});
-      assert.equal(new URL(page.url()).hash,'#set/colors','Browser Back must restore selected subpage');
-      await screenshot(page,'settings-colors-subpage-1440');
+      assert.equal(new URL(page.url()).hash,'#set/colors','Browser Back must restore legacy appearance deep link');
+      assert.equal(await page.locator('[data-settings-section="appearance"]').count(),1);
+      await screenshot(page,'settings-appearance-consolidated-1440');
     });
 
     await checked('Settings: functional browser preferences apply and persist without changing server settings',async()=>{
