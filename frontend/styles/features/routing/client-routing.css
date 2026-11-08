@@ -1,6 +1,6 @@
 /* XMesh Nexus — Client Routing. Single stylesheet, one definition per component.
    All dimensions are rem-based and inherit the panel's global scale. */
-#client-route-root.crx{--crx-bg:var(--nx-panel-bg);--crx-panel:var(--nx-section-bg);--crx-border:var(--nx-border);--crx-text:var(--tx,#ebf2f5);--crx-muted:var(--mu,#9ca9b8);--crx-accent:var(--a,#73e4bb);container:client-routing / inline-size;color:var(--crx-text);width:100%;min-width:0;display:grid;gap:1.25rem;padding:.375rem 0 2.5rem;font-size:.875rem}
+#client-route-root.crx{--crx-bg:var(--nx-panel-bg);--crx-panel:var(--nx-section-bg);--crx-border:var(--nx-border);--crx-text:var(--tx,#ebf2f5);--crx-muted:var(--mu,#9ca9b8);--crx-accent:var(--a,#73e4bb);container:client-routing / inline-size;color:var(--crx-text);width:100%;min-width:0;display:grid;gap:.8rem;padding:0 0 1.5rem;font-size:.875rem}
 #client-route-root.crx *,
 #client-route-root.crx *::before,
 #client-route-root.crx *::after{box-sizing:border-box}
@@ -29,55 +29,55 @@
 #client-route-root.crx input:focus-visible,
 #client-route-root.crx select:focus-visible,
 #client-route-root.crx textarea:focus-visible{outline:2px solid var(--crx-accent);outline-offset:2px}
-#client-route-root.crx .crx-page-head{display:flex;align-items:end;justify-content:space-between;gap:1.25rem;flex-wrap:wrap;padding:.875rem 0 1.125rem;border-bottom:1px solid var(--crx-border)}
-#client-route-root.crx .crx-page-copy{display:grid;gap:.35rem}
-#client-route-root.crx .crx-page-copy h2{font-size:1.5rem;font-weight:800}
-#client-route-root.crx .crx-page-copy p,
+#client-route-root.crx .crx-page-head{display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;min-height:3.25rem;padding:.45rem .65rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-bg);box-shadow:var(--nx-panel-shadow)}
+#client-route-root.crx .crx-page-copy{display:flex;align-items:center;min-width:0;gap:.55rem}
+#client-route-root.crx .crx-toolbar-label{font-size:.8rem;font-weight:750;color:var(--crx-text)}
 #client-route-root.crx .crx-section-head p{color:var(--crx-muted);font-size:.8125rem}
-#client-route-root.crx .crx-page-actions{display:flex;align-items:center;gap:.75rem}
-#client-route-root.crx .crx-total{color:var(--crx-muted);font-size:.75rem}
+#client-route-root.crx .crx-page-actions{display:flex;align-items:center;gap:.5rem;margin-left:auto}
+#client-route-root.crx .crx-total{display:inline-grid;place-items:center;min-width:1.45rem;min-height:1.45rem;padding:.12rem .35rem;border:1px solid var(--crx-border);border-radius:var(--nx-control-radius);background:var(--crx-panel);color:var(--crx-text);font-size:.73rem;font-weight:750;font-variant-numeric:tabular-nums}
+#client-route-root.crx .crx-page-actions .crx-btn{min-height:2.3rem;padding:.45rem .75rem;font-size:.78rem}
 /* A readable gallery: each template owns its scope, ordered decisions and actions. */
-#client-route-root.crx .crx-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,32rem),1fr));gap:1rem;align-items:start}
-#client-route-root.crx .crx-card{container:routing-card / inline-size;display:flex;flex-direction:column;gap:1.1rem;min-width:0;max-width:46rem;padding:1.25rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-bg);background-image:var(--nx-panel-image);box-shadow:var(--nx-panel-shadow)}
-#client-route-root.crx .crx-card-identity{display:grid;gap:.65rem;min-width:0}
-#client-route-root.crx .crx-card-title{font-size:1.125rem;font-weight:750;min-width:0}
-#client-route-root.crx .crx-overview-toggle{display:flex;align-items:center;gap:.75rem;min-height:2rem;width:100%;padding:0;border:0;border-radius:var(--nx-control-radius);background:transparent;color:var(--crx-text);font:inherit;text-align:left}
+#client-route-root.crx .crx-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));gap:.75rem;align-items:start}
+#client-route-root.crx .crx-card{container:routing-card / inline-size;display:flex;flex-direction:column;gap:.7rem;min-width:0;max-width:46rem;padding:.85rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-bg);background-image:var(--nx-panel-image);box-shadow:var(--nx-panel-shadow)}
+#client-route-root.crx .crx-card-identity{display:grid;gap:.35rem;min-width:0}
+#client-route-root.crx .crx-card-title{font-size:1.025rem;font-weight:750;min-width:0}
+#client-route-root.crx .crx-overview-toggle{display:flex;align-items:center;gap:.5rem;min-height:1.9rem;width:100%;padding:0;border:0;border-radius:var(--nx-control-radius);background:transparent;color:var(--crx-text);font:inherit;text-align:left}
 #client-route-root.crx .crx-overview-toggle>span{flex:1;min-width:0;overflow-wrap:anywhere}
 #client-route-root.crx .crx-overview-toggle>.crx-icon:first-child{width:1.35rem;height:1.35rem;color:var(--crx-accent)}
 #client-route-root.crx .crx-overview-toggle>.crx-icon:last-child{width:1rem;height:1rem;color:var(--crx-muted);transition:transform .16s}
 #client-route-root.crx .crx-overview-toggle[aria-expanded=true]>.crx-icon:last-child{transform:rotate(90deg)}
-#client-route-root.crx .crx-card-stats{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1rem;color:var(--crx-muted);font-size:.75rem}
+#client-route-root.crx .crx-card-stats{display:flex;align-items:center;flex-wrap:wrap;gap:.28rem .75rem;color:var(--crx-muted);font-size:.7rem}
 #client-route-root.crx .crx-state{display:inline-flex;align-items:center;gap:.375rem;color:var(--crx-accent);font-weight:700}
 #client-route-root.crx .crx-state i{width:.375rem;height:.375rem;border-radius:50%;background:currentColor}
 #client-route-root.crx .crx-state.is-off{color:var(--crx-muted)}
-#client-route-root.crx .crx-card-details{display:grid;gap:1rem;min-width:0}
+#client-route-root.crx .crx-card-details{display:grid;gap:.6rem;min-width:0}
 #client-route-root.crx .crx-card-details[hidden]{display:none}
-#client-route-root.crx .crx-card-flags{display:grid;gap:.5rem;min-width:0;padding:.85rem 1rem;border-radius:var(--nx-control-radius);background:var(--crx-panel)}
-#client-route-root.crx .crx-group-label{margin:0;color:var(--crx-muted);font-size:.6875rem;font-weight:650;line-height:1.5}
-#client-route-root.crx button.crx-assigned-source{display:flex;align-items:center;gap:.75rem;min-width:0;width:100%;padding:.3rem 0;text-align:left;font:inherit;color:var(--crx-text);border:0;border-radius:var(--nx-control-radius);background:transparent}
-#client-route-root.crx .crx-assigned-source>.crx-flag{flex:none;width:1.8rem;height:1.35rem}
-#client-route-root.crx .crx-assigned-source>span{display:grid;gap:.25rem;min-width:0;overflow-wrap:anywhere}
-#client-route-root.crx .crx-assigned-source b{font-size:.875rem;font-weight:650}
-#client-route-root.crx .crx-assigned-source small{font-size:.6875rem;line-height:1.5;color:var(--crx-muted)}
-#client-route-root.crx .crx-card-rules{display:grid;gap:.25rem;min-width:0}
-#client-route-root.crx .crx-card-rules>.crx-group-label{margin:0 0 .3rem}
-#client-route-root.crx button.crx-rule-chip{display:grid;grid-template-columns:1.5rem minmax(0,1fr) minmax(0,auto);align-items:center;gap:.75rem;width:100%;min-width:0;padding:.7rem .35rem;border:0;border-bottom:1px solid var(--crx-border);border-radius:0;background:transparent;text-align:left;font:inherit;line-height:1.45}
+#client-route-root.crx .crx-card-flags{display:grid;gap:.15rem;min-width:0;padding:.45rem .55rem;border:1px solid var(--crx-border);border-radius:var(--nx-control-radius);background:var(--crx-panel)}
+#client-route-root.crx .crx-group-label{margin:0;color:var(--crx-muted);font-size:.66rem;font-weight:650;line-height:1.4}
+#client-route-root.crx button.crx-assigned-source{display:flex;align-items:center;gap:.5rem;min-width:0;width:100%;padding:.25rem .2rem;text-align:left;font:inherit;color:var(--crx-text);border:0;border-radius:var(--nx-control-radius);background:transparent}
+#client-route-root.crx .crx-assigned-source>.crx-flag{flex:none;width:1.5rem;height:1.125rem}
+#client-route-root.crx .crx-assigned-source>span{display:grid;gap:.1rem;min-width:0;overflow-wrap:anywhere}
+#client-route-root.crx .crx-assigned-source b{font-size:.78rem;font-weight:650}
+#client-route-root.crx .crx-assigned-source small{font-size:.65rem;line-height:1.35;color:var(--crx-muted)}
+#client-route-root.crx .crx-card-rules{display:grid;gap:.12rem;min-width:0}
+#client-route-root.crx .crx-card-rules>.crx-group-label{margin:0 0 .1rem}
+#client-route-root.crx button.crx-rule-chip{display:grid;grid-template-columns:1.35rem minmax(0,1fr) minmax(0,auto);align-items:center;gap:.5rem;width:100%;min-width:0;padding:.45rem .25rem;border:0;border-bottom:1px solid var(--crx-border);border-radius:0;background:transparent;text-align:left;font:inherit;line-height:1.35}
 #client-route-root.crx button.crx-rule-chip:last-child{border-bottom:0}
 #client-route-root.crx button.crx-rule-chip:hover,#client-route-root.crx button.crx-assigned-source:hover{background:var(--nx-hover-bg)}
 #client-route-root.crx .crx-rule-index{align-self:start;padding-top:.1rem;color:var(--crx-muted);font-size:.6875rem;font-variant-numeric:tabular-nums}
-#client-route-root.crx .crx-rule-condition{display:grid;gap:.25rem;min-width:0}
-#client-route-root.crx .crx-rule-condition b{color:var(--crx-text);font-size:.8125rem;font-weight:650;overflow-wrap:anywhere}
+#client-route-root.crx .crx-rule-condition{display:grid;gap:.12rem;min-width:0}
+#client-route-root.crx .crx-rule-condition b{color:var(--crx-text);font-size:.77rem;font-weight:650;overflow-wrap:anywhere}
 #client-route-root.crx .crx-rule-condition small{display:flex;flex-wrap:wrap;gap:.4rem;color:var(--crx-muted);font-size:.6875rem}
-#client-route-root.crx .crx-rule-chip em{max-width:12rem;color:var(--crx-text);font-size:.75rem;font-style:normal;overflow-wrap:anywhere;text-align:right}
+#client-route-root.crx .crx-rule-chip em{max-width:12rem;color:var(--crx-text);font-size:.71rem;font-style:normal;overflow-wrap:anywhere;text-align:right}
 #client-route-root.crx .crx-rule-chip .crx-action-direct{color:var(--crx-accent)}
 #client-route-root.crx .crx-rule-chip .crx-action-block{color:var(--er)}
-#client-route-root.crx .crx-card-no-rules{display:block;padding:.4rem 0;color:var(--crx-muted);font-size:.75rem;line-height:1.5}
+#client-route-root.crx .crx-card-no-rules{display:block;padding:.2rem 0;color:var(--crx-muted);font-size:.72rem;line-height:1.45}
 #client-route-root.crx .crx-more-rules{min-width:0}
-#client-route-root.crx .crx-more-rules summary{cursor:pointer;padding:.65rem .35rem;color:var(--crx-accent);font-size:.75rem}
-#client-route-root.crx .crx-card-footer{display:flex;align-items:center;gap:.5rem;padding-top:.85rem;border-top:1px solid var(--crx-border)}
-#client-route-root.crx .crx-card-footer .crx-btn{flex:1;justify-content:flex-start;background:transparent;border-color:transparent;padding-left:.35rem}
+#client-route-root.crx .crx-more-rules summary{cursor:pointer;padding:.42rem .2rem;color:var(--crx-accent);font-size:.72rem}
+#client-route-root.crx .crx-card-footer{display:flex;align-items:center;gap:.35rem;padding-top:.45rem;border-top:1px solid var(--crx-border)}
+#client-route-root.crx .crx-card-footer .crx-btn{flex:1;justify-content:flex-start;min-height:2.2rem;padding:.35rem .4rem;background:transparent;border-color:transparent;font-size:.76rem}
 #client-route-root.crx .crx-card-footer .crx-btn>.crx-icon:last-child{margin-left:auto;color:var(--crx-muted);width:1rem;height:1rem}
-#client-route-root.crx .crx-card-footer .crx-icon-btn{background:transparent}
+#client-route-root.crx .crx-card-footer .crx-icon-btn{background:transparent;width:2.2rem;min-width:2.2rem;min-height:2.2rem}
 #client-route-root.crx [data-cr-bottom][hidden]{display:none}
 #client-route-root.crx .crx-dialog-mark{display:grid;place-items:center;width:3.5rem;height:3.5rem;border:1px solid color-mix(in srgb,var(--crx-accent) 25%,var(--crx-border));border-radius:var(--nx-card-radius);background:color-mix(in srgb,var(--crx-accent) 11%,var(--crx-panel));color:var(--crx-accent)}
 @container routing-card (max-width:25rem){
