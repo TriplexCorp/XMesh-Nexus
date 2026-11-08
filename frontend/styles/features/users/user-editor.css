@@ -739,14 +739,14 @@
 #dlg.user-create-modal .user-create-title-icon .ic{width:1.35rem;height:1.35rem}
 #dlg.user-create-modal .user-create-head h2{
   margin:0 0 .27rem;
-  font-size:clamp(1.4rem,1.4vw,1.78rem);
+  font-size:clamp(23px,1.55rem,29px);
   font-weight:790;
   line-height:1.12;
   letter-spacing:-.035em;
 }
 #dlg.user-create-modal .user-create-head p{
   color:var(--mu);
-  font-size:.82rem;
+  font-size:clamp(12px,.82rem,14px);
   line-height:1.45;
 }
 #dlg.user-create-modal .user-create-head .user-create-close{
@@ -794,12 +794,12 @@
 #dlg.user-create-modal .user-create-section-icon .ic{width:1.08rem;height:1.08rem}
 #dlg.user-create-modal .user-create-section-head h3{
   margin:0 0 .17rem;
-  font-size:1.07rem;
+  font-size:clamp(16px,1.07rem,18px);
   line-height:1.2;
   font-weight:760;
 }
 #dlg.user-create-modal .user-create-section-head p{
-  font-size:.76rem;
+  font-size:clamp(12px,.76rem,13px);
   line-height:1.4;
 }
 #dlg.user-create-modal .user-create-main-grid{
@@ -823,7 +823,7 @@
 #dlg.user-create-modal .user-create-field>span,
 #dlg.user-create-modal .user-create-extra-grid>.user-create-field>span:first-child,
 #dlg.user-create-modal .user-create-limits-grid>.user-create-field>span{
-  font-size:.83rem;
+  font-size:clamp(13px,.83rem,15px);
   line-height:1.3;
   font-weight:720;
   min-height:auto;
@@ -831,7 +831,7 @@
 }
 #dlg.user-create-modal .user-create-field>small,
 #dlg.user-create-modal .user-create-limits-grid>.user-create-field>small{
-  font-size:.69rem;
+  font-size:clamp(11px,.69rem,12px);
   line-height:1.4;
 }
 #dlg.user-create-modal input:not([type=checkbox]),
@@ -841,7 +841,7 @@
   height:2.85rem;
   min-height:2.85rem;
   border-radius:var(--nx-control-radius);
-  font-size:.87rem;
+  font-size:clamp(14px,.87rem,16px);
   padding:.6rem .8rem;
   box-shadow:none;
   background:color-mix(in srgb,var(--nx-dialog-bg) 75%,var(--nx-section-bg));
@@ -910,7 +910,7 @@
 }
 #dlg.user-create-modal .user-create-policy-note .ic{width:.9rem;height:.9rem}
 #dlg.user-create-modal .user-create-policy-note b{
-  font-size:.78rem;
+  font-size:clamp(12px,.78rem,14px);
   line-height:1.3;
   font-weight:750;
 }
