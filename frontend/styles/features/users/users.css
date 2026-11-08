@@ -22,6 +22,40 @@ dialog:not(.side):not(.pop):not(.pal):not(.user-modal) {
   width:100%;
   margin-right:0;
 }
+/* Treat the label and its count as distinct elements rather than fused text.
+   This remains compact in both themes and wraps cleanly on small screens. */
+.users-statusbar #uf [data-uf] {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:.48rem;
+  white-space:nowrap;
+}
+.users-statusbar #uf .users-filter-label {
+  flex:none;
+}
+.users-statusbar #uf .users-filter-count {
+  display:inline-grid;
+  place-items:center;
+  flex:none;
+  min-width:1.3rem;
+  padding:.1rem .36rem;
+  border-radius:.42rem;
+  background:var(--nx-section-bg);
+  color:var(--tx);
+  opacity:1;
+  font-size:.74rem;
+  font-weight:720;
+  font-variant-numeric:tabular-nums;
+  line-height:1.25;
+}
+.users-statusbar #uf [data-uf].on .users-filter-count {
+  background:color-mix(in srgb,var(--a) 12%,var(--nx-section-bg));
+}
+.users-statusbar #uf [data-uf]:focus-visible {
+  outline:2px solid var(--nx-focus);
+  outline-offset:2px;
+}
 .users-toolbar>* {
   min-width:0;
   max-width:100%;
