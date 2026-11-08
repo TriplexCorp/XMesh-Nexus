@@ -20,6 +20,11 @@ assert.match(runtime,/cdn_quota::exhausted\(user, tag, cdn_tags\)/,'Only tagged 
 assert.match(runtime,/let cdn_tags = crate::cdn_quota::tags/,'Signed desired config must use the persisted CDN group');
 assert.match(ui,/name="cdnInboundTags"/,'Settings must expose explicit inbound selection');
 assert.match(ui,/data-cdn-tags-save/,'Group changes must be saved through owner-controlled settings API');
+assert.match(ui,/data-bypass-legacy/,'Legacy global inbound rules must remain accessible but collapsed');
+assert.match(ui,/SETTINGS_PAGE_ALIASES=Object\.freeze/,'Legacy traffic settings links must remain routed');
+assert.doesNotMatch(ui,/system:\[\['system','Обновления','Updates'\],\['traffic'/,
+ 'Traffic quotas must no longer create their own tiny settings subpage');
+
 assert.match(ui,/cdnLimitGb/,'User and template forms must edit separate CDN quota');
 assert.match(integration,/CDN quota must not revoke unrelated MAIN inbound/,'Main inbound must stay available after CDN exhaustion');
 assert.match(integration,/Exhausted CDN user must not be provisioned/,'CDN cutoff must affect signed desired config');
