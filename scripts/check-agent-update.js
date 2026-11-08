@@ -166,7 +166,11 @@ assert.match(bulkActions,/actions:\['enable','disable','agent-update','delete'\]
 assert.match(bulkActions,/'agent-update':trans\('Обновить Agent','Update Agent'\)/);
 assert.match(bulkActions,/Math\.min\(2,items\.length\)/);
 assert.match(bulkActions,/await ops\.updateOne\(Number\(item\.id\)/);
-assert.match(bulkActions,/const search=toolbar\.querySelector/);
+assert.match(bulkActions,/const actions=toolbar\.querySelector/);
+assert.match(bulkActions,/toolbar\.insertBefore\(group,actions\|\|null\)/,
+  'Bulk entry must be positioned with the action cluster, ahead of density');
+assert.match(bulkActions,/toolbar\.after\(context\)/,
+  'Bulk selection and report must not reflow the main filter toolbar');
 
 console.log(`Mandatory Agent version policy: ${agentVersionRaw} OK`);
 console.log('Manifest-bound Agent lost-response retry source contract: OK');
