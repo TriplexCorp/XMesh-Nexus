@@ -1232,15 +1232,8 @@ fn allowed_inbound_squads(squads: &[Value], tag: &str) -> std::collections::Hash
     allowed
 }
 
-fn quota_gib_to_bytes(gib: f64) -> i64 {
-    let bytes = (gib * 1_073_741_824.0).floor();
-    if bytes.is_nan() || bytes <= 0.0 {
-        return 0;
-    }
-    if bytes.is_infinite() {
-        return i64::MAX;
-    }
-    bytes.to_string().parse::<i64>().unwrap_or(i64::MAX)
+fn quota_gb_to_bytes(gb: f64) -> i64 {
+    crate::gb_to_bytes_i64(gb)
 }
 
 fn provision_proxy_users(
@@ -1422,11 +1415,11 @@ fn build_offline_policy(
             .unwrap_or(0.0)
             .max(0.0);
         // Floor each quota to bytes without a lossy float/integer cast.
-        let used_bytes = quota_gib_to_bytes(used_gb);
-        let limit_bytes = quota_gib_to_bytes(limit_gb.max(0.0));
+        let used_bytes = quota_gb_to_bytes(used_gb);
+        let limit_bytes = quota_gb_to_bytes(limit_gb.max(0.0));
         let remaining = if limit_gb.is_finite() && limit_gb > 0.0 {
             let remaining_gb = (limit_gb - used_gb).max(0.0);
-            Some(quota_gib_to_bytes(remaining_gb))
+            Some(quota_gb_to_bytes(remaining_gb))
         } else {
             None
         };
@@ -2434,7 +2427,7 @@ mod provision_tests {
         ]});
         let users = vec![json!({
             "id":1,"xrayId":uuid,"squads":[4],"limit":0,
-            "cdnLimitGb":1.0,"cdnUsedBytes":1_073_741_824_i64
+            "cdnLimitGb":1.0,"cdnUsedBytes":1_000_000_000_i64
         })];
         let squads = vec![json!({"id":4,"inb":["MAIN_DE","CDN_DE","CDN_UK"]})];
         let tags = std::collections::HashSet::from(["CDN_DE".to_owned(), "CDN_UK".to_owned()]);
