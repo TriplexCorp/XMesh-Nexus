@@ -1643,8 +1643,11 @@ async function main() {
       assert(Math.max(...centers)-Math.min(...centers)<=3,'Header controls must share a vertical axis');
       assert(Math.abs(g.usage.y+g.usage.height/2-g.identity.y-g.identity.height/2)<=3,'Usage and Xray ID must align');
       assert.equal(g.paneScrolls,0,'Only the shared body may scroll');
-      if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Content must fit without scrolling when viewport height is sufficient');
+      assert(g.clientHeight>0,'Fixed-size frame must retain a scrollable content region');
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
+      assert(Math.abs(g.dialog.height-Math.min(38.5*g.rem,height-2*g.rem))<=4,
+        'Desktop User Details must keep the compact fixed frame');
+      assert(g.dialog.height<=40*g.rem,'User Details must not occupy nearly the entire screen');
       const layout=await page.locator('#dlg').evaluate(d=>{
         const b=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}};
         const fields=[...d.querySelectorAll('.user-basic-card>.f')].map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y}});
@@ -1742,6 +1745,9 @@ async function main() {
         return {dialog:box(dialog),panes:[...body.children].map(box),scrollTop:body.scrollTop,scrollHeight:body.scrollHeight,clientHeight:body.clientHeight,footer:box(dialog.querySelector('.user-canvas-foot'))};
       });
       assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.right<=width+1,'Mobile dialog must fit viewport');
+      const rem=await page.evaluate(()=>parseFloat(getComputedStyle(document.documentElement).fontSize));
+      assert(g.dialog.height<=Math.min(38.5*rem,height-rem)+3,
+        'Mobile User Details frame must be compact and viewport-clamped');
       assert.equal(g.scrollTop,0);
       assert.equal(g.panes.length,5,'All task panels must stay mounted');
       assert.equal(await page.locator('[data-user-editor-pane][data-active=true]').count(),1);

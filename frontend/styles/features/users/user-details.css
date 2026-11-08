@@ -1652,3 +1652,40 @@ dialog.user-modal .user-pane {
 #dlg.user-modal .user-pane-settings .user-detail-card>.f{
   min-width:0;
 }
+
+/* Compact User Details workstation. One frame for Settings, Access, Routing,
+ * Traffic and Devices. Short panels align to top; long panels scroll. */
+#dlg.user-modal>.user-canvas{padding:clamp(.65rem,.85vw,.85rem) clamp(.75rem,1vw,1rem) .55rem}
+#dlg.user-modal .user-head{min-height:0;padding:.1rem 0 .62rem;gap:.45rem .7rem}
+#dlg.user-modal .user-head .who .av{
+  inline-size:2.9rem;block-size:2.9rem;min-inline-size:2.9rem;max-inline-size:2.9rem;flex:0 0 2.9rem;
+}
+#dlg.user-modal .user-head h2{font-size:clamp(1.08rem,1.3vw,1.38rem);line-height:1.2}
+#dlg.user-modal .user-head-actions{gap:.35rem}
+#dlg.user-modal .user-head-actions .gh,#dlg.user-modal .user-head-actions .ia{min-height:2.25rem;height:2.25rem}
+#dlg.user-modal .user-head-actions .ia{flex-basis:2.25rem;width:2.25rem}
+#dlg.user-modal .user-overview-band,
+#dlg.user-modal .user-canvas .user-overview-band{padding:.62rem .82rem;gap:.35rem .8rem}
+#dlg.user-modal .user-overview-band .user-usage-line>strong{font-size:1.12rem}
+#dlg.user-modal .user-editor-tabs{gap:.28rem;padding-block:.42rem .46rem}
+#dlg.user-modal .user-editor-tabs [role=tab]{min-height:2.2rem;padding:.44rem .7rem;font-size:.78rem}
+#dlg.user-modal .user-canvas-grid{padding:.62rem .12rem .65rem 0}
+#dlg.user-modal .user-pane-settings .user-settings-cards{gap:.6rem .72rem}
+#dlg.user-modal .user-detail-card{padding:.75rem .85rem;gap:.45rem}
+#dlg.user-modal .user-detail-card .user-card-title{gap:.6rem;margin-bottom:0;padding-bottom:.42rem}
+#dlg.user-modal .user-detail-card .user-card-title h3{font-size:.9rem}
+#dlg.user-modal .user-detail-card .user-card-title p{font-size:.71rem}
+#dlg.user-modal .user-pane-settings .user-basic-card{gap:.48rem .6rem}
+#dlg.user-modal .user-pane-settings .user-note-card textarea{min-height:4.35rem;resize:vertical}
+#dlg.user-modal .user-editor-actions{min-height:2.95rem;padding:.48rem 0}
+#dlg.user-modal .user-canvas-foot{min-height:1.5rem;padding:.32rem 0 .02rem;font-size:.7rem}
+@media(max-width:760px){
+  #dlg.user-modal>.user-canvas{padding:.6rem .7rem .45rem}
+  #dlg.user-modal .user-head .who .av{
+    inline-size:2.65rem;block-size:2.65rem;min-inline-size:2.65rem;max-inline-size:2.65rem;flex-basis:2.65rem;
+  }
+  #dlg.user-modal .user-head-actions{gap:.25rem}
+  #dlg.user-modal .user-editor-tabs{padding-block:.32rem .4rem}
+  #dlg.user-modal .user-editor-tabs [role=tab]{padding:.43rem .55rem}
+  #dlg.user-modal .user-canvas-grid{padding-block:.5rem}
+}

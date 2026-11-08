@@ -28,7 +28,7 @@
 @import url("../features/subscriptions/subscription-surface.css?v=0a79377d5733");
 @import url("../features/templates/templates.css?v=afe5244ed257");
 @import url("../features/tools/tools.css?v=b2eed08c8a90");
-@import url("../features/users/user-details.css?v=e52ce610bf41");
+@import url("../features/users/user-details.css?v=e4f8c3c051e1");
 @import url("../features/users/user-dialog-viewport.css?v=055046d32582");
 @import url("../features/users/user-editor.css?v=eae27af2ed4d");
 @import url("../features/users/user-sharing-risk.css?v=63e931c6689a");
@@ -138,45 +138,37 @@ dialog[open]:not(#dlg)::backdrop{opacity:1}
   margin-top:0;
 }
 
-/* User details is content-sized until the viewport becomes the constraint.
- * The body is the only shrinkable/scrollable region; the footer stays in flow.
- * This removes the large empty lower half caused by combining a 690px dialog
- * minimum with a fixed 54rem canvas height. */
+/* Compact User Details workspace: the frame NEVER changes across tabs.
+ * Keep one shared scroller; all mounted form drafts stay in the DOM. */
 #dlg.user-modal{
-  min-height:0;
-  height:auto;
+  --dialog-width:64rem;
+  width:min(var(--dialog-width),calc(100vw - 2rem));
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-width:0;min-inline-size:0;min-height:0;min-block-size:0;
+  height:min(38.5rem,calc(100dvh - 2rem));
+  block-size:min(38.5rem,calc(100dvh - 2rem));
+  max-height:calc(100dvh - 2rem);max-block-size:calc(100dvh - 2rem);
 }
 #dlg.user-modal>.user-canvas{
-  block-size:auto;
-  height:auto;
-  max-block-size:calc(100dvh - 2rem);
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
+  box-sizing:border-box;width:100%;height:100%;block-size:100%;
+  min-height:0;min-block-size:0;max-height:100%;max-block-size:100%;
+  display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto auto auto;
+  align-content:stretch;gap:0;overflow:hidden;
 }
 #dlg.user-modal .user-canvas-grid{
-  flex:0 1 auto;
-  min-height:0;
-  overflow:auto;
-  overscroll-behavior:contain;
-  align-content:start;
+  min-height:0;min-block-size:0;min-width:0;height:100%;
+  overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;
+  overscroll-behavior:contain;align-content:start;
 }
-#dlg.user-modal .user-canvas-foot{
-  flex:0 0 auto;
-  position:relative;
-  inset:auto;
-  margin-top:0;
-}
+#dlg.user-modal .user-canvas-foot{position:relative;inset:auto;margin-top:0}
 @media(max-width:760px){
-  #dlg.host-wide{
-    min-width:0;
-    min-inline-size:0;
-    width:calc(100vw - 1rem);
-    inline-size:calc(100vw - 1rem);
-    max-width:calc(100vw - 1rem);
-    max-inline-size:calc(100vw - 1rem);
+  #dlg.host-wide{min-width:0;min-inline-size:0;width:calc(100vw - 1rem);inline-size:calc(100vw - 1rem);max-width:calc(100vw - 1rem);max-inline-size:calc(100vw - 1rem)}
+  #dlg.user-modal{
+    width:calc(100vw - 1rem);inline-size:calc(100vw - 1rem);
+    height:min(38.5rem,calc(100dvh - 1rem));
+    block-size:min(38.5rem,calc(100dvh - 1rem));
+    max-height:calc(100dvh - 1rem);max-block-size:calc(100dvh - 1rem);
   }
-  #dlg.user-modal>.user-canvas{max-block-size:calc(100dvh - 1rem)}
 }
 
 /* XRAY STUDIO outer geometry belongs to the native dialog layer, not to the
