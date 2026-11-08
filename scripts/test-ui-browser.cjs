@@ -828,7 +828,9 @@ async function main() {
         assert(await scope.locator(card).count()>0,route+' requires a persisted fixture');
         const mode=scope.locator('[data-bulk-action="mode"]');
         assert(await mode.isVisible(),route+' must have bulk actions in its existing toolbar');
+        assert.match((await mode.innerText()).trim(),/^(Массовые действия|Bulk actions)$/);
         await mode.click();
+        assert.match((await mode.innerText()).trim(),/^(Завершить выбор|Finish selection)$/);
         const first=scope.locator(card+' [data-bulk-check]').first();
         assert(await first.isVisible(),route+' must expose a selection checkbox on each card');
         await first.check();
@@ -943,6 +945,23 @@ async function main() {
       }
     });
 
+    await checked('Hosts bulk actions stay within responsive toolbar bounds',async()=>{
+      for(const width of [1920,1366,1024,390]){
+        await page.setViewportSize({width,height:900});
+        await navigate('hosts');
+        const mode=page.locator('.host-directory-toolbar [data-bulk-action="mode"]');
+        await mode.click();
+        await page.locator('.host-card-grid [data-bulk-check]').first().check();
+        const g=await page.locator('.host-directory-toolbar').evaluate(el=>{
+          const t=el.getBoundingClientRect(),b=el.querySelector('[data-bulk-toolbar]').getBoundingClientRect();
+          return{toolbarLeft:t.left,toolbarRight:t.right,bulkLeft:b.left,bulkRight:b.right,overflow:document.documentElement.scrollWidth>innerWidth+1};
+        });
+        assert(!g.overflow,'Host bulk selection must not overflow page');
+        assert(g.bulkLeft>=g.toolbarLeft-1&&g.bulkRight<=g.toolbarRight+1,'Bulk controls stay inside toolbar at '+width);
+        await mode.click();
+      }
+    });
+
     await checked('Hosts toolbar: inline counters share a compact row on desktop',async()=>{
       for(const width of [1920,1366,1024,390]){
         await page.setViewportSize({width,height:900});
@@ -952,17 +971,18 @@ async function main() {
           const search=box(toolbar.querySelector('[data-host-search]'));
           const summary=box(toolbar.querySelector('.host-directory-summary'));
           const density=box(toolbar.querySelector('.nx-workspace-grid-controls'));
+          const bulk=box(toolbar.querySelector('[data-bulk-toolbar]'));
           const add=box(toolbar.querySelector('.nx-workspace-create'));
           const metrics=[...toolbar.querySelectorAll('.host-summary-metric')].map(box);
           const bar=box(toolbar);
-          return{bar,search,summary,density,add,metrics,overflow:document.documentElement.scrollWidth>innerWidth+1,
+          return{bar,search,summary,bulk,density,add,metrics,overflow:document.documentElement.scrollWidth>innerWidth+1,
             separate:!!document.querySelector('.host-directory > .host-directory-summary')};
         });
         assert.equal(result.separate,false,'Hosts stats must not make a second standalone surface');
         assert.equal(result.metrics.length,3,'All three host inventory counters must remain visible');
         assert(!result.overflow,'Toolbar counts must not create horizontal page overflow');
         assert(result.metrics.every(m=>m.width>0),'Host summary numbers must have visible widths');
-        for(const item of [result.search,result.summary,result.density,result.add])
+        for(const item of [result.search,result.summary,result.bulk,result.density,result.add])
           assert(item.x>=result.bar.x-1&&item.right<=result.bar.right+1,
             'Every toolbar control must fit within its framed surface');
         assert(Math.abs(result.search.mid-result.add.mid)<3,
@@ -970,6 +990,8 @@ async function main() {
         if(width>=1366){
           assert(Math.abs(result.search.mid-result.summary.mid)<3,
             'Desktop counts must share the same toolbar row as search');
+          assert(Math.abs(result.search.mid-result.bulk.mid)<3,
+            'Desktop bulk action trigger must share the leading toolbar row');
           assert(Math.abs(result.summary.mid-result.density.mid)<3,
             'Desktop density controls must stay on the same row as counters');
           assert(result.bar.height<=95,'Hosts desktop toolbar must not waste space on stacked metrics');

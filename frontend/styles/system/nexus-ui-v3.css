@@ -6,7 +6,7 @@
 /* Scoped panel features. The public subscription portal has its own document entrypoint. */
 @import url("../features/access/access.css?v=c9b134b8a0bd");
 @import url("../features/balancers/balancers.css?v=78e756c1e123");
-@import url("../features/hosts/hosts.css?v=fbe0bf466a1a");
+@import url("../features/hosts/hosts.css?v=4afca02e5042");
 @import url("../features/nodes/diagnostics.css?v=88108462f070");
 @import url("../features/nodes/node-dialogs.css?v=56d227cd5200");
 @import url("../features/nodes/node-editor.css?v=5a99df72a6ca");
@@ -345,7 +345,6 @@ html[data-motion=off] dialog[open]:not(#dlg){transform:none}
 #view .nx-bulk-check input:checked+.nx-bulk-check-face{border-color:var(--a);background:var(--a)}
 #view .nx-bulk-check input:checked+.nx-bulk-check-face::after{content:"";width:.43rem;height:.23rem;transform:translateY(-.08rem) rotate(-45deg);border-left:2px solid var(--nx-dialog-bg);border-bottom:2px solid var(--nx-dialog-bg)}
 #view :is(.nc,.host-card,.squad-card,.template-card,.balancer-card).nx-bulk-selected{border-color:color-mix(in srgb,var(--a) 64%,var(--nx-border));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 18%,transparent)}
-#view .host-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:auto;justify-self:start}
 #view .templates-workspace .template-section-tools>.nx-bulk-toolbar{flex:0 0 auto}
 #view .balancer-toolbar>.nx-bulk-toolbar{margin-inline-start:0}
 #view .users-toolbar #bulk{display:none;grid-column:1/-1;position:static;inset:auto;transform:none;z-index:auto;justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:.4rem;width:100%;max-width:100%;min-width:0;margin:0;padding:.5rem;border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);background:var(--nx-section-bg);box-shadow:none}
@@ -353,7 +352,6 @@ html[data-motion=off] dialog[open]:not(#dlg){transform:none}
 #view .users-toolbar #bulk button{min-height:var(--nx-control-h-sm)}
 @media(max-width:760px){
  #view .nx-bulk-toolbar{flex:1 1 100%;order:3}
- #view .host-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:4}
  #view .nx-bulk-actions-menu{inset-inline-start:auto;inset-inline-end:0}
 }
 

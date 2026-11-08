@@ -119,7 +119,7 @@
   bar.hidden=!show;
   if(!show)return;
   bar.innerHTML='<button type="button" class="gh sm nx-bulk-mode" data-bulk-action="mode" aria-pressed="'+st.mode+'"'+(st.busy?' disabled':'')+'>'+
-   (st.mode?trans('Готово','Done'):trans('Выбрать','Select'))+'</button>'+
+   (st.mode?trans('Завершить выбор','Finish selection'):trans('Массовые действия','Bulk actions'))+'</button>'+
    (st.mode?'<span class="nx-bulk-count" aria-live="polite">'+trans('Выбрано: ','Selected: ')+n+'</span>'+
     '<button type="button" class="gh sm nx-bulk-select-all" data-bulk-action="all"'+(st.busy?' disabled':'')+'>'+trans('Все видимые','All visible')+'</button>'+
     '<button type="button" class="gh sm nx-bulk-clear" data-bulk-action="clear"'+(!n||st.busy?' disabled':'')+'>'+trans('Снять выбор','Clear')+'</button>'+
