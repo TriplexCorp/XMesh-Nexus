@@ -41,7 +41,8 @@ root.querySelector=selector=>elements.get(selector)||element(selector);
 root.contains=target=>target?.insideMenu!==false;
 for(const selector of [
  '[data-panel-version-trigger]','[data-panel-version-menu]',
- '[data-panel-version-heading]','[data-panel-version-number]',
+ '[data-panel-version-heading]','[data-panel-version-close]',
+ '[data-panel-version-installed]','[data-panel-version-number]',
  '[data-panel-version-revision]','[data-panel-version-check]',
  '[data-panel-version-status]','[data-panel-version-update]',
  '[data-panel-version-update-status]','[data-panel-version-reload]',
@@ -95,7 +96,8 @@ async function run(){
  element('[data-panel-version-update]').click();
  await tick();
  assert.equal(requests,1);
- assert.equal(element('[data-panel-version-update-status]').textContent,'Системный updater готов к запросу.','Cancellation must not report queue');
+ assert.equal(element('[data-panel-version-update-status]').textContent,'','Cancelled requests must not show a false progress message');
+ assert.equal(element('[data-panel-version-menu]').dataset.actionMode,'update','Cancellation keeps the available update action');
  approved=true;
  element('[data-panel-version-update]').click();
  // The shared confirmation dialog is outside the dropdown in the DOM.
@@ -103,19 +105,22 @@ async function run(){
  assert.equal(element('[data-panel-version-menu]').hidden,false,'Owner confirmation must not dismiss the status popover');
  await tick();
  assert.equal(requests,2);
- assert.equal(element('[data-panel-version-update]').disabled,true,'Queued upgrade prevents duplicate request');
- assert.equal(element('[data-panel-version-update-status]').dataset.state,'queued');
- assert.notEqual(element('[data-panel-version-update-status]').dataset.state,'success','HTTP 202 is not deployment');
+ assert.equal(element('[data-panel-version-update]').hidden,true,'Queued upgrade hides the unusable update action');
+ assert.equal(element('[data-panel-version-status]').dataset.state,'queued');
+ assert.notEqual(element('[data-panel-version-status]').dataset.state,'success','HTTP 202 is not deployment');
  assert.equal(timers.size,1,'Queue should be polled while menu is open');
  server={status:'running'};
  [...timers.values()][0]();
  await tick();
- assert.equal(element('[data-panel-version-update-status]').dataset.state,'running');
- assert.equal(element('[data-panel-version-update]').disabled,true);
+ assert.equal(element('[data-panel-version-status]').dataset.state,'running');
+ assert.equal(element('[data-panel-version-update]').hidden,true);
  server={status:'success'};
  [...timers.values()][0]();
  await tick();
  assert.equal(element('[data-panel-version-reload]').hidden,false);
+ assert.equal(element('[data-panel-version-update]').hidden,true,'Old update action must disappear on completion');
+ assert.equal(element('[data-panel-version-menu]').dataset.actionMode,'reload','Reload becomes the primary action');
+ assert.equal(element('[data-panel-version-status]').dataset.state,'success');
  assert.equal(timers.size,0,'Stop polling once completed');
  element('[data-panel-version-reload]').click();
  assert.equal(reloads,1);
@@ -129,7 +134,8 @@ async function run(){
  await tick();
  element('[data-panel-version-check]').click();
  await tick();
- assert.equal(element('[data-panel-version-update]').disabled,true,'Missing host updater disables installation');
+ assert.equal(element('[data-panel-version-update]').hidden,true,'Missing updater must not display an unusable update action');
+ assert.equal(element('[data-panel-version-settings]').hidden,false,'Settings fallback must remain visible');
  console.log('Panel version popover: owner gate, cancel, queue, polling, success, unavailable and reload passed');
 }
 run().catch(error=>{console.error(error);process.exitCode=1});
