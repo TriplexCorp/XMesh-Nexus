@@ -319,3 +319,40 @@ html[data-motion=off] dialog[open]:not(#dlg){transform:none}
   dialog:not(#dlg),dialog:not(#dlg)::backdrop{animation:none!important;transition:none!important}
   dialog[open]:not(#dlg){transform:none}
 }
+
+/* Shared bulk-selection surface. It participates in existing catalogue
+ * toolbars and inherits the active appearance/material/density tokens. */
+#view .nx-bulk-toolbar{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:.35rem;min-width:0;max-width:100%;margin:0;position:relative}
+#view .nx-bulk-toolbar[hidden]{display:none}
+#view .nx-bulk-toolbar .gh{min-height:var(--nx-control-h-sm);font-size:.75rem;white-space:nowrap}
+#view .nx-bulk-toolbar .nx-bulk-mode{border-color:color-mix(in srgb,var(--a) 28%,var(--nx-border))}
+#view .nx-bulk-toolbar .nx-bulk-mode[aria-pressed=true]{background:color-mix(in srgb,var(--a) 12%,var(--nx-control-bg));color:var(--tx)}
+#view .nx-bulk-count{font-size:.75rem;font-weight:750;color:var(--tx);white-space:nowrap;font-variant-numeric:tabular-nums}
+#view .nx-bulk-draft{font-size:.7rem;color:var(--mu)}
+#view .nx-bulk-actions{position:relative}
+#view .nx-bulk-actions>summary{display:inline-flex;align-items:center;gap:.4rem;list-style:none;cursor:pointer}
+#view .nx-bulk-actions>summary::-webkit-details-marker{display:none}
+#view .nx-bulk-actions>summary[aria-disabled=true]{opacity:.5;pointer-events:none}
+#view .nx-bulk-actions-menu{position:absolute;inset-inline-start:0;top:calc(100% + .4rem);z-index:40;display:grid;gap:.2rem;padding:.3rem;min-width:10rem;border:1px solid var(--nx-border);border-radius:var(--ui-radius);background:var(--nx-dialog-bg);box-shadow:var(--nx-panel-shadow)}
+#view .nx-bulk-actions-menu>button{display:flex;align-items:center;width:100%;padding:.48rem .62rem;border:0;border-radius:var(--ui-control-radius);background:transparent;color:var(--tx);font:inherit;font-size:.78rem;text-align:start;cursor:pointer}
+#view .nx-bulk-actions-menu>button:hover:not(:disabled){background:var(--nx-selected-bg)}
+#view .nx-bulk-actions-menu>button.is-danger{color:var(--er)}
+#view .nx-bulk-actions-menu>button:focus-visible,#view .nx-bulk-check input:focus-visible+.nx-bulk-check-face{outline:2px solid var(--nx-focus);outline-offset:2px}
+#view .nx-bulk-check{display:none;align-items:center;justify-content:center;flex:0 0 1.42rem;width:1.42rem;height:1.42rem;position:relative;cursor:pointer}
+#view .nx-bulk-selecting .nx-bulk-check{display:inline-flex}
+#view .nx-bulk-check input{position:absolute;inset:0;opacity:0;margin:0;width:100%;height:100%;cursor:pointer}
+#view .nx-bulk-check-face{display:grid;place-items:center;width:1.05rem;height:1.05rem;border:1px solid var(--nx-border-strong);border-radius:calc(var(--ui-control-radius)*.45);background:var(--nx-control-bg)}
+#view .nx-bulk-check input:checked+.nx-bulk-check-face{border-color:var(--a);background:var(--a)}
+#view .nx-bulk-check input:checked+.nx-bulk-check-face::after{content:"";width:.43rem;height:.23rem;transform:translateY(-.08rem) rotate(-45deg);border-left:2px solid var(--nx-dialog-bg);border-bottom:2px solid var(--nx-dialog-bg)}
+#view :is(.nc,.host-card,.squad-card,.template-card,.balancer-card).nx-bulk-selected{border-color:color-mix(in srgb,var(--a) 64%,var(--nx-border));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 18%,transparent)}
+#view .host-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:auto;justify-self:start}
+#view .templates-workspace .template-section-tools>.nx-bulk-toolbar{flex:0 0 auto}
+#view .balancer-toolbar>.nx-bulk-toolbar{margin-inline-start:0}
+#view .users-toolbar #bulk{display:none;grid-column:1/-1;position:static;inset:auto;transform:none;z-index:auto;justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:.4rem;width:100%;max-width:100%;min-width:0;margin:0;padding:.5rem;border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);background:var(--nx-section-bg);box-shadow:none}
+#view .users-toolbar #bulk.on{display:flex;transform:none}
+#view .users-toolbar #bulk button{min-height:var(--nx-control-h-sm)}
+@media(max-width:760px){
+ #view .nx-bulk-toolbar{flex:1 1 100%;order:3}
+ #view .host-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:4}
+ #view .nx-bulk-actions-menu{inset-inline-start:auto;inset-inline-end:0}
+}
