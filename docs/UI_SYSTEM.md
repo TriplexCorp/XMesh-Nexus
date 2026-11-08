@@ -486,6 +486,13 @@ in individual feature CSS.
   material, density, focus, radius and control tokens from the system CSS.
   Feature CSS may adjust only each collection's card geometry and responsive
   reflow.
+- Hosts places its **real persisted inventory counts** (total, active, disabled)
+  directly between search and density controls inside the **same toolbar**.
+  These are noninteractive compact inline values, not a second full-width
+  summary card. At desktop widths the search, counts, density and create button
+  share one horizontal row; at narrow widths they reflow *inside that same
+  framed toolbar* without clipping or horizontal document overflow.
+  Filtering affects only visible Host cards and match count, not these totals.
 - All collection toolbars keep the search **first/left** and the create action
   **last/right**. Create actions use an accent icon tile nested inside a quiet
   outlined control; no unrelated feature-specific bright button variants.
