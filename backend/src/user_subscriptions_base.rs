@@ -1033,7 +1033,7 @@ fn add_subscription_profile_headers(response: &mut Response, settings: &Value) {
 }
 
 fn subscription_gb_to_bytes(gb: f64) -> u64 {
-    crate::gb_to_bytes_i64(gb) as u64
+    u64::try_from(crate::gb_to_bytes_i64(gb)).unwrap_or(0)
 }
 
 pub async fn serve(
