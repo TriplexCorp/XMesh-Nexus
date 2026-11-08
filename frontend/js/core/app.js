@@ -4864,12 +4864,13 @@ async function setP(){
     <aside class="settings-center-rail" aria-label="Разделы настроек">
       <nav class="settings-center-nav" aria-label="Разделы настроек">${navigation}</nav>
     </aside>
-    <div class="settings-center-main" id="settings-subpage" data-settings-section="${settingsPage}" data-single="${selected.length===1}">
+    <div class="settings-center-main" id="settings-subpage" data-settings-section="${settingsPage}" data-single="${activeCards.length<=1}">
       ${settingsPage==='security'?'':`<header class="settings-center-heading"><div><h2>${title}</h2><p>${description}</p></div></header>`}
+      ${focusMarkup}
       ${embedded?`<div class="settings-center-embedded" data-settings-group="${settingsPage}">${embedded[0]}</div>`:`
-      <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${selected.length===1}">
-        <div class="appearance-column workspace-stack">${columns[0].join('')}</div>
-        ${columns[1].length?'<div class="appearance-column workspace-stack">'+columns[1].join('')+'</div>':''}
+      <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${activeCards.length<=1}">
+        <div class="appearance-column workspace-stack" ${activeColumns[0]?'':'hidden'}>${columns[0].join('')}</div>
+        ${columns[1].length?'<div class="appearance-column workspace-stack" '+(activeColumns[1]?'':'hidden')+'>'+columns[1].join('')+'</div>':''}
       </div>`}
     </div></div></div>`,embedded?.[1]];
 }
