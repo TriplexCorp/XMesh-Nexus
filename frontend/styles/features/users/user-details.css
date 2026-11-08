@@ -1689,3 +1689,39 @@ dialog.user-modal .user-pane {
   #dlg.user-modal .user-editor-tabs [role=tab]{padding:.43rem .55rem}
   #dlg.user-modal .user-canvas-grid{padding-block:.5rem}
 }
+
+/* Overview identity/usage compact alignment.
+ * Keep the traffic summary and Xray ID on the same balanced desktop row;
+ * on phones they stack without moving the dialog frame. */
+#dlg.user-modal .user-overview-band{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,22rem);
+  align-items:center;
+  column-gap:.85rem;
+  row-gap:.3rem;
+}
+#dlg.user-modal .user-overview-band>.user-usage-line:first-child{
+  grid-column:1;
+  grid-row:1;
+  align-self:center;
+}
+#dlg.user-modal .user-overview-band>.user-identity-row{
+  grid-column:2;
+  grid-row:1;
+  width:100%;
+  min-width:0;
+  align-self:center;
+}
+#dlg.user-modal .user-overview-band>.user-usage-track{
+  grid-column:1/-1;
+  grid-row:2;
+}
+#dlg.user-modal .user-overview-band>.user-usage-line:not(:first-child){
+  grid-column:1/-1;
+  grid-row:3;
+}
+@media(max-width:760px){
+  #dlg.user-modal .user-overview-band{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-modal .user-overview-band>.user-identity-row{grid-column:1;grid-row:3}
+  #dlg.user-modal .user-overview-band>.user-usage-line:not(:first-child){grid-column:1;grid-row:4}
+}
