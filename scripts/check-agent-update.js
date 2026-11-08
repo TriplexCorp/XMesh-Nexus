@@ -154,6 +154,20 @@ assert.doesNotMatch(nodeDialogs,/runtime\.version[^\n]{0,120}(?:match|test)\(/,
 assert.match(nodeDialogs,/No client-side version allow-list/,
   'The backend-authoritative capability contract must remain explicit');
 
+
+/* Single and bulk Agent updates must share the signed backend command, with
+ * per-node locking, bounded concurrency and no browser-side version gate. */
+const bulkActions=originalReadFileSync('frontend/js/features/users/workspace-bulk-actions.js','utf8');
+new Function(bulkActions);
+assert.match(nodeDialogs,/window\.XMeshNodeAgentOps=Object\.freeze/);
+assert.match(nodeDialogs,/pendingAgentUpdates\.has\(id\)/);
+assert.match(nodeDialogs,/updateOne:\(id,options\)=>updateOneAgent/);
+assert.match(bulkActions,/actions:\['enable','disable','agent-update','delete'\]/);
+assert.match(bulkActions,/'agent-update':trans\('Обновить Agent','Update Agent'\)/);
+assert.match(bulkActions,/Math\.min\(2,items\.length\)/);
+assert.match(bulkActions,/await ops\.updateOne\(Number\(item\.id\)/);
+assert.match(bulkActions,/const search=toolbar\.querySelector/);
+
 console.log(`Mandatory Agent version policy: ${agentVersionRaw} OK`);
 console.log('Manifest-bound Agent lost-response retry source contract: OK');
 console.log('Backend-authoritative Agent update validation: OK');
