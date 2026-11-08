@@ -102,12 +102,13 @@
 .squad-directory-toolbar>.nx-workspace-create{grid-column:5;grid-row:1;justify-self:end}
 @media(max-width:1100px){
  .squad-directory-toolbar.squad-directory-toolbar{
-   grid-template-columns:minmax(0,1fr) max-content max-content max-content
+   grid-template-columns:minmax(0,1fr) max-content
  }
- .squad-directory-toolbar>.nx-bulk-toolbar{grid-column:2;grid-row:1;justify-self:start}
- .squad-directory-toolbar>.nx-workspace-grid-controls{grid-column:3;grid-row:1}
- .squad-directory-toolbar>.nx-workspace-create{grid-column:4;grid-row:1}
- .squad-directory-toolbar>.nx-directory-toolbar-note{grid-column:1/-1;grid-row:2}
+ .squad-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
+ .squad-directory-toolbar>.nx-workspace-create{grid-column:2;grid-row:1}
+ .squad-directory-toolbar>.nx-bulk-toolbar{grid-column:1;grid-row:2;justify-self:start}
+ .squad-directory-toolbar>.nx-workspace-grid-controls{grid-column:2;grid-row:2;justify-self:end}
+ .squad-directory-toolbar>.nx-directory-toolbar-note{grid-column:1/-1;grid-row:3}
 }
 @media(max-width:680px){
  .squad-directory-toolbar.squad-directory-toolbar{grid-template-columns:minmax(0,1fr) max-content}
@@ -117,3 +118,13 @@
  .squad-directory-toolbar>.nx-workspace-grid-controls{grid-column:1/-1;grid-row:3;justify-self:start}
  .squad-directory-toolbar>.nx-directory-toolbar-note{grid-column:1/-1;grid-row:4}
 }
+
+
+/* The selection checkbox is the first grid child. Explicitly reserve its
+ * track and hide per-card editing while selecting; otherwise the old
+ * three-track header pushes the Edit button outside the viewport at 768px. */
+#view .squad-directory.nx-bulk-selecting .squad-card-head{grid-template-columns:1.42rem 2.7rem minmax(0,1fr);gap:.5rem}
+#view .squad-directory.nx-bulk-selecting .squad-card-head-actions{display:none}
+#view .squad-directory.nx-bulk-selecting .squad-card-head>.nx-bulk-check{grid-column:1;grid-row:1}
+#view .squad-directory.nx-bulk-selecting .squad-card-head>.squad-card-emblem{grid-column:2;grid-row:1}
+#view .squad-directory.nx-bulk-selecting .squad-card-head>.squad-card-identity{grid-column:3;grid-row:1}
