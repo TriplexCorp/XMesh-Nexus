@@ -84,6 +84,12 @@ const render=factory(api,DB,icon,escape,[
  mount();
  assert.equal(counter.textContent,'');
  assert.match(html,/role="tablist"/);
+ assert.match(html,/class="template-section-tools nx-workspace-toolbar"[^>]*><nav class="templates-tabs"/,
+   'Type tabs must live inside the active collection toolbar');
+ assert.doesNotMatch(html,/data-ui-page="templates"><nav class="templates-tabs"/,
+   'There must be no standalone type-tab row above the toolbar');
+ assert.equal((html.match(/class="templates-tabs"/g)||[]).length,1,
+   'Exactly one tablist must exist even when both collections have records');
  assert.doesNotMatch(html,/templates-kicker|templates-heading-actions/);
  queryInput.value='Премиум';
  callbacks.input({target:{closest:selector=>selector==='[data-template-search]'?queryInput:null}});

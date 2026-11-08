@@ -498,6 +498,13 @@ in individual feature CSS.
   share one horizontal row; at narrow widths they reflow *inside that same
   framed toolbar* without clipping or horizontal document overflow.
   Filtering affects only visible Host cards and match count, not these totals.
+- Templates places **User templates / Subscription drafts** tabs (including
+  their real counts) inside the same collection toolbar as search, grid density
+  and the one active create button. Never render a separate tab row above the
+  toolbar. A single accessible tablist moves between the two real collection
+  panels when changing type, preserving search text per type, focus and CRUD.
+  On narrow viewports, controls may wrap *within the same toolbar surface*,
+  never adding a second framed summary/navigation surface.
 - All collection toolbars keep the search **first/left** and the create action
   **last/right**. Create actions use an accent icon tile nested inside a quiet
   outlined control; no unrelated feature-specific bright button variants.

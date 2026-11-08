@@ -136,3 +136,57 @@
 @media(max-width:680px){
  .template-section-tools>.nx-workspace-actions{margin-left:0;width:100%;justify-content:space-between}
 }
+
+/* One catalog toolbar: type tabs, search and actions share a single surface.
+   The tablist is moved between panels rather than duplicated on tab changes. */
+.templates-workspace .template-section-tools{
+  display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;
+  gap:clamp(.5rem,.8vw,.9rem);min-width:0;
+  padding:clamp(.45rem,.7vw,.7rem);
+  border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);
+  background:var(--nx-panel-bg);box-shadow:var(--nx-panel-shadow)
+}
+.templates-workspace .template-section-tools>.templates-tabs{
+  display:flex;align-items:center;gap:.18rem;flex:0 0 auto;
+  min-width:0;padding:0;margin:0;border:0;white-space:nowrap
+}
+.templates-workspace .templates-tabs [role=tab]{
+  display:inline-flex;align-items:center;gap:.45rem;
+  min-height:var(--nx-control-h-sm);
+  padding:.4rem .6rem;
+  font-size:.77rem;line-height:1.25
+}
+.templates-workspace .templates-tabs [role=tab]>span{
+  display:inline-grid;place-items:center;min-width:1.2rem;
+  font-size:.69rem;line-height:1.25;font-variant-numeric:tabular-nums
+}
+.templates-workspace .template-section-tools>.template-search{
+  flex:0 1 19rem;width:100%;max-width:19rem;min-width:9rem
+}
+.templates-workspace .template-section-tools>.nx-workspace-actions{
+  flex:0 0 auto;min-width:0;margin-left:auto
+}
+.templates-workspace .template-section-tools>.template-filter-count{
+  flex:0 0 auto;min-width:0
+}
+@media(max-width:1000px){
+  .templates-workspace .template-section-tools{flex-wrap:wrap}
+  .templates-workspace .template-section-tools>.template-search{flex:1 1 12rem;max-width:none}
+}
+@media(max-width:680px){
+  .templates-workspace .template-section-tools>.templates-tabs{order:0}
+  .templates-workspace .template-section-tools>.nx-workspace-actions{
+    order:1;flex:0 1 auto;width:auto;margin-left:auto
+  }
+  .templates-workspace .template-section-tools>.template-search{
+    order:2;flex:1 1 100%;min-width:0;max-width:none
+  }
+  .templates-workspace .template-section-tools>.template-filter-count{order:3}
+}
+@media(max-width:520px){
+  .templates-workspace .template-section-tools>.templates-tabs{flex:1 1 100%}
+  .templates-workspace .template-section-tools>.nx-workspace-actions{
+    width:100%;margin-left:0;justify-content:space-between
+  }
+  .templates-workspace .template-section-tools>.template-search{order:1}
+}
