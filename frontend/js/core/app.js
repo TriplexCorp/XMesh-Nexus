@@ -1087,7 +1087,7 @@ const view=()=>{
   applyFilter();
   window.XMeshBulk?.mount(root.closest('.balancer-workspace'));
  };
- const read=()=>[...$('.balancer-editor')].map((row,i)=>{
+ const read=()=>[...document.querySelectorAll('.balancer-editor')].map((row,i)=>{
   const get=name=>row.querySelector('[data-balancer-field="'+name+'"]');
   const source=[...row.querySelectorAll('[data-balancer-source]:checked')].map(el=>el.dataset.balancerSource);
   const obs={probeInterval:get('probeInterval').value.trim(),probeTimeout:get('probeTimeout').value.trim(),
