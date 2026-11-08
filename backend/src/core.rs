@@ -806,14 +806,15 @@ mod tests {
         server.extend_from_slice(&[42_u8; 32]);
         server.extend_from_slice(&[0_u8, 40_u8]);
         server.extend_from_slice(&ech_config);
-        let output = format!("ECH config list: \\n{}\\nECH server keys: \\n{}\\n", STANDARD.encode(&config), STANDARD.encode(&server));
+        let output = format!("ECH config list: \n{}\nECH server keys: \n{}\n", STANDARD.encode(&config), STANDARD.encode(&server));
         let result = parse_ech_output(&output).unwrap();
         assert_eq!(result["echConfigList"], STANDARD.encode(config));
         assert_eq!(result["echServerKeys"], STANDARD.encode(&server));
-        server[server.len() - 1] ^= 1;
-        let corrupt = format!("ECH config list: \\n{}\\nECH server keys: \\n{}\\n", result["echConfigList"].as_str().unwrap(), STANDARD.encode(server));
+        let last = server.len() - 1;
+        server[last] ^= 1;
+        let corrupt = format!("ECH config list: \n{}\nECH server keys: \n{}\n", result["echConfigList"].as_str().unwrap(), STANDARD.encode(server));
         assert!(parse_ech_output(&corrupt).is_err());
-        assert!(parse_ech_output("ECH config list: \\nnot-base64").is_err());
+        assert!(parse_ech_output("ECH config list: \nnot-base64").is_err());
     }
 
     #[test]
