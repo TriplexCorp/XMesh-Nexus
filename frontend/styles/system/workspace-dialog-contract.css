@@ -169,6 +169,7 @@ dialog#dlg.user-modal>.user-canvas{
 }
 
 #dlg.user-modal .user-canvas-grid{
+  box-sizing:border-box;
   min-height:0;
   min-block-size:0;
   min-width:0;
