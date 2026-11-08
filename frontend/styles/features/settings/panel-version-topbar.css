@@ -44,10 +44,24 @@
   color:inherit;font:inherit;font-size:.8rem;font-weight:740;
   text-decoration:none;text-align:center;cursor:pointer;
 }
-.top-panel-version-actions button:hover,
+.top-panel-version-actions [hidden]{display:none!important}
+.top-panel-version-actions [data-panel-version-update]{
+  background:var(--nx-accent,var(--ac));color:var(--btn-text,#071b15);
+  border-color:transparent;
+}
+.top-panel-version-actions [data-panel-version-update]:hover{filter:brightness(1.06)}
+.top-panel-version-actions [data-panel-version-reload]{border-color:var(--nx-accent,var(--ac))}
+.top-panel-version-actions button:hover:not([data-panel-version-update]),
 .top-panel-version-actions a:hover{background:var(--nx-hover-bg)}
 .top-panel-version-actions button:disabled{opacity:.6;cursor:progress}
 .top-panel-version-actions a{border-color:var(--nx-accent,var(--ac))}
+.top-panel-version-update-status{
+  margin:0;font-size:.73rem;line-height:1.5;color:var(--nx-muted);
+}
+.top-panel-version-update-status:empty{display:none}
+.top-panel-version-update-status[data-state=success]{color:var(--ok)}
+.top-panel-version-update-status[data-state=failed],
+.top-panel-version-update-status[data-state=unavailable]{color:var(--wr,var(--nx-muted))}
 .top-panel-version-caption{margin:0;color:var(--nx-muted);font-size:.68rem;line-height:1.5}
 @media(max-width:1100px){
  .top-panel-version-trigger{padding:.4rem .55rem}
