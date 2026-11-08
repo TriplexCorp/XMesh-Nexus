@@ -191,7 +191,8 @@ async function main() {
       try{
         await trigger.click();
         await menu.waitFor({state:'visible'});
-        await page.locator('[data-panel-version-check]').click();
+        // Opening the version menu initiates a read-only check automatically.
+        // Wait for the result instead of racing the temporary disabled button.
         await page.waitForFunction(()=>{
           const panel=document.querySelector('[data-panel-version-menu]');
           return panel?.dataset.actionMode==='update'&&!panel.querySelector('[data-panel-version-update]').hidden;
@@ -203,6 +204,25 @@ async function main() {
         assert.equal(updateAction.disabled,false,'An available update must have an enabled primary action');
         assert.notEqual(updateAction.background,updateAction.color,'Primary update text must contrast with the background');
 
+        // An old success marker after a fresh page load is NOT this page's
+        // completed request. The next update must remain available.
+        await page.evaluate(()=>{window.__versionUpdaterStage='success'});
+        await close.click();
+        await trigger.click();
+        await page.waitForFunction(()=>document.querySelector('[data-panel-version-menu]')?.dataset.actionMode==='update');
+        assert.equal(await page.locator('[data-panel-version-update]').isVisible(),true,
+          'Stale success must not hide another confirmed upgrade');
+        assert.equal(await page.locator('[data-panel-version-reload]').isVisible(),false,
+          'A previous update must not permanently demand a browser reload');
+        assert.equal(await page.locator('[data-panel-version-check]').isVisible(),true,
+          'A persisted success must allow checking for newer updates');
+
+        // A queued/running update witnessed in the same page does require a
+        // reload when the host worker subsequently reports completion.
+        await page.evaluate(()=>{window.__versionUpdaterStage='queued'});
+        await close.click();
+        await trigger.click();
+        await page.waitForFunction(()=>document.querySelector('[data-panel-version-status]')?.dataset.state==='queued');
         await page.evaluate(()=>{window.__versionUpdaterStage='success'});
         await close.click();
         await trigger.click();

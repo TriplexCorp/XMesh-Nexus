@@ -35,6 +35,7 @@ window.XMeshI18n=(()=>{
     "Обновить XMesh Nexus из origin/main? Сначала будет создана резервная копия PostgreSQL, затем выполнятся пересборка Docker и перезапуск панели.":"Update XMesh Nexus from origin/main? A PostgreSQL backup will be created before Docker is rebuilt and the panel restarted.",
     "Начать обновление":"Start update",
     "Проверка сравнивает установленную сборку с main.":"The installed build is compared against main.",
+    "Предыдущее обновление завершено. Проверяем наличие новых версий.":"The previous update completed. Checking for newer versions.",
     "Проверка и запуск обновления доступны владельцу панели.":"Only the owner can check for and install updates.",
     "Запуск обновления…":"Queueing update…",
     "Системный updater готов к запросу.":"System updater is ready.",

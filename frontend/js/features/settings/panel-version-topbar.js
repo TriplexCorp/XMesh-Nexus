@@ -20,6 +20,10 @@
 
   let owner=false,installed=null,checked=null,checking=false,open=false;
   let systemState=null,systemError='',requesting=false,readingState=false,watch=null;
+  // The host keeps its last terminal result in a status marker across browser
+  // reloads and later upgrades. Only a request observed in THIS page lifetime
+  // may turn "success" into an instruction to reload this page.
+  let observedUpdate=false;
   const labels={
     ru:{
       title:'Версия панели',check:'Проверить обновления',checking:'Проверка GitHub…',
@@ -35,6 +39,7 @@
       reload:'Перезагрузить страницу',idle:'Системный updater готов к запросу.',
       queued:'Запрос принят в очередь системного updater.',running:'Обновление выполняется на сервере. Связь может прерваться.',
       success:'Системный updater завершил работу. Перезагрузите страницу и проверьте новую сборку.',
+      previousSuccess:'Предыдущее обновление завершено. Проверяем наличие новых версий.',
       failed:'Ошибка установки. Проверьте системный журнал обновления.',
       updaterUnavailable:'Системный updater недоступен. Проверьте xmesh-panel-update.path на хосте.',
       reconnect:'Нет связи с API во время обновления. Повторная проверка будет выполнена автоматически.'
@@ -53,6 +58,7 @@
       reload:'Reload page',idle:'System updater is ready.',
       queued:'Update request queued for the host updater.',running:'Update running on the host. Connection may be interrupted.',
       success:'The host updater finished. Reload to verify the installed build.',
+      previousSuccess:'The previous update completed. Checking for newer versions.',
       failed:'Update failed. Inspect the host updater logs.',
       updaterUnavailable:'Host updater is unavailable. Check xmesh-panel-update.path.',
       reconnect:'Cannot reach the API during the update. Status will be checked again.'
@@ -87,15 +93,19 @@
 
     const stage=systemState?.status||'idle';
     const busy=active()||requesting;
-    const successful=stage==='success';
+    const successful=stage==='success'&&observedUpdate;
+    // A persisted "success" is not a lock on all future upgrades. GitHub's
+    // read-only ancestry check remains the authority on update availability;
+    // the host API still rejects queued/running duplicates.
     const available=owner&&checked?.status==='update_available'&&!successful;
-    const canUpdate=available&&!checking&&!readingState&&!busy&&stage!=='unavailable'&&
-      stage!=='success'&&systemState!==null;
+    const canUpdate=available&&!checking&&!readingState&&!busy&&
+      stage!=='unavailable'&&systemState!==null;
     const displayState=successful?'success':busy?(requesting?'queued':stage):
       checked?.status||'idle';
     const message=successful?words.success:
       busy?(requesting?words.updating:words[stage]||words.running):
-      checked?(words[checked.status]||words.unverifiable):words.waiting;
+      checked?(words[checked.status]||words.unverifiable):
+      stage==='success'?words.previousSuccess:words.waiting;
 
     status.textContent=message;
     status.dataset.state=displayState;
@@ -132,7 +142,12 @@
     trigger.setAttribute('aria-expanded',String(open));
     if(open){
       render();
-      if(owner)void loadUpdateState();
+      if(owner){
+        void loadUpdateState();
+        // On a fresh page the worker may still say "success" from the last
+        // deployment. Always allow a new version check to re-enable updating.
+        if(!checked&&!checking)void checkUpdates();
+      }
     }else{
       stopWatch();
     }
@@ -146,7 +161,7 @@
     stopWatch();
     owner=user?.role==='owner';
     installed=null;checked=null;systemState=null;systemError='';
-    requesting=false;checking=false;readingState=false;
+    requesting=false;checking=false;readingState=false;observedUpdate=false;
     root.hidden=false;
     render();
     try{
@@ -171,6 +186,7 @@
     try{
       const result=await bridge.status();
       systemState=result&&typeof result.status==='string'?result:{status:'unavailable'};
+      if(active())observedUpdate=true;
       systemError='';
     }catch(error){
       // The active updater can restart the API: do not misreport it as failed.
@@ -207,6 +223,8 @@
       if(!result?.cancelled){
         // HTTP 202 means queued, NOT installed. Only the host status endpoint
         // can report success. Never claim deployment on a POST response.
+        observedUpdate=true;
+        checked=null;
         systemState={status:'queued'};
         watchProgress();
         void loadUpdateState();
