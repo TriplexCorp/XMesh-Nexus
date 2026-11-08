@@ -356,3 +356,6 @@ html[data-motion=off] dialog[open]:not(#dlg){transform:none}
  #view .host-directory-toolbar>.nx-bulk-toolbar{grid-column:1/-1;grid-row:4}
  #view .nx-bulk-actions-menu{inset-inline-start:auto;inset-inline-end:0}
 }
+
+/* Keep the unified toolbar inside its surface before it must overflow. */
+#view .templates-workspace .template-section-tools{flex-wrap:wrap}
