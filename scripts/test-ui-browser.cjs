@@ -379,6 +379,19 @@ async function main() {
 
     await checked('Router: leaving Settings never traps global navigation until reload',async()=>{
       await page.setViewportSize({width:1440,height:900});
+      // Enter Settings through the actual global navigation and immediately
+      // leave again, reproducing the report without a browser refresh.
+      await navigate('users');
+      await page.locator('#nav a[href="#set"]').click();
+      await page.waitForFunction(()=>
+        location.hash==='#set'&&
+        document.querySelector('#settings-subpage')?.dataset.settingsSection==='general'&&
+        document.querySelector('#view')?.dataset.page==='set');
+      await page.locator('#nav a[href="#users"]').click();
+      await page.waitForFunction(()=>
+        location.hash==='#users'&&
+        document.querySelector('#view')?.dataset.page==='users'&&
+        !document.querySelector('#settings-subpage')&&!document.querySelector('#view .sk'));
       // Exercise a real sidebar click, not navigate() (which uses page.goto
       // and can conceal a broken hashchange-only route transition).
       for(const [from,destination,selector] of [
