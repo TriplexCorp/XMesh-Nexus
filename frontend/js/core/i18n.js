@@ -15,6 +15,19 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Лимит CDN, ГБ": "CDN limit, GB",
+    "CDN-трафик": "CDN traffic",
+    "CDN-трафик · весь узел": "CDN traffic · entire node",
+    "CDN-трафик · выбранные inbound": "CDN traffic · selected inbounds",
+    "Основной · вне CDN-квоты": "Main · outside CDN quota",
+    "CDN ·": "CDN ·",
+    "Обновления, Xray-core и CDN-квоты": "Updates, Xray-core and CDN quotas",
+    "Глобальные CDN-inbound": "Global CDN inbounds",
+    "Правила CDN сохранены. Доступ изменится при синхронизации узлов.": "CDN rules saved. Access changes on node sync.",
+    "Сохранить правила CDN": "Save CDN rules",
+    "Период CDN-квоты": "CDN quota period",
+    "Ошибка сохранения правил CDN:": "Failed to save CDN rules:",
+    "Основной сервер не расходует отдельную квоту. Выберите «CDN-трафик», чтобы весь узел расходовал общий лимит пользователя.": "Main servers do not spend the separate quota. Select CDN traffic to include the entire node in the shared user limit.",
     "Категория трафика узла": "Node traffic category",
 
     "Трафик обхода": "Bypass traffic",
