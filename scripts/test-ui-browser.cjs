@@ -191,7 +191,8 @@ async function main() {
       try{
         await trigger.click();
         await menu.waitFor({state:'visible'});
-        await page.locator('[data-panel-version-check]').click();
+        // Opening the version menu initiates a read-only check automatically.
+        // Wait for the result instead of racing the temporary disabled button.
         await page.waitForFunction(()=>{
           const panel=document.querySelector('[data-panel-version-menu]');
           return panel?.dataset.actionMode==='update'&&!panel.querySelector('[data-panel-version-update]').hidden;
