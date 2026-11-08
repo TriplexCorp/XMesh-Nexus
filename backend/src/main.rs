@@ -3982,7 +3982,7 @@ async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
 
 /// Convert a decimal GB quantity to an exact whole-byte quota.
 /// Parse the shortest base-10 representation to avoid floating-point
-/// underflow at byte boundaries (e.g. 0.00000003 GB is exactly 30 bytes).
+/// underflow at byte boundaries (e.g. 0.000_000_03 GB is exactly 30 bytes).
 pub(crate) fn gb_to_bytes_i64(gb: f64) -> i64 {
     if gb <= 0.0 || gb.is_nan() {
         return 0;
@@ -3998,7 +3998,7 @@ pub(crate) fn gb_to_bytes_i64(gb: f64) -> i64 {
         });
     let decimals = mantissa
         .split_once('.')
-        .map_or(0_i32, |(_, fraction)| fraction.len() as i32);
+        .map_or(0_i32, |(_, fraction)| i32::try_from(fraction.len()).unwrap_or(i32::MAX));
     let digits = mantissa.replace('.', "");
     let Ok(coefficient) = digits.parse::<i128>() else {
         return i64::MAX;
@@ -4009,15 +4009,15 @@ pub(crate) fn gb_to_bytes_i64(gb: f64) -> i64 {
             i128::MAX
         } else {
             coefficient
-                .checked_mul(10_i128.pow(power as u32))
+                .checked_mul(10_i128.pow(u32::try_from(power).unwrap_or_default()))
                 .unwrap_or(i128::MAX)
         }
     } else if power < -38 {
         0
     } else {
-        coefficient / 10_i128.pow((-power) as u32)
+        coefficient / 10_i128.pow(u32::try_from(-power).unwrap_or_default())
     };
-    bytes.clamp(0, i128::from(i64::MAX)) as i64
+    i64::try_from(bytes.clamp(0, i128::from(i64::MAX))).unwrap_or(i64::MAX)
 }
 
 #[cfg(test)]
@@ -4027,8 +4027,8 @@ mod decimal_gb_conversion_tests {
     #[test]
     fn exact_decimal_quota_bytes() {
         assert_eq!(gb_to_bytes_i64(0.0), 0);
-        assert_eq!(gb_to_bytes_i64(0.00000003), 30);
-        assert_eq!(gb_to_bytes_i64(0.000000001), 1);
+        assert_eq!(gb_to_bytes_i64(0.000_000_03), 30);
+        assert_eq!(gb_to_bytes_i64(0.000_000_001), 1);
         assert_eq!(gb_to_bytes_i64(0.5), 500_000_000);
         assert_eq!(gb_to_bytes_i64(1.0), 1_000_000_000);
         assert_eq!(gb_to_bytes_i64(5.0), 5_000_000_000);
