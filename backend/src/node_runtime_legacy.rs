@@ -2407,7 +2407,7 @@ mod provision_tests {
             crate::cdn_quota::tags_for_node(&settings, &standard, &sample_tags).unwrap();
         let limited_tags =
             crate::cdn_quota::tags_for_node(&settings, &limited, &sample_tags).unwrap();
-        let user = json!({"cdnLimitGb":5,"cdnUsedBytes":5_i64*1_073_741_824});
+        let user = json!({"cdnLimitGb":5,"cdnUsedBytes":5_i64*1_000_000_000});
         assert!(!crate::cdn_quota::exhausted(&user, "PL_LTE", &normal_tags));
         assert!(crate::cdn_quota::exhausted(&user, "PL_LTE", &limited_tags));
         assert!(!crate::cdn_quota::exhausted(
