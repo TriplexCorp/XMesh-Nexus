@@ -38,7 +38,7 @@ function element(id) {
 }
 const root=element('top-panel-version');
 root.querySelector=selector=>elements.get(selector)||element(selector);
-root.contains=()=>true;
+root.contains=target=>target?.insideMenu!==false;
 for(const selector of [
  '[data-panel-version-trigger]','[data-panel-version-menu]',
  '[data-panel-version-heading]','[data-panel-version-number]',
@@ -98,6 +98,9 @@ async function run(){
  assert.equal(element('[data-panel-version-update-status]').textContent,'Системный updater готов к запросу.','Cancellation must not report queue');
  approved=true;
  element('[data-panel-version-update]').click();
+ // The shared confirmation dialog is outside the dropdown in the DOM.
+ doc.listeners.click({target:{insideMenu:false}});
+ assert.equal(element('[data-panel-version-menu]').hidden,false,'Owner confirmation must not dismiss the status popover');
  await tick();
  assert.equal(requests,2);
  assert.equal(element('[data-panel-version-update]').disabled,true,'Queued upgrade prevents duplicate request');
