@@ -3269,17 +3269,16 @@ async function hostsP(){
   const search='<div class="nx-directory-search host-directory-search">'+ic('search')+
     '<input type="search" data-host-search aria-label="Поиск хостов" placeholder="Поиск по названию, адресу, профилю или inbound" autocomplete="off" spellcheck="false" value="'+esc(hostSearchQuery)+'" '+(items.length?'':'disabled')+'>'+
     '<button type="button" class="nx-directory-search-clear" data-host-search-clear aria-label="Очистить поиск" title="Очистить поиск" '+(hostSearchQuery?'':'hidden')+'>'+ic('x')+'</button></div>';
-  const summary='<div class="host-directory-summary" aria-label="Хосты">'+
-    '<div class="host-summary-metric"><span>'+ic('server')+'Всего хостов</span><strong>'+items.length+'</strong></div>'+
-    '<div class="host-summary-metric is-active"><span>'+ic('check')+'Активных</span><strong>'+active+'</strong></div>'+
-    '<div class="host-summary-metric"><span>'+ic('minus')+'Отключённых</span><strong>'+(items.length-active)+'</strong></div>'+
+  const summary='<div class="host-directory-summary" role="group" aria-label="Статистика хостов">'+
+    '<div class="host-summary-metric"><span>'+ic('server')+'Всего</span><strong>'+items.length+'</strong></div>'+
+    '<div class="host-summary-metric is-active"><span>'+ic('check')+'Активны</span><strong>'+active+'</strong></div>'+
+    '<div class="host-summary-metric"><span>'+ic('minus')+'Отключены</span><strong>'+(items.length-active)+'</strong></div>'+
     '</div>';
   const body=items.length?'<div class="host-card-grid" data-ui-layout="cards" data-workspace-grid="hosts" data-grid-mode="'+workspaceGridMode('hosts')+'">'+items.map((host,i)=>hostCard(host,i,items.length)).join('')+'</div>':
     '<div class="card empty"><b>Хостов пока нет</b><span>Добавьте адреса подключения, которые должны видеть клиенты.</span>'+
     '<button type="button" class="gh sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>';
   const html='<section class="host-directory"><div class="nx-directory-toolbar host-directory-toolbar">'+search+
-    '<p class="nx-directory-toolbar-note">'+ENT.hosts.n+'</p>'+
-    workspaceGridControls('hosts')+workspaceCreateButton('hosts','Хост')+'</div>'+summary+
+    summary+workspaceGridControls('hosts')+workspaceCreateButton('hosts','Хост')+'</div>'+
     (items.length?'<p class="nx-directory-search-count" data-host-search-count hidden><span>Найдено:</span> <b data-host-search-count-value></b></p>':'')+
     body+
     (items.length?'<div class="nx-directory-search-empty" data-host-search-empty hidden>'+ic('search')+
