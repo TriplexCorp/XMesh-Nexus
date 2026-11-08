@@ -252,7 +252,7 @@ async function main() {
       await page.setViewportSize({width:1440,height:900});
       const content={
         general:['#brand-panel','#start-page','[data-hk]','#toast-duration'],
-        appearance:['#palette-apply','#content-width','#ts','[data-ui="motion"]'],
+        appearance:['#palette-apply','#content-width','#ts','#follow-reduced-motion'],
         system:['#core-panel','[data-cdn-tags-save]'],
         security:['#security-tab-auth'],
         admins:['[data-ne="admins"]'],
