@@ -4635,12 +4635,11 @@ const SETTINGS_FOCUS_GROUPS=Object.freeze({
  appearance:[['colors','Цвет и тема','Colors & theme'],['layout','Композиция','Layout'],['typography','Текст и эффекты','Type & effects']],
  system:[['system','Обновления','Updates'],['traffic','Трафик и CDN','Traffic & CDN']]
 });
-const settingsFocusMemory={};
 function settingsFocusForPage(page){
  const items=SETTINGS_FOCUS_GROUPS[page]||[];
  const slug=location.hash.slice(1).split('/')[1];
  if(items.some(([name])=>name===slug))return slug;
- return items.some(([name])=>name===settingsFocusMemory[page])?settingsFocusMemory[page]:items[0]?.[0];
+ return items[0]?.[0];
 }
 function selectSettingsFocus(group,{navigate=false}={}){
  const main=document.querySelector('#settings-subpage');
@@ -4661,7 +4660,6 @@ function selectSettingsFocus(group,{navigate=false}={}){
  main.dataset.single=single;
  for(const column of grid.querySelectorAll('.appearance-column'))
   column.hidden=![...column.querySelectorAll('[data-settings-group]')].some(card=>!card.hidden);
- settingsFocusMemory[page]=group;
  if(navigate&&location.hash!=='#set/'+group)
   history.pushState(history.state,'',location.pathname+location.search+'#set/'+group);
  if(navigate){
@@ -6142,7 +6140,13 @@ $('#bell').innerHTML=ic('bell');syncTopLanguage();$('#logout').innerHTML=ic('log
 $('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace(location.pathname)};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{apply();if(C.theme==='auto')syncSubscriptionTheme()});
 matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',()=>{if(C.followReducedMotion)apply()});
-addEventListener('hashchange',()=>{if(backendReady)render()});
+addEventListener('hashchange',()=>{
+ if(!backendReady)return;
+ const main=document.querySelector('#settings-subpage');
+ if(cur==='set'&&main?.dataset.settingsSection===settingsPageFromHash()&&
+    selectSettingsFocus(settingsFocusForPage(main.dataset.settingsSection)))return;
+ render();
+});
 // Persistent quota notifications are read from PostgreSQL, not a transient
 // browser timer or client-only threshold. Polling discovers events even if
 // another administrator is editing a node on a different device.
