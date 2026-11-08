@@ -2578,7 +2578,7 @@ async fn enforce_node_traffic_limit(
                        THEN (data->>'mult')::numeric
                        ELSE 1
                      END
-                   >= (data->>'limit')::numeric*1073741824
+                   >= (data->>'limit')::numeric*1000000000
            )
          RETURNING data->>'name' AS node_name,
            (data->>'limit')::numeric AS limit_gb",
@@ -3382,8 +3382,8 @@ async fn get_user_traffic(
         "sampleCount": servers.len(),
         "totalUplinkBytes": uplink,
         "totalDownlinkBytes": downlink,
-        "effectiveUsedGb": base_usage+(numeric_i64_to_f64(uplink.saturating_add(downlink)) / 1_073_741_824.0),
-        "meteredUsedGb": numeric_i64_to_f64(uplink.saturating_add(downlink)) / 1_073_741_824.0,
+        "effectiveUsedGb": base_usage+(numeric_i64_to_f64(uplink.saturating_add(downlink)) / 1_000_000_000.0),
+        "meteredUsedGb": numeric_i64_to_f64(uplink.saturating_add(downlink)) / 1_000_000_000.0,
         "servers": servers,
         "inbounds": inbound_totals,
         "inboundAccounting": "independent_signed_user_inbound_counters"
@@ -3980,7 +3980,63 @@ async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
     )
 }
 
-// Panel quotas are expressed in GiB; signed node counters are bytes.
+/// Convert a decimal GB quantity to an exact whole-byte quota.
+/// Parse the shortest base-10 representation to avoid floating-point
+/// underflow at byte boundaries (e.g. `0.000_000_03` GB is exactly 30 bytes).
+pub(crate) fn gb_to_bytes_i64(gb: f64) -> i64 {
+    if gb <= 0.0 || gb.is_nan() {
+        return 0;
+    }
+    if !gb.is_finite() {
+        return i64::MAX;
+    }
+    let repr = gb.to_string();
+    let (mantissa, exponent) = repr
+        .split_once(['e', 'E'])
+        .map_or((repr.as_str(), 0_i32), |(m, e)| {
+            (m, e.parse::<i32>().unwrap_or(0))
+        });
+    let decimals = mantissa.split_once('.').map_or(0_i32, |(_, fraction)| {
+        i32::try_from(fraction.len()).unwrap_or(i32::MAX)
+    });
+    let digits = mantissa.replace('.', "");
+    let Ok(coefficient) = digits.parse::<i128>() else {
+        return i64::MAX;
+    };
+    let power = exponent.saturating_add(9).saturating_sub(decimals);
+    let bytes = if power >= 0 {
+        if power > 38 {
+            i128::MAX
+        } else {
+            coefficient
+                .checked_mul(10_i128.pow(u32::try_from(power).unwrap_or_default()))
+                .unwrap_or(i128::MAX)
+        }
+    } else if power < -38 {
+        0
+    } else {
+        coefficient / 10_i128.pow(u32::try_from(-power).unwrap_or_default())
+    };
+    i64::try_from(bytes.clamp(0, i128::from(i64::MAX))).unwrap_or(i64::MAX)
+}
+
+#[cfg(test)]
+mod decimal_gb_conversion_tests {
+    use super::gb_to_bytes_i64;
+
+    #[test]
+    fn exact_decimal_quota_bytes() {
+        assert_eq!(gb_to_bytes_i64(0.0), 0);
+        assert_eq!(gb_to_bytes_i64(0.000_000_03), 30);
+        assert_eq!(gb_to_bytes_i64(0.000_000_001), 1);
+        assert_eq!(gb_to_bytes_i64(0.5), 500_000_000);
+        assert_eq!(gb_to_bytes_i64(1.0), 1_000_000_000);
+        assert_eq!(gb_to_bytes_i64(5.0), 5_000_000_000);
+        assert_eq!(gb_to_bytes_i64(f64::INFINITY), i64::MAX);
+    }
+}
+
+// Panel quotas are expressed in decimal GB (1 GB = 1,000,000,000 bytes); signed node counters are bytes.
 // Keep the manually configured baseline in panel_records and overlay actual,
 // monotonic signed user counters on reads. Never use node-wide RX/TX here.
 pub(crate) fn add_metered_usage(user: &mut Value, bytes: i64) {
@@ -3989,7 +4045,7 @@ pub(crate) fn add_metered_usage(user: &mut Value, bytes: i64) {
         .and_then(Value::as_f64)
         .unwrap_or(0.0)
         .max(0.0);
-    let measured = numeric_i64_to_f64(bytes.max(0)) / 1_073_741_824.0;
+    let measured = numeric_i64_to_f64(bytes.max(0)) / 1_000_000_000.0;
     if let Some(object) = user.as_object_mut() {
         object.insert("used".into(), json!(base + measured));
         object.insert("meteredUsedGb".into(), json!(measured));
@@ -4894,13 +4950,13 @@ mod tests {
     }
 
     #[test]
-    fn metered_usage_is_added_in_gib_not_raw_bytes() {
+    fn metered_usage_is_added_in_decimal_gb_not_raw_bytes() {
         let mut user = json!({"id":21,"used":0.0,"limit":2});
-        super::add_metered_usage(&mut user, 1_073_741_824);
+        super::add_metered_usage(&mut user, 1_000_000_000);
         assert_eq!(user["used"], 1.0);
         assert_eq!(user["meteredUsedGb"], 1.0);
         assert_eq!(super::user_status(&user, 1_800_000_000_000), "ACTIVE");
-        super::add_metered_usage(&mut user, 1_073_741_824);
+        super::add_metered_usage(&mut user, 1_000_000_000);
         assert_eq!(user["used"], 2.0);
         assert_eq!(super::user_status(&user, 1_800_000_000_000), "LIMITED");
     }

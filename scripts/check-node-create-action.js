@@ -123,7 +123,7 @@ assert.match(dialogJs,/window\.XMeshSelects\?\.refresh\?\.\(dlg\)/,
 assert.match(dialogJs,/id="tplsel"/,'Template handler must keep its existing selector');
 assert.match(dialogJs,/data-generate-username/,'Username generator action must be preserved');
 assert.match(dialogJs,/decorate\('xrayProfileId'/,'Xray profile assignment must remain in the form');
-assert.match(app,/\{k:'cdnLimitGb',l:'Трафик обхода, ГиБ',t:'num'/,
+assert.match(app,/\{k:'cdnLimitGb',l:'Лимит CDN, ГБ',t:'num'/,
  'Separate bypass quota must use the shared numeric user field');
 assert.match(dialogJs,/const cdnLimit=decorate\('cdnLimitGb',0,'user-create-cdn-limit'\)/,
  'Redesigned create form must render the independent bypass quota');
@@ -137,7 +137,7 @@ assert.match(dialogJs,/const cdnLimit=decorate\('cdnLimitGb',0,'user-create-cdn-
  'Redesigned user form must render the CDN quota using the canonical numeric field definition');
 assert.match(dialogJs,/<div class="user-create-limits-grid">\$\{limit\}\$\{cdnLimit\}\$\{days\}\$\{strategy\}\$\{hwid\}/,
  'CDN quota must sit beside total traffic in the visible limits section');
-assert.match(app,/\{k:'cdnLimitGb',l:'Трафик обхода, ГиБ',t:'num'/,
+assert.match(app,/\{k:'cdnLimitGb',l:'Лимит CDN, ГБ',t:'num'/,
  'CDN field must retain its existing numeric user schema');
 assert.match(app,/set\('cdnLimitGb',p\.cdnLimitGb\|\|0\)/,
  'Selecting a template must populate the visible CDN limit field');

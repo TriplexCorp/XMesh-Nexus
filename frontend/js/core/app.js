@@ -5,7 +5,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const hs=s=>[...String(s)].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7);
 const panelIsEnglish=()=>window.XMeshI18n?.getLanguage()==='en';
 const fmt=(v,d=0)=>(+v).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
-const gb=v=>{const en=panelIsEnglish(),unit=en?[' TB',' GB',' MB']:[' ТБ',' ГБ',' МБ'];return v>=1024?fmt(v/1024,2)+unit[0]:v>=10?fmt(v,1)+unit[1]:v>=1?fmt(v,2)+unit[1]:fmt(v*1024)+unit[2]};
+const gb=v=>{const en=panelIsEnglish(),unit=en?[' TB',' GB',' MB']:[' ТБ',' ГБ',' МБ'];return v>=1000?fmt(v/1000,2)+unit[0]:v>=10?fmt(v,1)+unit[1]:v>=1?fmt(v,2)+unit[1]:fmt(v*1000)+unit[2]};
 const ago=t=>{if(!t)return panelIsEnglish()?'never':'никогда';const s=(Date.now()-t)/1e3;return panelIsEnglish()?(s<60?'just now':s<3600?(s/60|0)+' min ago':s<86400?(s/3600|0)+' h ago':(s/86400|0)+' days ago'):(s<60?'только что':s<3600?(s/60|0)+' мин назад':s<86400?(s/3600|0)+' ч назад':(s/86400|0)+' дн назад')};
 let pendingUserTrafficDetail=null;
 let userTrafficReturn=null;
@@ -326,7 +326,7 @@ const ENT={
     {k:'tlsManualProvision',l:'Принудительно внешний сертификат',t:'bool',h:'Необязательно: готовые пути сертификата определяются автоматически из профиля. Используйте только для явного запрета ACME.'},
     {k:'tlsDomain',l:'TLS-домен ноды',ph:'node.example.com',h:'DNS-имя, которым вы управляете. Используется только при управляемом TLS. Никаких глобальных доменов.'},
     {k:'tlsAcmeEmail',l:'Контакт ACME (email)',ph:'admin@example.com',h:'Email для регистрации Let’s Encrypt и уведомлений о сертификате.'},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
-    {k:'cdnMode',l:'Категория трафика',t:'sel',o:[['standard','Основной · без квоты обхода'],['all','Трафик обхода · весь узел'],['selected','Трафик обхода · отдельные inbound']]},
+    {k:'cdnMode',l:'Категория трафика',t:'sel',o:[['standard','Основной · вне CDN-квоты'],['all','CDN-трафик · весь узел'],['selected','CDN-трафик · выбранные inbound']]},
     {k:'cdnInboundTags',l:'Подключения, расходующие квоту',t:'multi',o:()=>[...new Set(DB.profiles.flatMap(p=>inbs(p).map(i=>i.tag)))].map(tag=>[tag,tag])},
     {k:'billingPrice',l:'Стоимость аренды',t:'num'},
     {k:'billingCurrency',l:'Валюта',t:'sel',o:[['EUR','EUR · €'],['USD','USD · $'],['RUB','RUB · ₽'],['PLN','PLN · zł'],['GBP','GBP · £']]},
@@ -374,7 +374,7 @@ const ENT={
       return '';
     },
     guard:r=>''},
-  tpls:{t:'Шаблоны пользователей',n:'Лимиты, срок и доступ для новых пользователей.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Трафик обхода, ГиБ',t:'num',h:'0 — без лимита. Общая квота для узлов обхода и выбранных inbound.'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
+  tpls:{t:'Шаблоны пользователей',n:'Лимиты, срок и доступ для новых пользователей.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Лимит CDN, ГБ',t:'num',h:'0 — без лимита. Общая квота для узлов обхода и выбранных inbound.'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Трафик',r=>r.limit?r.limit+' ГБ':'∞'],['Срок',r=>r.days?r.days+' дн':'∞'],['Устройств',r=>r.hwid],['Сквады',r=>r.squads.map(i=>chip(esc(DB.squads.find(s=>s.id==i)?.name||'?'),'--b')).join(' ')],['Режим',r=>r.hold?chip('on hold','--c3'):'—']]},
   subs:{t:'Шаблоны подписки',n:'Формат и содержимое клиентской конфигурации.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'fmt',l:'Формат',t:'sel',o:FMT},{k:'content',l:'Содержимое',t:'area',rows:9}],def:()=>({fmt:'XRAY_JSON',content:'{}'}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Формат',r=>chip(r.fmt,'--c3')],['Размер',r=>r.content.length+' симв.']]},
@@ -397,8 +397,8 @@ const ENT={
   },
 
 };
-const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'tg',l:'Telegram ID',ph:'Например, 123456789'},{k:'email',l:'Email',t:'email',ph:'name@example.com'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Трафик обхода, ГиБ',t:'num',h:'0 — без лимита. Общая квота на подключения обхода.'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
-const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Трафик обхода, ГиБ',t:'num',h:'0 — без лимита (основные серверы не затрагиваются)'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
+const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'tg',l:'Telegram ID',ph:'Например, 123456789'},{k:'email',l:'Email',t:'email',ph:'name@example.com'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Лимит CDN, ГБ',t:'num',h:'0 — без лимита. Общая квота на подключения обхода.'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
+const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'cdnLimitGb',l:'Лимит CDN, ГБ',t:'num',h:'0 — без лимита (основные серверы не затрагиваются)'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
 
 // All 249 ISO 3166-1 alpha-2 regions, plus Kosovo (user-assigned XK).
 // ISO GB is the United Kingdom; UK and England are search aliases, not duplicate codes.
@@ -1880,7 +1880,7 @@ function statisticsP(){
 }
 
 /* ================= СИСТЕМНЫЕ МЕТРИКИ ================= */
-const sysBytes=n=>{if(!Number.isFinite(+n))return'—';const v=+n;if(v<1024)return fmt(v)+' Б';if(v<1024**2)return fmt(v/1024,1)+' КБ';if(v<1024**3)return fmt(v/1024**2,1)+' МБ';if(v<1024**4)return fmt(v/1024**3,2)+' ГБ';return fmt(v/1024**4,2)+' ТБ'};
+const sysBytes=n=>{if(!Number.isFinite(+n))return'—';const v=+n;if(v<1000)return fmt(v)+' Б';if(v<1000**2)return fmt(v/1000,1)+' КБ';if(v<1000**3)return fmt(v/1000**2,1)+' МБ';if(v<1000**4)return fmt(v/1000**3,2)+' ГБ';return fmt(v/1000**4,2)+' ТБ'};
 const sysPct=n=>n==null||n===''||!Number.isFinite(+n)?null:Math.max(0,Math.min(100,+n));
 const sysBar=n=>{const p=sysPct(n);return p===null?'<div class="sys-progress"><i style="width:0%"></i></div>':`<div class="sys-progress ${p>=90?'danger':p>=75?'warning':''}"><i style="width:${p}%"></i></div>`};
 const sysUptime=n=>{if(!Number.isFinite(+n))return'—';n=Math.max(0,Math.floor(+n));const d=Math.floor(n/86400),h=Math.floor(n%86400/3600),m=Math.floor(n%3600/60);return d?`${d} д ${h} ч`:h?`${h} ч ${m} мин`:`${m} мин`};
@@ -2461,7 +2461,7 @@ function userDrawer(id,tab){
       <div class="user-usage-line">${ic("activity")}<span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Сбросить трафик пользователя">${ic('redo')} Сбросить трафик</button><span class="user-expiry-summary" data-user-expiry-summary >${ic('calendar')} <span>Осталось</span> <strong>${userRemainingLabel(u.expireAt)}</strong></span></div>
       ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,usageRatio*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,usageRatio*100)))}"><i></i></div>`:''}
       ${(Array.isArray(DB.set.cdnInboundTags)&&DB.set.cdnInboundTags.length)||DB.nodes.some(n=>n.cdnMode&&n.cdnMode!=='standard')?
-        `<div class="user-usage-line"><span>Трафик обхода${DB.set.cdnResetPeriod==='monthly'?' · текущий месяц':''}</span><strong>${(Number(u.cdnUsedBytes||0)/1073741824).toFixed(2)} ГиБ</strong><small>${Number(u.cdnLimitGb||0)>0?'из '+Number(u.cdnLimitGb)+' ГиБ':'без лимита'}</small></div>`:''}
+        `<div class="user-usage-line"><span>CDN-трафик${DB.set.cdnResetPeriod==='monthly'?' · текущий месяц':''}</span><strong>${(Number(u.cdnUsedBytes||0)/1000000000).toFixed(2)} ГБ</strong><small>${Number(u.cdnLimitGb||0)>0?'из '+Number(u.cdnLimitGb)+' ГБ':'без лимита'}</small></div>`:''}
       <div class="user-identity-row">${ic("key")}<span>Xray ID</span>${viewerMode() ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
     </div>
     <nav class="user-editor-tabs" role="tablist" aria-label="Настройки пользователя">${[['ov','Настройки','sliders'],['acc','Доступ и подписка','globe'],['routing','Маршрутизация','route'],['traffic','Трафик','activity'],['dev','Устройства','monitor']].map(([key,title,icon],index)=>`<button type="button" role="tab" id="user-tab-${key}" aria-controls="user-panel-${key}" aria-selected="${index===0}" tabindex="${index===0?0:-1}" data-user-editor-tab="${key}">${ic(icon)}<span>${title}</span></button>`).join('')}</nav>
@@ -4049,7 +4049,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
       '<input type="hidden" name="cdnMode" value="'+esc(o.cdnMode||'standard')+'">'+
       '<div class="node-bypass-choices">'+
         '<button type="button" data-node-cdn-kind="standard" aria-pressed="'+(!o.cdnMode||o.cdnMode==='standard')+'">'+ic('server')+'<span>Основной сервер</span></button>'+
-        '<button type="button" data-node-cdn-kind="bypass" aria-pressed="'+(o.cdnMode==='all'||o.cdnMode==='selected')+'">'+ic('shield')+'<span>Трафик обхода</span></button>'+
+        '<button type="button" data-node-cdn-kind="bypass" aria-pressed="'+(o.cdnMode==='all'||o.cdnMode==='selected')+'">'+ic('shield')+'<span>CDN-трафик</span></button>'+
       '</div>'+
       '<label class="node-bypass-scope" data-node-cdn-scope-wrap'+(o.cdnMode==='all'||o.cdnMode==='selected'?'':' hidden')+'>'+
         '<input type="checkbox" data-node-cdn-scope'+(o.cdnMode==='selected'?' checked':'')+'>'+
@@ -4100,7 +4100,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e.fs):k==='nodes'
     ?'<nav class="node-editor-tabs" role="tablist" aria-label="Настройки узла">'+[['connection','Подключение','server'],['traffic','Трафик','activity'],['network','IP-пул','globe'],['billing','Оплата','calendar']].map(([tab,label,icon],index)=>'<button type="button" role="tab" id="node-tab-'+tab+'" aria-controls="node-panel-'+tab+'" aria-selected="'+(index===0)+'" tabindex="'+(index===0?'0':'-1')+'" data-node-editor-tab="'+tab+'">'+ic(icon)+'<span>'+label+'</span></button>').join('')+'</nav><div class="node-form-layout">'+
       '<div class="node-connection-pane" id="node-panel-connection" role="tabpanel" aria-labelledby="node-tab-connection" data-node-editor-pane="connection" data-active="true" aria-hidden="false"><section class="node-main-section" aria-label="Параметры подключения"><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section><aside class="node-network-stack">'+nodeTlsFields+'</aside></div>'+
-      `<section class="node-billing-section node-traffic-section" id="node-panel-traffic" role="tabpanel" aria-labelledby="node-tab-traffic" data-node-editor-pane="traffic" data-active="false" aria-hidden="true" inert><div class="node-task-workspace"><section class="node-rent-editor"><h3 class="node-form-section-title">Трафик обхода</h3><p class="note">Основной сервер не расходует отдельную квоту. Выберите «Трафик обхода», чтобы весь узел расходовал общий лимит пользователя.</p><div class="node-billing-fields">${nodeCdnModeField}<div data-node-cdn-inbounds ${o.cdnMode==='selected'?'':'hidden inert'}><div data-node-cdn-options>${nodeCdnChoiceField}</div><p class="note">Отметьте inbound этого узла, которые расходуют квоту обхода. Остальные останутся обычными.</p></div></div></section><aside class="node-task-aside node-provider-editor"><h3 class="node-form-section-title">Сетевой трафик узла</h3><div class="node-billing-fields">${nodeTrafficFields}</div><p class="note">Этот технический лимит узла не связан с квотой трафика обхода у пользователя.</p></aside></div></section><section class="node-ip-section" id="node-panel-network" role="tabpanel" aria-labelledby="node-tab-network" data-node-editor-pane="network" data-active="false" aria-hidden="true" inert><div class="node-rotation-editor-body node-task-workspace"><section class="node-pool-editor"><h3 class="node-form-section-title">IP-пул и ротация</h3><p class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</p>${poolField}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output></section><aside class="node-task-aside node-rotation-settings"><h3 class="node-form-section-title">Ротация</h3>${rotationFields}${rotationProbe}</aside></div></section><section class="node-billing-section" id="node-panel-billing" role="tabpanel" aria-labelledby="node-tab-billing" data-node-editor-pane="billing" data-active="false" aria-hidden="true" inert><div class="node-task-workspace"><section class="node-rent-editor"><h3 class="node-form-section-title">Оплата сервера</h3><div class="node-billing-fields">${billingFields}</div></section><aside class="node-task-aside node-provider-editor"><h3 class="node-form-section-title">Провайдер</h3><div class="node-billing-fields">${providerFields}</div></aside></div></section></div>`
+      `<section class="node-billing-section node-traffic-section" id="node-panel-traffic" role="tabpanel" aria-labelledby="node-tab-traffic" data-node-editor-pane="traffic" data-active="false" aria-hidden="true" inert><div class="node-task-workspace"><section class="node-rent-editor"><h3 class="node-form-section-title">CDN-трафик</h3><p class="note">Основной сервер не расходует отдельную квоту. Выберите «CDN-трафик», чтобы весь узел расходовал общий лимит пользователя.</p><div class="node-billing-fields">${nodeCdnModeField}<div data-node-cdn-inbounds ${o.cdnMode==='selected'?'':'hidden inert'}><div data-node-cdn-options>${nodeCdnChoiceField}</div><p class="note">Отметьте inbound этого узла, которые расходуют квоту обхода. Остальные останутся обычными.</p></div></div></section><aside class="node-task-aside node-provider-editor"><h3 class="node-form-section-title">Сетевой трафик узла</h3><div class="node-billing-fields">${nodeTrafficFields}</div><p class="note">Этот технический лимит узла не связан с квотой трафика обхода у пользователя.</p></aside></div></section><section class="node-ip-section" id="node-panel-network" role="tabpanel" aria-labelledby="node-tab-network" data-node-editor-pane="network" data-active="false" aria-hidden="true" inert><div class="node-rotation-editor-body node-task-workspace"><section class="node-pool-editor"><h3 class="node-form-section-title">IP-пул и ротация</h3><p class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</p>${poolField}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output></section><aside class="node-task-aside node-rotation-settings"><h3 class="node-form-section-title">Ротация</h3>${rotationFields}${rotationProbe}</aside></div></section><section class="node-billing-section" id="node-panel-billing" role="tabpanel" aria-labelledby="node-tab-billing" data-node-editor-pane="billing" data-active="false" aria-hidden="true" inert><div class="node-task-workspace"><section class="node-rent-editor"><h3 class="node-form-section-title">Оплата сервера</h3><div class="node-billing-fields">${billingFields}</div></section><aside class="node-task-aside node-provider-editor"><h3 class="node-form-section-title">Провайдер</h3><div class="node-billing-fields">${providerFields}</div></aside></div></section></div>`
     :standardFields;
   const boundedEntityEditor=['tpls','admins'].includes(k);
   const editorFields=boundedEntityEditor?'<div class="entity-editor-body">'+fields+'</div>':fields;
@@ -4514,13 +4514,13 @@ async function nodesP(){
       Math.max(0,Number(rxTotal)+Number(txTotal));
     l.networkTotalBytes=Number.isFinite(bytes)?bytes:null;
     LV[n.id]=l;
-    const trafficGb=l.networkTotalBytes===null?null:l.networkTotalBytes*nodeTrafficFactor(n)/1073741824;
+    const trafficGb=l.networkTotalBytes===null?null:l.networkTotalBytes*nodeTrafficFactor(n)/1000000000;
     const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><header class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><span class="node-endpoint"><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</span></div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${renderNodeXrayVersion(n.id,runtime.get(n.id))}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${renderNodeAgentVersion(n.id,runtime.get(n.id))}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></header>
       <div class="node-body"><div class="node-summary"><div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b><div class="node-online-clients" title="Онлайн-клиенты по свежей телеметрии агента ноды"><span>Пользователи онлайн</span><b>${m?.onlineClients!=null&&Number.isFinite(Number(m.onlineClients))?Math.max(0,Math.trunc(Number(m.onlineClients))):"—"}</b></div></div><div><span>XRAY STUDIO</span>${p?'<b>'+esc(p.name)+'</b><small class="mu" data-node-profile-status="'+esc(n.id)+'" title="Проверка подписанной политики и реально используемой конфигурации Xray">'+esc(nodeProfileStatus(runtime.get(n.id)))+'</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'<span class="mu" data-node-profile-status="'+esc(n.id)+'">Профиль пока не назначен</span>'}</div></div>
       ${nodeShowsTlsStatus(p,n)?'<div class="node-tls-health" data-node-tls-status title="Ожидается подписанный отчёт агента">'+ic('shield')+'<span data-node-tls-label>TLS · нет данных</span></div>':''}
       ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span data-node-geodata-status>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
-      ${n.cdnMode&&n.cdnMode!=='standard'?`<div class="node-ip-rotation active" title="Общая квота обхода задаётся пользователю; обычные серверы продолжают работать">${ic('cloud')}<span>Обход · ${n.cdnMode==='all'?'весь узел':(Array.isArray(n.cdnInboundTags)?n.cdnInboundTags.length:0)+' inbound'}</span></div>`:''}
+      ${n.cdnMode&&n.cdnMode!=='standard'?`<div class="node-ip-rotation active" title="Общая квота обхода задаётся пользователю; обычные серверы продолжают работать">${ic('cloud')}<span>CDN · ${n.cdnMode==='all'?'весь узел':(Array.isArray(n.cdnInboundTags)?n.cdnInboundTags.length:0)+' inbound'}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       </div><div class="node-metrics"><div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
@@ -4615,7 +4615,7 @@ function updateNodeGauges(){DB.nodes.forEach(n=>{
   const metrics=[['cpu-'+n.id,l.cpu,'загрузка'],['ram-'+n.id,l.ram,'занято']];
   metrics.forEach(([key,value,detail])=>setNodeGauge(key,Number.isFinite(value)?value:0,Number.isFinite(value)?Math.round(value)+'%':'—',Number.isFinite(value)?detail:'нет данных'));
   const total=l.networkTotalBytes;
-  const trafficGb=Number.isFinite(total)?total*nodeTrafficFactor(n)/1073741824:null;
+  const trafficGb=Number.isFinite(total)?total*nodeTrafficFactor(n)/1000000000:null;
   const traffic=n.limit&&trafficGb!==null?cl(trafficGb/n.limit*100,0,100):0,tc=traffic>90?'--er':traffic>75?'--wr':'--c3';
   setNodeGauge('traffic-'+n.id,traffic,trafficGb===null?'—':n.limit?Math.round(traffic)+'%':'∞',
     trafficGb===null?'нет данных':n.limit?`${gb(trafficGb)} / ${gb(n.limit)}`:`${gb(trafficGb)} · без лимита`);
@@ -4669,7 +4669,7 @@ function securityP(){
 const SETTINGS_PAGES=Object.freeze([
  ['general','Панель','Брендинг, поведение, интеграции и уведомления','sliders',['general','integrations']],
  ['appearance','Оформление','Палитра, композиция, типографика и эффекты','sun',['colors','layout','typography']],
- ['system','Система и трафик','Обновления, Xray-core и квоты обхода','server',['system','traffic']],
+ ['system','Система и трафик','Обновления, Xray-core и CDN-квоты','server',['system','traffic']],
  ['security','Безопасность','Авторизация, 2FA, сессии и аудит','shield-check',['security']],
  ['admins','Администраторы','Управление доступом сотрудников панели','shield',['admins']],
  ['data','Данные','Экспорт данных и перенос персонального оформления','file',['data']]
@@ -4862,19 +4862,19 @@ async function setP(){
   const cdnTagChoices=[...new Set([...tags(),...(Array.isArray(DB.set.cdnInboundTags)?DB.set.cdnInboundTags:[])])].filter(Boolean);
   const cdnSelection=new Set(Array.isArray(DB.set.cdnInboundTags)?DB.set.cdnInboundTags:[]);
   const cdnSettingsMarkup=`<section class="card" data-settings-group="traffic">
-    <div class="hd"><div><h3>Трафик обхода</h3><p>Общий период квоты и совместимость с прежними глобальными правилами</p></div></div>
+    <div class="hd"><div><h3>CDN-трафик</h3><p>Общий период квоты и совместимость с прежними глобальными правилами</p></div></div>
     <p class="note">Основной сервер остаётся безлимитным, а сервер обхода расходует отдельную квоту пользователя. Категорию выбирайте в карточке узла, лимит — в пользователе или шаблоне.</p>
-    <label class="f"><span>Период квоты обхода</span><select name="cdnResetPeriod" ${sessionUser?.role!=='owner'?'disabled':''}>
+    <label class="f"><span>Период CDN-квоты</span><select name="cdnResetPeriod" ${sessionUser?.role!=='owner'?'disabled':''}>
       <option value="lifetime" ${DB.set.cdnResetPeriod!=='monthly'?'selected':''}>Накопительный · без автоматического сброса</option>
       <option value="monthly" ${DB.set.cdnResetPeriod==='monthly'?'selected':''}>Каждый календарный месяц · UTC</option>
     </select><small>При выборе месячного режима новый период начинается 1-го числа в 00:00 UTC. Учитываются только подтверждённые приращения счётчиков с момента установки этого обновления.</small></label>
-    <details class="bypass-legacy-rules" data-bypass-legacy><summary>Расширенные правила inbound <small>${cdnSelection.size?cdnSelection.size+" выбрано":"для совместимости"}</small></summary><p class="note">Глобальные теги применяются ко всем узлам с таким inbound, даже к основным. Действующие правила сохранены; для новых подключений выбирайте категорию на узле.</p><div class="f"><span>Глобально ограниченные inbound</span>
-      <div class="ms" role="group" aria-label="Глобальные inbound обхода">
+    <details class="bypass-legacy-rules" data-bypass-legacy><summary>Расширенные правила inbound <small>${cdnSelection.size?cdnSelection.size+" выбрано":"для совместимости"}</small></summary><p class="note">Глобальные теги применяются ко всем узлам с таким inbound, даже к основным. Действующие правила сохранены; для новых подключений выбирайте категорию на узле.</p><div class="f"><span>Глобальные CDN-inbound</span>
+      <div class="ms" role="group" aria-label="Глобальные CDN-inbound">
         ${cdnTagChoices.map(tag=>`<label class="ck"><input type="checkbox" name="cdnInboundTags" value="${esc(tag)}" ${cdnSelection.has(tag)?'checked':''} ${sessionUser?.role!=='owner'?'disabled':''}><span>${esc(tag)}</span></label>`).join('')||'<span class="mu">В профилях XRAY STUDIO пока нет inbound.</span>'}
       </div>
       <small>Подсчитывается подтверждённый входящий и исходящий трафик. Прежние выбранные inbound остаются включёнными, пока вы сами их не измените.</small>
     </div>
-    </details><div class="act"><button type="button" class="btn" data-cdn-tags-save ${sessionUser?.role!=='owner'?'disabled':''}>${ic('check')} Сохранить правила обхода</button></div>
+    </details><div class="act"><button type="button" class="btn" data-cdn-tags-save ${sessionUser?.role!=='owner'?'disabled':''}>${ic('check')} Сохранить правила CDN</button></div>
   </section>`;
   source.innerHTML=sourceHtml+cdnSettingsMarkup;
   const groups=SETTINGS_PAGES.find(([key])=>key===settingsPage)?.[4]||['general'];
@@ -4995,8 +4995,8 @@ document.addEventListener('click',async e=>{
     const chosen=[...panel.querySelectorAll('[name="cdnInboundTags"]:checked')].map(input=>input.value);
     const period=panel.querySelector('[name="cdnResetPeriod"]')?.value||'lifetime';
     b.disabled=true;
-    try{await api.saveSettings({cdnInboundTags:chosen,cdnResetPeriod:period});toast('Правила обхода сохранены. Доступ изменится при синхронизации узлов.')}
-    catch(error){toast('Ошибка сохранения правил обхода: '+(error.message||'API'))}
+    try{await api.saveSettings({cdnInboundTags:chosen,cdnResetPeriod:period});toast('Правила CDN сохранены. Доступ изменится при синхронизации узлов.')}
+    catch(error){toast('Ошибка сохранения правил CDN: '+(error.message||'API'))}
     finally{b.disabled=false}
     return;
   }

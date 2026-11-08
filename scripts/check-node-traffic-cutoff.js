@@ -8,7 +8,7 @@ const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
 const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 assert.match(backend,/NODE TRAFFIC LIMIT EXHAUSTED/);
 assert.match(backend,/node_network_traffic_totals t/);
-assert.match(backend,/>= \(data->>'limit'\)::numeric\*1073741824/);
+assert.match(backend,/>= \(data->>'limit'\)::numeric\*1000000000/);
 assert.match(backend,/data->>'disabled'\)::boolean,false\)=false/,
  'Cutoff must happen exactly once per enabled node');
 assert.match(backend,/disabledReason.*traffic_limit/);

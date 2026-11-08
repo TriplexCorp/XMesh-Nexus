@@ -1232,15 +1232,8 @@ fn allowed_inbound_squads(squads: &[Value], tag: &str) -> std::collections::Hash
     allowed
 }
 
-fn quota_gib_to_bytes(gib: f64) -> i64 {
-    let bytes = (gib * 1_073_741_824.0).floor();
-    if bytes.is_nan() || bytes <= 0.0 {
-        return 0;
-    }
-    if bytes.is_infinite() {
-        return i64::MAX;
-    }
-    bytes.to_string().parse::<i64>().unwrap_or(i64::MAX)
+fn quota_gb_to_bytes(gb: f64) -> i64 {
+    crate::gb_to_bytes_i64(gb)
 }
 
 fn provision_proxy_users(
@@ -1422,11 +1415,12 @@ fn build_offline_policy(
             .unwrap_or(0.0)
             .max(0.0);
         // Floor each quota to bytes without a lossy float/integer cast.
-        let used_bytes = quota_gib_to_bytes(used_gb);
-        let limit_bytes = quota_gib_to_bytes(limit_gb.max(0.0));
+        let used_bytes = quota_gb_to_bytes(used_gb);
+        let limit_bytes = quota_gb_to_bytes(limit_gb.max(0.0));
         let remaining = if limit_gb.is_finite() && limit_gb > 0.0 {
-            let remaining_gb = (limit_gb - used_gb).max(0.0);
-            Some(quota_gib_to_bytes(remaining_gb))
+            // Subtract whole bytes, not floating-point GB quantities: 0.7-0.4
+            // must not lose a byte through binary representation rounding.
+            Some(limit_bytes.saturating_sub(used_bytes))
         } else {
             None
         };
@@ -2401,7 +2395,7 @@ mod provision_tests {
         assert_eq!(policy["users"].as_array().unwrap().len(), 1);
         assert_eq!(policy["users"][0]["offlineBudgetBytes"], 64 * 1024 * 1024);
         assert_eq!(policy["users"][0]["expireAtMs"], 1_800_000_010_000_i64);
-        assert_eq!(policy["users"][0]["panelUsedBytes"], 536_870_912);
+        assert_eq!(policy["users"][0]["panelUsedBytes"], 500_000_000);
         assert_eq!(policy["nodeId"], 12);
     }
     #[test]
@@ -2414,7 +2408,7 @@ mod provision_tests {
             crate::cdn_quota::tags_for_node(&settings, &standard, &sample_tags).unwrap();
         let limited_tags =
             crate::cdn_quota::tags_for_node(&settings, &limited, &sample_tags).unwrap();
-        let user = json!({"cdnLimitGb":5,"cdnUsedBytes":5_i64*1_073_741_824});
+        let user = json!({"cdnLimitGb":5,"cdnUsedBytes":5_i64*1_000_000_000});
         assert!(!crate::cdn_quota::exhausted(&user, "PL_LTE", &normal_tags));
         assert!(crate::cdn_quota::exhausted(&user, "PL_LTE", &limited_tags));
         assert!(!crate::cdn_quota::exhausted(
@@ -2434,7 +2428,7 @@ mod provision_tests {
         ]});
         let users = vec![json!({
             "id":1,"xrayId":uuid,"squads":[4],"limit":0,
-            "cdnLimitGb":1.0,"cdnUsedBytes":1_073_741_824_i64
+            "cdnLimitGb":1.0,"cdnUsedBytes":1_000_000_000_i64
         })];
         let squads = vec![json!({"id":4,"inb":["MAIN_DE","CDN_DE","CDN_UK"]})];
         let tags = std::collections::HashSet::from(["CDN_DE".to_owned(), "CDN_UK".to_owned()]);

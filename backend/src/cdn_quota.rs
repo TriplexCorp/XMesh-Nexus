@@ -12,8 +12,7 @@ use std::collections::{HashMap, HashSet};
 use crate::ApiError;
 
 const MAX_TAGS: usize = 128;
-const MAX_GIB: f64 = 1_000_000.0;
-const GIB: f64 = 1_073_741_824.0;
+const MAX_GB: f64 = 1_000_000.0;
 
 fn bad_request(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, message)
@@ -152,8 +151,8 @@ pub fn validate_user(user: &Value) -> Result<(), ApiError> {
         let limit = limit
             .as_f64()
             .ok_or_else(|| bad_request("CDN: лимит должен быть числом."))?;
-        if !limit.is_finite() || !(0.0..=MAX_GIB).contains(&limit) {
-            return Err(bad_request("CDN: лимит должен быть от 0 до 1000000 ГиБ."));
+        if !limit.is_finite() || !(0.0..=MAX_GB).contains(&limit) {
+            return Err(bad_request("CDN: лимит должен быть от 0 до 1000000 ГБ."));
         }
     }
     Ok(())
@@ -229,10 +228,10 @@ pub fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<String>) ->
     };
     // The panel validates saved quota values. Any invalid legacy quota must
     // never become an overflow-based authorization bypass.
-    if !limit.is_finite() || limit > MAX_GIB {
+    if !limit.is_finite() || limit > MAX_GB {
         return true;
     }
-    crate::numeric_i64_to_f64(consumed_bytes.max(0)) >= (limit * GIB).floor()
+    consumed_bytes.max(0) >= crate::gb_to_bytes_i64(limit)
 }
 
 #[cfg(test)]
@@ -252,7 +251,7 @@ mod tests {
     #[test]
     fn unlimited_main_and_bounded_cdn_are_independent() {
         let tags = HashSet::from(["CDN_DE".to_owned(), "CDN_UK".to_owned()]);
-        let user = json!({"cdnLimitGb":1.0,"cdnUsedBytes":1_073_741_824_i64});
+        let user = json!({"cdnLimitGb":1.0,"cdnUsedBytes":1_000_000_000_i64});
         assert!(exhausted(&user, "CDN_DE", &tags));
         assert!(exhausted(&user, "CDN_UK", &tags));
         assert!(!exhausted(&user, "MAIN_DE", &tags));
@@ -262,6 +261,41 @@ mod tests {
             &tags
         ));
         assert!(exhausted(&json!({"cdnLimitGb":1.0}), "CDN_DE", &tags));
+    }
+
+    #[test]
+    fn decimal_gigabytes_enforce_exact_byte_thresholds() {
+        let tags = HashSet::from(["CDN_PL".to_owned()]);
+        assert!(!exhausted(
+            &json!({"cdnLimitGb":1.0,"cdnUsedBytes":999_999_999_i64}),
+            "CDN_PL",
+            &tags
+        ));
+        assert!(exhausted(
+            &json!({"cdnLimitGb":1.0,"cdnUsedBytes":1_000_000_000_i64}),
+            "CDN_PL",
+            &tags
+        ));
+        assert!(!exhausted(
+            &json!({"cdnLimitGb":0.000_000_03,"cdnUsedBytes":29_i64}),
+            "CDN_PL",
+            &tags
+        ));
+        assert!(exhausted(
+            &json!({"cdnLimitGb":0.000_000_03,"cdnUsedBytes":30_i64}),
+            "CDN_PL",
+            &tags
+        ));
+        assert!(!exhausted(
+            &json!({"cdnLimitGb":5,"cdnUsedBytes":4_999_999_999_i64}),
+            "CDN_PL",
+            &tags
+        ));
+        assert!(exhausted(
+            &json!({"cdnLimitGb":5,"cdnUsedBytes":5_000_000_000_i64}),
+            "CDN_PL",
+            &tags
+        ));
     }
 
     #[test]
@@ -295,7 +329,7 @@ mod tests {
     fn quota_is_independent_of_total_account_meter() {
         let tags = HashSet::from(["CDN_DE".to_owned()]);
         let user =
-            json!({"limit":0,"used":10_000.0,"cdnLimitGb":3.0,"cdnUsedBytes":1_073_741_824_i64});
+            json!({"limit":0,"used":10_000.0,"cdnLimitGb":3.0,"cdnUsedBytes":1_000_000_000_i64});
         assert!(!exhausted(&user, "CDN_DE", &tags));
         assert!(!exhausted(&user, "MAIN_DE", &tags));
         assert!(validate_user(&json!({"cdnLimitGb":3.0})).is_ok());

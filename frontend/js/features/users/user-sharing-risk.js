@@ -9,15 +9,15 @@
   const TTL=60000;
   const HOUR=3600000;
   const DAY=24*HOUR;
-  const GiB=1024**3;
+  const GB=1000**3;
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const en=()=>globalThis.XMeshI18n?.getLanguage?.()==='en';
   const t=(ru,enText)=>en()?enText:ru;
   const fmtBytes=value=>{
     const n=Math.max(0,Number(value)||0);
-    if(n>=1024**4)return (n/1024**4).toFixed(n>=10*1024**4?1:2)+' '+t('ТБ','TB');
-    if(n>=GiB)return (n/GiB).toFixed(n>=10*GiB?1:2)+' '+t('ГБ','GB');
-    return (n/1024**2).toFixed(0)+' '+t('МБ','MB');
+    if(n>=1000**4)return (n/1000**4).toFixed(n>=10*1000**4?1:2)+' '+t('ТБ','TB');
+    if(n>=GB)return (n/GB).toFixed(n>=10*GB?1:2)+' '+t('ГБ','GB');
+    return (n/1000**2).toFixed(0)+' '+t('МБ','MB');
   };
   const ago=ms=>{
     const value=Number(ms)||0;if(!value)return '—';
