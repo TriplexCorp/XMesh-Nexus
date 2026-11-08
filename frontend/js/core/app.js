@@ -4838,8 +4838,20 @@ async function setP(){
   // rules and the original per-feature lifecycle/mounting logic.
   const embedded=settingsPage==='security'?securityP():
     settingsPage==='admins'?await simple(['admins']):null;
+  const focusItems=SETTINGS_FOCUS_GROUPS[settingsPage]||[];
+  const focusGroup=focusItems.length?settingsFocusForPage(settingsPage):null;
+  const activeCards=selected.filter(card=>!focusGroup||card.dataset.settingsGroup===focusGroup);
   const columns=[[],[]];
-  selected.forEach((card,index)=>columns[index%2].push(card.outerHTML));
+  selected.forEach((card,index)=>{
+    if(focusGroup&&card.dataset.settingsGroup!==focusGroup)card.hidden=true;
+    columns[index%2].push(card.outerHTML);
+  });
+  const activeColumns=columns.map((_,index)=>selected.some((card,cardIndex)=>
+    cardIndex%2===index&&(!focusGroup||card.dataset.settingsGroup===focusGroup)));
+  const focusMarkup=focusItems.length>1?
+    `<div class="settings-focus-bar" role="group" aria-label="${panelIsEnglish()?'Settings groups':'Группы настроек'}">
+      ${focusItems.map(([key,ru,en])=>`<button type="button" data-settings-focus="${key}" class="${key===focusGroup?'is-active':''}" aria-pressed="${key===focusGroup?'true':'false'}">${panelIsEnglish()?en:ru}</button>`).join('')}
+    </div>`:'';
   const [,title,description]=SETTINGS_PAGES.find(([key])=>key===settingsPage);
   const navigation=settingsPagesForSession().map(([key,label,subtitle,iconName])=>{
     const active=key===settingsPage;
