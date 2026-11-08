@@ -313,6 +313,7 @@ async function main() {
         }
       }
       await navigate('set/appearance');
+      await page.locator('[data-settings-focus="colors"]').click();
       const original=await page.locator('#custom-a').inputValue();
       try{
         await page.locator('#custom-a').fill('#ABCDEF');
