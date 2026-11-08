@@ -88,8 +88,10 @@ assert.match(source,/class="crx-flag"/,'Flags must be rendered without external 
 assert.match(source,/data-cr-json-apply/,'JSON mode must remain available');
 const clientCss=fs.readFileSync('frontend/styles/features/routing/client-routing.css','utf8');
 assert.match(clientCss,/#client-route-root\.crx \.crx-card/,'Cards must have dedicated scoped styling');
-assert.match(clientCss,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,24rem\),1fr\)\)/,
- 'Gallery should distribute a small number of real cards across desktop width');
+assert.match(clientCss,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,24rem\),30rem\)\)/,
+ 'Routing gallery must cap card tracks rather than distribute cards across the whole desktop');
+assert.match(clientCss,/\.crx-list\{[^}]*justify-content:start/,
+ 'Routing templates must stay packed against the left edge with small consistent gaps');
 assert.match(clientCss,/\.crx-card-identity\{display:grid;gap:\.35rem/,
  'Compact cards must not return to oversized vertical gaps');
 assert.match(clientCss,/\.crx-source-grid/,'Server selection must use responsive cards');

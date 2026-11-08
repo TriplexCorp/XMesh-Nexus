@@ -816,6 +816,44 @@ async function main() {
       }
     });
 
+    await checked('Catalogue bulk toolbars: select, count and clear without mutating records',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      for(const [route,root,card] of [
+        ['nodes','.nodes-page','[data-node-card-id]'],
+        ['hosts','.host-directory','[data-host-card-id]'],
+        ['squads','.squad-directory','[data-squad-card]']
+      ]){
+        await navigate(route);
+        const scope=page.locator(root);
+        assert(await scope.locator(card).count()>0,route+' requires a persisted fixture');
+        const mode=scope.locator('[data-bulk-action="mode"]');
+        assert(await mode.isVisible(),route+' must have bulk actions in its existing toolbar');
+        assert.match((await mode.innerText()).trim(),/^(Массовые действия|Bulk actions)$/);
+        await mode.click();
+        assert.match((await mode.innerText()).trim(),/^(Завершить выбор|Finish selection)$/);
+        const first=scope.locator(card+' [data-bulk-check]').first();
+        assert(await first.isVisible(),route+' must expose a selection checkbox on each card');
+        await first.check();
+        assert.match(await scope.locator('.nx-bulk-count').innerText(),/\b1\b/);
+        await scope.locator('[data-bulk-action="all"]').click();
+        const visible=await scope.locator(card+':visible').count();
+        assert.equal(await scope.locator('[data-bulk-check]:checked').count(),visible,
+          route+' select visible must target only visible cards');
+        await scope.locator('[data-bulk-action="clear"]').click();
+        assert.equal(await scope.locator('[data-bulk-check]:checked').count(),0);
+        await mode.click();
+        assert.equal(await scope.locator('[data-bulk-check]:visible').count(),0);
+      }
+      await navigate('users');
+      assert.equal(await page.locator('.users-toolbar #bulk').count(),1,
+        'Existing User bulk actions must live inside the main toolbar');
+      const checkbox=page.locator('#ut [data-sel]').first();
+      await checkbox.check();
+      assert(await page.locator('.users-toolbar #bulk.on').isVisible(),
+        'User bulk toolbar should activate as soon as a row is selected');
+      await page.locator('[data-bk="clr"]').click();
+    });
+
     await checked('Host directory: cards, layout, active state and existing controls',async()=>{
       for(const [width,height] of [[1920,1080],[1366,768],[390,844]]){
         await page.setViewportSize({width,height});
@@ -907,6 +945,23 @@ async function main() {
       }
     });
 
+    await checked('Hosts bulk actions stay within responsive toolbar bounds',async()=>{
+      for(const width of [1920,1366,1024,390]){
+        await page.setViewportSize({width,height:900});
+        await navigate('hosts');
+        const mode=page.locator('.host-directory-toolbar [data-bulk-action="mode"]');
+        await mode.click();
+        await page.locator('.host-card-grid [data-bulk-check]').first().check();
+        const g=await page.locator('.host-directory-toolbar').evaluate(el=>{
+          const t=el.getBoundingClientRect(),b=el.querySelector('[data-bulk-toolbar]').getBoundingClientRect();
+          return{toolbarLeft:t.left,toolbarRight:t.right,bulkLeft:b.left,bulkRight:b.right,overflow:document.documentElement.scrollWidth>innerWidth+1};
+        });
+        assert(!g.overflow,'Host bulk selection must not overflow page');
+        assert(g.bulkLeft>=g.toolbarLeft-1&&g.bulkRight<=g.toolbarRight+1,'Bulk controls stay inside toolbar at '+width);
+        await mode.click();
+      }
+    });
+
     await checked('Hosts toolbar: inline counters share a compact row on desktop',async()=>{
       for(const width of [1920,1366,1024,390]){
         await page.setViewportSize({width,height:900});
@@ -916,17 +971,18 @@ async function main() {
           const search=box(toolbar.querySelector('[data-host-search]'));
           const summary=box(toolbar.querySelector('.host-directory-summary'));
           const density=box(toolbar.querySelector('.nx-workspace-grid-controls'));
+          const bulk=box(toolbar.querySelector('[data-bulk-toolbar]'));
           const add=box(toolbar.querySelector('.nx-workspace-create'));
           const metrics=[...toolbar.querySelectorAll('.host-summary-metric')].map(box);
           const bar=box(toolbar);
-          return{bar,search,summary,density,add,metrics,overflow:document.documentElement.scrollWidth>innerWidth+1,
+          return{bar,search,summary,bulk,density,add,metrics,overflow:document.documentElement.scrollWidth>innerWidth+1,
             separate:!!document.querySelector('.host-directory > .host-directory-summary')};
         });
         assert.equal(result.separate,false,'Hosts stats must not make a second standalone surface');
         assert.equal(result.metrics.length,3,'All three host inventory counters must remain visible');
         assert(!result.overflow,'Toolbar counts must not create horizontal page overflow');
         assert(result.metrics.every(m=>m.width>0),'Host summary numbers must have visible widths');
-        for(const item of [result.search,result.summary,result.density,result.add])
+        for(const item of [result.search,result.summary,result.bulk,result.density,result.add])
           assert(item.x>=result.bar.x-1&&item.right<=result.bar.right+1,
             'Every toolbar control must fit within its framed surface');
         assert(Math.abs(result.search.mid-result.add.mid)<3,
@@ -934,6 +990,8 @@ async function main() {
         if(width>=1366){
           assert(Math.abs(result.search.mid-result.summary.mid)<3,
             'Desktop counts must share the same toolbar row as search');
+          assert(Math.abs(result.search.mid-result.bulk.mid)<3,
+            'Desktop bulk action trigger must share the leading toolbar row');
           assert(Math.abs(result.summary.mid-result.density.mid)<3,
             'Desktop density controls must stay on the same row as counters');
           assert(result.bar.height<=95,'Hosts desktop toolbar must not waste space on stacked metrics');
@@ -1301,9 +1359,19 @@ async function main() {
           assert(compact.create.right<=compact.toolbar.right+1,
             'Create action must remain inside the toolbar frame');
           assert.equal(compact.cards.length,3,'All routing templates remain visible');
-          if(width>=1366&&Math.abs(compact.cards[0].top-compact.cards[2].top)<3)
-            assert(compact.cards[2].right>=compact.list.right-48,
-              'Three cards on one row must fill the desktop gallery, without an unused fourth column');
+          if(width>=1366){
+            const sameRow=compact.cards.filter(card=>Math.abs(card.top-compact.cards[0].top)<3);
+            const rem=await page.evaluate(()=>parseFloat(getComputedStyle(document.documentElement).fontSize));
+            assert(Math.abs(compact.cards[0].left-compact.list.left)<2,
+              'Routing cards should start at the left edge of the workspace');
+            for(let i=1;i<sameRow.length;i++){
+              const gap=sameRow[i].left-sameRow[i-1].right;
+              assert(gap>=0&&gap<=Math.max(2*rem,32),
+                'Adjacent routing templates should have a small, consistent gap: '+gap+'px');
+            }
+            assert(sameRow.every(card=>card.width<=30*rem+2),
+              'Routing cards should remain readable without stretching over the entire workspace');
+          }
           if(width>=1920)assert(compact.cards[0].height<500,
             'Routing assignment and three ordered rules should not need a tall card');
           assert(!compact.overflow,'Compact routing gallery must not overflow the document');
@@ -1544,7 +1612,6 @@ async function main() {
       assert.equal(g.paneScrolls,0,'Only the shared body may scroll');
       if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Content must fit without scrolling when viewport height is sufficient');
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
-
       const layout=await page.locator('#dlg').evaluate(d=>{
         const b=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}};
         const fields=[...d.querySelectorAll('.user-basic-card>.f')].map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y}});

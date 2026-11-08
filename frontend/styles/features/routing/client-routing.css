@@ -37,8 +37,8 @@
 #client-route-root.crx .crx-total{display:inline-grid;place-items:center;min-width:1.45rem;min-height:1.45rem;padding:.12rem .35rem;border:1px solid var(--crx-border);border-radius:var(--nx-control-radius);background:var(--crx-panel);color:var(--crx-text);font-size:.73rem;font-weight:750;font-variant-numeric:tabular-nums}
 #client-route-root.crx .crx-page-actions .crx-btn{min-height:2.3rem;padding:.45rem .75rem;font-size:.78rem}
 /* A readable gallery: each template owns its scope, ordered decisions and actions. */
-#client-route-root.crx .crx-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));gap:.75rem;align-items:start}
-#client-route-root.crx .crx-card{container:routing-card / inline-size;display:flex;flex-direction:column;gap:.7rem;min-width:0;max-width:46rem;padding:.85rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-bg);background-image:var(--nx-panel-image);box-shadow:var(--nx-panel-shadow)}
+#client-route-root.crx .crx-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),30rem));gap:.75rem;align-items:start;justify-content:start}
+#client-route-root.crx .crx-card{container:routing-card / inline-size;display:flex;flex-direction:column;gap:.7rem;min-width:0;width:100%;max-width:none;padding:.85rem;border:1px solid var(--crx-border);border-radius:var(--nx-card-radius);background:var(--crx-bg);background-image:var(--nx-panel-image);box-shadow:var(--nx-panel-shadow)}
 #client-route-root.crx .crx-card-identity{display:grid;gap:.35rem;min-width:0}
 #client-route-root.crx .crx-card-title{font-size:1.025rem;font-weight:750;min-width:0}
 #client-route-root.crx .crx-overview-toggle{display:flex;align-items:center;gap:.5rem;min-height:1.9rem;width:100%;padding:0;border:0;border-radius:var(--nx-control-radius);background:transparent;color:var(--crx-text);font:inherit;text-align:left}
