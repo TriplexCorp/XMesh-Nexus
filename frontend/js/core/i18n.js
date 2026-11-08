@@ -16,6 +16,10 @@ window.XMeshI18n=(()=>{
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
     "Панель":"Panel",
+    "Группы настроек":"Settings groups",
+    "Интеграции и уведомления":"Integrations & alerts",
+    "Обновления":"Updates",
+    "Трафик и CDN":"Traffic & CDN",
     "Брендинг, поведение, интеграции и уведомления":"Branding, behavior, integrations and notifications",
     "Оформление":"Appearance",
     "Палитра, композиция, типографика и эффекты":"Palette, layout, typography and effects",
