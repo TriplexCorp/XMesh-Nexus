@@ -19,14 +19,48 @@ const styles=['frontend/styles/system/nexus-v3-foundation.css','frontend/styles/
     const [html,mount]=await templatesP();document.body.innerHTML=html;mount();
    };window.boot();`});
    await page.locator('[data-template-card="tpls:1"]').waitFor();
+   const geometry=await page.evaluate(()=>{
+     const bar=document.querySelector('[data-template-section=tpls] .template-section-tools');
+     const tabs=bar?.querySelector('.templates-tabs');
+     const search=bar?.querySelector('[data-template-search]');
+     const actions=bar?.querySelector('.nx-workspace-actions');
+     const rect=el=>{const r=el.getBoundingClientRect();return{x:r.x,right:r.right,top:r.top,bottom:r.bottom,mid:(r.top+r.bottom)/2}};
+     return{
+       bar:bar?rect(bar):null,
+       tabs:tabs?rect(tabs):null,
+       search:search?rect(search):null,
+       actions:actions?rect(actions):null,
+       tabCount:document.querySelectorAll('.templates-tabs').length,
+       standalone:document.querySelectorAll('.templates-workspace > .templates-tabs').length,
+       overflow:document.documentElement.scrollWidth>innerWidth+1
+     };
+   });
+   assert.equal(geometry.tabCount,1,'Exactly one accessible template tablist must exist');
+   assert.equal(geometry.standalone,0,'Template types must be inside the active toolbar, not on a separate row');
+   assert(geometry.tabs&&geometry.search&&geometry.actions,'The active toolbar must contain tabs, search and actions');
+   assert(!geometry.overflow,'The unified toolbar must not overflow the document');
+   for(const child of [geometry.tabs,geometry.search,geometry.actions]){
+     assert(child.x>=geometry.bar.x-1&&child.right<=geometry.bar.right+1,
+       'All template toolbar controls must stay inside its framed surface');
+   }
+   if(width===1920)assert(
+     Math.abs(geometry.tabs.mid-geometry.search.mid)<3&&
+     Math.abs(geometry.search.mid-geometry.actions.mid)<3,
+     'On desktop, template types, search and actions must share one horizontal line');
+
    assert.equal(await page.locator('[data-ne="tpls"]:visible').count(),1,'Only one create action should be visible');
    assert.equal(await page.locator('.templates-heading,.templates-kicker').count(),0,'Repeated headings must be removed');
    await page.locator('[data-template-search=tpls]').fill('Premium');
    assert.equal(await page.locator('[data-template-card]:visible').count(),1);
    await page.locator('[data-template-tab=subs]').click();
+   assert.equal(await page.locator('[data-template-section=subs] .template-section-tools .templates-tabs').count(),1,
+     'Tab switching must move the same navigation into the subscription toolbar');
+   assert.equal(await page.locator('.templates-tabs').count(),1,'Tablist must not be duplicated when switching');
    assert(await page.locator('[data-template-section=subs] .template-empty').isVisible());
    assert.equal(await page.locator('[data-ne="subs"]:visible').count(),1);
    await page.locator('[data-template-tab=subs]').press('Home');
+   assert.equal(await page.locator('[data-template-section=tpls] .template-section-tools .templates-tabs').count(),1,
+     'Keyboard Home must return the tablist to the user template toolbar');
    assert.equal(await page.locator('[data-template-search=tpls]').inputValue(),'Premium','Switching tabs must preserve the search');
    await page.locator('[data-template-search=tpls]').press('Escape');
    assert.equal(await page.locator('[data-template-card]:visible').count(),2);
