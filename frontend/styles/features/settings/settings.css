@@ -99,7 +99,7 @@
  display:flex;align-items:center;gap:.62rem;min-width:0;min-height:2.85rem;
  padding:.5rem .6rem;border:1px solid transparent;
  border-radius:var(--nx-control-radius);color:var(--mu);text-decoration:none;
- transition:background-color var(--nx-duration),border-color var(--nx-duration),color var(--nx-duration)
+ transition:background-color var(--nx-motion-medium) var(--nx-motion-ease),border-color var(--nx-motion-medium) var(--nx-motion-ease),color var(--nx-motion-fast) ease
 }
 .settings-center-link:hover{background:var(--nx-hover-bg);color:var(--tx)}
 .settings-center-link.is-active{
@@ -111,11 +111,12 @@
 .settings-center-link-icon{
  display:grid;place-items:center;flex:none;width:1.85rem;height:1.85rem;
  border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);
- background:var(--nx-section-bg)
+ background:var(--nx-section-bg);
+ transition:border-color var(--nx-motion-medium) var(--nx-motion-ease),color var(--nx-motion-medium) var(--nx-motion-ease),transform var(--nx-motion-medium) var(--nx-motion-ease-out)
 }
 .settings-center-link-icon .ic{width:1rem;height:1rem}
 .settings-center-link.is-active .settings-center-link-icon{
- color:var(--a);border-color:var(--nx-selected-border)
+ color:var(--a);border-color:var(--nx-selected-border);transform:scale(1.045)
 }
 .settings-center-link-copy{display:flex;align-items:center;min-width:0}
 .settings-center-link-copy strong{font-size:.82rem;font-weight:730;line-height:1.3}
@@ -194,6 +195,27 @@
  min-width:0;width:100%;max-width:none;margin:0
 }
 .settings-center-embedded>.card{width:100%;min-width:0}
+
+/* Subpage content enters without remounting the rail. Animating only the
+   heading and content avoids moving interactive navigation or changing grid
+   geometry; initial page loads and same-page refreshes remain immediate. */
+@keyframes nx-settings-panel-enter{
+ from{opacity:0;transform:translate3d(0,.45rem,0)}
+ to{opacity:1;transform:none}
+}
+html[data-motion=on] .settings-center-main.settings-center-enter > :is(.settings-center-heading,.settings-center-embedded,.settings-center-grid){
+ animation:nx-settings-panel-enter var(--nx-motion-medium) var(--nx-motion-ease-out) both
+}
+html[data-motion=on] .settings-center-main.settings-center-enter > :is(.settings-center-embedded,.settings-center-grid){
+ animation-duration:var(--nx-motion-slow);
+ animation-delay:45ms
+}
+html[data-motion=off] .settings-center-link,
+html[data-motion=off] .settings-center-link-icon{transition:none}
+@media(prefers-reduced-motion:reduce){
+ .settings-center-main.settings-center-enter > :is(.settings-center-heading,.settings-center-embedded,.settings-center-grid){animation:none!important}
+ .settings-center-link,.settings-center-link-icon{transition:none!important}
+}
 
 /* Functional browser preferences. The main design system remains authoritative;
  * settings only supply user-selected root-level overrides. */

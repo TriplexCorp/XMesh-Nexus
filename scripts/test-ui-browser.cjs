@@ -210,6 +210,57 @@ async function main() {
       await screenshot(page,'settings-composition-compact-mobile');
     });
 
+    await checked('Settings tabs: persistent navigation and accessible transitions',async()=>{
+      await page.setViewportSize({width:1440,height:900});
+      // The browser suite normally uses reduced motion: explicitly opt in
+      // for the positive animation case, then restore the original policy.
+      await page.emulateMedia({reducedMotion:'no-preference'});
+      try{
+        await navigate('set/general');
+        await page.evaluate(()=>{
+          const rail=document.querySelector('.settings-center-rail');
+          rail.dataset.motionProbe='preserved';
+          window.__settingsHadSkeleton=false;
+          window.__settingsSkeletonObserver=new MutationObserver(()=>{
+            if(document.querySelector('#view .sk'))window.__settingsHadSkeleton=true;
+          });
+          window.__settingsSkeletonObserver.observe(document.querySelector('#view'),{childList:true,subtree:true});
+        });
+        await page.locator('.settings-center-link[href="#set/appearance"]').click();
+        await page.locator('[data-settings-section="appearance"]').waitFor({state:'visible'});
+        const state=await page.evaluate(()=>{
+          window.__settingsSkeletonObserver.disconnect();
+          return{
+            rail:document.querySelector('.settings-center-rail')?.dataset.motionProbe,
+            skeleton:window.__settingsHadSkeleton,
+            active:document.querySelectorAll('.settings-center-link[aria-current="page"]').length,
+            heading:getComputedStyle(document.querySelector('.settings-center-heading')).animationName,
+            grid:getComputedStyle(document.querySelector('.settings-center-grid')).animationName
+          };
+        });
+        assert.equal(state.rail,'preserved','Switching settings pages must not replace the navigation rail');
+        assert.equal(state.skeleton,false,'Switching settings pages must not flash global skeletons');
+        assert.equal(state.active,1,'Exactly one navigation entry stays active');
+        assert.equal(state.heading,'nx-settings-panel-enter','Heading should transition on category changes');
+        assert.equal(state.grid,'nx-settings-panel-enter','Content should transition on category changes');
+
+        await page.evaluate(()=>{document.documentElement.dataset.motion='off'});
+        await page.locator('.settings-center-link[href="#set/system"]').click();
+        await page.locator('[data-settings-section="system"]').waitFor({state:'visible'});
+        assert.equal(await page.locator('.settings-center-grid').evaluate(el=>getComputedStyle(el).animationName),'none',
+          'Panel motion-off must disable Settings transitions');
+        await page.evaluate(()=>{document.documentElement.dataset.motion='on'});
+        await page.emulateMedia({reducedMotion:'reduce'});
+        await page.locator('.settings-center-link[href="#set/appearance"]').click();
+        await page.locator('[data-settings-section="appearance"]').waitFor({state:'visible'});
+        assert.equal(await page.locator('.settings-center-grid').evaluate(el=>getComputedStyle(el).animationName),'none',
+          'OS reduced-motion must disable Settings transitions');
+      }finally{
+        await page.emulateMedia({reducedMotion:'reduce'});
+        await page.evaluate(()=>{document.documentElement.dataset.motion='off'});
+      }
+    });
+
     await checked('CDN traffic pool: owner chooses inbounds and selection survives reload',async()=>{
       await page.setViewportSize({width:1440,height:900});
       await navigate('set/traffic');

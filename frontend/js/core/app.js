@@ -1222,10 +1222,40 @@ async function render(soft){
   if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   v.dataset.workspace=PAGE_WORKSPACES[cur];v.dataset.page=cur;
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
-  if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
+  // Adjacent Settings pages are one workspace: keep the mounted rail and
+  // current content visible until the next subpage is ready. Never flash the
+  // global loading skeleton between Settings categories.
+  const previousSettingsSection=cur==='set'?v.querySelector('#settings-subpage')?.dataset.settingsSection:null;
+  if(!soft){
+    v.classList.remove('still');
+    if(!previousSettingsSection)v.innerHTML=skel();
+    scrollTo(0,0);
+  }
   try{
     const [h,i]=await f();if(rt!==RT)return;
-    v.classList.toggle('still',!!soft);v.innerHTML=h;
+    v.classList.toggle('still',!!soft);
+    let keptSettingsRail=false;
+    if(previousSettingsSection&&cur==='set'){
+      const next=document.createElement('template');
+      next.innerHTML=h;
+      const incoming=next.content.querySelector('#settings-subpage');
+      const current=v.querySelector('#settings-subpage');
+      const links=[...v.querySelectorAll('.settings-center-link')];
+      const nextLinks=[...next.content.querySelectorAll('.settings-center-link')];
+      if(incoming&&current&&links.length===nextLinks.length&&
+        links.every((link,index)=>link.getAttribute('href')===nextLinks[index].getAttribute('href'))){
+        current.replaceWith(incoming);
+        links.forEach((link,index)=>{
+          const active=nextLinks[index].hasAttribute('aria-current');
+          link.classList.toggle('is-active',active);
+          if(active)link.setAttribute('aria-current','page');
+          else link.removeAttribute('aria-current');
+        });
+        if(previousSettingsSection!==incoming.dataset.settingsSection)incoming.classList.add('settings-center-enter');
+        keptSettingsRail=true;
+      }
+    }
+    if(!keptSettingsRail)v.innerHTML=h;
     decorateButtonIcons(v);
     if(i)i();
     initializeRangeProgress(v);
