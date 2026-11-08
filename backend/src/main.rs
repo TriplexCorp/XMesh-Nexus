@@ -3993,8 +3993,12 @@ pub(crate) fn gb_to_bytes_i64(gb: f64) -> i64 {
     let repr = gb.to_string();
     let (mantissa, exponent) = repr
         .split_once(['e', 'E'])
-        .map_or((repr.as_str(), 0_i32), |(m, e)| (m, e.parse::<i32>().unwrap_or(0)));
-    let decimals = mantissa.split_once('.').map_or(0_i32, |(_, fraction)| fraction.len() as i32);
+        .map_or((repr.as_str(), 0_i32), |(m, e)| {
+            (m, e.parse::<i32>().unwrap_or(0))
+        });
+    let decimals = mantissa
+        .split_once('.')
+        .map_or(0_i32, |(_, fraction)| fraction.len() as i32);
     let digits = mantissa.replace('.', "");
     let Ok(coefficient) = digits.parse::<i128>() else {
         return i64::MAX;
