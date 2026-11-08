@@ -1237,3 +1237,28 @@ dialog.node-wide .node-tls-setup-feedback[data-ready=no] { color:var(--er); }
   dialog.node-wide .node-address-port { grid-template-columns:minmax(0,1fr) 5rem; }
   dialog.node-wide .node-tls-method-option { gap:.6rem;padding:.7rem .5rem; }
 }
+
+
+/* Unified bypass-traffic policy: two intentional choices, advanced inbound scope. */
+dialog.node-wide .node-bypass-policy{grid-column:1/-1;display:grid;gap:.65rem;min-width:0}
+dialog.node-wide .node-bypass-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+dialog.node-wide .node-bypass-choices button{display:flex;align-items:center;justify-content:center;gap:.45rem;min-height:3rem;padding:.55rem .65rem;color:var(--tx);font:inherit;font-size:.8rem;font-weight:650;cursor:pointer;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg);transition:border-color .18s ease,background .18s ease}
+dialog.node-wide .node-bypass-choices button .ic{width:1rem;height:1rem;flex:none;color:var(--mu)}
+dialog.node-wide .node-bypass-choices button[aria-pressed=true]{border-color:color-mix(in srgb,var(--a) 65%,var(--nx-border));background:color-mix(in srgb,var(--a) 10%,var(--nx-section-bg))}
+dialog.node-wide .node-bypass-choices button[aria-pressed=true] .ic{color:var(--a)}
+dialog.node-wide .node-bypass-choices button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+dialog.node-wide .node-bypass-scope{display:flex;gap:.55rem;align-items:center;padding:.5rem .6rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-panel-bg);font-size:.78rem;cursor:pointer}
+dialog.node-wide .node-bypass-scope input{accent-color:var(--a);width:1rem;height:1rem;flex:none}
+dialog.node-wide .node-bypass-scope span{display:flex;flex-wrap:wrap;align-items:baseline;gap:.3rem}
+dialog.node-wide .node-bypass-scope small{color:var(--mu);font-size:.68rem}
+dialog.node-wide .node-bypass-scope[hidden],dialog.node-wide [data-node-cdn-inbounds][hidden]{display:none}
+dialog.node-wide [data-node-cdn-inbounds]{grid-column:1/-1;min-width:0;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);padding:.65rem;background:var(--nx-panel-bg)}
+dialog.node-wide [data-node-cdn-inbounds] .ms{display:flex;flex-wrap:wrap;gap:.45rem}
+dialog.node-wide [data-node-cdn-inbounds] .note{margin:.5rem 0 0;font-size:.72rem}
+.bypass-legacy-rules{margin:.6rem 0;padding:.55rem .7rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
+.bypass-legacy-rules>summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:.6rem;font-size:.79rem;font-weight:650}
+.bypass-legacy-rules>summary small{color:var(--mu);font-size:.68rem;font-weight:500}
+.bypass-legacy-rules[open]>summary{margin-bottom:.7rem}
+.bypass-legacy-rules .note{font-size:.75rem;line-height:1.5}
+@media(max-width:600px){dialog.node-wide .node-bypass-choices{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){dialog.node-wide .node-bypass-choices button{transition:none}}
