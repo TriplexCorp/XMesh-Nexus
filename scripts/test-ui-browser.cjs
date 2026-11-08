@@ -607,9 +607,9 @@ async function main() {
       for(const theme of ['light','dark']){
         await page.setViewportSize({width:1440,height:900});
         await navigate('users');
-        const layout=await page.locator('#uf').evaluate(root=>{
+        const layout=await page.locator('#uf').evaluate((root,theme)=>{
           const old=document.documentElement.dataset.theme;
-          document.documentElement.dataset.theme='${theme}';
+          document.documentElement.dataset.theme=theme;
           const buttons=[...root.querySelectorAll('button[data-uf]')];
           const dimensions=buttons.map(button=>{
             const label=button.querySelector('.users-filter-label');
@@ -625,9 +625,10 @@ async function main() {
               inside:l&&c&&c.right<=b.right+1
             };
           });
-          document.documentElement.dataset.theme=old;
+          if(old===undefined)delete document.documentElement.dataset.theme;
+          else document.documentElement.dataset.theme=old;
           return{dimensions,overflow:document.documentElement.scrollWidth>innerWidth+1};
-        });
+        },theme);
         assert.equal(layout.dimensions.length,7,'Every status category must have a count');
         assert(layout.dimensions.every(v=>v.gap>=6),'Labels must have a visible gap before their counters');
         assert(layout.dimensions.every(v=>v.countWidth>=18&&v.verticalDelta<=3&&v.inside),
