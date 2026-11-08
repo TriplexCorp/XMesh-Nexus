@@ -217,6 +217,128 @@ html[data-motion=off] .settings-center-link-icon{transition:none}
  .settings-center-link,.settings-center-link-icon{transition:none!important}
 }
 
+
+/* Dense, task-focused Settings composition. This is one shared contract for
+   all six categories, not one-off per-card offsets. Hidden groups keep their
+   original controls and event handlers mounted. */
+.settings-workspace .settings-center{gap:clamp(.6rem,.8vw,.95rem)}
+.settings-workspace .settings-center-rail{padding:.3rem}
+.settings-workspace .settings-center-nav{gap:.1rem}
+.settings-workspace .settings-center-link{
+ min-height:2.3rem;padding:.3rem .48rem;gap:.46rem
+}
+.settings-workspace .settings-center-link-icon{
+ width:1.55rem;height:1.55rem
+}
+.settings-workspace .settings-center-link-icon .ic{width:.88rem;height:.88rem}
+.settings-workspace .settings-center-main{
+ gap:clamp(.5rem,.65vw,.8rem)
+}
+.settings-workspace .settings-center-heading{
+ padding:.08rem 0 .48rem;gap:.55rem
+}
+.settings-workspace .settings-center-heading h2{font-size:1.03rem}
+.settings-workspace .settings-center-heading p{
+ margin:.1rem 0 0;font-size:.71rem;line-height:1.4
+}
+.settings-workspace .settings-focus-bar{
+ display:flex;flex-wrap:wrap;align-items:center;gap:.28rem;
+ min-width:0;width:fit-content;max-width:100%;
+ padding:.26rem;border:1px solid var(--nx-border);
+ border-radius:var(--nx-control-radius);background:var(--nx-section-bg)
+}
+.settings-workspace .settings-focus-bar>button{
+ min-height:2.05rem;min-width:0;padding:.4rem .75rem;
+ border:1px solid transparent;border-radius:var(--nx-control-radius);
+ background:transparent;color:var(--nx-muted);font-size:.76rem;font-weight:690;
+ line-height:1.25;white-space:normal;text-align:center;
+ transition:background-color var(--nx-duration),border-color var(--nx-duration),color var(--nx-duration)
+}
+.settings-workspace .settings-focus-bar>button:hover{
+ color:var(--tx);background:var(--nx-hover-bg)
+}
+.settings-workspace .settings-focus-bar>button.is-active{
+ background:var(--nx-selected-bg);border-color:var(--nx-selected-border);color:var(--tx)
+}
+.settings-workspace .settings-focus-bar>button:focus-visible{
+ outline:2px solid var(--nx-focus);outline-offset:2px
+}
+.settings-workspace .settings-center-grid{
+ grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem
+}
+.settings-workspace .settings-center-grid[data-single=true]{
+ grid-template-columns:minmax(0,1fr)
+}
+.settings-workspace .settings-center-grid .appearance-column{
+ gap:.7rem;min-width:0
+}
+.settings-workspace .settings-center-grid .card{
+ padding:calc(var(--nx-card-pad)*.8);min-width:0
+}
+.settings-workspace .settings-center-grid .setting-row{
+ padding:.52rem 0;gap:.55rem
+}
+.settings-workspace .settings-center-grid .appearance-card-heading,
+.settings-workspace .settings-center-grid .settings-appearance-header{
+ gap:.2rem;padding-bottom:.55rem
+}
+.settings-workspace .settings-center-grid .setting-copy :is(small,p){
+ line-height:1.36
+}
+.settings-workspace .settings-center-grid .palette-preset-grid{gap:.3rem}
+.settings-workspace .settings-center-grid .palette-preset{padding:.35rem;gap:.22rem}
+.settings-workspace .settings-center-grid .palette-preset-demo{height:1.05rem}
+.settings-workspace .settings-center-grid .font-choice>.choice button{
+ min-height:2.05rem;padding:.34rem .4rem
+}
+.settings-workspace .settings-center-grid .color-slider-grid{padding:.24rem 0}
+.settings-workspace .settings-center-grid .palette-draft-actions{margin-top:.45rem}
+.settings-workspace .settings-center-grid .history-placeholder{
+ margin-top:.5rem;padding-top:.55rem
+}
+.settings-workspace .settings-center-grid [data-settings-group][hidden],
+.settings-workspace .settings-center-grid .appearance-column[hidden],
+.settings-workspace .settings-center-embedded .security-center-pane[hidden]{
+ display:none!important
+}
+.settings-workspace .settings-center-embedded{
+ gap:.55rem
+}
+.settings-workspace .settings-center-embedded>.security-center{
+ gap:.6rem
+}
+.settings-workspace .settings-center-embedded .security-center-tabs{
+ padding:.3rem;gap:.3rem
+}
+.settings-workspace .settings-center-embedded .security-center-tabs button{
+ min-height:2.35rem;padding:.38rem .55rem
+}
+.settings-workspace .settings-center-embedded .security-center-information{
+ min-height:0;padding:calc(var(--nx-card-pad)*.8)
+}
+.settings-workspace .settings-center-embedded .security-center-pane>:is(.mfa-panel,#security-advanced,#security-sessions-panel){
+ margin-bottom:.6rem
+}
+.settings-workspace .settings-center-embedded>.card{
+ padding:calc(var(--nx-card-pad)*.8)
+}
+html[data-motion=on] .settings-workspace .settings-focus-enter{
+ animation:nx-settings-panel-enter var(--nx-motion-medium) var(--nx-motion-ease-out) both
+}
+@media(prefers-reduced-motion:reduce){
+ .settings-workspace .settings-focus-enter{animation:none!important}
+}
+@container settings-workspace (max-width:60rem){
+ .settings-workspace .settings-center-grid{
+  grid-template-columns:minmax(0,1fr)
+ }
+}
+@container settings-workspace (max-width:40rem){
+ .settings-workspace .settings-focus-bar{width:100%}
+ .settings-workspace .settings-focus-bar>button{flex:1 1 auto}
+ .settings-workspace .settings-center-grid .card{padding:var(--nx-card-pad)}
+}
+
 /* Functional browser preferences. The main design system remains authoritative;
  * settings only supply user-selected root-level overrides. */
 html[data-contrast=high]{

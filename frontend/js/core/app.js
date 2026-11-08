@@ -1195,6 +1195,8 @@ let pendingScrollTarget=null;
 function scrollToSettingsTarget(id){
   const target=document.getElementById(id);
   if(!target)return false;
+  const group=target.closest('[data-settings-group]')?.dataset.settingsGroup;
+  if(group)selectSettingsFocus(group);
   target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
   return true;
 }
@@ -1260,6 +1262,7 @@ async function render(soft){
     if(i)i();
     initializeRangeProgress(v);
     window.XMeshMfa?.mount(v);window.XMeshSecurity?.mount(v);
+    if(cur==='set')mountSettingsFocus();
     $('#unb').textContent=DB.users.length;drawBulk();
   }catch(error){
     if(rt!==RT)return;
@@ -4626,6 +4629,55 @@ const SETTINGS_PAGE_ALIASES=Object.freeze({
  colors:'appearance',layout:'appearance',typography:'appearance',
  integrations:'general',traffic:'system'
 });
+
+const SETTINGS_FOCUS_GROUPS=Object.freeze({
+ general:[['general','Основное','General'],['integrations','Интеграции и уведомления','Integrations & alerts']],
+ appearance:[['colors','Цвет и тема','Colors & theme'],['layout','Композиция','Layout'],['typography','Текст и эффекты','Type & effects']],
+ system:[['system','Обновления','Updates'],['traffic','Трафик и CDN','Traffic & CDN']]
+});
+function settingsFocusForPage(page){
+ const items=SETTINGS_FOCUS_GROUPS[page]||[];
+ const slug=location.hash.slice(1).split('/')[1];
+ if(items.some(([name])=>name===slug))return slug;
+ return items[0]?.[0];
+}
+function selectSettingsFocus(group,{navigate=false}={}){
+ const main=document.querySelector('#settings-subpage');
+ const page=main?.dataset.settingsSection;
+ const items=SETTINGS_FOCUS_GROUPS[page];
+ if(!items?.some(([name])=>name===group))return false;
+ const grid=main.querySelector('.settings-center-grid');
+ if(!grid)return false;
+ for(const button of main.querySelectorAll('[data-settings-focus]')){
+  const selected=button.dataset.settingsFocus===group;
+  button.setAttribute('aria-pressed',String(selected));
+  button.classList.toggle('is-active',selected);
+ }
+ const cards=[...grid.querySelectorAll('[data-settings-group]')];
+ for(const card of cards)card.hidden=card.dataset.settingsGroup!==group;
+ const single=String(cards.filter(card=>!card.hidden).length<=1);
+ grid.dataset.single=single;
+ main.dataset.single=single;
+ for(const column of grid.querySelectorAll('.appearance-column'))
+  column.hidden=![...column.querySelectorAll('[data-settings-group]')].some(card=>!card.hidden);
+ if(navigate&&location.hash!=='#set/'+group)
+  history.pushState(history.state,'',location.pathname+location.search+'#set/'+group);
+ if(navigate){
+  grid.classList.remove('settings-focus-enter');
+  void grid.offsetWidth;
+  grid.classList.add('settings-focus-enter');
+ }
+ return true;
+}
+function mountSettingsFocus(){
+ const main=document.querySelector('#settings-subpage');
+ if(!main||!SETTINGS_FOCUS_GROUPS[main.dataset.settingsSection])return;
+ main.querySelector('.settings-focus-bar')?.addEventListener('click',event=>{
+  const button=event.target.closest('button[data-settings-focus]');
+  if(!button||!main.contains(button))return;
+  selectSettingsFocus(button.dataset.settingsFocus,{navigate:true});
+ });
+}
 function settingsPagesForSession(){
  return SETTINGS_PAGES.filter(([key])=>key!=='admins'||sessionUser?.role==='owner');
 }
@@ -4784,8 +4836,20 @@ async function setP(){
   // rules and the original per-feature lifecycle/mounting logic.
   const embedded=settingsPage==='security'?securityP():
     settingsPage==='admins'?await simple(['admins']):null;
+  const focusItems=SETTINGS_FOCUS_GROUPS[settingsPage]||[];
+  const focusGroup=focusItems.length?settingsFocusForPage(settingsPage):null;
+  const activeCards=selected.filter(card=>!focusGroup||card.dataset.settingsGroup===focusGroup);
   const columns=[[],[]];
-  selected.forEach((card,index)=>columns[index%2].push(card.outerHTML));
+  selected.forEach((card,index)=>{
+    if(focusGroup&&card.dataset.settingsGroup!==focusGroup)card.hidden=true;
+    columns[index%2].push(card.outerHTML);
+  });
+  const activeColumns=columns.map((_,index)=>selected.some((card,cardIndex)=>
+    cardIndex%2===index&&(!focusGroup||card.dataset.settingsGroup===focusGroup)));
+  const focusMarkup=focusItems.length>1?
+    `<div class="settings-focus-bar" role="group" aria-label="${panelIsEnglish()?'Settings groups':'Группы настроек'}">
+      ${focusItems.map(([key,ru,en])=>`<button type="button" data-settings-focus="${key}" class="${key===focusGroup?'is-active':''}" aria-pressed="${key===focusGroup?'true':'false'}">${panelIsEnglish()?en:ru}</button>`).join('')}
+    </div>`:'';
   const [,title,description]=SETTINGS_PAGES.find(([key])=>key===settingsPage);
   const navigation=settingsPagesForSession().map(([key,label,subtitle,iconName])=>{
     const active=key===settingsPage;
@@ -4798,12 +4862,13 @@ async function setP(){
     <aside class="settings-center-rail" aria-label="Разделы настроек">
       <nav class="settings-center-nav" aria-label="Разделы настроек">${navigation}</nav>
     </aside>
-    <div class="settings-center-main" id="settings-subpage" data-settings-section="${settingsPage}" data-single="${selected.length===1}">
+    <div class="settings-center-main" id="settings-subpage" data-settings-section="${settingsPage}" data-single="${activeCards.length<=1}">
       ${settingsPage==='security'?'':`<header class="settings-center-heading"><div><h2>${title}</h2><p>${description}</p></div></header>`}
+      ${focusMarkup}
       ${embedded?`<div class="settings-center-embedded" data-settings-group="${settingsPage}">${embedded[0]}</div>`:`
-      <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${selected.length===1}">
-        <div class="appearance-column workspace-stack">${columns[0].join('')}</div>
-        ${columns[1].length?'<div class="appearance-column workspace-stack">'+columns[1].join('')+'</div>':''}
+      <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${activeCards.length<=1}">
+        <div class="appearance-column workspace-stack" ${activeColumns[0]?'':'hidden'}>${columns[0].join('')}</div>
+        ${columns[1].length?'<div class="appearance-column workspace-stack" '+(activeColumns[1]?'':'hidden')+'>'+columns[1].join('')+'</div>':''}
       </div>`}
     </div></div></div>`,embedded?.[1]];
 }
@@ -6075,7 +6140,13 @@ $('#bell').innerHTML=ic('bell');syncTopLanguage();$('#logout').innerHTML=ic('log
 $('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace(location.pathname)};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{apply();if(C.theme==='auto')syncSubscriptionTheme()});
 matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',()=>{if(C.followReducedMotion)apply()});
-addEventListener('hashchange',()=>{if(backendReady)render()});
+addEventListener('hashchange',()=>{
+ if(!backendReady)return;
+ const main=document.querySelector('#settings-subpage');
+ if(cur==='set'&&main?.dataset.settingsSection===settingsPageFromHash()&&
+    selectSettingsFocus(settingsFocusForPage(main.dataset.settingsSection)))return;
+ render();
+});
 // Persistent quota notifications are read from PostgreSQL, not a transient
 // browser timer or client-only threshold. Polling discovers events even if
 // another administrator is editing a node on a different device.

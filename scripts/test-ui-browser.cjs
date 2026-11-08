@@ -63,16 +63,16 @@ async function geometry(page) {
       .filter(node => !node.closest(intentionalScroll))
       .map(node => ({tag:node.tagName,identifier:node.id || node.getAttribute('name') || node.textContent.trim().slice(0,40),...box(node)}))
       .filter(r => r.width && (r.x < -1 || r.right > innerWidth + 1));
-    const columns = [...document.querySelectorAll('.appearance-column')].map(node => ({...box(node),display:getComputedStyle(node).display,cards:[...node.querySelectorAll(':scope > .card')].map(box)}));
+    const columns = [...document.querySelectorAll('.appearance-column')].filter(visible).map(node => ({...box(node),display:getComputedStyle(node).display,cards:[...node.querySelectorAll(':scope > .card')].filter(visible).map(box)}));
     const nodeCards = [...document.querySelectorAll('#view .nodes > .nc')].map(box);
-    const ranges = [...document.querySelectorAll('.appearance-layout input[type=range]')].map(box);
+    const ranges = [...document.querySelectorAll('.appearance-layout input[type=range]')].filter(visible).map(box);
     const top = document.querySelector('.top');
     const root = document.documentElement;
     return {
       viewport:{width:innerWidth,height:innerHeight},rootFont:parseFloat(getComputedStyle(root).fontSize),scrollWidth:root.scrollWidth,
       view:view && box(view),top:top && box(top),outside,columns,nodeCards,ranges,nodeGridMode:document.querySelector('.nodes')?.dataset.gridMode,
-      cards:[...(view?.querySelectorAll('.card') || [])].map(box),
-      settingsUpdates:[...document.querySelectorAll('#core-panel,#panel-update-card')].map(panel=>({actions:box(panel.querySelector('.update-action-row')),message:box(panel.querySelector('.history-placeholder'))})),
+      cards:[...(view?.querySelectorAll('.card') || [])].filter(visible).map(box),
+      settingsUpdates:[...document.querySelectorAll('#core-panel,#panel-update-card')].filter(visible).map(panel=>({actions:box(panel.querySelector('.update-action-row')),message:box(panel.querySelector('.history-placeholder'))})),
       dialog:dialog && box(dialog),
       material:{surface:root.dataset.surface,theme:root.dataset.theme,sidebar:root.dataset.sidebar,density:root.dataset.density},
       renderFailed:!!view?.textContent.includes('Не удалось открыть раздел'),
@@ -249,7 +249,7 @@ async function main() {
           const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,y:r.y,bottom:r.bottom,width:r.width,height:r.height}};
           const shell=document.querySelector('.settings-center'),main=document.querySelector('.settings-center-main'),view=document.querySelector('#view');
           const heading=document.querySelector('.settings-center-heading'),grid=document.querySelector('.settings-center-grid');
-          return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),view:box(view),shell:box(shell),main:box(main),heading:box(heading),grid:box(grid),nav:[...document.querySelectorAll('.settings-center-link')].map(box),cards:[...grid.querySelectorAll('.card')].map(box),single:main.dataset.single};
+          return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),view:box(view),shell:box(shell),main:box(main),heading:box(heading),grid:box(grid),nav:[...document.querySelectorAll('.settings-center-link')].map(box),cards:[...grid.querySelectorAll('.card')].filter(node=>node.getClientRects().length).map(box),single:main.dataset.single};
         });
         assert(g.scrollWidth<=g.viewport+1,'Settings must not create horizontal page scrolling');
         assert(Math.abs(g.shell.x-g.view.x)<=3,'Settings should start at the normal dashboard content left edge');
@@ -269,13 +269,73 @@ async function main() {
       const g=await page.evaluate(()=>{
         const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width}};
         const shell=document.querySelector('.settings-center'),nav=document.querySelector('.settings-center-nav'),grid=document.querySelector('.settings-center-grid');
-        const cards=[...grid.querySelectorAll('.card')];
+        const cards=[...grid.querySelectorAll('.card')].filter(node=>node.getClientRects().length);
         return{viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,shell:box(shell),navDisplay:getComputedStyle(nav).display,cards:cards.map(box)};
       });
       assert(g.scrollWidth<=g.viewport+1,'Mobile Settings must not cause document overflow');
       assert(g.navDisplay==='flex','Mobile Settings navigation must become a horizontal strip');
       assert(g.cards.every(card=>card.width>=g.shell.width*.85),'Mobile cards must use available width');
       await screenshot(page,'settings-composition-compact-mobile');
+    });
+
+    await checked('Settings compact groups: no blank column, real controls and retained drafts',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      const grouped={
+        general:{general:'#brand-panel',integrations:'[data-hk]'},
+        appearance:{colors:'#custom-a',layout:'#content-width',typography:'#ts'},
+        system:{system:'#core-panel',traffic:'[data-cdn-tags-save]'}
+      };
+      for(const [section,groups] of Object.entries(grouped)){
+        await navigate('set/'+section);
+        const buttons=page.locator('#settings-subpage [data-settings-focus]');
+        assert.equal(await buttons.count(),Object.keys(groups).length,'Incorrect compact group count: '+section);
+        for(const [group,control] of Object.entries(groups)){
+          await page.locator('#settings-subpage [data-settings-focus="'+group+'"]').click();
+          assert.equal(await page.locator('[data-settings-focus="'+group+'"]').getAttribute('aria-pressed'),'true');
+          assert.equal(new URL(page.url()).hash,'#set/'+group,'Group links must remain shareable');
+          assert(await page.locator(control).isVisible(),'Active group control must be visible: '+group);
+          const layout=await page.evaluate(()=>{
+            const grid=document.querySelector('.settings-center-grid');
+            const visible=el=>el.getClientRects().length>0;
+            const columns=[...grid.querySelectorAll('.appearance-column')].filter(visible);
+            const activeCards=[...grid.querySelectorAll('[data-settings-group]')].filter(visible);
+            const wrong=activeCards.filter(el=>el.dataset.settingsGroup!==document.querySelector('.settings-focus-bar [aria-pressed="true"]').dataset.settingsFocus);
+            return{columns:columns.length,active:activeCards.length,wrong:wrong.length,overflow:document.documentElement.scrollWidth>innerWidth+1,
+              hidden:[...grid.querySelectorAll('[data-settings-group][hidden]')].every(el=>!visible(el)),
+              width:grid.getBoundingClientRect().width,cardWidths:activeCards.map(el=>el.getBoundingClientRect().width)};
+          });
+          assert.equal(layout.wrong,0,'Unrelated cards must not consume workspace height');
+          assert.equal(layout.hidden,true,'Inactive settings cards must be hidden, not removed');
+          assert(layout.active>0&&layout.columns>0,'Focused group needs functional controls');
+          assert.equal(layout.overflow,false,'Compact groups must not overflow viewport');
+          if(layout.active===1)assert.equal(layout.columns,1,'Single-card group must not reserve a blank second column');
+          assert(layout.cardWidths.every(w=>w>0),'Visible settings cards must have useful width');
+        }
+      }
+      await navigate('set/appearance');
+      await page.locator('[data-settings-focus="colors"]').click();
+      const original=await page.locator('#custom-a').inputValue();
+      try{
+        await page.locator('#custom-a').fill('#ABCDEF');
+        await page.locator('[data-settings-focus="layout"]').click();
+        await page.goBack({waitUntil:'domcontentloaded'});
+        await page.waitForFunction(()=>document.querySelector('.settings-focus-bar [data-settings-focus="colors"]')?.getAttribute('aria-pressed')==='true');
+        assert.equal(await page.locator('#custom-a').inputValue(),'#ABCDEF',
+          'Back navigation within Settings must preserve unsaved fields');
+        await page.locator('[data-settings-focus="layout"]').click();
+        await page.locator('[data-settings-focus="colors"]').click();
+        assert.equal(await page.locator('#custom-a').inputValue(),'#ABCDEF',
+          'Switching internal groups must preserve unsaved input without remounting');
+      }finally{
+        await page.locator('#custom-a').fill(original);
+      }
+      await navigate('set/security');
+      assert(await page.locator('#security-tab-auth').isVisible(),'Security keeps its functional internal tabs');
+      await navigate('set/admins');
+      assert(await page.locator('[data-ne="admins"]').first().isVisible(),'Admins remains a functional Settings category');
+      await navigate('set/data');
+      assert(await page.locator('#gx').isVisible(),'Data export remains available');
+      assert(await page.locator('#appearance-import').isVisible(),'Theme import remains available');
     });
 
     await checked('Settings tabs: persistent navigation and accessible transitions',async()=>{
