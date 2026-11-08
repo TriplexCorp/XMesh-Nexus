@@ -169,8 +169,12 @@ assert.match(bulkActions,/await ops\.updateOne\(Number\(item\.id\)/);
 assert.match(bulkActions,/const actions=toolbar\.querySelector/);
 assert.match(bulkActions,/toolbar\.insertBefore\(group,actions\|\|null\)/,
   'Bulk entry must be positioned with the action cluster, ahead of density');
-assert.match(bulkActions,/toolbar\.after\(context\)/,
-  'Bulk selection and report must not reflow the main filter toolbar');
+assert(!bulkActions.includes('toolbar.after(context)'),
+  'Bulk controls must never be mounted outside their original toolbar');
+assert(bulkActions.includes('bar.classList.toggle(\'is-selecting\',st.mode)'),
+  'Bulk selection must stay in the original toolbar');
+assert(bulkActions.includes('bulkIcon(actionIcon(action),actionText(action))'),
+  'Every fleet command must have its semantic icon');
 
 console.log(`Mandatory Agent version policy: ${agentVersionRaw} OK`);
 console.log('Manifest-bound Agent lost-response retry source contract: OK');
