@@ -322,7 +322,6 @@ async function main() {
       const grouped={
         general:{general:'#brand-panel',integrations:'[data-hk]'},
         appearance:{colors:'#custom-a',layout:'#content-width',typography:'#ts'},
-        system:{system:'#core-panel',traffic:'[data-cdn-tags-save]'}
       };
       for(const [section,groups] of Object.entries(grouped)){
         await navigate('set/'+section);
@@ -352,6 +351,11 @@ async function main() {
           assert(layout.cardWidths.every(w=>w>0),'Visible settings cards must have useful width');
         }
       }
+      await navigate('set/system');
+      assert.equal(await page.locator('#settings-subpage [data-settings-focus]').count(),0,
+        'System and bypass quota must not live in separate two-control subpages');
+      assert(await page.locator('#core-panel').isVisible(),'Core updates must remain visible');
+      assert(await page.locator('[data-cdn-tags-save]').isVisible(),'Bypass quota settings must remain visible beside core updates');
       await navigate('set/appearance');
       await page.locator('[data-settings-focus="colors"]').click();
       const original=await page.locator('#custom-a').inputValue();
@@ -489,6 +493,9 @@ async function main() {
       await navigate('set/traffic');
       const save=page.locator('[data-cdn-tags-save]');
       await save.waitFor({state:'visible'});
+      assert(await page.locator('#core-panel').isVisible(),'Old traffic bookmark must show unified System page');
+      assert(await page.locator('[data-bypass-legacy]').isVisible(),'Legacy tag rules must remain discoverable');
+      await page.locator('[data-bypass-legacy] summary').click();
       const period=page.locator('[name="cdnResetPeriod"]');
       const initialPeriod=await period.inputValue();
       await period.selectOption('monthly');
@@ -2118,11 +2125,24 @@ async function main() {
             assert(workspace.right<workspace.aside&&workspace.width>=200,'Desktop tasks must use two readable columns');
           }
           if(key==='traffic'){
-            const policy=form.locator('[name="cdnMode"]');
-            await policy.selectOption('selected');
-            assert(await form.locator('[data-node-cdn-inbounds]').isVisible(),'LTE inbound controls must appear in mixed mode');
-            await policy.selectOption('standard');
-            assert(await form.locator('[data-node-cdn-inbounds]').isHidden(),'Regular nodes must not show LTE inbound controls');
+            const mode=form.locator('[name="cdnMode"]');
+            const bypass=form.locator('[data-node-cdn-kind="bypass"]');
+            const standard=form.locator('[data-node-cdn-kind="standard"]');
+            assert.equal(await mode.inputValue(),'standard','New nodes start as ordinary servers');
+            await bypass.click();
+            assert.equal(await mode.inputValue(),'all','Bypass option must meter the entire node');
+            assert.equal(await bypass.getAttribute('aria-pressed'),'true');
+            const scope=form.locator('[data-node-cdn-scope]');
+            await scope.check();
+            assert.equal(await mode.inputValue(),'selected','Advanced selection must reuse existing selected policy');
+            assert(await form.locator('[data-node-cdn-inbounds]').isVisible(),'Selected inbound controls must appear');
+            await scope.uncheck();
+            assert.equal(await mode.inputValue(),'all','Leaving advanced selection must restore entire-node mode');
+            assert(await form.locator('[data-node-cdn-inbounds]').isHidden());
+            await standard.click();
+            assert.equal(await mode.inputValue(),'standard','Ordinary servers must retain unlimited bypass quota');
+            assert.equal(await standard.getAttribute('aria-pressed'),'true');
+            assert(await form.locator('[data-node-cdn-inbounds]').isHidden());
           }
           if(key==='network'){
             await form.locator('[name="rotationIps"]').fill('192.0.2.10\n192.0.2.10\n192.0.2.11');
@@ -2251,6 +2271,10 @@ async function main() {
       await page.locator('[data-nu]').first().click();
       await page.waitForSelector('dialog#dlg.user-create-modal[open] .user-create-extra-grid');
       try{
+        const bypassLimit=page.locator('#dlg.user-create-modal input[name="cdnLimitGb"]');
+        assert(await bypassLimit.isVisible(),'Bypass traffic limit must be present when creating a user');
+        await bypassLimit.fill('5');
+        assert.equal(await bypassLimit.inputValue(),'5','Separate user bypass quota must accept a custom value');
         const squads=page.locator('.user-create-squads .ms');
         await squads.evaluate(list=>{
           const first=list.querySelector('label.ck');
