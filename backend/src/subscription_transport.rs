@@ -669,18 +669,17 @@ mod tests {
         }}]}}});
         let gaming = json!({"address":"game.example.org"});
         let reserve = json!({"address":"backup.example.org","clientFinalmask":{"tcp":[
-            {"type":"fragment","settings":{
-                "packets":"tlshello","lengths":["10-20","50-100","200-400"],
-                "delays":["0-0"],"maxSplit":"3-3"
-            }}]}});
+        {"type":"fragment","settings":{
+            "packets":"tlshello","lengths":["10-20","50-100","200-400"],
+            "delays":["0-0"],"maxSplit":"3-3"
+        }}]}});
         let primary = client_stream(&inbound, &gaming, "auto").unwrap();
         let backup = client_stream(&inbound, &reserve, "auto").unwrap();
         assert_eq!(primary["finalmask"], inbound["xmesh"]["clientFinalmask"]);
         assert_eq!(backup["finalmask"], reserve["clientFinalmask"]);
         assert_ne!(backup["finalmask"], primary["finalmask"]);
         assert_eq!(
-            client_stream(&inbound, &json!({"clientFinalmask":null}), "auto")
-                .unwrap()["finalmask"],
+            client_stream(&inbound, &json!({"clientFinalmask":null}), "auto").unwrap()["finalmask"],
             primary["finalmask"]
         );
     }
