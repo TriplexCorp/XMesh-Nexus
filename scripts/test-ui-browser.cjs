@@ -268,18 +268,32 @@ async function main() {
         const g=await page.evaluate(()=>{
           const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,y:r.y,bottom:r.bottom,width:r.width,height:r.height}};
           const shell=document.querySelector('.settings-center'),main=document.querySelector('.settings-center-main'),view=document.querySelector('#view');
-          const heading=document.querySelector('.settings-center-heading'),grid=document.querySelector('.settings-center-grid');
-          return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),view:box(view),shell:box(shell),main:box(main),heading:box(heading),grid:box(grid),nav:[...document.querySelectorAll('.settings-center-link')].map(box),cards:[...grid.querySelectorAll('.card')].filter(node=>node.getClientRects().length).map(box),single:main.dataset.single};
+          const toolbar=document.querySelector('.settings-center-rail'),navigation=document.querySelector('.settings-center-nav'),grid=document.querySelector('.settings-center-grid');
+          return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),
+            view:box(view),shell:box(shell),main:box(main),toolbar:box(toolbar),grid:box(grid),
+            navDisplay:getComputedStyle(navigation).display,nav:[...navigation.querySelectorAll('.settings-center-link')].map(box),
+            cards:[...grid.querySelectorAll('.card')].filter(node=>node.getClientRects().length).map(box),single:main.dataset.single,
+            duplicateHeadings:document.querySelectorAll('.settings-center-heading').length,
+            scrollToolbar:toolbar.scrollWidth>toolbar.clientWidth+1,
+            mainLabel:main.getAttribute('aria-label')};
         });
         assert(g.scrollWidth<=g.viewport+1,'Settings must not create horizontal page scrolling');
         assert(Math.abs(g.shell.x-g.view.x)<=3,'Settings should start at the normal dashboard content left edge');
         assert(Math.abs(g.shell.width-g.view.width)<=3,'Settings must use all available dashboard width');
-        assert(g.nav.every(n=>n.height<=g.rem*3.55),'Navigation should remain compact');
-        assert(g.main.x>=g.shell.x+g.rem*10,'Settings content must stay beside secondary navigation');
-        assert(g.main.width>=g.view.width*.6,'Settings content must not be artificially constrained');
-        assert(g.cards.every(c=>c.width>=g.rem*20),'Cards must remain usable, not squeezed by the navigation rail');
-        if(g.single==='true')assert(Math.abs(g.cards[0].x-g.heading.x)<3,
-          'Single card and heading must share the same left edge');
+        assert.equal(g.duplicateHeadings,0,'Subpage title and subtitle must not consume an extra Settings row');
+        assert.equal(g.navDisplay,'flex','Category navigation must always be a horizontal toolbar');
+        assert.equal(g.nav.length,6,'Owner must have six original functional Settings categories');
+        assert(g.nav.every(n=>n.height<=g.rem*3),'Toolbar tabs should remain compact');
+        assert(g.nav.every(n=>Math.abs((n.y+n.height/2)-(g.nav[0].y+g.nav[0].height/2))<2),
+          'All category tabs must share one continuous toolbar row');
+        assert(Math.abs(g.main.x-g.shell.x)<3,'Settings cards must begin at the full workspace left edge');
+        assert(Math.abs(g.main.width-g.view.width)<3,'No vertical rail may reserve dashboard width');
+        assert(g.main.y>=g.toolbar.bottom,'Settings form must follow the toolbar');
+        assert(!g.scrollToolbar,'Desktop Settings toolbar should show all six tabs without internal scrolling');
+        assert(g.mainLabel,'Settings content region must have an accessible name');
+        assert(g.cards.every(c=>c.width>=g.rem*20),'Cards must remain usable, not squeezed by navigation');
+        if(g.single==='true'&&g.cards.length)assert(Math.abs(g.cards[0].x-g.main.x)<3,
+          'Single card must align with the full-width Settings content');
         if(section==='appearance')await screenshot(page,'settings-appearance-consolidated-desktop');
       }
     });
@@ -288,12 +302,16 @@ async function main() {
       await navigate('set/appearance');
       const g=await page.evaluate(()=>{
         const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width}};
-        const shell=document.querySelector('.settings-center'),nav=document.querySelector('.settings-center-nav'),grid=document.querySelector('.settings-center-grid');
+        const shell=document.querySelector('.settings-center'),nav=document.querySelector('.settings-center-nav'),toolbar=document.querySelector('.settings-center-rail'),grid=document.querySelector('.settings-center-grid');
         const cards=[...grid.querySelectorAll('.card')].filter(node=>node.getClientRects().length);
-        return{viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,shell:box(shell),navDisplay:getComputedStyle(nav).display,cards:cards.map(box)};
+        const links=[...nav.querySelectorAll('a')].map(box);
+        return{viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,shell:box(shell),navDisplay:getComputedStyle(nav).display,
+          toolbar:box(toolbar),toolbarScrollable:toolbar.scrollWidth>toolbar.clientWidth+1,links,cards:cards.map(box)};
       });
       assert(g.scrollWidth<=g.viewport+1,'Mobile Settings must not cause document overflow');
-      assert(g.navDisplay==='flex','Mobile Settings navigation must become a horizontal strip');
+      assert(g.navDisplay==='flex','Settings navigation must stay horizontal on mobile');
+      assert(g.toolbarScrollable,'Small-screen Settings navigation should scroll inside its own toolbar');
+      assert(g.links.every(link=>Math.abs(link.y-g.links[0].y)<2),'Category tabs must not wrap into stacked rows');
       assert(g.cards.every(card=>card.width>=g.shell.width*.85),'Mobile cards must use available width');
       await screenshot(page,'settings-composition-compact-mobile');
     });
@@ -382,14 +400,14 @@ async function main() {
             rail:document.querySelector('.settings-center-rail')?.dataset.motionProbe,
             skeleton:window.__settingsHadSkeleton,
             active:document.querySelectorAll('.settings-center-link[aria-current="page"]').length,
-            heading:getComputedStyle(document.querySelector('.settings-center-heading')).animationName,
+            duplicateHeadings:document.querySelectorAll('.settings-center-heading').length,
             grid:getComputedStyle(document.querySelector('.settings-center-grid')).animationName
           };
         });
         assert.equal(state.rail,'preserved','Switching settings pages must not replace the navigation rail');
         assert.equal(state.skeleton,false,'Switching settings pages must not flash global skeletons');
         assert.equal(state.active,1,'Exactly one navigation entry stays active');
-        assert.equal(state.heading,'nx-settings-panel-enter','Heading should transition on category changes');
+        assert.equal(state.duplicateHeadings,0,'Horizontal Settings navigation must not insert page headings');
         assert.equal(state.grid,'nx-settings-panel-enter','Content should transition on category changes');
 
         await page.evaluate(()=>{document.documentElement.dataset.motion='off'});

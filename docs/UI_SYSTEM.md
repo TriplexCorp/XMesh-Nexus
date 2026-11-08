@@ -372,7 +372,7 @@ persisted Squad data to achieve visual compactness.
 
 ### Settings center: six coherent workspaces
 
-- The Settings rail contains **six** substantial pages, not a category per
+- The single **horizontal Settings toolbar** contains **six** substantial pages, not a category per
   minor preference: `#set/general` (Panel: brand, behavior, integrations,
   notifications), `#set/appearance` (Appearance: colors, composition,
   typography, effects), `#set/system` (System & traffic: Xray, panel updates,
@@ -406,18 +406,23 @@ persisted Squad data to achieve visual compactness.
 - Keep existing field IDs, card identifiers, `data-ui` contracts and focus
   semantics intact. Deep links from the version rail and update actions must
   target the System subpage; destructive actions remain separately authorized.
-- **Composition and empty-space budget:** Settings is left-aligned and fills
-  the available dashboard workspace rather than being centered within a 96rem
-  cap or restricting single-card pages to 54rem. The secondary navigation is
-  compact, and active group controls fit directly below the page heading.
+- **Composition and empty-space budget:** Settings uses the entire dashboard
+  content width, without a permanent secondary navigation column. Below the
+  one existing global page title `Настройки`, the compact category toolbar
+  displays six original functional pages in a **single horizontal row**.
+  Do not repeat a selected category title and its description on a separate
+  line: that duplicates navigation and wastes vertical space. Subsection
+  focus controls (e.g. Appearance: Colors / Layout / Typography) sit directly
+  below the primary toolbar only where multiple groups actually exist.
   Feature-scoped tokens compress card padding, row heights, text notes and
-  desktop gaps consistently across all six categories. At narrower widths the
-  columns reflow into one track. There must be no empty reserved column,
-  offscreen inactive controls, duplicated forms, fabricated metrics, or large
-  dead gaps under an unrelated taller group.
-- The shell and cards inherit `nexus-v3` material, density and spacing tokens.
-  Secondary navigation must remain usable on narrow/mobile viewports and must
-  not create horizontal document overflow.
+  desktop gaps consistently across all six categories. At narrower widths
+  content cards reflow into one track. No empty reserved column, duplicated
+  forms, fabricated metrics or oversized spacer surfaces are allowed.
+- The toolbar and cards inherit `nexus-v3` material, density and spacing tokens.
+  The toolbar must remain **one horizontal line** even on mobile: overflow
+  scrolls within its own framed strip, not the document. The active tab must
+  retain `aria-current=page`, a visible focus state and correct navigation
+  via Back/Forward without replacing the entire toolbar.
 
 ### Dedicated CDN inbound traffic quota (stage 1)
 
