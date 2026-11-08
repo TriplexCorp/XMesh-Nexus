@@ -484,7 +484,7 @@ def main():
 
         # Quota editing must preserve existing signed per-user usage, including
         # transitions from unlimited back to limited and their PATCH response.
-        expected_usage = 120 / (1024**3)
+        expected_usage = 120 / (1000**3)  # Decimal GB, as reported by the API.
         code, unlimited, _ = request("PATCH",f"/collections/users/{user_id}",
                                     {"limit":0},cookie=cookie,origin=BASE)
         assert_status(code,200,"make metered user unlimited without resetting usage")
