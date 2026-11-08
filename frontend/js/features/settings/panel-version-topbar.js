@@ -6,6 +6,8 @@
   const trigger=root.querySelector('[data-panel-version-trigger]');
   const menu=root.querySelector('[data-panel-version-menu]');
   const heading=root.querySelector('[data-panel-version-heading]');
+  const close=root.querySelector('[data-panel-version-close]');
+  const installedLabel=root.querySelector('[data-panel-version-installed]');
   const version=root.querySelector('[data-panel-version-number]');
   const revision=root.querySelector('[data-panel-version-revision]');
   const check=root.querySelector('[data-panel-version-check]');
@@ -27,7 +29,7 @@
       unknown_revision:'Ревизия этой сборки неизвестна — сравнение недоступно.',
       unverifiable:'Ветки различаются или сравнение недоступно. Нужна ручная проверка.',
       unavailable:'Не удалось связаться с GitHub. Актуальность не подтверждена.',
-      settings:'Другие способы обновления',noRevision:'Ревизия сборки неизвестна',
+      settings:'Другие способы обновления',noRevision:'Ревизия сборки неизвестна',close:'Закрыть',
       readOnly:'Проверка и запуск обновления доступны владельцу панели.',
       update:'Обновить панель',updating:'Запуск обновления…',
       reload:'Перезагрузить страницу',idle:'Системный updater готов к запросу.',
@@ -45,7 +47,7 @@
       unknown_revision:'This build has no revision identifier; comparison is unavailable.',
       unverifiable:'Branches differ or cannot be compared. Check manually.',
       unavailable:'GitHub could not be reached. Update status is unverified.',
-      settings:'Other update options',noRevision:'Build revision unavailable',
+      settings:'Other update options',noRevision:'Build revision unavailable',close:'Close',
       readOnly:'Only the owner can check for and install updates.',
       update:'Update panel',updating:'Queueing update…',
       reload:'Reload page',idle:'System updater is ready.',
@@ -73,32 +75,55 @@
   function render(){
     const words=t(),build=installed?.version||'—',sha=short(installed?.revision);
     version.textContent='Nexus v'+build;
+    installedLabel.textContent='Nexus v'+build;
     heading.textContent=words.title;
+    close.setAttribute('aria-label',words.close);
+    close.title=words.close;
+    menu.setAttribute('aria-label',words.title);
     trigger.setAttribute('aria-label',words.title+': '+build);
     trigger.title=words.title+': '+build;
     revision.textContent=sha?'Build '+sha:words.noRevision;
     revision.title=sha?installed.revision:words.noRevision;
+
+    const stage=systemState?.status||'idle';
+    const busy=active()||requesting;
+    const successful=stage==='success';
+    const available=owner&&checked?.status==='update_available'&&!successful;
+    const canUpdate=available&&!checking&&!readingState&&!busy&&stage!=='unavailable'&&
+      stage!=='success'&&systemState!==null;
+    const displayState=successful?'success':busy?(requesting?'queued':stage):
+      checked?.status||'idle';
+    const message=successful?words.success:
+      busy?(requesting?words.updating:words[stage]||words.running):
+      checked?(words[checked.status]||words.unverifiable):words.waiting;
+
+    status.textContent=message;
+    status.dataset.state=displayState;
+    status.title=short(checked?.latest_revision)?'main '+short(checked.latest_revision):'';
+    menu.dataset.state=displayState;
+    menu.dataset.actionMode=successful?'reload':canUpdate?'update':'check';
+
     check.textContent=checking?words.checking:words.check;
-    check.disabled=checking||requesting;
-    check.hidden=!owner;
-    caption.textContent=owner?words.waiting:words.readOnly;
-    status.textContent=checked?(words[checked.status]||words.unverifiable):'';
-    status.dataset.state=checked?.status||'idle';
-    const latest=short(checked?.latest_revision);
-    status.title=latest?'main '+latest:'';
-    const available=owner&&checked?.status==='update_available';
-    update.hidden=!available;
-    update.disabled=requesting||checking||readingState||active()||systemState?.status==='unavailable'||systemState===null;
-    update.textContent=requesting?words.updating:words.update;
-    const state=systemState?.status;
-    updateStatus.textContent=owner?(systemError||(
-      state==='unavailable'?words.updaterUnavailable:words[state]||''
-    )):'';
-    updateStatus.dataset.state=state||'idle';
-    reload.hidden=!owner||state!=='success';
+    check.disabled=checking||readingState;
+    check.hidden=!owner||successful||busy;
+    update.textContent=words.update;
+    // Never show a dark disabled primary action; a completed host update
+    // always takes precedence over a stale GitHub "update_available" result.
+    update.hidden=!canUpdate;
+    update.disabled=false;
+    reload.hidden=!owner||!successful;
     reload.textContent=words.reload;
+
+    const problem=owner&&(systemError||(
+      stage==='unavailable'&&available?words.updaterUnavailable:
+      stage==='failed'?words.failed:''
+    ));
+    updateStatus.textContent=problem||'';
+    updateStatus.dataset.state=problem?(stage==='unavailable'?'unavailable':'failed'):'idle';
     settings.textContent=words.settings;
-    settings.hidden=!available;
+    settings.hidden=!owner||(!available&&stage!=='failed'&&stage!=='unavailable');
+    caption.textContent=owner?'':words.readOnly;
+    caption.hidden=owner;
     root.dataset.updateAvailable=available?'true':'false';
   }
   function toggle(next){
@@ -193,6 +218,7 @@
     }
   }
   trigger.addEventListener('click',()=>toggle(!open));
+  close.addEventListener('click',()=>{toggle(false);trigger.focus()});
   check.addEventListener('click',()=>{void checkUpdates()});
   update.addEventListener('click',()=>{void requestUpdate()});
   reload.addEventListener('click',()=>location.reload());

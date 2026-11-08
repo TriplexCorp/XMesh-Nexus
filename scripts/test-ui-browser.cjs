@@ -173,6 +173,74 @@ async function main() {
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
+    await checked('Version popover: available, completed, unavailable and accessible actions',async()=>{
+      await navigate('home');
+      await page.locator('[data-panel-version-trigger]').waitFor({state:'visible'});
+      await page.route('**/api/v1/panel/version/check',route=>route.fulfill({
+        status:200,contentType:'application/json',
+        body:JSON.stringify({status:'update_available',latest_revision:'0123456789abcdef0123456789abcdef01234567'})
+      }));
+      await page.evaluate(()=>{
+        window.__versionUpdaterStatus=window.XMeshPanelUpdater.status;
+        window.__versionUpdaterStage='idle';
+        window.XMeshPanelUpdater.status=async()=>({status:window.__versionUpdaterStage});
+      });
+      const trigger=page.locator('[data-panel-version-trigger]');
+      const menu=page.locator('[data-panel-version-menu]');
+      const close=page.locator('[data-panel-version-close]');
+      try{
+        await trigger.click();
+        await menu.waitFor({state:'visible'});
+        await page.locator('[data-panel-version-check]').click();
+        await page.waitForFunction(()=>{
+          const panel=document.querySelector('[data-panel-version-menu]');
+          return panel?.dataset.actionMode==='update'&&!panel.querySelector('[data-panel-version-update]').hidden;
+        });
+        const updateAction=await page.locator('[data-panel-version-update]').evaluate(button=>{
+          const style=getComputedStyle(button);
+          return{disabled:button.disabled,background:style.backgroundColor,color:style.color};
+        });
+        assert.equal(updateAction.disabled,false,'An available update must have an enabled primary action');
+        assert.notEqual(updateAction.background,updateAction.color,'Primary update text must contrast with the background');
+
+        await page.evaluate(()=>{window.__versionUpdaterStage='success'});
+        await close.click();
+        await trigger.click();
+        await page.waitForFunction(()=>document.querySelector('[data-panel-version-menu]')?.dataset.actionMode==='reload');
+        assert.equal(await page.locator('[data-panel-version-update]').isVisible(),false,
+          'The obsolete update action must disappear when the host updater reports success');
+        assert.equal(await page.locator('[data-panel-version-check]').isVisible(),false,
+          'Success should not show redundant check actions');
+        assert.equal(await page.locator('[data-panel-version-reload]').isVisible(),true);
+        assert.match(await page.locator('[data-panel-version-status]').innerText(),/Перезагрузите|Reload/i);
+
+        await page.evaluate(()=>{window.__versionUpdaterStage='unavailable'});
+        await close.click();
+        await trigger.click();
+        await page.waitForFunction(()=>document.querySelector('[data-panel-version-update-status]')?.dataset.state==='unavailable');
+        assert.equal(await page.locator('[data-panel-version-update]').isVisible(),false,
+          'Do not show an unusable dark update button');
+        assert.equal(await page.locator('[data-panel-version-settings]').isVisible(),true,
+          'An unavailable updater needs a visible Settings fallback');
+
+        await page.emulateMedia({reducedMotion:'reduce'});
+        assert.equal(await menu.evaluate(el=>getComputedStyle(el).animationName),'none',
+          'Reduced-motion mode must disable popover animation');
+        await close.click();
+        assert.equal(await trigger.getAttribute('aria-expanded'),'false');
+        assert.equal(await trigger.evaluate(el=>document.activeElement===el),true,
+          'Closing the menu should return keyboard focus to its trigger');
+      }finally{
+        await page.evaluate(()=>{
+          if(window.__versionUpdaterStatus)window.XMeshPanelUpdater.status=window.__versionUpdaterStatus;
+          delete window.__versionUpdaterStatus;
+          delete window.__versionUpdaterStage;
+          document.querySelector('[data-panel-version-menu]:not([hidden]) [data-panel-version-close]')?.click();
+        });
+        await page.unroute('**/api/v1/panel/version/check');
+      }
+    });
+
     await checked('Settings composition: full-width, left-aligned desktop workspace and compact navigation',async()=>{
       await page.setViewportSize({width:1920,height:1080});
       for(const section of ['general','appearance','system','data']){
