@@ -1195,6 +1195,8 @@ let pendingScrollTarget=null;
 function scrollToSettingsTarget(id){
   const target=document.getElementById(id);
   if(!target)return false;
+  const group=target.closest('[data-settings-group]')?.dataset.settingsGroup;
+  if(group)selectSettingsFocus(group);
   target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
   return true;
 }
@@ -1260,6 +1262,7 @@ async function render(soft){
     if(i)i();
     initializeRangeProgress(v);
     window.XMeshMfa?.mount(v);window.XMeshSecurity?.mount(v);
+    if(cur==='set')mountSettingsFocus();
     $('#unb').textContent=DB.users.length;drawBulk();
   }catch(error){
     if(rt!==RT)return;
