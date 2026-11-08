@@ -1085,8 +1085,9 @@ const view=()=>{
    '</div></details></article>';
   }).join(''):'<div class="balancer-empty"><strong>Балансировщиков пока нет</strong><p>Добавьте любую комбинацию серверов. Одиночные подключения работают независимо.</p></div>';
   applyFilter();
+  window.XMeshBulk?.mount(root.closest('.balancer-workspace'));
  };
- const read=()=>[...$$('.balancer-editor')].map((row,i)=>{
+ const read=()=>[...$('.balancer-editor')].map((row,i)=>{
   const get=name=>row.querySelector('[data-balancer-field="'+name+'"]');
   const source=[...row.querySelectorAll('[data-balancer-source]:checked')].map(el=>el.dataset.balancerSource);
   const obs={probeInterval:get('probeInterval').value.trim(),probeTimeout:get('probeTimeout').value.trim(),
@@ -1108,6 +1109,14 @@ const view=()=>{
   if(!list)return;
   view();
   mountWorkspaceGrid($('.balancer-workspace'));
+  window.XMeshBulk?.mount($('.balancer-workspace'),{handleDraft:(action,ids)=>{
+    const selected=new Set(ids.map(String));
+    const current=read();
+    draft=action==='delete'?current.filter((_,index)=>!selected.has(String(index))):
+      current.map((item,index)=>selected.has(String(index))?
+        {...item,enabled:action==='enable'}:item);
+    view();
+  }});
    const search=$('#balancer-search'),clear=$('#balancer-search-clear');
    search.addEventListener('input',()=>{clear.hidden=!search.value;applyFilter()});
    clear.addEventListener('click',()=>{search.value='';clear.hidden=true;applyFilter();search.focus()});
@@ -1260,6 +1269,7 @@ async function render(soft){
     if(!keptSettingsRail)v.innerHTML=h;
     decorateButtonIcons(v);
     if(i)i();
+    window.XMeshBulk?.mount(v);
     initializeRangeProgress(v);
     window.XMeshMfa?.mount(v);window.XMeshSecurity?.mount(v);
     if(cur==='set')mountSettingsFocus();
@@ -2030,13 +2040,14 @@ async function usersP(){
     <div class="users-search-wrap"><label class="search users-search-field" style="cursor:text">${ic('search')}<input id="uq" placeholder="Поиск пользователей" value="${esc(UQ.q)}" aria-label="Поиск по имени, тегу, email, ссылке или Telegram ID"></label><span class="users-search-hint">Поиск по имени · тегу · email · ссылке · Telegram ID</span></div>
     <select id="usq" aria-label="Сквад"><option value="">Все сквады</option>${DB.squads.map(s=>`<option value="${s.id}"${UQ.sq==s.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select>
     <div class="users-toolbar-actions"><button type="button" class="gh users-refresh-action" data-users-refresh title="Загрузить актуальные данные пользователей" aria-label="Обновить список пользователей">${ic('redo')}<span>Обновить</span></button><button class="gh" data-exp>${ic('dl')}Экспорт CSV</button><button class="btn" data-nu>${ic('plus')}Пользователь</button></div>
+    <div class="bulk" id="bulk" role="toolbar" aria-label="Массовые действия"></div>
   </div><div class="users-advanced-filters" data-ui-toolbar="filters" aria-label="Дополнительные фильтры пользователей">
     <label>Тег <select data-user-filter="tag"><option value="">Все теги</option>${[...new Set(DB.users.map(u=>u.tag).filter(Boolean))].sort().map(tag=>`<option value="${esc(tag)}"${UQ.tag===tag?' selected':''}>${esc(tag)}</option>`).join('')}</select></label>
     <label>Inbound <select data-user-filter="inbound"><option value="">Все inbound</option>${[...new Set(DB.squads.flatMap(s=>s.inb||[]))].sort().map(tag=>`<option value="${esc(tag)}"${UQ.inbound===tag?' selected':''}>${esc(tag)}</option>`).join('')}</select></label>
     <label>Узел <select data-user-filter="node"><option value="">Все узлы</option>${DB.nodes.map(n=>`<option value="${n.id}"${UQ.node===String(n.id)?' selected':''}>${esc(n.name)}</option>`).join('')}</select></label>
     <label>Срок <select data-user-filter="expiry"><option value="">Любой срок</option><option value="eternal"${UQ.expiry==='eternal'?' selected':''}>Бессрочно</option><option value="3"${UQ.expiry==='3'?' selected':''}>До 3 дней</option><option value="7"${UQ.expiry==='7'?' selected':''}>До 7 дней</option><option value="30"${UQ.expiry==='30'?' selected':''}>До 30 дней</option></select></label>
     <button type="button" class="gh sm" data-user-filter-reset>Сбросить фильтры</button>
-  </div><div class="bulk" id="bulk" role="toolbar" aria-label="Массовые действия"></div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
+  </div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
     $$('[data-user-filter]').forEach(el=>el.onchange=()=>{UQ[el.dataset.userFilter]=el.value;UQ.page=1;drawUsers()});
     $('[data-user-filter-reset]').onclick=()=>{for(const key of ['sq','inbound','tag','node','expiry'])UQ[key]='';UQ.page=1;render(1)};
     // Poll only user presence, not the entire bootstrap with profiles and secrets.
@@ -4414,6 +4425,7 @@ function nodeExplorerUpdate(){
   explorer.runtimeQueue.push(entry);
  }
  nodeExplorerPump(explorer);
+ window.XMeshBulk?.mount(root);
 }
 function mountNodeExplorer(){
  const root=document.querySelector('.nodes-page');if(!root||!nodeExplorer)return;
