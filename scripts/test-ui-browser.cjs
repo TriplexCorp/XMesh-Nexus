@@ -829,12 +829,29 @@ async function main() {
         const mode=scope.locator('[data-bulk-action="mode"]');
         assert(await mode.isVisible(),route+' must have bulk actions in its existing toolbar');
         assert.match((await mode.innerText()).trim(),/^(Массовые действия|Bulk actions)$/);
+        const geometry=await scope.evaluate(area=>{
+          const toolbar=area.querySelector('.nodes-toolbar,.host-directory-toolbar,.squad-directory-toolbar');
+          const search=toolbar.querySelector('.node-explorer-search,.nx-directory-search').getBoundingClientRect();
+          const bulk=toolbar.querySelector('[data-bulk-toolbar]').getBoundingClientRect();
+          const t=toolbar.getBoundingClientRect();
+          return{searchRight:search.right,searchTop:search.top,bulkLeft:bulk.left,bulkTop:bulk.top,
+            toolbarBottom:t.bottom,toolbarTop:t.top};
+        });
+        assert(Math.abs(geometry.searchTop-geometry.bulkTop)<15,
+          route+' bulk trigger must share the leading toolbar row');
+        assert(geometry.bulkLeft>=geometry.searchRight-2&&geometry.bulkLeft-geometry.searchRight<=80,
+          route+' bulk actions must follow the left search, not float to the right');
         await mode.click();
         assert.match((await mode.innerText()).trim(),/^(Завершить выбор|Finish selection)$/);
         const first=scope.locator(card+' [data-bulk-check]').first();
         assert(await first.isVisible(),route+' must expose a selection checkbox on each card');
         await first.check();
         assert.match(await scope.locator('.nx-bulk-count').innerText(),/\b1\b/);
+        if(route==='nodes'){
+          const update=scope.locator('[data-bulk-action="agent-update"]');
+          assert.equal(await update.count(),1,'Nodes must expose a mass Agent update command');
+          assert(await update.isEnabled(),'Selected nodes must enable mass Agent update');
+        }
         await scope.locator('[data-bulk-action="all"]').click();
         const visible=await scope.locator(card+':visible').count();
         assert.equal(await scope.locator('[data-bulk-check]:checked').count(),visible,
