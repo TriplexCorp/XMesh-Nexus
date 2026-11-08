@@ -83,7 +83,7 @@
 /* Settings uses the full available dashboard workspace, aligned to its left edge.
    Shared density/material tokens still govern the sidebar and feature surfaces. */
 .settings-center{
- display:grid;grid-template-columns:minmax(12rem,13.5rem) minmax(0,1fr);
+ display:grid;grid-template-columns:minmax(11rem,12.25rem) minmax(0,1fr);
  gap:var(--nx-page-gap);align-items:start;min-width:0;
  width:100%;max-width:none;margin:0
 }
@@ -154,11 +154,15 @@
 }
 .settings-center-grid{
  min-width:0;width:100%;align-items:start;
- grid-template-columns:minmax(0,1.2fr) minmax(0,.9fr)
+ grid-template-columns:minmax(0,1.08fr) minmax(0,1fr)
 }
 .settings-center-grid[data-single=true]{grid-template-columns:minmax(0,1fr)}
 .settings-center-grid .appearance-column{min-width:0}
 .settings-center-grid .card{min-width:0}
+/* Grouped pages use the space efficiently without stretching short cards. */
+.settings-center-main[data-settings-section=appearance] .settings-center-grid,
+.settings-center-main[data-settings-section=general] .settings-center-grid{align-items:start}
+
 @container settings-workspace (max-width:70rem){
  .settings-center{grid-template-columns:minmax(0,1fr)}
  .settings-center-rail{position:static;max-height:none;overflow:visible}
