@@ -15,6 +15,20 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Массовые операции": "Bulk operations",
+    "Выбрано: ": "Selected: ",
+    "Все видимые": "All visible",
+    "Применяется после сохранения": "Applies after saving",
+    "Применить действие «": "Apply action “",
+    "» к ": "” to ",
+    " элементам?": " items?",
+    "Связанные хосты: ": "Linked hosts: ",
+    "Они не будут удалены, но привязки могут измениться.": "They will not be deleted, but node assignments may change.",
+    "Доступ пользователей, связанных со сквадами, может измениться.": "Access for users linked to these squads may change.",
+    "Редактор не готов": "Editor is not ready",
+    "Черновик изменён. Нажмите «Сохранить».": "Draft changed. Click Save to apply.",
+    "Ошибка массовой операции: ": "Bulk action failed: ",
+    "Обработано: ": "Completed: ",
     "Панель":"Panel",
     "Статистика хостов":"Host statistics",
     "Активны":"Active",
