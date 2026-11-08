@@ -124,10 +124,12 @@
     let activeId=null, activeTab='sources', search='', jsonValue='', jsonError='', saveBusy=false, confirmDelete='';
     const makeRule=()=>({match:'geosite',value:'',action:'proxy'});
 
+    // The page title already identifies Client Routing. The gallery needs one
+    // compact toolbar, not a second page heading plus a detached action row.
     const rootMarkup='<section class="crx" id="client-route-root" aria-label="Клиентская маршрутизация">'+
-      '<header class="crx-page-head"><div class="crx-page-copy">'+
-      '<h2>Шаблоны</h2></div>'+
-      '<div class="crx-page-actions"><span class="crx-total" data-cr-counter></span><button type="button" class="crx-btn crx-btn-primary" data-cr-add>'+icon('plus')+' Новый шаблон</button></div></header>'+
+      '<div class="crx-page-head" role="toolbar" aria-label="Шаблоны">'+
+      '<div class="crx-page-copy"><span class="crx-toolbar-label">Шаблоны</span><strong class="crx-total" data-cr-counter aria-label="Количество шаблонов"></strong></div>'+
+      '<div class="crx-page-actions"><button type="button" class="crx-btn crx-btn-primary" data-cr-add>'+icon('plus')+' Новый шаблон</button></div></div>'+
       '<div class="crx-list" data-cr-list></div>'+
       '<div class="crx-bottom" data-cr-bottom><div><strong data-cr-status></strong><span>Изменения попадут в клиентскую подписку при следующем обновлении</span></div>'+
       '<div class="crx-bottom-actions"><button type="button" class="crx-btn crx-btn-ghost" data-cr-reset hidden>Отменить изменения</button>'+
@@ -141,7 +143,7 @@
     function countInfo(){return draft.reduce((n,p)=>n+(p.servers||[]).length,0);}
     function status(){
       const el=document.getElementById('client-route-root');if(!el)return;
-      el.querySelector('[data-cr-counter]').textContent=countLabel(draft.length,['шаблон','шаблона','шаблонов'],['template','templates']);
+      el.querySelector('[data-cr-counter]').textContent=String(draft.length);
       el.querySelector('[data-cr-status]').textContent=countLabel(draft.length,['шаблон','шаблона','шаблонов'],['template','templates'])+' · '+countLabel(countInfo(),['назначение','назначения','назначений'],['assignment','assignments']);
       el.querySelector('[data-cr-reset]').hidden=!dirty();
       el.querySelector('[data-cr-save]').disabled=saveBusy||!dirty();
