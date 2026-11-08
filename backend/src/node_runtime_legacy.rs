@@ -1418,8 +1418,9 @@ fn build_offline_policy(
         let used_bytes = quota_gb_to_bytes(used_gb);
         let limit_bytes = quota_gb_to_bytes(limit_gb.max(0.0));
         let remaining = if limit_gb.is_finite() && limit_gb > 0.0 {
-            let remaining_gb = (limit_gb - used_gb).max(0.0);
-            Some(quota_gb_to_bytes(remaining_gb))
+            // Subtract whole bytes, not floating-point GB quantities: 0.7-0.4
+            // must not lose a byte through binary representation rounding.
+            Some(limit_bytes.saturating_sub(used_bytes))
         } else {
             None
         };
