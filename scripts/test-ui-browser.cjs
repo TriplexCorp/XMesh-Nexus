@@ -318,6 +318,11 @@ async function main() {
       try{
         await page.locator('#custom-a').fill('#ABCDEF');
         await page.locator('[data-settings-focus="layout"]').click();
+        await page.goBack({waitUntil:'domcontentloaded'});
+        await page.waitForFunction(()=>document.querySelector('.settings-focus-bar [data-settings-focus="colors"]')?.getAttribute('aria-pressed')==='true');
+        assert.equal(await page.locator('#custom-a').inputValue(),'#ABCDEF',
+          'Back navigation within Settings must preserve unsaved fields');
+        await page.locator('[data-settings-focus="layout"]').click();
         await page.locator('[data-settings-focus="colors"]').click();
         assert.equal(await page.locator('#custom-a').inputValue(),'#ABCDEF',
           'Switching internal groups must preserve unsaved input without remounting');
