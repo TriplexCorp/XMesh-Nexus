@@ -15,6 +15,21 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Перезагрузить страницу":"Reload page",
+    "Другие способы обновления":"Other update options",
+    "Только владелец может обновлять панель.":"Only the owner can update the panel.",
+    "Обновить XMesh Nexus из origin/main? Сначала будет создана резервная копия PostgreSQL, затем выполнятся пересборка Docker и перезапуск панели.":"Update XMesh Nexus from origin/main? A PostgreSQL backup will be created before Docker is rebuilt and the panel restarted.",
+    "Начать обновление":"Start update",
+    "Проверка сравнивает установленную сборку с main.":"The installed build is compared against main.",
+    "Проверка и запуск обновления доступны владельцу панели.":"Only the owner can check for and install updates.",
+    "Запуск обновления…":"Queueing update…",
+    "Системный updater готов к запросу.":"System updater is ready.",
+    "Запрос принят в очередь системного updater.":"Update request queued for the host updater.",
+    "Обновление выполняется на сервере. Связь может прерваться.":"Update running on the host. Connection may be interrupted.",
+    "Системный updater завершил работу. Перезагрузите страницу и проверьте новую сборку.":"The host updater finished. Reload to verify the installed build.",
+    "Ошибка установки. Проверьте системный журнал обновления.":"Update failed. Inspect the host updater logs.",
+    "Системный updater недоступен. Проверьте xmesh-panel-update.path на хосте.":"Host updater is unavailable. Check xmesh-panel-update.path.",
+    "Нет связи с API во время обновления. Повторная проверка будет выполнена автоматически.":"Cannot reach the API during the update. Status will be checked again.",
     "Брендинг, домены и персональные параметры навигации":"Branding, domains and personal navigation preferences",
     "Читаемость, шрифты и настройки движения":"Readability, fonts and motion preferences",
     "События и уведомления интерфейса":"Events and interface notifications",
