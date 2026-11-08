@@ -15,6 +15,21 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Random browser (экспериментально)": "Random browser (experimental)",
+    "Randomized uTLS (экспериментально)": "Randomized uTLS (experimental)",
+    "Anti-DPI · FinalMask этого подключения": "Anti-DPI · FinalMask for this endpoint",
+    "Настройка только клиентского Xray JSON. Разные Host могут использовать разные фрагментации. Пресеты применимы к TCP TLS ClientHello, не являются гарантией обхода DPI. 0 мс означает отсутствие намеренных задержек, а не нулевой RTT.": "Client-side Xray JSON only. Each Host can use different fragmentation. Presets apply to TCP TLS ClientHello and do not guarantee DPI bypass. 0 ms means no intentional delay, not zero RTT.",
+    "Игры · 2 фрагмента": "Gaming · 2 fragments",
+    "Резерв · 3 фрагмента": "Backup · 3 fragments",
+    "Наследовать": "Inherit",
+    "Пусто — наследовать": "Empty — inherit",
+    "Host заменяет клиентскую FinalMask inbound целиком. Если inbound требует симметричные маски, включите их в этот JSON в правильном порядке. Результат проверяется при экспорте подписки. Для автоматического выбора рабочего Host нужна поддержка клиента.": "A Host overrides the entire inbound client FinalMask. If the inbound requires symmetric mask layers, include them in this JSON in the correct order. Compatibility is checked when exporting a subscription. Automatic Host selection requires client support.",
+    "ожидается объект JSON": "Expected a JSON object",
+    "допустимы только tcp, udp и quicParams": "Only tcp, udp and quicParams are allowed",
+    "tcp должен быть массивом": "tcp must be an array",
+    "udp должен быть массивом": "udp must be an array",
+    "quicParams должен быть объектом": "quicParams must be an object",
+    "Клиентская FinalMask:": "Client FinalMask:",
     "Массовые операции": "Bulk operations",
     "Обновление Agent уже выполняется для этой ноды.": "Agent update is already running for this node.",
     "Ход обновления Agent": "Agent update progress",

@@ -14,6 +14,21 @@ for(const key of ['data-endpoints-panel','data-endpoint-list','data-endpoint-edi
  assert(view.includes(key),'Endpoint UI missing '+key);
 }
 assert(!view.includes('data-endpoint="sec"'),'Security is configured by inbound, not Hosts');
+
+assert(view.includes('data-endpoint="clientFinalmask"'),
+ 'Host editor must expose the per-endpoint FinalMask JSON override');
+for(const action of ['mask-gaming','mask-reserve','mask-inherit']){
+ assert(view.includes('data-endpoint-action="'+action+'"'),
+  'Host editor must expose '+action+' without changing other Hosts');
+}
+const endpointSource=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-hosts.js','utf8');
+assert.match(endpointSource,/clientFinalmask,/, 'Host save payload must include parsed client FinalMask');
+assert.match(endpointSource,/clientFinalmask:null|clientFinalmask=null/,
+ 'Clearing the Host mask must restore inbound inheritance');
+assert.match(endpointSource,/maxSplit:'2-2'/, 'Gaming mask must use exactly two fragments');
+assert.match(endpointSource,/maxSplit:'3-3'/, 'Backup mask must use exactly three fragments');
+assert.match(endpointSource,/delays:\['0-0'\]/, 'Low-latency presets must not inject artificial delays');
+
 const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const studio=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
 const html=fs.readFileSync('frontend/index.html','utf8');
