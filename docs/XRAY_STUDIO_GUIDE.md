@@ -353,6 +353,23 @@ An existing customized FinalMask is not randomly regenerated during unrelated ed
 
 New hosts default to Chrome.
 
+
+## ECH: генерация без терминала
+
+Для выбранного TLS inbound (включая VLESS + XHTTP + TLS) откройте **XRAY STUDIO → TLS → Сгенерировать ECH**.
+Укажите **внешний SNI** и нажмите **Сгенерировать и вставить в JSON**.
+
+Кнопка использует установленное в панели Xray-core: `xray tls ech --serverName <public-name>` через защищённый API. Она добавляет:
+
+- Сервер: `inbounds[].streamSettings.tlsSettings.echServerKeys` (секретный ключ; не копируйте его в клиентские настройки).
+- Клиентская метаинформация Nexus: `inbounds[].xmesh.clientTlsSettings.echConfigList` (публичная ECH-конфигурация). Генератор Xray JSON-подписки автоматически переносит её в `outbounds[].streamSettings.tlsSettings.echConfigList`.
+
+Существующие сертификаты, транспорт и FinalMask не меняются. JSON остаётся **несохранённым**, пока оператор явно не нажмёт «Сохранить». При замене существующей пары требуется отдельное подтверждение: клиенты со старым ECH Config могут перестать подключаться.
+
+Кнопка недоступна для REALITY/без TLS. Генерация требует подходящей версии Xray-core в панели; в приложениях клиентов требуется поддержка ECH. Проверяйте итоговый серверный конфиг через «Проверить» и реальную подписку на тестовом подключении **до переключения действующих пользователей**.
+
+ECH скрывает внутренний ClientHello, но внешний SNI остаётся виден. Это не обещание обхода DPI. Никогда не публикуйте ECH Server Keys, не добавляйте их в Host или клиентский outbound. Защищайте доступ к серверным профилям и бэкапам.
+
 ## Per-user fingerprint
 
 The user card can override the host fingerprint.
