@@ -10,12 +10,10 @@
   const installedLabel=root.querySelector('[data-panel-version-installed]');
   const version=root.querySelector('[data-panel-version-number]');
   const revision=root.querySelector('[data-panel-version-revision]');
-  const check=root.querySelector('[data-panel-version-check]');
   const status=root.querySelector('[data-panel-version-status]');
   const update=root.querySelector('[data-panel-version-update]');
   const updateStatus=root.querySelector('[data-panel-version-update-status]');
   const reload=root.querySelector('[data-panel-version-reload]');
-  const settings=root.querySelector('[data-panel-version-settings]');
   const caption=root.querySelector('[data-panel-version-caption]');
 
   let owner=false,installed=null,checked=null,checking=false,open=false;
@@ -26,14 +24,14 @@
   let observedUpdate=false;
   const labels={
     ru:{
-      title:'Версия панели',check:'Проверить обновления',checking:'Проверка GitHub…',
+      title:'Версия панели',checking:'Проверка GitHub…',
       waiting:'Проверка сравнивает установленную сборку с main.',
       up_to_date:'Установлена актуальная сборка.',update_available:'Доступно обновление панели.',
       local_ahead:'Установленная сборка новее текущей ветки main.',
       unknown_revision:'Ревизия этой сборки неизвестна — сравнение недоступно.',
       unverifiable:'Ветки различаются или сравнение недоступно. Нужна ручная проверка.',
       unavailable:'Не удалось связаться с GitHub. Актуальность не подтверждена.',
-      settings:'Другие способы обновления',noRevision:'Ревизия сборки неизвестна',close:'Закрыть',
+      noRevision:'Ревизия сборки неизвестна',close:'Закрыть',
       readOnly:'Проверка и запуск обновления доступны владельцу панели.',
       update:'Обновить панель',updating:'Запуск обновления…',
       reload:'Перезагрузить страницу',idle:'Системный updater готов к запросу.',
@@ -45,14 +43,14 @@
       reconnect:'Нет связи с API во время обновления. Повторная проверка будет выполнена автоматически.'
     },
     en:{
-      title:'Panel version',check:'Check for updates',checking:'Checking GitHub…',
+      title:'Panel version',checking:'Checking GitHub…',
       waiting:'The installed build is compared against main.',
       up_to_date:'This build is up to date.',update_available:'A panel update is available.',
       local_ahead:'The installed build is ahead of upstream main.',
       unknown_revision:'This build has no revision identifier; comparison is unavailable.',
       unverifiable:'Branches differ or cannot be compared. Check manually.',
       unavailable:'GitHub could not be reached. Update status is unverified.',
-      settings:'Other update options',noRevision:'Build revision unavailable',close:'Close',
+      noRevision:'Build revision unavailable',close:'Close',
       readOnly:'Only the owner can check for and install updates.',
       update:'Update panel',updating:'Queueing update…',
       reload:'Reload page',idle:'System updater is ready.',
@@ -104,6 +102,7 @@
       checked?.status||'idle';
     const message=successful?words.success:
       busy?(requesting?words.updating:words[stage]||words.running):
+      checking?words.checking:
       checked?(words[checked.status]||words.unverifiable):
       stage==='success'?words.previousSuccess:words.waiting;
 
@@ -111,11 +110,8 @@
     status.dataset.state=displayState;
     status.title=short(checked?.latest_revision)?'main '+short(checked.latest_revision):'';
     menu.dataset.state=displayState;
-    menu.dataset.actionMode=successful?'reload':canUpdate?'update':'check';
+    menu.dataset.actionMode=successful?'reload':canUpdate?'update':'idle';
 
-    check.textContent=checking?words.checking:words.check;
-    check.disabled=checking||readingState;
-    check.hidden=!owner||successful||busy;
     update.textContent=words.update;
     // Never show a dark disabled primary action; a completed host update
     // always takes precedence over a stale GitHub "update_available" result.
@@ -130,8 +126,6 @@
     ));
     updateStatus.textContent=problem||'';
     updateStatus.dataset.state=problem?(stage==='unavailable'?'unavailable':'failed'):'idle';
-    settings.textContent=words.settings;
-    settings.hidden=!owner||(!available&&stage!=='failed'&&stage!=='unavailable');
     caption.textContent=owner?'':words.readOnly;
     caption.hidden=owner;
     root.dataset.updateAvailable=available?'true':'false';
@@ -146,7 +140,8 @@
         void loadUpdateState();
         // On a fresh page the worker may still say "success" from the last
         // deployment. Always allow a new version check to re-enable updating.
-        if(!checked&&!checking)void checkUpdates();
+        if(!checking&&!requesting&&!active()&&
+          !(systemState?.status==='success'&&observedUpdate))void checkUpdates();
       }
     }else{
       stopWatch();
@@ -237,15 +232,8 @@
   }
   trigger.addEventListener('click',()=>toggle(!open));
   close.addEventListener('click',()=>{toggle(false);trigger.focus()});
-  check.addEventListener('click',()=>{void checkUpdates()});
   update.addEventListener('click',()=>{void requestUpdate()});
   reload.addEventListener('click',()=>location.reload());
-  settings.addEventListener('click',event=>{
-    event.preventDefault();
-    toggle(false);
-    location.hash='set/system';
-    window.setTimeout(()=>document.getElementById('panel-update-card')?.scrollIntoView({behavior:'smooth',block:'center'}),120);
-  });
   // The shared confirmation dialog lives outside the popover. Do not dismiss
   // the version menu while the user is confirming an upgrade.
   document.addEventListener('click',event=>{if(open&&!root.contains(event.target)&&!requesting)toggle(false)});

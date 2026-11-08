@@ -37,9 +37,9 @@ assert.match(script,/close\.addEventListener\('click'/);
 assert.match(script,/const successful=stage==='success'&&observedUpdate/);
 assert.match(script,/if\(active\(\)\)observedUpdate=true/);
 assert.match(script,/checked=null;\s*systemState=\{status:'queued'\}/);
-assert.match(script,/if\(!checked&&!checking\)void checkUpdates\(\)/,
+assert.match(script,/if\(!checking&&!requesting&&!active\(\)&&/,
   'Opening the popover must recover from a prior persisted host success');
-assert.match(script,/menu\.dataset\.actionMode=successful\?'reload':canUpdate\?'update':'check'/);
+assert.match(script,/menu\.dataset\.actionMode=successful\?'reload':canUpdate\?'update':'idle'/);
 assert.match(script,/update\.hidden=!canUpdate/);
 assert.match(script,/reload\.hidden=!owner\|\|!successful/);
 assert.match(css,/data-action-mode=reload/);
@@ -53,8 +53,12 @@ assert.match(script,/getJSON\('\/api\/v1\/panel\/version\/check'\)/);
 assert.match(script,/owner=user\?\.role==='owner'/);
 assert.match(script,/addEventListener\('xmesh:locale-changed',render\)/,'Language changes must use the explicit locale event');
 assert.doesNotMatch(script,/MutationObserver/,'Watching the lang attribute would recursively render the translator');
-assert.match(script,/check\.hidden=!owner/);
-assert.match(script,/settings\.hidden=!owner/);
+assert.match(script,/checking\?words\.checking/,'Automatic version checks must have a visible status');
+assert.match(script,/void checkUpdates\(\)/,'Opening the popover must run the read-only check');
+assert.doesNotMatch(html,/data-panel-version-check/,'Do not duplicate automatic check with a button');
+assert.doesNotMatch(html,/data-panel-version-settings/,'Remove redundant alternate-update link');
+assert.doesNotMatch(script,/querySelector\('\[data-panel-version-check\]'\)/);
+assert.doesNotMatch(script,/querySelector\('\[data-panel-version-settings\]'\)/);
 assert.match(script,/update\.hidden=!canUpdate/);
 assert.match(script,/window\.XMeshPanelUpdater/);
 assert.match(script,/systemState=\{status:'queued'\}/);

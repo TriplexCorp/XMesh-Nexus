@@ -43,10 +43,10 @@ for(const selector of [
  '[data-panel-version-trigger]','[data-panel-version-menu]',
  '[data-panel-version-heading]','[data-panel-version-close]',
  '[data-panel-version-installed]','[data-panel-version-number]',
- '[data-panel-version-revision]','[data-panel-version-check]',
+ '[data-panel-version-revision]',
  '[data-panel-version-status]','[data-panel-version-update]',
  '[data-panel-version-update-status]','[data-panel-version-reload]',
- '[data-panel-version-settings]','[data-panel-version-caption]'
+ '[data-panel-version-caption]'
 ])element(selector);
 const doc={
  hidden:false, listeners:{},
@@ -79,7 +79,8 @@ async function run(){
  await window.XMeshPanelVersion.init({role:'admin'});
  element('[data-panel-version-trigger]').click();
  await tick();
- assert.equal(element('[data-panel-version-check]').hidden,true,'Only owner can check');
+ assert.equal(element('[data-panel-version-update]').hidden,true,'Non-owner has no install action');
+ assert.doesNotMatch(html,/data-panel-version-check|data-panel-version-settings/,'Obsolete actions must be absent from markup');
  assert.equal(element('[data-panel-version-update]').hidden,true,'Admin cannot update');
  assert.equal(requests,0);
  element('[data-panel-version-trigger]').click();
@@ -88,8 +89,6 @@ async function run(){
  element('[data-panel-version-trigger]').click();
  await tick();
  assert(reads>=1,'Owner checks real host status on opening');
- element('[data-panel-version-check]').click();
- await tick();
  assert.equal(element('[data-panel-version-update]').hidden,false);
  assert.equal(element('[data-panel-version-update]').disabled,false);
  approved=false;
@@ -134,8 +133,8 @@ async function run(){
  server={status:'success'};
  element('[data-panel-version-trigger]').click();
  await tick();
- assert.equal(element('[data-panel-version-check]').hidden,false,
-   'Old successful deployment must never hide the next read-only check');
+ assert.equal(element('[data-panel-version-reload]').hidden,true,
+   'Old successful deployment must not require another reload');
  assert.equal(element('[data-panel-version-reload]').hidden,true,
    'Old success must not demand a pointless second reload');
  assert.equal(element('[data-panel-version-update]').hidden,false,
@@ -156,10 +155,9 @@ async function run(){
  server={status:'unavailable'};
  element('[data-panel-version-trigger]').click();
  await tick();
- element('[data-panel-version-check]').click();
- await tick();
  assert.equal(element('[data-panel-version-update]').hidden,true,'Missing updater must not display an unusable update action');
- assert.equal(element('[data-panel-version-settings]').hidden,false,'Settings fallback must remain visible');
+ assert.match(element('[data-panel-version-update-status]').textContent,/недоступен/i,
+   'Missing updater must explain the problem instead of suggesting a redundant link');
  console.log('Panel version popover: owner gate, cancel, queue, polling, success, unavailable and reload passed');
 }
 run().catch(error=>{console.error(error);process.exitCode=1});
