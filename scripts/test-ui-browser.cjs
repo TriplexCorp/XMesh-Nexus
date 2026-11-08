@@ -214,8 +214,8 @@ async function main() {
           'Stale success must not hide another confirmed upgrade');
         assert.equal(await page.locator('[data-panel-version-reload]').isVisible(),false,
           'A previous update must not permanently demand a browser reload');
-        assert.equal(await page.locator('[data-panel-version-check]').isVisible(),true,
-          'A persisted success must allow checking for newer updates');
+        assert.equal(await page.locator('[data-panel-version-check]').count(),0,
+          'The automatic read-only check must not have a redundant manual button');
 
         // A queued/running update witnessed in the same page does require a
         // reload when the host worker subsequently reports completion.
@@ -229,8 +229,8 @@ async function main() {
         await page.waitForFunction(()=>document.querySelector('[data-panel-version-menu]')?.dataset.actionMode==='reload');
         assert.equal(await page.locator('[data-panel-version-update]').isVisible(),false,
           'The obsolete update action must disappear when the host updater reports success');
-        assert.equal(await page.locator('[data-panel-version-check]').isVisible(),false,
-          'Success should not show redundant check actions');
+        assert.equal(await page.locator('[data-panel-version-check]').count(),0,
+          'Successful updates must not show manual version checks');
         assert.equal(await page.locator('[data-panel-version-reload]').isVisible(),true);
         assert.match(await page.locator('[data-panel-version-status]').innerText(),/Перезагрузите|Reload/i);
 
@@ -240,8 +240,9 @@ async function main() {
         await page.waitForFunction(()=>document.querySelector('[data-panel-version-update-status]')?.dataset.state==='unavailable');
         assert.equal(await page.locator('[data-panel-version-update]').isVisible(),false,
           'Do not show an unusable dark update button');
-        assert.equal(await page.locator('[data-panel-version-settings]').isVisible(),true,
-          'An unavailable updater needs a visible Settings fallback');
+        assert.equal(await page.locator('[data-panel-version-settings]').count(),0,
+          'Do not show another update path in the version popover');
+        assert.match(await page.locator('[data-panel-version-update-status]').innerText(),/недоступен|unavailable/i);
 
         await page.emulateMedia({reducedMotion:'reduce'});
         assert.equal(await menu.evaluate(el=>getComputedStyle(el).animationName),'none',
