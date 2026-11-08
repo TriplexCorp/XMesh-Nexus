@@ -277,12 +277,12 @@ mod tests {
             &tags
         ));
         assert!(!exhausted(
-            &json!({"cdnLimitGb":0.00000003,"cdnUsedBytes":29_i64}),
+            &json!({"cdnLimitGb":0.000_000_03,"cdnUsedBytes":29_i64}),
             "CDN_PL",
             &tags
         ));
         assert!(exhausted(
-            &json!({"cdnLimitGb":0.00000003,"cdnUsedBytes":30_i64}),
+            &json!({"cdnLimitGb":0.000_000_03,"cdnUsedBytes":30_i64}),
             "CDN_PL",
             &tags
         ));
