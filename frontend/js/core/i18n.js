@@ -15,6 +15,14 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Панель":"Panel",
+    "Брендинг, поведение, интеграции и уведомления":"Branding, behavior, integrations and notifications",
+    "Оформление":"Appearance",
+    "Палитра, композиция, типографика и эффекты":"Palette, layout, typography and effects",
+    "Система и трафик":"System and traffic",
+    "Обновления XMesh, Xray-core и правила LTE/CDN":"XMesh updates, Xray-core and LTE/CDN policies",
+    "Данные":"Data",
+    "Авторизация, 2FA, сессии и аудит":"Authentication, 2FA, sessions and audit",
     "Перезагрузить страницу":"Reload page",
     "Другие способы обновления":"Other update options",
     "Только владелец может обновлять панель.":"Only the owner can update the panel.",

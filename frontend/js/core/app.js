@@ -4581,25 +4581,28 @@ function securityP(){
 }
 
 /* ================= НАСТРОЙКИ ================= */
-// Subpages reuse existing inputs and save actions rather than inventing parallel forms.
+// Each page is a meaningful workflow, not a page for every tiny preference.
+// Keep the original functional cards (and their owners/API handlers) intact.
 const SETTINGS_PAGES=Object.freeze([
- ['general','Общие','Брендинг, домены и персональные параметры навигации','sliders'],
- ['colors','Цвет и тема','Основная палитра интерфейса и брендовые акценты','sun'],
- ['layout','Композиция','Плотность, радиусы и вид карточек','layers'],
- ['typography','Текст и эффекты','Читаемость, шрифты и настройки движения','pen'],
- ['integrations','Интеграции','События и уведомления интерфейса','link'],
- ['system','Ядро и обновления','Установка и обновление бинарника ядра на сервере панели','server'],
- ['traffic','Лимиты CDN','Общая группа ограниченных inbound для пользователей','cloud'],
- ['security','Безопасность','Авторизация, двухфакторная защита, сессии и аудит','shield-check'],
- ['admins','Администраторы','Управление доступом сотрудников панели','shield'],
- ['data','Данные панели','Экспорт данных и перенос персонального оформления','file']
+ ['general','Панель','Брендинг, поведение, интеграции и уведомления','sliders',['general','integrations']],
+ ['appearance','Оформление','Палитра, композиция, типографика и эффекты','sun',['colors','layout','typography']],
+ ['system','Система и трафик','Обновления XMesh, Xray-core и правила LTE/CDN','server',['system','traffic']],
+ ['security','Безопасность','Авторизация, 2FA, сессии и аудит','shield-check',['security']],
+ ['admins','Администраторы','Управление доступом сотрудников панели','shield',['admins']],
+ ['data','Данные','Экспорт данных и перенос персонального оформления','file',['data']]
 ]);
+// Backwards-compatible bookmarks: do not create duplicate UI pages or forms.
+const SETTINGS_PAGE_ALIASES=Object.freeze({
+ colors:'appearance',layout:'appearance',typography:'appearance',
+ integrations:'general',traffic:'system'
+});
 function settingsPagesForSession(){
  return SETTINGS_PAGES.filter(([key])=>key!=='admins'||sessionUser?.role==='owner');
 }
 function settingsPageFromHash(){
- const slug=location.hash.slice(1).split('/')[1];
- return settingsPagesForSession().some(([key])=>key===slug)?slug:'general';
+ const slug=location.hash.slice(1).split('/')[1]||'general';
+ const page=SETTINGS_PAGE_ALIASES[slug]||slug;
+ return settingsPagesForSession().some(([key])=>key===page)?page:'general';
 }
 function settingsPageForTarget(id){
  return id==='core-panel'||id==='panel-update-card'?'system':'general';
@@ -4742,8 +4745,10 @@ async function setP(){
     <div class="act"><button type="button" class="btn" data-cdn-tags-save ${sessionUser?.role!=='owner'?'disabled':''}>${ic('check')} Сохранить CDN-группу</button></div>
   </section>`;
   source.innerHTML=sourceHtml+cdnSettingsMarkup;
+  const groups=SETTINGS_PAGES.find(([key])=>key===settingsPage)?.[4]||['general'];
   const selected=[...source.content.querySelectorAll('[data-settings-group]')]
-    .filter(card=>card.dataset.settingsGroup===settingsPage);
+    .filter(card=>groups.includes(card.dataset.settingsGroup))
+    .sort((a,b)=>groups.indexOf(a.dataset.settingsGroup)-groups.indexOf(b.dataset.settingsGroup));
   // Render the existing Security Center and Admins editors inside Settings.
   // Neither is duplicated or reimplemented, preserving all authorization
   // rules and the original per-feature lifecycle/mounting logic.
