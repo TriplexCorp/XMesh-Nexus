@@ -161,7 +161,7 @@ assert.match(userCss,/#dlg\.user-create-modal \.user-create-head h2\{[\s\S]*font
  'Primary title must remain readable on desktop');
 assert.match(userCss,/#dlg\.user-create-modal \.user-create-footer\{[\s\S]*min-height:4\.7rem/,
  'Primary create/cancel actions must remain in a readable fixed footer');
-assert.match(dialogJs,/placeholder=\\"Введите имя пользователя\\"/,
+assert.match(dialogJs,/placeholder="Введите имя пользователя"/,
  'Username must provide the concept placeholder without modifying its submission name');
 assert.match(userCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1380px/,
  'New-user dialog must use the quieter v5 desktop surface');
