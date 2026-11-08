@@ -16,12 +16,12 @@ window.XMeshStudioHosts=(()=>{
      '<details class="sv-advanced"><summary>Клиентские переопределения</summary><p class="sv-muted">Укажите только отличия от настроек inbound. Transport и Security не дублируются.</p>'+
      '<div class="sv-two">'+field('Внешний SNI','sni','vpn.example.com')+field('Host','host','cdn.example.com')+'</div>'+
      '<div class="sv-two">'+field('Path','path','/xhttp')+
-      '<label class="sv-field"><span>Fingerprint</span><select data-endpoint="fp"><option value="chrome">Chrome (по умолчанию)</option><option value="firefox">Firefox</option><option value="safari">Safari</option><option value="ios">iOS</option></select></label></div>'+
+      '<label class="sv-field"><span>Fingerprint</span><select data-endpoint="fp"><option value="chrome">Chrome (по умолчанию)</option><option value="firefox">Firefox</option><option value="safari">Safari</option><option value="ios">iOS</option><option value="random">Random browser (экспериментально)</option><option value="randomized">Randomized uTLS (экспериментально)</option></select></label></div>'+
      '<div class="sv-two">'+field('ALPN','alpn','h2,http/1.1')+field('gRPC Service Name','serviceName','service')+'</div>'+
      '<div class="sv-two">'+field('REALITY Public Key','publicKey')+field('REALITY Short ID','shortId')+'</div>'+
      '<div class="sv-two">'+field('REALITY Spider X','spiderX','/')+field('Код страны','countryCode','DE')+'</div>'+
      '<div class="sv-two">'+field('VLESS Encryption клиента','clientEncryption','Пусто — наследовать из inbound')+'</div>'+
-     '<p class="sv-muted">Пустые значения наследуются от inbound. Клиентский VLESS Encryption не равен серверному decryption.</p></details>'+
+     '<details class="sv-advanced"><summary>Anti-DPI · FinalMask этого подключения</summary>'+'<p class="sv-muted">Настройка только клиентского Xray JSON. Разные Host могут использовать разные фрагментации. Пресеты применимы к TCP TLS ClientHello, не являются гарантией обхода DPI. 0 мс означает отсутствие намеренных задержек, а не нулевой RTT.</p>'+'<div class="sv-inline"><button type="button" data-endpoint-action="mask-gaming">Игры · 2 фрагмента</button><button type="button" data-endpoint-action="mask-reserve">Резерв · 3 фрагмента</button><button type="button" data-endpoint-action="mask-inherit">Наследовать</button></div>'+'<label class="sv-field"><span>host.clientFinalmask (JSON)</span><textarea data-endpoint="clientFinalmask" rows="7" spellcheck="false" placeholder="Пусто — наследовать"></textarea></label>'+'<p class="sv-muted">Host заменяет клиентскую FinalMask inbound целиком. Если inbound требует симметричные маски, включите их в этот JSON в правильном порядке. Результат проверяется при экспорте подписки. Для автоматического выбора рабочего Host нужна поддержка клиента.</p></details>'+'<p class="sv-muted">Пустые значения наследуются от inbound. Клиентский VLESS Encryption не равен серверному decryption.</p></details>'+
      '<div class="sv-endpoint-nodes"><b>Доступные узлы</b><p>Без выбора — все узлы текущего профиля.</p><div data-endpoint-nodes></div></div>'+
      '<footer><button type="button" class="sv-primary" data-endpoint-action="save">Сохранить подключение</button><button type="button" data-endpoint-action="cancel">Отмена</button></footer></div></section>';
   }
@@ -67,6 +67,7 @@ window.XMeshStudioHosts=(()=>{
       qs('[data-endpoint-title]').textContent=h?'Изменить подключение':'Новое подключение';
       for(const k of ['remark','address','sni','host','path','publicKey','shortId','alpn','serviceName','spiderX','countryCode','clientEncryption'])set(k,h?.[k]||'');
       set('fp',h?.fp||'chrome');
+      set('clientFinalmask',h?.clientFinalmask&&typeof h.clientFinalmask==='object'&&Object.keys(h.clientFinalmask).length?JSON.stringify(h.clientFinalmask,null,2):'');
       set('port',h?.port||443);set('enabled',h?.disabled?'no':'yes');
       const nodes=qs('[data-endpoint-nodes]');nodes.replaceChildren();
       for(const n of connected()){
@@ -91,6 +92,19 @@ window.XMeshStudioHosts=(()=>{
       if([...address].some(c=>' /@?#'.includes(c)||c==='\\')||address.length>253)return ctx.notify('Некорректный адрес сервера.');
       if(value('countryCode')&&!/^[A-Za-z]{2}$/.test(value('countryCode')))return ctx.notify('Страна: укажите двухбуквенный код, например DE.');
       if(value('alpn')&&!value('alpn').split(',').every(x=>/^[a-zA-Z0-9/._-]{1,32}$/.test(x.trim())))return ctx.notify('ALPN: неверный формат.');
+      let clientFinalmask=null;
+      const maskText=value('clientFinalmask');
+      if(maskText){
+        try{
+          const parsed=JSON.parse(maskText);
+          if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('ожидается объект JSON');
+          if(Object.keys(parsed).some(k=>!['tcp','udp','quicParams'].includes(k)))throw Error('допустимы только tcp, udp и quicParams');
+          if(parsed.tcp!=null&&!Array.isArray(parsed.tcp))throw Error('tcp должен быть массивом');
+          if(parsed.udp!=null&&!Array.isArray(parsed.udp))throw Error('udp должен быть массивом');
+          if(parsed.quicParams!=null&&(typeof parsed.quicParams!=='object'||Array.isArray(parsed.quicParams)))throw Error('quicParams должен быть объектом');
+          if(Object.keys(parsed).length)clientFinalmask=parsed;
+        }catch(err){return ctx.notify('Клиентская FinalMask: '+err.message)}
+      }
       const nodeIds=[...qs('[data-endpoint-nodes]').querySelectorAll('input:checked')].map(x=>Number(x.value));
       const old=editing==null?null:hosts().find(h=>String(h.id)===String(editing));
       // A legacy host may be pinned to nodes no longer in this profile.
@@ -104,7 +118,7 @@ window.XMeshStudioHosts=(()=>{
         sni:value('sni'),host:value('host'),path:value('path'),fp:value('fp')||'chrome',
         publicKey:value('publicKey'),shortId:value('shortId'),
         alpn:value('alpn'),serviceName:value('serviceName'),spiderX:value('spiderX'),
-        countryCode:value('countryCode').toUpperCase(),clientEncryption:value('clientEncryption'),
+        countryCode:value('countryCode').toUpperCase(),clientEncryption:value('clientEncryption'),clientFinalmask,
         nodes:nodeIds,disabled:value('enabled')==='no'};
       try{
         if(old)await ctx.api.update('hosts',old.id,data);
@@ -115,6 +129,14 @@ window.XMeshStudioHosts=(()=>{
     async function action(button){
       const op=button.dataset.endpointAction;
       if(op==='add')return open(null);
+      if(op==='mask-gaming'||op==='mask-reserve'){
+        const settings=op==='mask-gaming'
+          ?{packets:'tlshello',lengths:['5-10','500-700'],delays:['0-0'],maxSplit:'2-2'}
+          :{packets:'tlshello',lengths:['10-20','50-100','200-400'],delays:['0-0'],maxSplit:'3-3'};
+        set('clientFinalmask',JSON.stringify({tcp:[{type:'fragment',settings}]},null,2));
+        return;
+      }
+      if(op==='mask-inherit'){set('clientFinalmask','');return;}
       if(op==='cancel')return close();
       if(op==='save')return save();
       const h=hosts().find(x=>String(x.id)===button.dataset.hostId);
