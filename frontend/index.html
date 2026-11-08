@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#071b15">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=Inter:wght@400..800&family=Golos+Text:wght@400..800&family=Rubik:wght@400..800&family=Nunito+Sans:wght@400..800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Roboto:wght@400..800&family=PT+Sans:wght@400;700&family=Montserrat:wght@400..800&family=Ubuntu:wght@400;500;700&family=Open+Sans:wght@400..800&family=Source+Sans+3:wght@400..800&family=Fira+Sans:wght@400;500;600;700&family=Jost:wght@400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles/system/nexus-ui-v3.css?v=a265a804daaa">
+<link rel="stylesheet" href="/styles/system/nexus-ui-v3.css?v=bbe2a6186388">
 <link rel="stylesheet" href="/styles/system/workspace-dialog-contract.css?v=89dae5441971">
 </head>
 <body>
@@ -33,8 +33,11 @@
         <p class="top-panel-version-message" data-panel-version-status role="status" aria-live="polite"></p>
         <div class="top-panel-version-actions">
           <button type="button" data-panel-version-check>Проверить обновления</button>
-          <a data-panel-version-settings href="#set" hidden>Открыть обновление в настройках</a>
+          <button type="button" data-panel-version-update hidden>Обновить панель</button>
+          <button type="button" data-panel-version-reload hidden>Перезагрузить страницу</button>
+          <a data-panel-version-settings href="#set/system" hidden>Другие способы обновления</a>
         </div>
+        <p class="top-panel-version-update-status" data-panel-version-update-status role="status" aria-live="polite"></p>
         <p class="top-panel-version-caption" data-panel-version-caption></p>
       </section>
     </div><button class="ib" id="theme" aria-label="Сменить тему"></button><button class="ib" id="bell" type="button" aria-label="Уведомления" aria-haspopup="dialog" aria-expanded="false"></button><div class="top-language" id="top-language">
@@ -54,7 +57,7 @@
 <script src="/js/features/xray-studio/xray-json-diagnostics.js?v=b7f2210dfeb7"></script>
 <script src="/js/features/subscriptions/subscription-experience.js?v=c8c170542f87"></script>
 <script src="/js/features/subscriptions/subscription-traffic.js?v=759d13506a1e"></script>
-<script src="/js/core/i18n.js?v=b075ceceed81"></script>
+<script src="/js/core/i18n.js?v=e9e0f12176be"></script>
 <script src="/js/core/i18n-consistency.js?v=2502c530c5a9"></script>
 <script src="/js/features/subscriptions/subscription-studio.js?v=6fd519838c7b"></script>
 <script src="/js/core/qr-code.js?v=eea8a5afd3c1"></script>
@@ -75,8 +78,8 @@
 <script src="/js/features/nodes/node-routing.js?v=d862fb66d248"></script>
 <script src="/js/features/routing/client-routing.js?v=0f12ef3d01a0"></script>
 <script src="/js/features/hosts/host-editor.js?v=d33ed233d987"></script>
-<script src="/js/features/settings/panel-version-topbar.js?v=608b6321269e"></script>
-<script src="/js/core/app.js?v=08d1cf8ac1cd"></script>
+<script src="/js/features/settings/panel-version-topbar.js?v=769afc1696cb"></script>
+<script src="/js/core/app.js?v=ac23f4f6f12c"></script>
 <script src="/js/features/users/user-fingerprint-override.js?v=81b3aa0c1314"></script>
 <script src="/js/features/users/user-editor-draft.js?v=781ad0402494"></script>
 <script src="/js/features/users/user-client-routing.js?v=3f9b9cb717d2"></script>

@@ -6192,6 +6192,26 @@ async function refreshPanelUpdateStatus(showToast=false){
   if(showToast)toast(message);
   return state;
 }
+// Reuse the owner-confirmed, server-authorized updater from the compact
+// version menu. The API accepts only the fixed host update request; no shell
+// command, Docker socket or caller-chosen Git ref is exposed here.
+window.XMeshPanelUpdater={
+  async request(){
+    if(sessionUser?.role!=='owner')throw Error('Только владелец может обновлять панель.');
+    const confirmed=await panelConfirm(
+      'Обновить XMesh Nexus из origin/main? Сначала будет создана резервная копия PostgreSQL, затем выполнятся пересборка Docker и перезапуск панели.',
+      {title:'Обновление XMesh Nexus',confirmLabel:'Начать обновление'}
+    );
+    if(!confirmed)return {cancelled:true};
+    const result=await backendRequest('/api/v1/panel/update',{method:'POST',body:JSON.stringify({})});
+    startPanelUpdateWatch();
+    return result;
+  },
+  status(){
+    if(sessionUser?.role!=='owner')return Promise.reject(Error('Недостаточно прав.'));
+    return backendRequest('/api/v1/panel/update');
+  }
+};
 async function refreshCoreStatus(showToast=false){
   const state=await backendRequest('/api/v1/core');
   syncCoreBadge(state);

@@ -1,5 +1,5 @@
-//! Read-only, on-demand check of the running panel build against upstream main.
-//! This never executes a command, queues an update or fetches user-supplied URLs.
+//! Read-only build provenance and owner-only upstream version check.
+//! The update command remains isolated in the existing host-owned updater.
 use axum::{Json, extract::Extension};
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -7,6 +7,25 @@ use std::time::Duration;
 use crate::{ApiError, auth, require_owner};
 
 const PRODUCT_VERSION: &str = include_str!("../../VERSION");
+// The display release advances with the verified first-parent main history.
+// VERSION remains pinned for v6 agent / post-quantum protocol compatibility.
+const DISPLAY_VERSION: &str = match option_env!("PANEL_DISPLAY_VERSION") {
+    Some(version) => version,
+    None => "unknown",
+};
+fn installed_panel_version() -> &'static str {
+    let version = DISPLAY_VERSION.trim();
+    let parts = version.split('.').collect::<Vec<_>>();
+    if parts.len() == 3
+        && parts
+            .iter()
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+    {
+        version
+    } else {
+        PRODUCT_VERSION.trim()
+    }
+}
 const BUILD_REVISION: &str = match option_env!("PANEL_BUILD_REVISION") {
     Some(revision) => revision,
     None => "unknown",
@@ -35,7 +54,8 @@ fn classify_compare_status(value: &str) -> &'static str {
 /// Every authenticated role can inspect the panel version.
 pub async fn installed() -> Json<Value> {
     Json(json!({
-        "version": PRODUCT_VERSION.trim(),
+        "version": installed_panel_version(),
+        "compatibility_version": PRODUCT_VERSION.trim(),
         "revision": installed_revision(),
         "source": "running_build"
     }))
@@ -56,8 +76,8 @@ async fn github_json(client: &reqwest::Client, path: &str) -> Option<Value> {
 }
 
 /// Only the owner may initiate an upstream network check; it is never an update.
-/// Compare known build revisions by Git ancestry rather than VERSION alone,
-/// because the product version can remain 6.0.0 over many commits.
+/// Git ancestry still determines update availability: the semantic display
+/// version alone is not proof that one installed binary contains another.
 pub async fn check(Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
     require_owner(&actor)?;
     let Ok(client) = reqwest::Client::builder()
@@ -80,7 +100,7 @@ pub async fn check(Extension(actor): Extension<auth::AuthUser>) -> Result<Json<V
         return Ok(Json(json!({
             "status":"unknown_revision",
             "latest_revision":remote_sha,
-            "version":PRODUCT_VERSION.trim()
+            "version":installed_panel_version()
         })));
     };
     if local == remote_sha {
@@ -111,6 +131,11 @@ pub async fn check(Extension(actor): Extension<auth::AuthUser>) -> Result<Json<V
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn display_version_has_a_safe_fallback() {
+        assert_eq!(installed_panel_version().split('.').count(), 3);
+        assert_eq!(PRODUCT_VERSION.trim(), "6.0.0");
+    }
     #[test]
     fn revision_validation_is_strict() {
         assert!(valid_revision(&"a".repeat(40)));

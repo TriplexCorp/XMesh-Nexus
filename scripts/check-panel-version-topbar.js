@@ -19,6 +19,7 @@ const signer=read('backend/Dockerfile.xsp-signer');
 const compose=read('compose.yaml');
 const ctl=read('xmeshctl');
 const resolver=read('scripts/resolve-panel-build-revision.sh');
+const displayResolver=read('scripts/resolve-panel-display-version.sh');
 const install=read('install.sh');
 const i18n=read('frontend/js/core/i18n.js');
 new Function(script);
@@ -27,6 +28,9 @@ assert.match(html,/id="top-panel-version"/);
 assert.match(html,/data-panel-version-trigger[^>]*aria-expanded="false"/);
 assert.match(html,/data-panel-version-menu[^>]*role="dialog"/);
 assert.match(html,/data-panel-version-status[^>]*aria-live="polite"/);
+assert.match(html,/data-panel-version-update hidden/);
+assert.match(html,/data-panel-version-update-status[^>]*role="status"/);
+assert.match(html,/data-panel-version-reload hidden/);
 assert.match(html,/panel-version-topbar[.]js[?]v=[a-f0-9]{12}/);
 assert.match(entry,/panel-version-topbar[.]css[?]v=[a-f0-9]{12}/);
 assert.match(app,/XMeshPanelVersion\?\.init\(sessionUser\)/);
@@ -36,10 +40,14 @@ assert.match(script,/owner=user\?\.role==='owner'/);
 assert.match(script,/addEventListener\('xmesh:locale-changed',render\)/,'Language changes must use the explicit locale event');
 assert.doesNotMatch(script,/MutationObserver/,'Watching the lang attribute would recursively render the translator');
 assert.match(script,/check\.hidden=!owner/);
-assert.match(script,/settings\.hidden=!owner\|\|checked\?\.status!=='update_available'/);
+assert.match(script,/settings\.hidden=!available/);
+assert.match(script,/update\.hidden=!available/);
+assert.match(script,/window\.XMeshPanelUpdater/);
+assert.match(script,/systemState=\{status:'queued'\}/);
+assert.match(app,/window\.XMeshPanelUpdater=\{/);
 assert.match(script,/status\.dataset\.state=checked\?\.status\|\|'idle'/);
 assert.doesNotMatch(script,/method\s*:\s*['"]POST['"]/,'Checking updates must remain read-only');
-assert.doesNotMatch(script,/\/api\/v1\/panel\/update/,'Version control must not queue an update');
+assert.doesNotMatch(script,/\/api\/v1\/panel\/update/,'Version UI calls the existing owner-confirmed updater bridge, never a second unguarded endpoint');
 assert.match(css,/\.top-panel-version-menu\[hidden\]/);
 assert.match(css,/@media\(max-width:760px\)/);
 assert.match(backend,/\.route\("\/panel\/version", get\(panel_version::installed\)\)/);
@@ -58,11 +66,15 @@ assert.match(docker,/--mount=type=bind,source=\.,target=\/source,readonly/,
  'Direct Compose builds must inspect the checkout without copying Git into the image');
 assert.match(docker,/sh \/source\/scripts\/resolve-panel-build-revision[.]sh/);
 assert.match(docker,/sh \/source\/scripts\/resolve-panel-build-revision[.]sh[^\n]* > \/build\/PANEL_BUILD_REVISION/);
-assert.match(docker,/PANEL_BUILD_REVISION="\$\(cat \/build\/PANEL_BUILD_REVISION\)" cargo build --release/,
+assert.match(docker,/PANEL_BUILD_REVISION="\$\(cat \/build\/PANEL_BUILD_REVISION\)"/,
  'Resolved SHA must be supplied to rustc instead of the unknown default');
 assert.match(resolver,/GIT_OPTIONAL_LOCKS=0/,'Read-only BuildKit mount must not write Git index');
 assert.match(resolver,/status --porcelain --untracked-files=normal/,
  'Build revision must not impersonate a clean upstream commit for dirty sources');
+assert.match(displayResolver,/rev-list --first-parent --count/,'Display release must monotonically advance with first-parent main commits');
+assert.match(docker,/PANEL_DISPLAY_VERSION="\$\(cat \/build\/PANEL_DISPLAY_VERSION\)"/);
+assert.match(version,/option_env!\("PANEL_DISPLAY_VERSION"\)/);
+assert.match(version,/"compatibility_version": PRODUCT_VERSION\.trim\(\)/);
 assert.match(resolver,/diff --quiet HEAD/,
  'Build revision must reject locally changed tracked sources');
 assert.match(compose,/PANEL_BUILD_REVISION: \$\{PANEL_BUILD_REVISION:-unknown\}/);
@@ -101,4 +113,4 @@ try{
   fs.rmSync(source,{recursive:true,force:true});
   fs.rmSync(archive,{recursive:true,force:true});
 }
-console.log('Panel build provenance and owner-only on-demand update check: OK');
+console.log('Panel build provenance, incrementing release version and owner-only update entrypoint: OK');
