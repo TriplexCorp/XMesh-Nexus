@@ -370,21 +370,29 @@ is collapsed. Native HTML disclosure semantics, keyboard focus and existing
 Nexus Classic/Glass/Raised tokens apply. Do not change membership or
 persisted Squad data to achieve visual compactness.
 
-### Settings center: navigable subpages
+### Settings center: six coherent workspaces
 
-- `#set` opens General. `#set/general`, `#set/colors`, `#set/layout`,
-  `#set/typography`, `#set/integrations`, `#set/system`, `#set/security`,
-  `#set/admins` (owner only), and `#set/data` are navigable, reload-safe
-  destinations with browser Back/Forward support. Legacy `#security` and
-  `#admins` URLs redirect into these settings routes.
+- The Settings rail contains **six** substantial pages, not a category per
+  minor preference: `#set/general` (Panel: brand, behavior, integrations,
+  notifications), `#set/appearance` (Appearance: colors, composition,
+  typography, effects), `#set/system` (System & traffic: Xray, panel updates,
+  LTE/CDN quotas), `#set/security` (Security Center), `#set/admins` (owner-only
+  staff management), and `#set/data` (safe data and theme exports). `#set`
+  opens Panel. These routes preserve browser Back/Forward and page reloads.
+- Old saved URLs remain functional aliases with no duplicate forms:
+  `#set/colors`, `#set/layout`, `#set/typography` open Appearance;
+  `#set/integrations` opens Panel; `#set/traffic` opens System & traffic.
+  Direct `#security` and `#admins` are still redirected to Settings.
 - The global System rail contains **Settings only**. The real Security Center
   (MFA, sessions, audit and policy) and Administrators CRUD editor mount inside
   the Settings navigation without duplicate forms or alternate API handlers.
   Non-owners never see Administrators and are prevented from opening its deep
   link. Subscription Studio remains a separate functional workbench.
-- Each subpage mounts **only its own existing setting cards** in a responsive
-  one- or two-column workspace. Do not restore the former kilometer-long
-  settings page, empty placeholder panels or fake save controls.
+- Each workspace mounts **all existing cards belonging to its related feature
+  groups**, and no unrelated cards. A pair of independent column stacks keeps
+  short cards compact even beside long font or palette editors. The existing
+  save handlers, IDs and authorization checks remain authoritative; no parallel
+  forms or blank placeholder surfaces are introduced.
 - Appearance choices save with the existing browser-local behavior; brand
   fields save through their existing form; webhook toggles persist immediately.
   Xray-core and panel-update operations retain their authenticated backend
