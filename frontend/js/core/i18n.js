@@ -15,6 +15,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Категория трафика узла": "Node traffic category",
+
     "Трафик обхода": "Bypass traffic",
     "Трафик обхода, ГиБ": "Bypass traffic, GiB",
     "Категория трафика": "Traffic category",
