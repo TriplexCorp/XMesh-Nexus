@@ -56,7 +56,7 @@ const timers=new Map();let timerId=0;
 const window={
  XMeshI18n:{getLanguage:()=> 'ru'},
  XMeshPanelUpdater:{
-  async request(){requests++;return approved?{status:'queued'}:{cancelled:true}},
+  async request(){requests++;if(approved)server={status:'queued'};return approved?{status:'queued'}:{cancelled:true}},
   async status(){reads++;return {...server}}
  },
  setTimeout:fn=>{fn();return 1}
