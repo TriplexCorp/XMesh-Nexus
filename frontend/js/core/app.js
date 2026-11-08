@@ -4849,7 +4849,7 @@ async function setP(){
     `<div class="settings-focus-bar" role="group" aria-label="${panelIsEnglish()?'Settings groups':'Группы настроек'}">
       ${focusItems.map(([key,ru,en])=>`<button type="button" data-settings-focus="${key}" class="${key===focusGroup?'is-active':''}" aria-pressed="${key===focusGroup?'true':'false'}">${panelIsEnglish()?en:ru}</button>`).join('')}
     </div>`:'';
-  const [,title,description]=SETTINGS_PAGES.find(([key])=>key===settingsPage);
+  const [,title]=SETTINGS_PAGES.find(([key])=>key===settingsPage);
   const navigation=settingsPagesForSession().map(([key,label,subtitle,iconName])=>{
     const active=key===settingsPage;
     return `<a class="settings-center-link${active?' is-active':''}" href="#set/${key}" ${active?'aria-current="page"':''}>
@@ -4857,12 +4857,14 @@ async function setP(){
       <span class="settings-center-link-copy"><strong>${label}</strong><small>${subtitle}</small></span>
     </a>`;
   }).join('');
+  // Primary dashboard title already says "Settings". Use one full-width
+  // horizontal navigation row; duplicate subsection headings waste vertical
+  // space and shrink real form controls.
   return [`<div class="settings-workspace" data-ui-page="settings"><div class="settings-center">
-    <aside class="settings-center-rail" aria-label="Разделы настроек">
+    <div class="settings-center-rail">
       <nav class="settings-center-nav" aria-label="Разделы настроек">${navigation}</nav>
-    </aside>
-    <div class="settings-center-main" id="settings-subpage" data-settings-section="${settingsPage}" data-single="${activeCards.length<=1}">
-      ${settingsPage==='security'?'':`<header class="settings-center-heading"><div><h2>${title}</h2><p>${description}</p></div></header>`}
+    </div>
+    <div class="settings-center-main" id="settings-subpage" role="region" aria-label="${title}" data-settings-section="${settingsPage}" data-single="${activeCards.length<=1}">
       ${focusMarkup}
       ${embedded?`<div class="settings-center-embedded" data-settings-group="${settingsPage}">${embedded[0]}</div>`:`
       <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${activeCards.length<=1}">
