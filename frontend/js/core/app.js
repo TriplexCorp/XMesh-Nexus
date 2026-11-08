@@ -4862,19 +4862,19 @@ async function setP(){
   const cdnTagChoices=[...new Set([...tags(),...(Array.isArray(DB.set.cdnInboundTags)?DB.set.cdnInboundTags:[])])].filter(Boolean);
   const cdnSelection=new Set(Array.isArray(DB.set.cdnInboundTags)?DB.set.cdnInboundTags:[]);
   const cdnSettingsMarkup=`<section class="card" data-settings-group="traffic">
-    <div class="hd"><div><h3>CDN / Белые списки</h3><p>Единый лимит трафика по выбранным inbound на всех нодах</p></div></div>
-    <p class="note">В одной подписке могут быть безлимитные обычные узлы и отдельные LTE-узлы с квотой пользователя. LTE-узел отмечается на вкладке «Трафик» его настроек; старый выбор inbound ниже сохранён для совместимости.</p>
-    <label class="f"><span>Период квоты LTE</span><select name="cdnResetPeriod" ${sessionUser?.role!=='owner'?'disabled':''}>
+    <div class="hd"><div><h3>Трафик обхода</h3><p>Общий период квоты и совместимость с прежними глобальными правилами</p></div></div>
+    <p class="note">Основной сервер остаётся безлимитным, а сервер обхода расходует отдельную квоту пользователя. Категорию выбирайте в карточке узла, лимит — в пользователе или шаблоне.</p>
+    <label class="f"><span>Период квоты обхода</span><select name="cdnResetPeriod" ${sessionUser?.role!=='owner'?'disabled':''}>
       <option value="lifetime" ${DB.set.cdnResetPeriod!=='monthly'?'selected':''}>Накопительный · без автоматического сброса</option>
       <option value="monthly" ${DB.set.cdnResetPeriod==='monthly'?'selected':''}>Каждый календарный месяц · UTC</option>
     </select><small>При выборе месячного режима новый период начинается 1-го числа в 00:00 UTC. Учитываются только подтверждённые приращения счётчиков с момента установки этого обновления.</small></label>
-    <div class="f"><span>Inbound, входящие в CDN-группу</span>
-      <div class="ms" role="group" aria-label="CDN inbound">
+    <details class="bypass-legacy-rules" data-bypass-legacy><summary>Расширенные правила inbound <small>${cdnSelection.size?cdnSelection.size+" выбрано":"для совместимости"}</small></summary><p class="note">Глобальные теги применяются ко всем узлам с таким inbound, даже к основным. Действующие правила сохранены; для новых подключений выбирайте категорию на узле.</p><div class="f"><span>Глобально ограниченные inbound</span>
+      <div class="ms" role="group" aria-label="Глобальные inbound обхода">
         ${cdnTagChoices.map(tag=>`<label class="ck"><input type="checkbox" name="cdnInboundTags" value="${esc(tag)}" ${cdnSelection.has(tag)?'checked':''} ${sessionUser?.role!=='owner'?'disabled':''}><span>${esc(tag)}</span></label>`).join('')||'<span class="mu">В профилях XRAY STUDIO пока нет inbound.</span>'}
       </div>
-      <small>Эта глобальная группа — для существующих правил. Новые LTE-узлы удобнее отмечать в карточке узла. Подсчитывается подтверждённый входящий + исходящий трафик пользователя.</small>
+      <small>Подсчитывается подтверждённый входящий и исходящий трафик. Прежние выбранные inbound остаются включёнными, пока вы сами их не измените.</small>
     </div>
-    <div class="act"><button type="button" class="btn" data-cdn-tags-save ${sessionUser?.role!=='owner'?'disabled':''}>${ic('check')} Сохранить CDN-группу</button></div>
+    </details><div class="act"><button type="button" class="btn" data-cdn-tags-save ${sessionUser?.role!=='owner'?'disabled':''}>${ic('check')} Сохранить правила обхода</button></div>
   </section>`;
   source.innerHTML=sourceHtml+cdnSettingsMarkup;
   const groups=SETTINGS_PAGES.find(([key])=>key===settingsPage)?.[4]||['general'];
@@ -4995,8 +4995,8 @@ document.addEventListener('click',async e=>{
     const chosen=[...panel.querySelectorAll('[name="cdnInboundTags"]:checked')].map(input=>input.value);
     const period=panel.querySelector('[name="cdnResetPeriod"]')?.value||'lifetime';
     b.disabled=true;
-    try{await api.saveSettings({cdnInboundTags:chosen,cdnResetPeriod:period});toast('Политика LTE сохранена. Доступ изменится при синхронизации нод.')}
-    catch(error){toast('Ошибка сохранения CDN-группы: '+(error.message||'API'))}
+    try{await api.saveSettings({cdnInboundTags:chosen,cdnResetPeriod:period});toast('Правила обхода сохранены. Доступ изменится при синхронизации узлов.')}
+    catch(error){toast('Ошибка сохранения правил обхода: '+(error.message||'API'))}
     finally{b.disabled=false}
     return;
   }
