@@ -1606,3 +1606,49 @@ dialog.user-modal .user-pane {
   #dlg.user-modal .user-route-rule-fields{grid-template-columns:minmax(0,1fr)}
   #dlg.user-modal .user-route-rule-fields .user-route-target{grid-column:auto}
 }
+
+/* User Details composition: the basic fields are a 2x2 identity group,
+ * the note sits beneath them, and connection controls form a calm second
+ * column. Preserve the mounted tab geometry and inherited material tokens. */
+@media (min-width:1100px){
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards{
+    grid-template-columns:minmax(0,1fr) minmax(0,1.04fr);
+    grid-template-rows:auto auto;
+    align-items:start;
+    gap:.7rem .8rem;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-basic-card{
+    grid-column:1;
+    grid-row:1;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:.58rem .68rem;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-basic-card>.user-card-title{
+    grid-column:1/-1;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-basic-card>.f{
+    grid-column:auto;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-note-card{
+    grid-column:1;
+    grid-row:2;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-connection-card{
+    grid-column:2;
+    grid-row:1 / span 2;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-note-card textarea{
+    min-height:6.7rem;
+  }
+}
+#dlg.user-modal .user-pane-settings .user-detail-card>.user-card-title{
+  border-bottom:1px solid var(--nx-border);
+  margin-bottom:.1rem;
+  padding-bottom:.48rem;
+}
+#dlg.user-modal .user-pane-settings .user-settings-cards{
+  min-width:0;
+}
+#dlg.user-modal .user-pane-settings .user-detail-card>.f{
+  min-width:0;
+}

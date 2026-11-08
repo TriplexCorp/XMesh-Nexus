@@ -1612,6 +1612,16 @@ async function main() {
       assert.equal(g.paneScrolls,0,'Only the shared body may scroll');
       if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Content must fit without scrolling when viewport height is sufficient');
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
+      const layout=await page.locator('#dlg').evaluate(d=>{
+        const b=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}};
+        const fields=[...d.querySelectorAll('.user-basic-card>.f')].map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y}});
+        return {basic:b('.user-basic-card'),connection:b('.user-connection-card'),note:b('.user-note-card'),fields};
+      });
+      assert(layout.connection.x>=layout.basic.right-2,'Connection controls must form the right-hand column');
+      assert(Math.abs(layout.note.x-layout.basic.x)<=2&&layout.note.y>=layout.basic.bottom-2,
+        'Administrator note must follow the basic data on the left');
+      assert(layout.fields.length===4&&Math.abs(layout.fields[0].x-layout.fields[1].x)>8,
+        'Basic user data must form two compact columns on desktop');
       for(const key of ['acc','routing','traffic','dev','ov']){
         await page.locator(`[data-user-editor-tab="${key}"]`).click();
         const bounds=await page.locator('#dlg').boundingBox();
