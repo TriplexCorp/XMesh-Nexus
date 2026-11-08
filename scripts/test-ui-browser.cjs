@@ -603,6 +603,54 @@ async function main() {
       await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
     });
 
+    await checked('Users status filters: distinct labels, readable count badges, and selection',async()=>{
+      for(const theme of ['light','dark']){
+        await page.setViewportSize({width:1440,height:900});
+        await navigate('users');
+        const layout=await page.locator('#uf').evaluate(root=>{
+          const old=document.documentElement.dataset.theme;
+          document.documentElement.dataset.theme='${theme}';
+          const buttons=[...root.querySelectorAll('button[data-uf]')];
+          const dimensions=buttons.map(button=>{
+            const label=button.querySelector('.users-filter-label');
+            const count=button.querySelector('.users-filter-count');
+            const l=label?.getBoundingClientRect(),c=count?.getBoundingClientRect(),b=button.getBoundingClientRect();
+            return{
+              label:label?.textContent,number:count?.textContent,
+              gap:l&&c?c.left-l.right:0,
+              countWidth:c?.width||0,
+              verticalDelta:l&&c?Math.abs((l.top+l.bottom)/2-(c.top+c.bottom)/2):100,
+              pressed:button.getAttribute('aria-pressed'),
+              active:button.classList.contains('on'),
+              inside:l&&c&&c.right<=b.right+1
+            };
+          });
+          document.documentElement.dataset.theme=old;
+          return{dimensions,overflow:document.documentElement.scrollWidth>innerWidth+1};
+        });
+        assert.equal(layout.dimensions.length,7,'Every status category must have a count');
+        assert(layout.dimensions.every(v=>v.gap>=6),'Labels must have a visible gap before their counters');
+        assert(layout.dimensions.every(v=>v.countWidth>=18&&v.verticalDelta<=3&&v.inside),
+          'Each count badge must be readable and aligned inside its button');
+        assert(layout.dimensions.every(v=>v.pressed===(v.active?'true':'false')),
+          'Accessible filter selection must match visual state');
+        assert.equal(layout.overflow,false,'User filter pills must not overflow the page');
+      }
+      await page.locator('#uf [data-uf="ONLINE"]').click();
+      await page.waitForFunction(()=>document.querySelector('#uf [data-uf="ONLINE"]')?.getAttribute('aria-pressed')==='true');
+      assert.equal(await page.locator('#uf [aria-pressed="true"]').count(),1);
+      await page.locator('#uf [data-uf="all"]').click();
+      await page.waitForFunction(()=>document.querySelector('#uf [data-uf="all"]')?.getAttribute('aria-pressed')==='true');
+      await page.setViewportSize({width:390,height:844});
+      const narrow=await page.locator('#uf').evaluate(root=>({
+        overflow:document.documentElement.scrollWidth>innerWidth+1,
+        all:[...root.querySelectorAll('button[data-uf]')].every(b=>b.getBoundingClientRect().width>=48),
+        gaps:[...root.querySelectorAll('button[data-uf]')].map(b=>b.querySelector('.users-filter-count').getBoundingClientRect().left-b.querySelector('.users-filter-label').getBoundingClientRect().right)
+      }));
+      assert.equal(narrow.overflow,false,'Mobile status counters must not cause horizontal overflow');
+      assert(narrow.all&&narrow.gaps.every(n=>n>=6),'Mobile filters must keep readable label-to-count spacing');
+    });
+
     await checked('Users pagination: 15 / 30 / 60 with enhanced select',async()=>{
       await navigate('users');
       await page.evaluate(async userId=>{
