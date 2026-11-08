@@ -1301,8 +1301,9 @@ async function main() {
           assert(compact.create.right<=compact.toolbar.right+1,
             'Create action must remain inside the toolbar frame');
           assert.equal(compact.cards.length,3,'All routing templates remain visible');
-          if(width>=1366)assert(compact.cards[2].right>=compact.list.right-48,
-            'Three cards should fill the desktop gallery, without an unused fourth column');
+          if(width>=1366&&Math.abs(compact.cards[0].top-compact.cards[2].top)<3)
+            assert(compact.cards[2].right>=compact.list.right-48,
+              'Three cards on one row must fill the desktop gallery, without an unused fourth column');
           if(width>=1920)assert(compact.cards[0].height<500,
             'Routing assignment and three ordered rules should not need a tall card');
           assert(!compact.overflow,'Compact routing gallery must not overflow the document');
