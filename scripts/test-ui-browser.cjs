@@ -302,7 +302,7 @@ async function main() {
       await page.setViewportSize({width:390,height:844});
       await navigate('set/appearance');
       const g=await page.evaluate(()=>{
-        const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width}};
+        const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,width:r.width}};
         const shell=document.querySelector('.settings-center'),nav=document.querySelector('.settings-center-nav'),toolbar=document.querySelector('.settings-center-rail'),grid=document.querySelector('.settings-center-grid');
         const cards=[...grid.querySelectorAll('.card')].filter(node=>node.getClientRects().length);
         const links=[...nav.querySelectorAll('a')].map(box);
@@ -1046,10 +1046,10 @@ async function main() {
         const icon=card.querySelector('.squad-card-emblem').getBoundingClientRect();
         const label=card.querySelector('.squad-card-identity').getBoundingClientRect();
         return{cardRight:r.right,headerRight:h.right,iconRight:icon.right,labelRight:label.right,
-          editHidden:getComputedStyle(card.querySelector('.squad-card-head-actions')).display==='none',
+          editVisible:getComputedStyle(card.querySelector('.squad-card-head-actions')).display!=='none',
           overflow:document.documentElement.scrollWidth>innerWidth+1};
       });
-      assert(bounds.editHidden,'Per-card editing controls must not compete with a bulk checkbox');
+      assert(bounds.editVisible,'Edit must remain visible during bulk selection');
       assert(bounds.iconRight<=bounds.cardRight+1&&bounds.labelRight<=bounds.cardRight+1,
         'Squad identity must remain inside its card when selection is active');
       assert(!bounds.overflow,'Bulk selection must not overflow 768px viewports');
