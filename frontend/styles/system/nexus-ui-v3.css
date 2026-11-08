@@ -358,13 +358,49 @@ html[data-motion=off] dialog[open]:not(#dlg){transform:none}
 /* Keep the unified toolbar inside its surface before it must overflow. */
 #view .templates-workspace .template-section-tools{flex-wrap:wrap}
 
-/* A single batch toolbar grammar in every directory: selection follows search. */
-#view .nx-bulk-toolbar{justify-self:start;flex:0 1 auto;order:0}
-#view .nx-bulk-report{flex:1 1 100%;min-width:0;display:grid;gap:.4rem;padding:.65rem .75rem;border-top:1px solid var(--nx-border);font-size:.75rem}
-#view .nx-bulk-report>strong{font-size:.78rem;color:var(--tx);font-variant-numeric:tabular-nums}
-#view .nx-bulk-report-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:.3rem;max-height:13rem;overflow-y:auto}
-#view .nx-bulk-report-row{display:grid;gap:.15rem;min-width:0;padding:.35rem .5rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
+/* Bulk actions live in the normal action cluster; selection is a quiet
+ * contextual row OUTSIDE the filter toolbar, so no toolbar jumps in height. */
+#view .nx-bulk-toolbar{align-self:center;justify-self:end;flex:0 0 auto;order:0;white-space:nowrap}
+#view .nodes-toolbar>.nx-bulk-toolbar{margin-inline:0 .1rem;align-self:flex-end}
+#view .nx-bulk-context{
+ display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:.45rem .8rem;min-width:0;padding:.45rem .7rem;
+ border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);
+ background:var(--nx-panel-bg);box-shadow:var(--nx-panel-shadow);
+}
+#view .nx-bulk-context[hidden]{display:none}
+#view .nx-bulk-context-controls{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem .55rem;min-height:var(--nx-control-h-sm);min-width:0}
+#view .nx-bulk-context-controls>.nx-bulk-count{margin-inline-end:.15rem}
+#view .nx-bulk-context-controls>.gh{min-height:var(--nx-control-h-sm)}
+#view .nx-bulk-report{margin-inline-start:auto;min-width:0;flex:0 1 auto}
+#view .nx-bulk-report[open]{flex:1 1 100%;margin-inline-start:0}
+#view .nx-bulk-report-summary{
+ display:inline-flex;align-items:center;justify-content:space-between;
+ min-height:var(--nx-control-h-sm);padding:.35rem .65rem;
+ border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);
+ background:var(--nx-control-bg);font-size:.75rem;font-weight:720;
+ color:var(--tx);white-space:nowrap;cursor:pointer;font-variant-numeric:tabular-nums;
+ list-style:none;
+}
+#view .nx-bulk-report-summary::-webkit-details-marker{display:none}
+#view .nx-bulk-report-summary::after{content:"▾";margin-inline-start:.6rem;color:var(--mu)}
+#view .nx-bulk-report[open]>.nx-bulk-report-summary::after{transform:rotate(180deg)}
+#view .nx-bulk-report-summary:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
+#view .nx-bulk-report-list{
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));
+ gap:.4rem;max-height:13rem;overflow-y:auto;margin-top:.5rem;
+}
+#view .nx-bulk-report-row{
+ display:grid;gap:.1rem;min-width:0;padding:.45rem .6rem;
+ border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);
+ background:var(--nx-section-bg);font-size:.73rem;
+}
 #view .nx-bulk-report-row>b{overflow-wrap:anywhere}
 #view .nx-bulk-report-row>span{color:var(--mu);overflow-wrap:anywhere}
 #view .nx-bulk-report-row.is-success>span{color:var(--ok)}
 #view .nx-bulk-report-row.is-error>span{color:var(--er)}
+@media(max-width:760px){
+ #view .nx-bulk-toolbar{flex:0 0 auto;order:0}
+ #view .nx-bulk-context{align-items:stretch}
+ #view .nx-bulk-report{flex:1 1 100%;margin-inline-start:0}
+}
