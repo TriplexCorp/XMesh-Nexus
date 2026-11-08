@@ -4,7 +4,7 @@
  * server-side bulk endpoint: every change uses the existing validated API. */
 (()=>{
  const specs=[
-  {kind:'nodes',root:'.nodes-page',toolbar:'.nodes-toolbar',cards:'[data-node-card-id]',key:'data-node-card-id',actions:['enable','disable','delete']},
+  {kind:'nodes',root:'.nodes-page',toolbar:'.nodes-toolbar',cards:'[data-node-card-id]',key:'data-node-card-id',actions:['enable','disable','agent-update','delete']},
   {kind:'hosts',root:'.host-directory',toolbar:'.host-directory-toolbar',cards:'[data-host-card-id]',key:'data-host-card-id',actions:['enable','disable','delete']},
   {kind:'squads',root:'.squad-directory',toolbar:'.squad-directory-toolbar',cards:'[data-squad-card]',key:'data-squad-card',actions:['delete']},
   {kind:'tpls',root:'[data-template-section="tpls"]',toolbar:'.template-section-tools',cards:'[data-template-card^="tpls:"]',key:'data-template-card',actions:['delete']},
@@ -14,7 +14,7 @@
  const state=new Map(),bound=new WeakSet(),draftHandlers=new WeakMap();
  const trans=(ru,en)=>typeof panelIsEnglish==='function'&&panelIsEnglish()?en:ru;
  const selection=kind=>{
-  if(!state.has(kind))state.set(kind,{mode:false,ids:new Set(),busy:false});
+  if(!state.has(kind))state.set(kind,{mode:false,ids:new Set(),busy:false,batch:null});
   return state.get(kind);
  };
  const keyOf=(card,spec)=>{
@@ -25,7 +25,8 @@
  const visibleCards=(root,spec)=>cardsFor(root,spec).filter(card=>!card.hidden&&card.getClientRects().length>0);
  const actionText=action=>({
   enable:trans('Включить','Enable'),disable:trans('Отключить','Disable'),
-  delete:trans('Удалить','Delete')
+  delete:trans('Удалить','Delete'),
+  'agent-update':trans('Обновить Agent','Update Agent')
  })[action];
  const cardName=(kind,id)=>{
   if(kind==='balancers')return '#'+id;
@@ -48,8 +49,10 @@
      group.dataset.bulkToolbar=spec.kind;
      group.setAttribute('role','toolbar');
      group.setAttribute('aria-label',trans('Массовые операции','Bulk operations'));
-     const target=toolbar.querySelector('.nx-workspace-actions,.node-grid-controls,.nx-workspace-grid-controls,.node-create-action');
-     toolbar.insertBefore(group,target||null);
+     // One placement contract: immediately after the left search.
+     const search=toolbar.querySelector('.node-explorer-search,.nx-directory-search,.template-search');
+     if(search)search.after(group);
+     else toolbar.insertBefore(group,toolbar.firstChild);
     }
     if(!bound.has(area)){
      bound.add(area);
@@ -70,7 +73,7 @@
       const action=button.dataset.bulkAction,st=selection(spec.kind);
       if(action==='mode'){
        st.mode=!st.mode;
-       if(!st.mode)st.ids.clear();
+       if(!st.mode){st.ids.clear();st.batch=null;}
        update(area,spec);
       }else if(action==='all'){
        for(const card of visibleCards(area,spec))st.ids.add(keyOf(card,spec));
@@ -126,7 +129,84 @@
     '<details class="nx-bulk-actions"><summary class="gh sm" aria-label="'+trans('Массовые операции','Bulk operations')+'"'+(!n||st.busy?' aria-disabled="true"':'')+'>'+trans('Действия','Actions')+' <span aria-hidden="true">▾</span></summary>'+
     '<div class="nx-bulk-actions-menu">'+spec.actions.map(action=>'<button type="button" data-bulk-action="'+action+'" class="'+(action==='delete'?'is-danger':'')+'"'+(st.busy||!n?' disabled':'')+'>'+actionText(action)+'</button>').join('')+'</div></details>'+
     (spec.draft?'<span class="nx-bulk-draft">'+trans('Применяется после сохранения','Save to apply')+'</span>':''):'');
+  if(st.batch){
+   const report=document.createElement('section');
+   report.className='nx-bulk-report';
+   report.setAttribute('aria-label',trans('Ход обновления Agent','Agent update progress'));
+   report.setAttribute('role','status');
+   const total=st.batch.items.length,done=st.batch.items.filter(item=>['success','error'].includes(item.status)).length;
+   const title=document.createElement('strong');
+   title.textContent=trans('Обновление Agent: ','Agent update: ')+done+' / '+total;
+   report.append(title);
+   const list=document.createElement('div');
+   list.className='nx-bulk-report-list';
+   for(const item of st.batch.items){
+    const row=document.createElement('div');
+    row.className='nx-bulk-report-row is-'+item.status;
+    const name=document.createElement('b');
+    name.textContent=item.name;
+    const status=document.createElement('span');
+    status.textContent=item.message||trans('Ожидает','Pending');
+    row.append(name,status);list.append(row);
+   }
+   report.append(list);bar.append(report);
+  }
   if(st.busy)bar.setAttribute('aria-busy','true');else bar.removeAttribute('aria-busy');
+ }
+ async function updateNodeAgents(area,spec,eligible){
+  const st=selection(spec.kind);
+  const ops=window.XMeshNodeAgentOps;
+  if(!ops||typeof ops.updateOne!=='function'){
+   st.busy=false;update(area,spec);
+   toast(trans('Обновление Agent недоступно. Обновите страницу.','Agent update is unavailable. Reload the page.'));
+   return;
+  }
+  const items=eligible.map(id=>({
+   id,name:cardName('nodes',id),status:'pending',message:trans('Ожидает','Pending')
+  }));
+  st.batch={items};
+  update(area,spec);
+  let cursor=0;
+  const stageLabels={
+   checking:trans('Проверка связи','Checking connection'),
+   sending:trans('Отправка команды','Sending command'),
+   installing:trans('Установка Agent','Installing Agent'),
+   verifying:trans('Проверка версии','Verifying version')
+  };
+  // A maximum of two live commands. Per-node in-flight locking also
+  // prevents a repeated single-card update while a fleet job is running.
+  const worker=async()=>{
+   while(cursor<items.length){
+    const item=items[cursor++];
+    item.status='running';item.message=stageLabels.checking;update(area,spec);
+    try{
+     const result=await ops.updateOne(Number(item.id),{
+      onStage:stage=>{
+       item.message=stageLabels[stage]||stageLabels.checking;
+       update(area,spec);
+      }
+     });
+     item.status='success';
+     item.message=result.warning
+      ?trans('Команда выполнена, ожидается heartbeat','Command succeeded, awaiting heartbeat')
+      :trans('Agent обновлён','Agent updated');
+     st.ids.delete(item.id);
+    }catch(error){
+     item.status='error';
+     item.message=String(error?.message||error||trans('Ошибка обновления','Update failed'));
+    }
+    update(area,spec);
+   }
+  };
+  try{
+   await Promise.all(Array.from({length:Math.min(2,items.length)},()=>worker()));
+  }finally{
+   st.busy=false;
+   update(area,spec);
+  }
+  const succeeded=items.filter(item=>item.status==='success').length,failed=items.length-succeeded;
+  toast(trans('Обновление Agent завершено: ','Agent update finished: ')+
+   succeeded+'/'+items.length+(failed?' · '+trans('ошибок: ','failed: ')+failed:''));
  }
  async function execute(area,spec,action){
   const st=selection(spec.kind),ids=[...st.ids];
@@ -142,13 +222,25 @@
   if(action==='delete'&&spec.kind==='squads'){
    warning+=' '+trans('Доступ пользователей, связанных со сквадами, может измениться.','Users linked to these squads may lose access.');
   }
-  const ok=await panelConfirm(warning,{
+  if(action==='agent-update'){
+   warning+=' '+trans('Обновления выполняются не более чем на двух нодах одновременно. Доступность и поддержку самообновления проверит сервер.',
+     'Updates run on at most two nodes at a time. The server checks connectivity and update eligibility.');
+  }
+  st.busy=true;update(area,spec);
+  let ok=false;
+  try{ok=await panelConfirm(warning,{
    title:trans('Массовые операции','Bulk operations'),
    confirmLabel:actionText(action),
    danger:action==='delete'||action==='disable'
-  });
-  if(!ok)return;
-  st.busy=true;update(area,spec);
+  });}catch(error){
+   toast(trans('Ошибка подтверждения: ','Confirmation failed: ')+(error.message||error));
+  }
+  if(!ok){st.busy=false;update(area,spec);return}
+  if(action==='agent-update'){
+   await updateNodeAgents(area,spec,eligible);
+   return;
+  }
+  st.batch=null;update(area,spec);
   if(spec.draft){
    const handler=draftHandlers.get(area);
    try{
