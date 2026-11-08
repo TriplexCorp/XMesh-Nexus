@@ -752,13 +752,45 @@ let tt;const toast=(m,al,fn)=>{
   t.style.removeProperty('--toast-left');
  }
  void t.offsetWidth;t.classList.add('show');
- clearTimeout(tt);tt=setTimeout(close,al?6000:3600);
+ clearTimeout(tt);tt=setTimeout(close,al?Math.max(10000,(C.toastDuration+2)*1000):C.toastDuration*1000);
 };
-const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,contentWidth:1920,gapScale:1,autoCoreRefresh:1,coreRefreshSeconds:30};
+const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,contentWidth:1920,gapScale:1,autoCoreRefresh:1,coreRefreshSeconds:30,contrast:'standard',linkStyle:'standard',lineSpacing:'normal',tabularNums:0,followReducedMotion:1,stickyTopbar:0,navCounter:1,startPage:'home',toastDuration:4,toastPosition:'center'};
 let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;C.ts=cl(Number(C.ts)||1,.9,2);C.radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);// Remove legacy split-text preferences: the unified interface scale controls text and UI together.
 delete C.textSize;delete C.textPrecision;C.rangePrecision=C.rangePrecision===10?10:1;
+// Browser-local settings are constrained before they are applied or imported.
+const normalizePanelPreferences=()=> {
+ const variants={
+  theme:['dark','light','auto'],density:['compact','comfortable','spacious'],
+  surface:['solid','glass','raised'],glow:['off','subtle','normal','rich'],
+  borders:['off','soft','strong'],sidebar:['standard','compact'],
+  contrast:['standard','high'],linkStyle:['standard','underline'],
+  lineSpacing:['compact','normal','relaxed'],
+  toastPosition:['center','right'],
+  startPage:['home','statistics','users','nodes','hosts','profiles','subscription','last']
+ };
+ for(const [key,allowed] of Object.entries(variants))
+  if(!allowed.includes(C[key]))C[key]=CDEFAULT[key];
+ for(const key of ['tabularNums','followReducedMotion','stickyTopbar','navCounter','motion','railTips','autoCoreRefresh'])
+  C[key]=C[key]===0||C[key]===false?0:1;
+ if(![3,4,6,9].includes(Number(C.toastDuration)))C.toastDuration=4;
+ else C.toastDuration=Number(C.toastDuration);
+ C.ts=cl(Number(C.ts)||1,.9,2);
+ C.contentWidth=cl(Number(C.contentWidth)||1920,720,3000);
+ C.gapScale=cl(Number(C.gapScale)||1,.8,1.4);
+ C.radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);
+ if(!/^#[0-9a-f]{6}$/i.test(String(C.customA)))C.customA=CDEFAULT.customA;
+ if(!/^#[0-9a-f]{6}$/i.test(String(C.customB)))C.customB=CDEFAULT.customB;
+};
+normalizePanelPreferences();
 const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
-const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,2));const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',radius+'px');r.dataset.motion=C.motion?'on':'off';
+const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,2));const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',radius+'px');r.dataset.contrast=C.contrast;
+r.dataset.linkStyle=C.linkStyle;
+r.dataset.lineSpacing=C.lineSpacing;
+r.dataset.tabularNums=C.tabularNums?'on':'off';
+r.dataset.navCounter=C.navCounter?'on':'off';
+r.dataset.stickyTopbar=C.stickyTopbar?'on':'off';
+r.dataset.toastPosition=C.toastPosition;
+r.dataset.motion=C.motion&&!(C.followReducedMotion&&matchMedia('(prefers-reduced-motion: reduce)').matches)?'on':'off';
 r.style.setProperty('--panel-content-max',cl(Number(C.contentWidth)||1920,720,3000)+'px');
 const baseGap=C.density==='compact'?.75:C.density==='spacious'?1.45:1.1;
 r.style.setProperty('--view-gap',(baseGap*cl(Number(C.gapScale)||1,.8,1.4))+'rem');
@@ -1170,6 +1202,10 @@ async function render(soft){
   document.querySelectorAll('body > .xm-period-portal').forEach(menu=>menu.remove());
   document.querySelector('body > .sv-studio-portal')?.remove();
   T.forEach(clearInterval);T=[];let route=location.hash.slice(1);
+  if(!route){
+    const fallback=C.startPage==='last'?(()=>{try{return localStorage.getItem('xmeshNexusLastPage')||'home'}catch(_){return 'home'}})():C.startPage;
+    route=['home','statistics','users','nodes','hosts','profiles','subscription'].includes(fallback)?fallback:'home';
+  }
   // Backward-compatible, direct legacy paths open their new Settings subpages.
   if(route==='admins'||route==='security'){
     history.replaceState(history.state,'',location.pathname+location.search+'#set/'+route);
@@ -1179,7 +1215,11 @@ async function render(soft){
     history.replaceState(history.state,'',location.pathname+location.search+'#set/general');
     route='set/general';
   }
-  cur=route.startsWith('set/')?'set':route;if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
+  cur=route.startsWith('set/')?'set':route;
+  if(location.hash&&['home','statistics','users','nodes','hosts','profiles','subscription'].includes(cur)){
+    try{localStorage.setItem('xmeshNexusLastPage',cur)}catch(_){}
+  }
+  if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   v.dataset.workspace=PAGE_WORKSPACES[cur];v.dataset.page=cur;
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
@@ -4543,16 +4583,16 @@ function securityP(){
 /* ================= НАСТРОЙКИ ================= */
 // Subpages reuse existing inputs and save actions rather than inventing parallel forms.
 const SETTINGS_PAGES=Object.freeze([
- ['general','Общие','Отдельные названия и домены панели управления и подписки','sliders'],
+ ['general','Общие','Брендинг, домены и персональные параметры навигации','sliders'],
  ['colors','Цвет и тема','Основная палитра интерфейса и брендовые акценты','sun'],
  ['layout','Композиция','Плотность, радиусы и вид карточек','layers'],
- ['typography','Текст и эффекты','Размер и начертание текста','pen'],
- ['integrations','Интеграции','События, о которых панель сообщает во внешние сервисы','link'],
+ ['typography','Текст и эффекты','Читаемость, шрифты и настройки движения','pen'],
+ ['integrations','Интеграции','События и уведомления интерфейса','link'],
  ['system','Ядро и обновления','Установка и обновление бинарника ядра на сервере панели','server'],
  ['traffic','Лимиты CDN','Общая группа ограниченных inbound для пользователей','cloud'],
  ['security','Безопасность','Авторизация, двухфакторная защита, сессии и аудит','shield-check'],
  ['admins','Администраторы','Управление доступом сотрудников панели','shield'],
- ['data','Данные панели','Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.','file']
+ ['data','Данные панели','Экспорт данных и перенос персонального оформления','file']
 ]);
 function settingsPagesForSession(){
  return SETTINGS_PAGES.filter(([key])=>key!=='admins'||sessionUser?.role==='owner');
@@ -4610,6 +4650,8 @@ async function setP(){
       <div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
     </div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Контраст интерфейса</b><small>Повышенный контраст делает подписи и границы заметнее во всей панели.</small></div><div class="setting-control">${choices('contrast',[['standard','Стандарт'],['high','Повышенный']])}</div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Подчёркивание ссылок</b><small>Текстовые ссылки можно выделять не только цветом.</small></div><div class="setting-control">${choices('linkStyle',[['standard','Обычное'],['underline','Подчёркнутое']])}</div></div>
       <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Введите HEX или настройте цвет ползунками. Палитра изменится только после подтверждения.</small></div><div class="setting-control"><div class="palette-hex-fields"><label class="palette-hex-field"><span>Основной</span><span class="palette-hex-editor"><i id="palette-preview-a" aria-hidden="true" style="--picked:${paletteDraft.a}"></i><input type="text" id="custom-a" value="${paletteDraft.a}" autocomplete="off" spellcheck="false" maxlength="7" aria-label="HEX основного цвета" placeholder="#74DDB1"></span></label><label class="palette-hex-field"><span>Вторичный</span><span class="palette-hex-editor"><i id="palette-preview-b" aria-hidden="true" style="--picked:${paletteDraft.b}"></i><input type="text" id="custom-b" value="${paletteDraft.b}" autocomplete="off" spellcheck="false" maxlength="7" aria-label="HEX вторичного цвета" placeholder="#C6E985"></span></label></div></div></div>
     </section>
@@ -4621,9 +4663,19 @@ async function setP(){
     <section class="card sg" data-settings-group="typography"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Масштаб интерфейса</b><small>Масштаб текста и элементов вместе: 90–200% с шагом 1%. Для стандартного размера установите 100%.</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="2" step="0.01" value="${C.ts}" aria-label="Масштаб интерфейса"><label class="precision-number"><input type="number" id="tsv" data-appearance-value="ts" min="90" max="200" step="1" value="${Math.round(C.ts*100)}" aria-label="Точный масштаб интерфейса"><span>%</span></label></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Шрифт</b><small>16 вариантов шрифта с поддержкой кириллицы. Выбор применяется ко всей панели и сохраняется в настройках</small></div><div class="setting-control font-choice">${choices('font',[['onest','Manrope'],['inter','Inter'],['golos','Golos Text'],['rubik','Rubik'],['nunito','Nunito Sans'],['plex','IBM Plex Sans'],['roboto','Roboto'],['pt','PT Sans'],['montserrat','Montserrat'],['ubuntu','Ubuntu'],['opensans','Open Sans'],['source','Source Sans 3'],['fira','Fira Sans'],['jost','Jost'],['system','Системный'],['mono','Моно']])}</div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Межстрочный интервал</b><small>Расстояние между строками описаний и вспомогательного текста.</small></div><div class="setting-control">${choices('lineSpacing',[['compact','Плотный'],['normal','Обычный'],['relaxed','Свободный']])}</div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Ровные цифры</b><small>Цифры одинаковой ширины для удобного сравнения показателей.</small></div><label class="sw"><input type="checkbox" id="tabular-nums" ${C.tabularNums?'checked':''} aria-label="Ровные цифры"><span></span></label></div>
     </section>
   <div class="card" id="brand-panel" data-settings-group="general"><div class="hd"><div><h3>Бренд и домены</h3><p>Отдельные названия и домены панели управления и подписки</p></div></div><form data-k="brand" method="dialog" class="sg settings-brand-form"><div class="settings-brand-fields">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}${field({k:'subscriptionBrand',l:'Название подписки',ph:'Название вашего сервиса',h:'Название клиентского портала. Если пусто — используется название панели. Изменяется также в SUBSCRIPTION STUDIO.'},DB.set.subscriptionBrand||'')}${field({k:'subscriptionDomain',l:'Домен подписки',ph:'sub.example.com',h:'Независим от домена панели. Оформление и размещение — в SUBSCRIPTION STUDIO.'},DB.set.subscriptionDomain||'')}</div><div class="setting-actions"><button class="btn">Сохранить</button></div></form></div>
+  <section class="card sg" data-settings-group="general"><div class="appearance-card-heading"><h3>Поведение панели</h3><small>Персональные параметры текущего браузера — не меняют настройки других администраторов.</small></div>
+    <div class="setting-row"><div class="setting-copy"><b>Стартовая страница</b><small>Куда переходить при открытии панели без выбранного раздела.</small></div><div class="setting-control"><select id="start-page" aria-label="Стартовая страница">${[['home','Дашборд'],['statistics','Статистика'],['users','Пользователи'],['nodes','Узлы'],['hosts','Хосты'],['profiles','XRAY STUDIO'],['subscription','SUBSCRIPTION STUDIO'],['last','Последний открытый раздел']].map(([v,l])=>`<option value="${v}" ${C.startPage===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
+    <div class="setting-row"><div class="setting-copy"><b>Счётчик пользователей в меню</b><small>Показывать количество пользователей рядом с разделом навигации.</small></div><label class="sw"><input type="checkbox" id="nav-counter" ${C.navCounter?'checked':''} aria-label="Счётчик пользователей в меню"><span></span></label></div>
+  </section>
   <div class="card" data-settings-group="integrations"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
+  <section class="card sg" data-settings-group="integrations"><div class="appearance-card-heading"><h3>Уведомления интерфейса</h3><small>Всплывающие сообщения панели. Персональные настройки этого браузера.</small></div>
+    <div class="setting-row"><div class="setting-copy"><b>Длительность уведомлений</b><small>Время показа обычных сообщений. Действия с отменой остаются видимыми дольше.</small></div><div class="setting-control"><select id="toast-duration" aria-label="Длительность уведомлений">${[[3,'3 секунды'],[4,'4 секунды'],[6,'6 секунд'],[9,'9 секунд']].map(([v,l])=>`<option value="${v}" ${C.toastDuration===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
+    <div class="setting-row"><div class="setting-copy"><b>Расположение уведомлений</b><small>Для обычных сообщений. Уведомления диалоговых окон остаются рядом с ними.</small></div><div class="setting-control">${choices('toastPosition',[['center','По центру'],['right','Справа']])}</div></div>
+  </section>
 </div><div class="appearance-column workspace-stack">
     <section class="card sg" data-settings-group="layout"><div class="appearance-card-heading"><h3>Композиция</h3><small>Плотность, радиусы и вид карточек</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Плотность</b><small>От компактной таблицы до просторных карточек</small></div><div class="setting-control">${choices('density',[['compact','Компактно'],['comfortable','Стандарт'],['spacious','Свободно']])}</div></div>
@@ -4632,6 +4684,7 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Границы карточек</b><small>Можно убрать линии или сделать их заметнее</small></div><div class="setting-control">${choices('borders',[['off','Без линий'],['soft','Мягкие'],['strong','Яркие']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Боковая панель</b><small>Компактный режим оставляет в основном только иконки</small></div><div class="setting-control">${choices('sidebar',[['standard','Обычная'],['compact','Компактная']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсказки при наведении</b><small>Показывать названия разделов и кнопок боковой панели. Работает в обычном и компактном режимах.</small></div><label class="sw"><input type="checkbox" id="rail-tips" ${C.railTips?'checked':''} aria-label="Подсказки при наведении"><span></span></label></div>
+      <div class="setting-row"><div class="setting-copy"><b>Закреплять верхнюю панель</b><small>Поиск и основные действия остаются видимыми при прокрутке на компьютере.</small></div><label class="sw"><input type="checkbox" id="sticky-topbar" ${C.stickyTopbar?'checked':''} aria-label="Закреплять верхнюю панель"><span></span></label></div>
     </section>
 <section class="card sg" data-settings-group="layout">
     <div class="appearance-card-heading"><h3>Рабочее пространство</h3><small>Ширина панели и интервалы между разделами</small></div>
@@ -4643,6 +4696,7 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Подсветка фона</b><small>Мягкое цветное свечение за панелью</small></div><div class="setting-control">${choices('glow',[['off','Выкл.'],['subtle','Мягкая'],['normal','Средняя'],['rich','Яркая']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Анимации</b><small>Отключите движение и переходы, если они отвлекают</small></div><label class="sw"><input type="checkbox" id="mo" ${C.motion?'checked':''} aria-label="Анимации"><span></span></label></div>
       <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления сохраняются в localStorage этого браузера</small></div><button class="gh sm" id="rs">Сбросить оформление</button></div>
+      <div class="setting-row"><div class="setting-copy"><b>Учитывать настройки ОС</b><small>Если в системе включено уменьшение движения, анимации автоматически отключатся.</small></div><label class="sw"><input type="checkbox" id="follow-reduced-motion" ${C.followReducedMotion?'checked':''} aria-label="Учитывать уменьшение движения в ОС"><span></span></label></div>
     </section>
 
   <div class="card" id="core-panel" data-settings-group="system"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
@@ -4659,7 +4713,12 @@ async function setP(){
     <div class="update-action-row"><button type="button" class="gh" data-panel-update-status>Проверить состояние</button><button type="button" class="btn" data-panel-update>Обновить панель</button></div>
     <div class="history-placeholder" id="panel-update-message" role="status" aria-live="polite">${esc(panelUpdateView.error||panelUpdateStatusText(panelUpdateView.status))}</div>
   </div>`:''}
-  <div class="card" data-settings-group="data"><div class="hd"><div><h3>Данные панели</h3><p>Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.</p></div><button class="gh" id="gx">${ic('dl')}Скачать резервную копию</button></div><p class="note">Резервная копия содержит настройки панели. Храните её в безопасном месте.</p></div></div></div>`;
+  <div class="card" data-settings-group="data"><div class="hd"><div><h3>Экспорт данных панели</h3><p>JSON-снимок текущих коллекций. Это не дамп PostgreSQL и не механизм восстановления базы.</p></div><button class="gh" id="gx">${ic('dl')}Скачать JSON-снимок</button></div><p class="note">Экспорт может содержать конфиденциальные данные. Для полного восстановления используйте резервное копирование PostgreSQL на сервере.</p></div>
+  <section class="card sg" data-settings-group="data"><div class="appearance-card-heading"><h3>Перенос оформления</h3><small>Экспорт и импорт персональной темы, плотности и остальных параметров интерфейса.</small></div>
+    <div class="settings-personal-data-actions"><button class="gh" type="button" data-appearance-export>Скачать оформление JSON</button><label class="f"><span>Импортировать оформление JSON</span><input type="file" id="appearance-import" accept=".json,application/json" aria-label="Импортировать оформление JSON"></label></div>
+    <p class="note">Файл оформления не содержит пользователей, токенов и настроек сервера. При импорте текущие параметры браузера заменяются.</p>
+  </section>
+</div></div>`;
   // The HTML template is never mounted. Only the active page's original cards
   // enter the DOM, so duplicate forms, handlers and deep scrolling disappear.
   const source=document.createElement('template');
@@ -5373,7 +5432,14 @@ the old node will lose access. Cancel and create a new Node ID if both must work
    else if(g('#palette-cancel')){resetPaletteDraft();render(1)}
   else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value&&(prop!=='surface'||['solid','glass','raised'].includes(value))){C[prop]=value;apply();if(prop==='font'||prop==='surface')syncSubscriptionTheme();document.querySelectorAll(`[data-ui="${prop}"]`).forEach(x=>{const active=x.dataset.value===value;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}}
   else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};resetPaletteDraft();apply();syncSubscriptionTheme();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
-  else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
+  else if(b=g('[data-appearance-export]')){
+    const settings=Object.fromEntries(Object.keys(CDEFAULT).map(key=>[key,C[key]]));
+    settings.rangePrecision=C.rangePrecision;
+    const url=URL.createObjectURL(new Blob([JSON.stringify({schema:'xmesh-appearance-v1',settings},null,2)],{type:'application/json'}));
+    const a=document.createElement('a');a.href=url;a.download='xmesh-appearance.json';a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-snapshot.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
   else if(b=g('[data-panel-update-status]')){
     b.disabled=true;
@@ -5551,6 +5617,48 @@ document.addEventListener('change',async e=>{const t=e.target;
   }
 
   syncRangeProgress(t);
+  if(t.id==='appearance-import'){
+    const file=t.files?.[0];if(!file)return;
+    try{
+      if(file.size>32768)throw Error('Файл оформления слишком большой (максимум 32 КБ).');
+      const payload=JSON.parse(await file.text());
+      if(payload?.schema!=='xmesh-appearance-v1'||!payload.settings||typeof payload.settings!=='object'||Array.isArray(payload.settings))
+        throw Error('Неверный формат файла оформления.');
+      const raw=payload.settings,next={...CDEFAULT};
+      const hex=/^#[0-9a-f]{6}$/i;
+      const allowedAccent=['emerald','ocean','amber','rose','violet','cyan','ruby','sapphire','teal','coral','indigo','copper','glacier','graphite','lime','terracotta','orchid','aurora','sakura','storm','flame','sage','midnight','tropical','custom'];
+      const allowedFont=['onest','inter','golos','rubik','nunito','plex','roboto','pt','montserrat','ubuntu','opensans','source','fira','jost','system','mono'];
+      const numericBounds={hue:[0,360],sat:[0,100],lum:[0,100],ts:[.9,2],radius:[1,36],contentWidth:[720,3000],gapScale:[.8,1.4],coreRefreshSeconds:[15,120]};
+      for(const [key,fallback] of Object.entries(CDEFAULT)){
+        const value=raw[key];
+        if(typeof value!==typeof fallback)continue;
+        if(['customA','customB'].includes(key)&&!hex.test(value))throw Error('Некорректный HEX в файле оформления.');
+        if(key==='accent'&&!allowedAccent.includes(value))continue;
+        if(key==='font'&&!allowedFont.includes(value))continue;
+        if(key in numericBounds&&(!Number.isFinite(value)||value<numericBounds[key][0]||value>numericBounds[key][1]))continue;
+        if(typeof fallback==='number'&&(!Number.isFinite(value)||Math.abs(value)>5000))continue;
+        next[key]=value;
+      }
+      C=next;normalizePanelPreferences();
+      C.rangePrecision=raw.rangePrecision===10?10:1;
+      resetPaletteDraft();apply();syncSubscriptionTheme();syncCoreAutoRefresh();render(1);
+      toast('Оформление импортировано.');
+    }catch(error){toast('Не удалось импортировать оформление: '+error.message)}
+    finally{t.value=''}
+    return;
+  }
+  if(t.id==='start-page'||t.id==='toast-duration'){
+    if(t.id==='start-page')C.startPage=t.value;
+    else C.toastDuration=Number(t.value);
+    normalizePanelPreferences();apply();
+    toast('Параметр сохранён в этом браузере.');
+    return;
+  }
+  if(['nav-counter','sticky-topbar','tabular-nums','follow-reduced-motion'].includes(t.id)){
+    const key={'nav-counter':'navCounter','sticky-topbar':'stickyTopbar','tabular-nums':'tabularNums','follow-reduced-motion':'followReducedMotion'}[t.id];
+    C[key]=t.checked?1:0;apply();
+    return;
+  }
   if(t.id==='range-precision'){
     C.rangePrecision=t.value==='10'?10:1;
     updateVisibleRangePrecision();
@@ -5931,6 +6039,7 @@ $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class=
 $('#bell').innerHTML=ic('bell');syncTopLanguage();$('#logout').innerHTML=ic('logout')+'<span class="logout-label">Выйти</span>';$('#logout').setAttribute('aria-label','Выйти');$('#addb').innerHTML='<span class="addb-icon">'+ic('plus')+'</span><span class="addb-label">Новый пользователь</span>';
 $('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace(location.pathname)};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{apply();if(C.theme==='auto')syncSubscriptionTheme()});
+matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',()=>{if(C.followReducedMotion)apply()});
 addEventListener('hashchange',()=>{if(backendReady)render()});
 // Persistent quota notifications are read from PostgreSQL, not a transient
 // browser timer or client-only threshold. Polling discovers events even if

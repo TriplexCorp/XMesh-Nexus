@@ -264,7 +264,9 @@ async function main() {
         await navigate('set/'+category);
         assert.equal(await page.locator('.settings-center-link[aria-current="page"]').count(),1,'Exactly one settings subpage must be active');
         assert(await page.locator(selector).count()>0,'Missing settings control '+category);
-        assert.equal(await page.locator('[data-settings-group]').count(),category==='colors'||category==='layout'||category==='typography'||category==='integrations'?2:category==='system'?2:1);
+        const expectedCards={general:2,colors:2,layout:2,typography:2,integrations:3,system:2,traffic:1,security:1,admins:1,data:2};
+        assert.equal(await page.locator('[data-settings-group]').count(),expectedCards[category],
+          'Settings '+category+' must mount its active functional cards without hiding new options');
         assert.equal(await page.locator('[data-settings-group]:not([data-settings-group="'+category+'"])').count(),0,'Inactive settings must not remain mounted');
       }
       assert.equal(await page.locator('#nav a[href="#admins"],#nav a[href="#security"]').count(),0,
@@ -289,6 +291,47 @@ async function main() {
       await page.locator('#palette-apply').waitFor({state:'visible'});
       assert.equal(new URL(page.url()).hash,'#set/colors','Browser Back must restore selected subpage');
       await screenshot(page,'settings-colors-subpage-1440');
+    });
+
+    await checked('Settings: functional browser preferences apply and persist without changing server settings',async()=>{
+      await navigate('set/colors');
+      const original=await page.evaluate(()=>localStorage.getItem('xmeshNexusSettings'));
+      try{
+        await page.locator('[data-ui="contrast"][data-value="high"]').click();
+        assert.equal(await page.locator('html').getAttribute('data-contrast'),'high');
+        await page.locator('[data-ui="linkStyle"][data-value="underline"]').click();
+        assert.equal(await page.locator('html').getAttribute('data-link-style'),'underline');
+        await navigate('set/general');
+        await page.locator('#start-page').selectOption('nodes');
+        await page.locator('#nav-counter').uncheck();
+        assert.equal(await page.locator('html').getAttribute('data-nav-counter'),'off');
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.locator('#start-page').waitFor({state:'visible'});
+        assert.equal(await page.locator('#start-page').inputValue(),'nodes');
+        assert.equal(await page.locator('html').getAttribute('data-contrast'),'high');
+        assert.equal(await page.locator('#nav-counter').isChecked(),false);
+        await navigate('set/typography');
+        await page.locator('[data-ui="lineSpacing"][data-value="relaxed"]').click();
+        await page.locator('#tabular-nums').check();
+        assert.equal(await page.locator('html').getAttribute('data-line-spacing'),'relaxed');
+        assert.equal(await page.locator('html').getAttribute('data-tabular-nums'),'on');
+        await navigate('set/integrations');
+        await page.locator('#toast-duration').selectOption('6');
+        await page.locator('[data-ui="toastPosition"][data-value="right"]').click();
+        const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('xmeshNexusSettings')));
+        assert.equal(saved.toastDuration,6);
+        assert.equal(saved.toastPosition,'right');
+        assert.equal(saved.startPage,'nodes');
+        await navigate('set/data');
+        assert(await page.locator('[data-appearance-export]').isVisible());
+        assert(await page.locator('#appearance-import').count()===1);
+      }finally{
+        await page.evaluate(old=>{
+          if(old===null)localStorage.removeItem('xmeshNexusSettings');
+          else localStorage.setItem('xmeshNexusSettings',old);
+        },original);
+        await navigate('set/colors');
+      }
     });
 
     await checked('Global search: user notes, Ctrl+K and command activation',async()=>{

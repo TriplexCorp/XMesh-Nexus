@@ -152,6 +152,26 @@ assert.match(settingsCss,/@container settings-workspace \(max-width:70rem\)/,'Se
 assert.match(settingsCss,/width:100%;max-width:none;margin:0/,'Settings should use the full available width and left alignment');
 assert.match(settingsCss,/\.settings-center-embedded/,'Dedicated feature screens should mount inside the Settings workspace');
 
+// Functional settings must affect real runtime behavior, persist, and be translated.
+for(const key of ['contrast','linkStyle','lineSpacing','tabularNums','followReducedMotion','stickyTopbar','navCounter','startPage','toastDuration','toastPosition']){
+ assert(app.includes(key+':'),'Functional appearance preference not initialized: '+key);
+}
+for(const control of ['start-page','nav-counter','tabular-nums','sticky-topbar','follow-reduced-motion','toast-duration','appearance-import'])
+ assert(app.includes('id="'+control+'"'),'Settings control not rendered: '+control);
+assert.match(app,/normalizePanelPreferences\(\)/,'Preferences must be normalized before applying or importing');
+assert.match(app,/xmeshNexusLastPage/,'Last page setting must persist a real route');
+assert.match(app,/C\.toastDuration\*1000/,'Notification duration must alter the toast timer');
+assert.match(app,/schema:'xmesh-appearance-v1'/,'Appearance import/export must use a versioned schema');
+assert.match(app,/file\.size>32768/,'Appearance import must limit file size');
+assert.match(app,/Object\.entries\(CDEFAULT\)/,'Appearance import must only consider known preference keys');
+for(const token of ['data-contrast=high','data-line-spacing=relaxed','data-nav-counter=off','data-toast-position=right','data-sticky-topbar=on']){
+ assert(settingsCss.includes(token),'Settings token has no actual visual effect: '+token);
+}
+const englishSettings=read('frontend/js/core/i18n.js');
+for(const text of ['Поведение панели','Межстрочный интервал','Уведомления интерфейса','Перенос оформления','Стартовая страница']){
+ assert(englishSettings.includes('"'+text+'":'),'Missing English translation: '+text);
+}
+
 // Catalog controls must remain a reusable interaction surface, not five forks.
 assert.match(app,/function workspaceGridControls\(kind\)/,'Catalog density controls must be shared');
 assert.match(app,/function workspaceCreateButton\(kind,label,id=''\)/,'Catalog creation buttons must be shared');
