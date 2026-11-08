@@ -44,8 +44,15 @@ jobs:
           package-manager-cache: false
       - name: Download pinned official Xray and verify archive
         run: |
+          set -euo pipefail
           mkdir -p /tmp/xmesh-xray-test
-          curl --fail --location --silent --show-error https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip -o /tmp/xmesh-xray-test/core.zip
+          # GitHub release CDN occasionally responds with HTTP 502/503/504.
+          # Retry only the download; never bypass the pinned archive checksum.
+          curl --fail --location --silent --show-error \
+            --retry 8 --retry-all-errors --retry-delay 3 --retry-max-time 240 \
+            --connect-timeout 15 --max-time 60 \
+            https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-64.zip \
+            -o /tmp/xmesh-xray-test/core.zip
           echo 'e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214  /tmp/xmesh-xray-test/core.zip' | sha256sum --check
           unzip -j /tmp/xmesh-xray-test/core.zip xray -d /tmp/xmesh-xray-test
           chmod +x /tmp/xmesh-xray-test/xray
