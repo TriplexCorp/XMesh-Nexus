@@ -335,3 +335,10 @@ html[data-toast-position=right] #xmesh-feedback-toast[popover]:not(.toast-below-
 @media(max-width:760px){
   html[data-sticky-topbar=on] .top{position:relative;top:auto;padding-top:0}
 }
+
+
+/* Keep Settings categories in a single row on narrow viewports: the toolbar
+ * scrolls horizontally rather than letting links wrap into stacked rows. */
+#view .settings-workspace .settings-center-rail{max-width:100%;overflow-x:auto;overflow-y:hidden}
+#view .settings-workspace .settings-center-nav{display:flex;flex-flow:row nowrap;white-space:nowrap;width:max-content;min-width:max-content;align-items:center}
+#view .settings-workspace .settings-center-nav>.settings-center-link{flex:0 0 auto;white-space:nowrap}
