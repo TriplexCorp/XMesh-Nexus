@@ -589,10 +589,10 @@ const operations={
     fields:[{name:'publicName',label:'Внешний SNI (публичный домен)',wide:true,required:true,
      value:typeof tls.serverName==='string'?tls.serverName:'',placeholder:'public.example.com',
      help:'Это открытое имя в ClientHelloOuter; оно не обязано совпадать с реальным SNI. Укажите допустимый домен без https:// и порта.',
-     validate:value=>/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$/.test(value)?'':'Укажите корректный ASCII-домен без схемы и порта.'}]
+     validate:value=>/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$/.test(value)?'':'Укажите корректный ASCII-домен без схемы и порта.'}]
    });
    if(!response)return;
-   if(!/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$/.test(response.publicName))throw Error('Некорректное внешнее имя ECH.');
+   if(!/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$/.test(response.publicName))throw Error('Некорректное внешнее имя ECH.');
    if(currentServerKey||oldConfig){
     const approved=await dialog.confirm({
      title:'Перегенерировать существующие ECH-ключи?',
