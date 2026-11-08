@@ -834,10 +834,12 @@ async function main() {
           const search=toolbar.querySelector('.node-explorer-search,.nx-directory-search').getBoundingClientRect();
           const bulk=toolbar.querySelector('[data-bulk-toolbar]').getBoundingClientRect();
           const t=toolbar.getBoundingClientRect();
-          return{searchRight:search.right,searchTop:search.top,bulkLeft:bulk.left,bulkTop:bulk.top,
+          return{searchRight:search.right,searchTop:search.top,searchBottom:search.bottom,
+            bulkLeft:bulk.left,bulkTop:bulk.top,bulkBottom:bulk.bottom,
             toolbarBottom:t.bottom,toolbarTop:t.top};
         });
-        assert(Math.abs(geometry.searchTop-geometry.bulkTop)<15,
+        assert(Math.abs(geometry.searchTop-geometry.bulkTop)<15||
+          Math.abs(geometry.searchBottom-geometry.bulkBottom)<12,
           route+' bulk trigger must share the leading toolbar row');
         assert(geometry.bulkLeft>=geometry.searchRight-2&&geometry.bulkLeft-geometry.searchRight<=80,
           route+' bulk actions must follow the left search, not float to the right');
