@@ -4946,13 +4946,13 @@ mod tests {
     }
 
     #[test]
-    fn metered_usage_is_added_in_gib_not_raw_bytes() {
+    fn metered_usage_is_added_in_decimal_gb_not_raw_bytes() {
         let mut user = json!({"id":21,"used":0.0,"limit":2});
-        super::add_metered_usage(&mut user, 1_073_741_824);
+        super::add_metered_usage(&mut user, 1_000_000_000);
         assert_eq!(user["used"], 1.0);
         assert_eq!(user["meteredUsedGb"], 1.0);
         assert_eq!(super::user_status(&user, 1_800_000_000_000), "ACTIVE");
-        super::add_metered_usage(&mut user, 1_073_741_824);
+        super::add_metered_usage(&mut user, 1_000_000_000);
         assert_eq!(user["used"], 2.0);
         assert_eq!(super::user_status(&user, 1_800_000_000_000), "LIMITED");
     }
