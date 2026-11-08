@@ -6150,10 +6150,18 @@ apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',()
 matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',()=>{if(C.followReducedMotion)apply()});
 addEventListener('hashchange',()=>{
  if(!backendReady)return;
- const main=document.querySelector('#settings-subpage');
- if(cur==='set'&&main?.dataset.settingsSection===settingsPageFromHash()&&
-    selectSettingsFocus(settingsFocusForPage(main.dataset.settingsSection)))return;
- render();
+ // Only a Settings -> Settings group change may reuse the current workspace.
+ // On #users/#nodes/#home, settingsPageFromHash() falls back to "general":
+ // without the route guard, leaving Settings > General gets swallowed and the
+ // old page stays on screen until a full browser reload.
+ const targetHash=location.hash;
+ const staysInSettings=targetHash==='#set'||targetHash.startsWith('#set/');
+ if(staysInSettings&&cur==='set'){
+  const main=document.querySelector('#settings-subpage');
+  if(main?.dataset.settingsSection===settingsPageFromHash()&&
+     selectSettingsFocus(settingsFocusForPage(main.dataset.settingsSection)))return;
+ }
+ void render();
 });
 // Persistent quota notifications are read from PostgreSQL, not a transient
 // browser timer or client-only threshold. Polling discovers events even if
