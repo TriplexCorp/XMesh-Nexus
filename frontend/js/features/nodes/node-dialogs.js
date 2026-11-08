@@ -64,6 +64,7 @@
     const telegram=decorate('tg','', 'user-create-tg');
     const email=decorate('email','', 'user-create-email');
     const limit=decorate('limit',0,'user-create-limit');
+    const cdnLimit=decorate('cdnLimitGb',0,'user-create-cdn-limit');
     const days=decorate('days',0,'user-create-days');
     const strategy=decorate('strategy','NO_RESET','user-create-strategy');
     const hwid=decorate('hwid',0,'user-create-hwid');
@@ -110,8 +111,9 @@
               <span class="user-create-section-icon">${ic('activity')}</span>
               <div><span class="user-create-section-kicker">POLICY</span><h3>Ограничения</h3><p>Трафик, срок действия, сброс и устройства.</p></div>
             </div>
-            <div class="user-create-limits-grid">${limit}${days}${strategy}${hwid}</div>
-            <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>0 — без ограничений. При значении больше 0 лимит исполняется сервером по зарегистрированным HWID.</small></p></div>
+            <div class="user-create-limits-grid">${limit}${cdnLimit}${days}${strategy}${hwid}
+              <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>0 — без ограничений. При значении больше 0 лимит исполняется сервером по зарегистрированным HWID.</small></p></div>
+            </div>
           </section>
 
           <section class="user-create-section user-create-section-extra">
