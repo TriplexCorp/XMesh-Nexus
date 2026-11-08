@@ -450,7 +450,7 @@ window.XMeshI18n=(()=>{
     'Маршрутизация клиентов сохранена':'Client routing saved',
     'Вверх':'Move up',
     'Вниз':'Move down',
-    'Шаблоны':'Templates','Диагностика':'Diagnostics','Администраторы':'Administrators','Админы':'Admins',
+    'Шаблоны':'Templates','Количество шаблонов':'Number of templates','Диагностика':'Diagnostics','Администраторы':'Administrators','Админы':'Admins',
     'Настройки':'Settings','Подписка':'Subscription','Ещё':'More',
     'Ещё разделы':'More sections','Поиск и команды':'Search and commands',
     'Сменить тему':'Switch theme','Уведомления':'Notifications',
