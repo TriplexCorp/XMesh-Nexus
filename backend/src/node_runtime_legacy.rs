@@ -2395,7 +2395,7 @@ mod provision_tests {
         assert_eq!(policy["users"].as_array().unwrap().len(), 1);
         assert_eq!(policy["users"][0]["offlineBudgetBytes"], 64 * 1024 * 1024);
         assert_eq!(policy["users"][0]["expireAtMs"], 1_800_000_010_000_i64);
-        assert_eq!(policy["users"][0]["panelUsedBytes"], 536_870_912);
+        assert_eq!(policy["users"][0]["panelUsedBytes"], 500_000_000);
         assert_eq!(policy["nodeId"], 12);
     }
     #[test]
