@@ -29,16 +29,29 @@
         <span class="top-panel-version-label" data-panel-version-number>Nexus</span>
       </button>
       <section class="top-panel-version-menu" id="top-panel-version-menu" data-panel-version-menu role="dialog" aria-label="Версия панели" hidden>
-        <header><strong data-panel-version-heading>Версия панели</strong><small data-panel-version-revision>—</small></header>
-        <p class="top-panel-version-message" data-panel-version-status role="status" aria-live="polite"></p>
+        <header class="top-panel-version-head">
+          <div class="top-panel-version-identity">
+            <strong data-panel-version-heading>Версия панели</strong>
+            <div class="top-panel-version-build"><b data-panel-version-installed>Nexus</b><small data-panel-version-revision>—</small></div>
+          </div>
+          <button class="top-panel-version-close" type="button" data-panel-version-close aria-label="Закрыть" title="Закрыть">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg>
+          </button>
+        </header>
+        <div class="top-panel-version-feedback">
+          <span class="top-panel-version-state-dot" aria-hidden="true"></span>
+          <p class="top-panel-version-message" data-panel-version-status role="status" aria-live="polite"></p>
+        </div>
         <div class="top-panel-version-actions">
-          <button type="button" data-panel-version-check>Проверить обновления</button>
           <button type="button" data-panel-version-update hidden>Обновить панель</button>
           <button type="button" data-panel-version-reload hidden>Перезагрузить страницу</button>
-          <a data-panel-version-settings href="#set/system" hidden>Другие способы обновления</a>
+          <button type="button" data-panel-version-check>Проверить обновления</button>
         </div>
         <p class="top-panel-version-update-status" data-panel-version-update-status role="status" aria-live="polite"></p>
-        <p class="top-panel-version-caption" data-panel-version-caption></p>
+        <footer class="top-panel-version-footer">
+          <a data-panel-version-settings href="#set/system" hidden>Другие способы обновления</a>
+          <p class="top-panel-version-caption" data-panel-version-caption></p>
+        </footer>
       </section>
     </div><button class="ib" id="theme" aria-label="Сменить тему"></button><button class="ib" id="bell" type="button" aria-label="Уведомления" aria-haspopup="dialog" aria-expanded="false"></button><div class="top-language" id="top-language">
       <button class="ib top-language-trigger" id="language-trigger" type="button" aria-label="Язык интерфейса" aria-haspopup="true" aria-expanded="false" aria-controls="language-menu"></button>
