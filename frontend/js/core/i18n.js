@@ -15,6 +15,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Ошибка ECH:": "ECH error:",
     "Сгенерировать ECH": "Generate ECH",
     "Сгенерировать ECH для TLS и клиентских подписок": "Generate ECH for TLS and client subscriptions",
     "ECH доступен только для TLS inbound.": "ECH is available only for TLS inbounds.",
