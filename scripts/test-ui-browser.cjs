@@ -377,6 +377,48 @@ async function main() {
       assert(await page.locator('#appearance-import').isVisible(),'Theme import remains available');
     });
 
+    await checked('Router: leaving Settings never traps global navigation until reload',async()=>{
+      await page.setViewportSize({width:1440,height:900});
+      // Exercise a real sidebar click, not navigate() (which uses page.goto
+      // and can conceal a broken hashchange-only route transition).
+      for(const [from,destination,selector] of [
+        ['set/general','users','.users-panel'],
+        ['set/integrations','nodes','.nodes'],
+        ['set/appearance','hosts','.host-directory'],
+        ['set/system','templates','.templates-workspace']
+      ]){
+        await navigate(from);
+        assert.equal(await page.locator('#view').getAttribute('data-page'),'set',
+          'Precondition: Settings is actually rendered before leaving '+from);
+        await page.locator('#nav a[href="#'+destination+'"]').click();
+        await page.waitForFunction(dest=>
+          location.hash==='#'+dest&&
+          document.querySelector('#view')?.dataset.page===dest&&
+          !document.querySelector('#view .sk')&&
+          !document.querySelector('#settings-subpage'),destination);
+        assert(await page.locator('#view '+selector).first().isVisible(),
+          'Global navigation should render '+destination+' immediately after '+from);
+        assert.equal(new URL(page.url()).hash,'#'+destination);
+        assert((await page.locator('#nav a[href="#'+destination+'"]').getAttribute('class')).includes('on'),
+          'Main navigation should highlight the destination, not Settings');
+      }
+      // Also cover a direct hash change from the default Settings page.
+      await navigate('set/general');
+      await page.evaluate(()=>{location.hash='#home'});
+      await page.waitForFunction(()=>
+        location.hash==='#home'&&document.querySelector('#view')?.dataset.page==='home'&&
+        !document.querySelector('#settings-subpage')&&!document.querySelector('#view .sk'));
+      // Moving within Settings should still preserve its existing optimization.
+      await navigate('set/general');
+      await page.locator('[data-settings-focus="integrations"]').click();
+      assert.equal(new URL(page.url()).hash,'#set/integrations');
+      assert.equal(await page.locator('[data-settings-section="general"]').count(),1);
+      assert.equal(await page.locator('[data-settings-focus="integrations"]').getAttribute('aria-pressed'),'true');
+      await page.locator('#nav a[href="#users"]').click();
+      await page.waitForFunction(()=>document.querySelector('#view')?.dataset.page==='users'&&
+        !document.querySelector('#settings-subpage')&&!document.querySelector('#view .sk'));
+    });
+
     await checked('Settings tabs: persistent navigation and accessible transitions',async()=>{
       await page.setViewportSize({width:1440,height:900});
       // The browser suite normally uses reduced motion: explicitly opt in
