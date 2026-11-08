@@ -4626,6 +4626,57 @@ const SETTINGS_PAGE_ALIASES=Object.freeze({
  colors:'appearance',layout:'appearance',typography:'appearance',
  integrations:'general',traffic:'system'
 });
+
+const SETTINGS_FOCUS_GROUPS=Object.freeze({
+ general:[['general','Основное','General'],['integrations','Интеграции и уведомления','Integrations & alerts']],
+ appearance:[['colors','Цвет и тема','Colors & theme'],['layout','Композиция','Layout'],['typography','Текст и эффекты','Type & effects']],
+ system:[['system','Обновления','Updates'],['traffic','Трафик и CDN','Traffic & CDN']]
+});
+const settingsFocusMemory={};
+function settingsFocusForPage(page){
+ const items=SETTINGS_FOCUS_GROUPS[page]||[];
+ const slug=location.hash.slice(1).split('/')[1];
+ if(items.some(([name])=>name===slug))return slug;
+ return items.some(([name])=>name===settingsFocusMemory[page])?settingsFocusMemory[page]:items[0]?.[0];
+}
+function selectSettingsFocus(group,{navigate=false}={}){
+ const main=document.querySelector('#settings-subpage');
+ const page=main?.dataset.settingsSection;
+ const items=SETTINGS_FOCUS_GROUPS[page];
+ if(!items?.some(([name])=>name===group))return false;
+ const grid=main.querySelector('.settings-center-grid');
+ if(!grid)return false;
+ for(const button of main.querySelectorAll('[data-settings-focus]')){
+  const selected=button.dataset.settingsFocus===group;
+  button.setAttribute('aria-pressed',String(selected));
+  button.classList.toggle('is-active',selected);
+ }
+ const cards=[...grid.querySelectorAll('[data-settings-group]')];
+ for(const card of cards)card.hidden=card.dataset.settingsGroup!==group;
+ const single=String(cards.filter(card=>!card.hidden).length<=1);
+ grid.dataset.single=single;
+ main.dataset.single=single;
+ for(const column of grid.querySelectorAll('.appearance-column'))
+  column.hidden=![...column.querySelectorAll('[data-settings-group]')].some(card=>!card.hidden);
+ settingsFocusMemory[page]=group;
+ if(navigate&&location.hash!=='#set/'+group)
+  history.pushState(history.state,'',location.pathname+location.search+'#set/'+group);
+ if(navigate){
+  grid.classList.remove('settings-focus-enter');
+  void grid.offsetWidth;
+  grid.classList.add('settings-focus-enter');
+ }
+ return true;
+}
+function mountSettingsFocus(){
+ const main=document.querySelector('#settings-subpage');
+ if(!main||!SETTINGS_FOCUS_GROUPS[main.dataset.settingsSection])return;
+ main.querySelector('.settings-focus-bar')?.addEventListener('click',event=>{
+  const button=event.target.closest('button[data-settings-focus]');
+  if(!button||!main.contains(button))return;
+  selectSettingsFocus(button.dataset.settingsFocus,{navigate:true});
+ });
+}
 function settingsPagesForSession(){
  return SETTINGS_PAGES.filter(([key])=>key!=='admins'||sessionUser?.role==='owner');
 }
