@@ -80,23 +80,52 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:2.6
 
 /* Host directory · compact Nexus cards. Shared system tokens own all material
    choices (solid, glass and raised); this feature only defines composition. */
-.host-directory{display:grid;gap:var(--nx-page-gap);align-content:start;min-width:0}
+.host-directory{display:grid;gap:var(--nx-page-gap);align-content:start;min-width:0;container:host-directory / inline-size}
 .host-card[hidden]{display:none}
-.host-directory-summary{
-  display:flex;align-items:center;flex-wrap:wrap;gap:.7rem 1.8rem;
-  min-width:0;padding:.85rem 1.1rem;
-  border:1px solid var(--nx-border);
-  border-radius:var(--nx-card-radius);
-  background:var(--nx-panel-bg);
-  background-image:var(--nx-panel-image);
-  box-shadow:var(--nx-panel-shadow);
-  backdrop-filter:var(--nx-backdrop);
+/* Inventory belongs to the search toolbar, not an oversized second surface.
+   Override the shared directory grid only for Hosts. */
+.host-directory-toolbar.host-directory-toolbar{
+  display:grid;grid-template-columns:minmax(11rem,17rem) minmax(0,1fr) max-content max-content;
+  align-items:center;gap:.45rem clamp(.65rem,1vw,1.1rem)
 }
-.host-summary-metric{display:grid;grid-template-columns:auto;gap:.22rem;min-width:6.5rem}
-.host-summary-metric>span{display:flex;align-items:center;gap:.42rem;color:var(--mu);font-size:.76rem;line-height:1.25}
-.host-summary-metric>span .ic{width:.94rem;height:.94rem;flex:none;color:var(--a)}
+.host-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
+.host-directory-toolbar>.host-directory-summary{
+  grid-column:2;grid-row:1;display:flex;align-items:center;justify-content:flex-start;
+  gap:clamp(.65rem,1.2vw,1.4rem);min-width:0;min-height:var(--nx-control-h-sm);
+  margin:0;padding:0;border:0;border-radius:0;background:transparent;
+  box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none
+}
+.host-directory-toolbar>.nx-workspace-grid-controls{grid-column:3;grid-row:1;justify-self:end}
+.host-directory-toolbar>.nx-workspace-create{grid-column:4;grid-row:1;justify-self:end}
+.host-summary-metric{display:inline-flex;align-items:center;gap:.38rem;flex:none;min-width:0;white-space:nowrap}
+.host-summary-metric>span{display:inline-flex;align-items:center;gap:.3rem;color:var(--mu);font-size:.73rem;line-height:1.3}
+.host-summary-metric>span .ic{width:.9rem;height:.9rem;flex:none;color:var(--a)}
 .host-summary-metric.is-active>span .ic{color:var(--ok)}
-.host-summary-metric>strong{padding-left:1.36rem;color:var(--tx);font-size:1.2rem;line-height:1.25;font-weight:780;font-variant-numeric:tabular-nums}
+.host-summary-metric>strong{color:var(--tx);font-size:.83rem;line-height:1.3;font-weight:770;font-variant-numeric:tabular-nums}
+@container host-directory (max-width:65rem){
+  .host-directory-toolbar.host-directory-toolbar{
+    grid-template-columns:minmax(0,1fr) max-content max-content
+  }
+  .host-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
+  .host-directory-toolbar>.nx-workspace-grid-controls{grid-column:2;grid-row:1}
+  .host-directory-toolbar>.nx-workspace-create{grid-column:3;grid-row:1}
+  .host-directory-toolbar>.host-directory-summary{
+    grid-column:1/-1;grid-row:2;justify-self:start;min-height:1.3rem
+  }
+}
+@container host-directory (max-width:41rem){
+  .host-directory-toolbar.host-directory-toolbar{
+    grid-template-columns:minmax(0,1fr) max-content
+  }
+  .host-directory-toolbar>.nx-directory-search{grid-column:1;grid-row:1}
+  .host-directory-toolbar>.nx-workspace-create{grid-column:2;grid-row:1}
+  .host-directory-toolbar>.host-directory-summary{
+    grid-column:1/-1;grid-row:2;flex-wrap:wrap;gap:.5rem 1rem
+  }
+  .host-directory-toolbar>.nx-workspace-grid-controls{
+    grid-column:1/-1;grid-row:3;justify-self:start
+  }
+}
 .host-card-grid{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,30rem),1fr));
   gap:var(--nx-page-gap);align-items:stretch;min-width:0;
@@ -167,8 +196,6 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:2.6
 .host-card-order .ia:disabled{opacity:.35}
 .host-card :is(.host-card-name,.host-card-copy,.host-card-actions summary,.host-card-order .ia):focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
 @media(max-width:620px){
-  .host-directory-summary{gap:.9rem 1rem}
-  .host-summary-metric{min-width:5.7rem}
   .host-card{gap:.75rem}
   .host-card-header{gap:.4rem}
   .host-card-identity{gap:.55rem}
