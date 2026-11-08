@@ -290,7 +290,7 @@ async function main() {
         const buttons=page.locator('#settings-subpage [data-settings-focus]');
         assert.equal(await buttons.count(),Object.keys(groups).length,'Incorrect compact group count: '+section);
         for(const [group,control] of Object.entries(groups)){
-          await buttons.locator('[data-settings-focus="'+group+'"]').click();
+          await page.locator('#settings-subpage [data-settings-focus="'+group+'"]').click();
           assert.equal(await page.locator('[data-settings-focus="'+group+'"]').getAttribute('aria-pressed'),'true');
           assert.equal(new URL(page.url()).hash,'#set/'+group,'Group links must remain shareable');
           assert(await page.locator(control).isVisible(),'Active group control must be visible: '+group);
