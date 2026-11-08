@@ -48,6 +48,18 @@ assert.equal(api.translate('Выбрать Москва'),'Select Москва',
 assert.equal(api.translate('Архивная нода'),'Archived node');
 assert.equal(api.translate('Архивная нода #'),'Archived node #');
 assert.equal(api.translate('Параметры settings'),'Protocol settings');
+
+for(const [ru,en] of [
+  ['Выбрано:', 'Selected:'],
+  ['» к', '” to'],
+  ['элементам?', 'items?'],
+  ['Связанные хосты:', 'Linked hosts:'],
+  ['Ошибка массовой операции:', 'Bulk action failed:'],
+  ['Обработано:', 'Completed:']
+]){
+  assert.equal(api.translate(ru),en,'Bulk action translation should survive whitespace normalization');
+}
+
 for(const [ru,en] of api.dict){
  assert(en.trim(),'Empty English translation: '+ru);
  assert(!/[А-Яа-яЁё]/u.test(en),'English catalog contains Russian: '+ru);
