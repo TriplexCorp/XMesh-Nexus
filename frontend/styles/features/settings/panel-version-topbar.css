@@ -81,13 +81,11 @@
 .top-panel-version-menu .top-panel-version-actions>button:hover:not(:disabled){
  background:var(--nx-hover-bg);color:var(--tx)
 }
-/* One clear primary action for each state: check, update, or reload. */
-.top-panel-version-menu[data-action-mode=check] [data-panel-version-check],
+/* Only installation or reload can be primary: version checks are automatic. */
 .top-panel-version-menu[data-action-mode=update] [data-panel-version-update],
 .top-panel-version-menu[data-action-mode=reload] [data-panel-version-reload]{
  order:-1;background:var(--a);border-color:var(--a);color:var(--btn-text)
 }
-.top-panel-version-menu[data-action-mode=check] [data-panel-version-check]:hover:not(:disabled),
 .top-panel-version-menu[data-action-mode=update] [data-panel-version-update]:hover:not(:disabled),
 .top-panel-version-menu[data-action-mode=reload] [data-panel-version-reload]:hover:not(:disabled){
  background:color-mix(in srgb,var(--a) 88%,var(--tx));color:var(--btn-text)
@@ -98,13 +96,7 @@
 .top-panel-version-update-status{margin:0;font-size:.72rem;line-height:1.48;color:var(--wr);overflow-wrap:anywhere}
 .top-panel-version-update-status:empty{display:none}
 .top-panel-version-footer{display:grid;gap:.4rem;min-width:0}
-.top-panel-version-footer:has(>a[hidden]):has(>p[hidden]){display:none}
-.top-panel-version-footer>a{
- width:fit-content;max-width:100%;color:var(--a);font-size:.73rem;font-weight:650;
- text-decoration:none;line-height:1.45
-}
-.top-panel-version-footer>a[hidden]{display:none!important}
-.top-panel-version-footer>a:hover{text-decoration:underline;text-underline-offset:.18em}
+.top-panel-version-footer:has(>p[hidden]){display:none}
 .top-panel-version-caption{margin:0;color:var(--nx-muted);font-size:.71rem;line-height:1.45}
 .top-panel-version-caption[hidden]{display:none!important}
 html[data-motion=on] .top-panel-version-menu:not([hidden]){animation:nx-version-enter var(--nx-motion-medium) var(--nx-motion-ease-out) both}
