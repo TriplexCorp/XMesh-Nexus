@@ -80,79 +80,67 @@
 .settings-workspace #core-panel .setting-control select{width:100%}
 
 
-/* Settings uses the full available dashboard workspace, aligned to its left edge.
-   Shared density/material tokens still govern the sidebar and feature surfaces. */
+/* One Settings toolbar occupies one row; actual controls use the entire
+   dashboard width below it. Never reserve a secondary vertical sidebar. */
 .settings-center{
- display:grid;grid-template-columns:minmax(11rem,12.25rem) minmax(0,1fr);
- gap:var(--nx-page-gap);align-items:start;min-width:0;
- width:100%;max-width:none;margin:0
+ display:grid;grid-template-columns:minmax(0,1fr);gap:.7rem;align-items:start;
+ width:100%;min-width:0;max-width:none;margin:0
 }
 .settings-center-rail{
- position:sticky;top:5rem;align-self:start;min-width:0;
- max-height:calc(100dvh - 6rem);overflow-y:auto;scrollbar-width:thin;
- padding:.4rem;border:1px solid var(--nx-border);
+ display:block;position:relative;justify-self:start;align-self:start;
+ width:max-content;max-width:100%;min-width:0;
+ overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;
+ scrollbar-width:thin;scrollbar-color:var(--nx-border-strong) transparent;
+ padding:.25rem;border:1px solid var(--nx-border);
  border-radius:var(--nx-card-radius);background:var(--nx-panel-bg);
  box-shadow:var(--nx-panel-shadow)
 }
-.settings-center-nav{display:grid;gap:.15rem}
+.settings-center-nav{
+ display:flex;align-items:center;gap:.16rem;width:max-content;min-width:0
+}
 .settings-center-link{
- display:flex;align-items:center;gap:.62rem;min-width:0;min-height:2.85rem;
- padding:.5rem .6rem;border:1px solid transparent;
- border-radius:var(--nx-control-radius);color:var(--mu);text-decoration:none;
- transition:background-color var(--nx-motion-medium) var(--nx-motion-ease),border-color var(--nx-motion-medium) var(--nx-motion-ease),color var(--nx-motion-fast) ease
+ display:inline-flex;align-items:center;gap:.42rem;flex:0 0 auto;
+ min-width:0;min-height:2.35rem;padding:.38rem .68rem;
+ border:1px solid transparent;border-radius:var(--nx-control-radius);
+ color:var(--mu);text-decoration:none;white-space:nowrap;
+ transition:background-color var(--nx-motion-medium) var(--nx-motion-ease),
+ border-color var(--nx-motion-medium) var(--nx-motion-ease),color var(--nx-motion-fast) ease
 }
 .settings-center-link:hover{background:var(--nx-hover-bg);color:var(--tx)}
 .settings-center-link.is-active{
  background:var(--nx-selected-bg);border-color:var(--nx-selected-border);color:var(--tx)
 }
 .settings-center-link:focus-visible,.settings-center-related :is(a,button):focus-visible{
- outline:2px solid var(--nx-focus);outline-offset:2px
+ outline:2px solid var(--nx-focus);outline-offset:-2px
 }
 .settings-center-link-icon{
- display:grid;place-items:center;flex:none;width:1.85rem;height:1.85rem;
+ display:grid;place-items:center;flex:none;width:1.6rem;height:1.6rem;
  border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);
  background:var(--nx-section-bg);
- transition:border-color var(--nx-motion-medium) var(--nx-motion-ease),color var(--nx-motion-medium) var(--nx-motion-ease),transform var(--nx-motion-medium) var(--nx-motion-ease-out)
+ transition:border-color var(--nx-motion-medium) var(--nx-motion-ease),
+ color var(--nx-motion-medium) var(--nx-motion-ease),transform var(--nx-motion-medium) var(--nx-motion-ease-out)
 }
-.settings-center-link-icon .ic{width:1rem;height:1rem}
+.settings-center-link-icon .ic{width:.9rem;height:.9rem}
 .settings-center-link.is-active .settings-center-link-icon{
  color:var(--a);border-color:var(--nx-selected-border);transform:scale(1.045)
 }
 .settings-center-link-copy{display:flex;align-items:center;min-width:0}
-.settings-center-link-copy strong{font-size:.82rem;font-weight:730;line-height:1.3}
-/* The descriptive copy is already displayed in the active page heading.
-   Repeating it in every navigation row produced an unnecessarily tall rail. */
+.settings-center-link-copy strong{font-size:.79rem;font-weight:730;line-height:1.3}
 .settings-center-link-copy small{display:none}
-.settings-center-related{
- display:grid;gap:.15rem;margin-top:.45rem;padding-top:.45rem;
- border-top:1px solid var(--nx-separator)
-}
+.settings-center-related{display:flex;gap:.3rem;flex-wrap:wrap}
 .settings-center-related :is(a,button){
- display:flex;align-items:center;gap:.55rem;min-height:2.15rem;
- padding:.4rem .65rem;border:0;border-radius:var(--nx-control-radius);
- background:transparent;color:var(--mu);font:inherit;font-size:.76rem;
+ display:flex;align-items:center;gap:.4rem;min-height:2rem;
+ padding:.35rem .6rem;border:0;border-radius:var(--nx-control-radius);
+ background:transparent;color:var(--mu);font:inherit;font-size:.75rem;
  text-decoration:none;text-align:left;cursor:pointer
 }
-.settings-center-related :is(a,button):hover{
- color:var(--tx);background:var(--nx-hover-bg)
-}
-.settings-center-related .ic{width:.95rem;height:.95rem;flex:none}
+.settings-center-related :is(a,button):hover{color:var(--tx);background:var(--nx-hover-bg)}
+.settings-center-related .ic{width:.9rem;height:.9rem;flex:none}
 .settings-center-main{
  display:grid;gap:var(--nx-page-gap);align-content:start;
  min-width:0;width:100%;max-width:none;margin:0
 }
-/* Single-card sections follow the same left alignment as the full dashboard. */
 .settings-center-main[data-single=true]{max-width:none}
-.settings-center-heading{
- display:flex;align-items:center;justify-content:space-between;min-width:0;
- gap:.8rem;padding:.15rem .08rem .7rem;border-bottom:1px solid var(--nx-separator)
-}
-.settings-center-heading h2{
- margin:0;color:var(--tx);font-size:1.2rem;font-weight:760;letter-spacing:-.02em
-}
-.settings-center-heading p{
- margin:.25rem 0 0;color:var(--mu);font-size:.78rem;line-height:1.45
-}
 .settings-center-grid{
  min-width:0;width:100%;align-items:start;
  grid-template-columns:minmax(0,1.08fr) minmax(0,1fr)
@@ -160,32 +148,16 @@
 .settings-center-grid[data-single=true]{grid-template-columns:minmax(0,1fr)}
 .settings-center-grid .appearance-column{min-width:0}
 .settings-center-grid .card{min-width:0}
-/* Grouped pages use the space efficiently without stretching short cards. */
 .settings-center-main[data-settings-section=appearance] .settings-center-grid,
 .settings-center-main[data-settings-section=general] .settings-center-grid{align-items:start}
-
-@container settings-workspace (max-width:70rem){
- .settings-center{grid-template-columns:minmax(0,1fr)}
- .settings-center-rail{position:static;max-height:none;overflow:visible}
- .settings-center-nav{
-  display:flex;align-items:stretch;gap:.3rem;overflow-x:auto;
-  scrollbar-width:thin;padding-bottom:.25rem
- }
- .settings-center-link{flex:0 0 auto;max-width:13rem;padding:.5rem .65rem}
- .settings-center-link-icon{width:1.7rem;height:1.7rem}
- .settings-center-related{
-  display:flex;gap:.3rem;flex-wrap:wrap;padding-top:.35rem
- }
- .settings-center-related :is(a,button){min-height:2rem}
- .settings-center-main[data-single=true]{max-width:none}
-}
 @container settings-workspace (max-width:60rem){
  .settings-center-grid{grid-template-columns:minmax(0,1fr)}
 }
-@container settings-workspace (max-width:48rem){
- .settings-center-heading{padding-bottom:.45rem}
- .settings-center-link{max-width:none}
- .settings-center-main[data-single=true]{max-width:none}
+@container settings-workspace (max-width:44rem){
+ .settings-center{gap:.55rem}
+ .settings-center-rail{max-width:100%}
+ .settings-center-link{padding:.3rem .5rem;min-height:2.1rem}
+ .settings-center-link-icon{width:1.45rem;height:1.45rem}
 }
 
 /* Reuse original Security Center / Admins feature implementations as real
@@ -203,7 +175,7 @@
  from{opacity:0;transform:translate3d(0,.45rem,0)}
  to{opacity:1;transform:none}
 }
-html[data-motion=on] .settings-center-main.settings-center-enter > :is(.settings-center-heading,.settings-center-embedded,.settings-center-grid){
+html[data-motion=on] .settings-center-main.settings-center-enter > :is(.settings-center-embedded,.settings-center-grid){
  animation:nx-settings-panel-enter var(--nx-motion-medium) var(--nx-motion-ease-out) both
 }
 html[data-motion=on] .settings-center-main.settings-center-enter > :is(.settings-center-embedded,.settings-center-grid){
@@ -213,7 +185,7 @@ html[data-motion=on] .settings-center-main.settings-center-enter > :is(.settings
 html[data-motion=off] .settings-center-link,
 html[data-motion=off] .settings-center-link-icon{transition:none}
 @media(prefers-reduced-motion:reduce){
- .settings-center-main.settings-center-enter > :is(.settings-center-heading,.settings-center-embedded,.settings-center-grid){animation:none!important}
+ .settings-center-main.settings-center-enter > :is(.settings-center-embedded,.settings-center-grid){animation:none!important}
  .settings-center-link,.settings-center-link-icon{transition:none!important}
 }
 
@@ -233,13 +205,6 @@ html[data-motion=off] .settings-center-link-icon{transition:none}
 .settings-workspace .settings-center-link-icon .ic{width:.88rem;height:.88rem}
 .settings-workspace .settings-center-main{
  gap:clamp(.5rem,.65vw,.8rem)
-}
-.settings-workspace .settings-center-heading{
- padding:.08rem 0 .48rem;gap:.55rem
-}
-.settings-workspace .settings-center-heading h2{font-size:1.03rem}
-.settings-workspace .settings-center-heading p{
- margin:.1rem 0 0;font-size:.71rem;line-height:1.4
 }
 .settings-workspace .settings-focus-bar{
  display:flex;flex-wrap:wrap;align-items:center;gap:.28rem;
