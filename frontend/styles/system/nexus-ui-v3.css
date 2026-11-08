@@ -363,7 +363,8 @@ html[data-motion=off] dialog[open]:not(#dlg){transform:none}
 #view .nx-bulk-toolbar{align-self:center;justify-self:end;flex:0 0 auto;order:0;white-space:nowrap}
 #view .nodes-toolbar>.nx-bulk-toolbar{margin-inline:0 .1rem;align-self:flex-end}
 #view .nx-bulk-context{
- display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;
+ width:fit-content;max-width:100%;justify-self:end;margin-inline-start:auto;
  gap:.45rem .8rem;min-width:0;padding:.45rem .7rem;
  border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);
  background:var(--nx-panel-bg);box-shadow:var(--nx-panel-shadow);
@@ -401,6 +402,6 @@ html[data-motion=off] dialog[open]:not(#dlg){transform:none}
 #view .nx-bulk-report-row.is-error>span{color:var(--er)}
 @media(max-width:760px){
  #view .nx-bulk-toolbar{flex:0 0 auto;order:0}
- #view .nx-bulk-context{align-items:stretch}
+ #view .nx-bulk-context{align-items:stretch;width:100%;justify-self:stretch;margin-inline-start:0}
  #view .nx-bulk-report{flex:1 1 100%;margin-inline-start:0}
 }
