@@ -721,6 +721,12 @@ async function main() {
         assert(await card.isVisible(),'Real Host must remain visible before search');
         const before=await page.locator('.host-card-grid .host-card:visible').count();
         const totals=await page.locator('.host-directory-summary').innerText();
+        assert.equal(await page.locator('.host-directory-summary .host-summary-metric').count(),3,
+          'Hosts toolbar must show total, active and disabled metrics');
+        assert.equal(await page.locator('.host-directory-toolbar > .host-directory-summary').count(),1,
+          'Host metrics must live inside the toolbar, never as a separate second row card');
+        assert.equal(await page.locator('.host-directory > .host-directory-summary').count(),0,
+          'Do not render a separate statistics surface beneath the toolbar');
         for(const phrase of [host.remark,'UI.EXAMPLE.INVALID',profile.name,inboundTag.toUpperCase(),node.name]){
           await input.fill(phrase);
           assert(await card.isVisible(),'Hosts search must match saved metadata: '+phrase);
@@ -755,6 +761,40 @@ async function main() {
         assert(Math.abs(g.searchMid-g.createMid)<3,'Hosts search and creation must share the leading toolbar row');
         assert(g.searchRight<g.createLeft,'Hosts creation must stay to the right of search');
         assert(g.createRight<=g.right+1,'Hosts create must stay inside toolbar');
+      }
+    });
+
+    await checked('Hosts toolbar: inline counters share a compact row on desktop',async()=>{
+      for(const width of [1920,1366,1024,390]){
+        await page.setViewportSize({width,height:900});
+        await navigate('hosts');
+        const result=await page.locator('.host-directory-toolbar').evaluate(toolbar=>{
+          const box=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,mid:(r.top+r.bottom)/2}};
+          const search=box(toolbar.querySelector('[data-host-search]'));
+          const summary=box(toolbar.querySelector('.host-directory-summary'));
+          const density=box(toolbar.querySelector('.nx-workspace-grid-controls'));
+          const add=box(toolbar.querySelector('.nx-workspace-create'));
+          const metrics=[...toolbar.querySelectorAll('.host-summary-metric')].map(box);
+          const bar=box(toolbar);
+          return{bar,search,summary,density,add,metrics,overflow:document.documentElement.scrollWidth>innerWidth+1,
+            separate:!!document.querySelector('.host-directory > .host-directory-summary')};
+        });
+        assert.equal(result.separate,false,'Hosts stats must not make a second standalone surface');
+        assert.equal(result.metrics.length,3,'All three host inventory counters must remain visible');
+        assert(!result.overflow,'Toolbar counts must not create horizontal page overflow');
+        assert(result.metrics.every(m=>m.width>0),'Host summary numbers must have visible widths');
+        for(const item of [result.search,result.summary,result.density,result.add])
+          assert(item.x>=result.bar.x-1&&item.right<=result.bar.right+1,
+            'Every toolbar control must fit within its framed surface');
+        assert(Math.abs(result.search.mid-result.add.mid)<3,
+          'Search and create should remain aligned in one leading row');
+        if(width>=1366){
+          assert(Math.abs(result.search.mid-result.summary.mid)<3,
+            'Desktop counts must share the same toolbar row as search');
+          assert(Math.abs(result.summary.mid-result.density.mid)<3,
+            'Desktop density controls must stay on the same row as counters');
+          assert(result.bar.height<=95,'Hosts desktop toolbar must not waste space on stacked metrics');
+        }
       }
     });
 
