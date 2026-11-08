@@ -74,12 +74,24 @@ for(const key of ['data-cr-save','data-cr-add','data-cr-list','Клиентск�
  assert(markup.includes(key),'Missing client routing workspace control: '+key);
 assert.match(source,/clientRoutingProfiles/);
 assert.match(source,/class="crx-card/,'Card gallery must render each routing template independently');
+assert.match(markup,/class="crx-page-head" role="toolbar"/,
+ 'Template count and create action belong in one compact toolbar');
+assert.doesNotMatch(markup,/<h2>Шаблоны<\/h2>/,
+ 'Do not repeat the global Client Routing title with a second large section heading');
+assert.match(markup,/data-cr-counter/,'Toolbar must retain the live template count');
+assert.match(markup,/data-cr-add/,'Toolbar must retain the existing create handler');
+assert.match(source,/el\.querySelector\('\[data-cr-counter\]'\)\.textContent=String\(draft.length\)/,
+ 'Toolbar count should be one compact number, without duplicate labels');
 assert.match(source,/class="crx-overlay"/,'Full editor must open in a separate layer');
 assert.match(source,/class="crx-dialog"/,'The layered editor must be present');
 assert.match(source,/class="crx-flag"/,'Flags must be rendered without external resources');
 assert.match(source,/data-cr-json-apply/,'JSON mode must remain available');
 const clientCss=fs.readFileSync('frontend/styles/features/routing/client-routing.css','utf8');
 assert.match(clientCss,/#client-route-root\.crx \.crx-card/,'Cards must have dedicated scoped styling');
+assert.match(clientCss,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,24rem\),1fr\)\)/,
+ 'Gallery should distribute a small number of real cards across desktop width');
+assert.match(clientCss,/\.crx-card-identity\{display:grid;gap:\.35rem/,
+ 'Compact cards must not return to oversized vertical gaps');
 assert.match(clientCss,/\.crx-source-grid/,'Server selection must use responsive cards');
 assert.doesNotMatch(clientCss,/client-route-profile\{/,'Legacy routing layout must not return');
 
