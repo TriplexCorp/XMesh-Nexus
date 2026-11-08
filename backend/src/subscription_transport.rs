@@ -658,6 +658,33 @@ mod tests {
         assert_eq!(result["kcpSettings"]["header"]["type"], "wechat-video");
         assert!(result["kcpSettings"].get("acceptProxyProtocol").is_none());
     }
+
+    #[test]
+    fn host_specific_zero_delay_fragments_and_inheritance() {
+        let inbound = json!({"protocol":"vless","streamSettings":{
+            "network":"raw","security":"tls","tlsSettings":{"serverName":"example.org"}
+        },"xmesh":{"clientFinalmask":{"tcp":[{"type":"fragment","settings":{
+            "packets":"tlshello","lengths":["5-10","500-700"],
+            "delays":["0-0"],"maxSplit":"2-2"
+        }}]}}});
+        let gaming = json!({"address":"game.example.org"});
+        let reserve = json!({"address":"backup.example.org","clientFinalmask":{"tcp":[
+            {"type":"fragment","settings":{
+                "packets":"tlshello","lengths":["10-20","50-100","200-400"],
+                "delays":["0-0"],"maxSplit":"3-3"
+            }}]}});
+        let primary = client_stream(&inbound, &gaming, "auto").unwrap();
+        let backup = client_stream(&inbound, &reserve, "auto").unwrap();
+        assert_eq!(primary["finalmask"], inbound["xmesh"]["clientFinalmask"]);
+        assert_eq!(backup["finalmask"], reserve["clientFinalmask"]);
+        assert_ne!(backup["finalmask"], primary["finalmask"]);
+        assert_eq!(
+            client_stream(&inbound, &json!({"clientFinalmask":null}), "auto")
+                .unwrap()["finalmask"],
+            primary["finalmask"]
+        );
+    }
+
     #[test]
     fn transports_strip_inbound_only_keys() {
         for (method, key) in [
