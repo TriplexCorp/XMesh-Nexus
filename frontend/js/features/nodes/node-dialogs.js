@@ -158,38 +158,43 @@
 (()=>{
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-  async function updateAgent(button){
-    const id=Number(button.dataset.agentUpdate);
+  // Single-card and fleet Agent upgrades use the exact same authenticated
+  // backend command. The server determines eligibility from the heartbeat.
+  const pendingAgentUpdates=new Set();
+  async function updateOneAgent(id,{confirm=true,notify=true,onStage=()=>{}}={}){
+    id=Number(id);
     const node=DB.nodes.find(item=>Number(item.id)===id);
-    if(!node){toast('Узел не найден.');return}
-    if(button.dataset.loading==='1')return;
-
-    const original=button.innerHTML;
-    button.dataset.loading='1';
-    button.disabled=true;
+    if(!node)throw new Error('Узел не найден.');
+    if(!Number.isSafeInteger(id)||id<1||pendingAgentUpdates.has(id)||
+       (typeof nodeAgentUpdating!=='undefined'&&nodeAgentUpdating.has(id))){
+      throw new Error('Обновление Agent уже выполняется для этой ноды.');
+    }
+    pendingAgentUpdates.add(id);
+    let started=false,observed=null;
+    const stage=value=>{try{onStage(value)}catch(_){/* progress UI may be closed */}};
     try{
+      stage('checking');
       const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
       if(!runtime.connected){
         throw new Error('Нет свежей связи с управляющим агентом. Проверьте подключение ноды.');
       }
       const version=String(runtime.version||'неизвестная версия');
-      const confirmed=await panelConfirm(
-        'Обновить управляющий Agent на «'+node.name+'»? Сейчас нода сообщает '+version+'. Поддержку безопасного самообновления автоматически проверит backend перед постановкой фиксированной команды. Ключи и настройки ноды не перевыпускаются.',
-        {title:'Обновить Agent · '+node.name,confirmLabel:'Обновить Agent'}
-      );
-      if(!confirmed)return;
-
+      if(confirm){
+        const accepted=await panelConfirm(
+          'Обновить управляющий Agent на «'+node.name+'»? Сейчас нода сообщает '+version+'. Поддержку безопасного самообновления автоматически проверит backend перед постановкой фиксированной команды. Ключи и настройки ноды не перевыпускаются.',
+          {title:'Обновить Agent · '+node.name,confirmLabel:'Обновить Agent'}
+        );
+        if(!accepted)return {cancelled:true};
+      }
       if(typeof nodeAgentUpdating!=='undefined')nodeAgentUpdating.add(id);
+      started=true;
       if(typeof paintNodeAgentUpdate==='function')paintNodeAgentUpdate(id,true);
-      button.innerHTML=ic('refresh-cw')+'Проверка и обновление…';
-
-      // No client-side version allow-list. The authenticated endpoint is the
-      // single source of truth for whether this exact live Agent may self-update.
+      stage('sending');
       const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/agent-update',{
         method:'POST',body:JSON.stringify({})
       });
-      toast(node.name+': backend подтвердил возможность обновления, команда отправлена.');
-
+      if(notify)toast(node.name+': backend подтвердил возможность обновления, команда отправлена.');
+      stage('installing');
       const deadline=Date.now()+900000;
       let status=null;
       while(Date.now()<deadline){
@@ -200,24 +205,48 @@
         if(status.state==='failed')throw new Error(status.result||'Agent не смог завершить обновление.');
       }
       if(status?.state!=='succeeded')throw new Error('Agent не подтвердил установку в течение 15 минут.');
-
-      let observed=null;
+      stage('verifying');
       for(let attempt=0;attempt<8;attempt++){
         observed=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
         if(observed.connected&&observed.version===request.targetVersion)break;
         await sleep(2500);
       }
-      toast(node.name+': '+(status.result||'Agent успешно обновлён')+
-        (observed?.version!==request.targetVersion?' · ожидается новый heartbeat':''));
-      if(typeof updateNodeRuntimeBadges==='function')updateNodeRuntimeBadges(node,observed);
+      const warning=observed?.version!==request.targetVersion;
+      if(notify)toast(node.name+': '+(status.result||'Agent успешно обновлён')+
+        (warning?' · ожидается новый heartbeat':''));
+      return {id,name:node.name,targetVersion:request.targetVersion,warning,
+        message:status.result||'Agent успешно обновлён'};
+    }finally{
+      pendingAgentUpdates.delete(id);
+      if(started){
+        if(typeof nodeAgentUpdating!=='undefined')nodeAgentUpdating.delete(id);
+        if(typeof paintNodeAgentUpdate==='function')paintNodeAgentUpdate(id,false);
+        if(observed&&typeof updateNodeRuntimeBadges==='function')updateNodeRuntimeBadges(node,observed);
+      }
+    }
+  }
+
+  window.XMeshNodeAgentOps=Object.freeze({
+    updateOne:(id,options)=>updateOneAgent(id,{...options,confirm:false,notify:false}),
+    isUpdating:id=>pendingAgentUpdates.has(Number(id))
+  });
+
+  async function updateAgent(button){
+    const id=Number(button.dataset.agentUpdate);
+    if(button.dataset.loading==='1')return;
+    const original=button.innerHTML;
+    button.dataset.loading='1';button.disabled=true;
+    try{
+      await updateOneAgent(id,{onStage:step=>{
+        if(step==='sending'||step==='installing'||step==='verifying'){
+          button.innerHTML=ic('refresh-cw')+'Проверка и обновление…';
+        }
+      }});
     }catch(error){
       toast('Обновление Agent: '+(error?.message||'ошибка API'));
     }finally{
-      if(typeof nodeAgentUpdating!=='undefined')nodeAgentUpdating.delete(id);
-      if(typeof paintNodeAgentUpdate==='function')paintNodeAgentUpdate(id,false);
-      button.dataset.loading='';
-      button.disabled=false;
-      button.innerHTML=original;
+      delete button.dataset.loading;
+      if(button.isConnected){button.disabled=false;button.innerHTML=original}
     }
   }
 
