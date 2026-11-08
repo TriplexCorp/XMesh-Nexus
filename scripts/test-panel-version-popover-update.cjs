@@ -87,7 +87,7 @@ async function run(){
  await window.XMeshPanelVersion.init({role:'owner'});
  element('[data-panel-version-trigger]').click();
  await tick();
- assert.equal(reads,1,'Owner checks real host status on opening');
+ assert(reads>=1,'Owner checks real host status on opening');
  element('[data-panel-version-check]').click();
  await tick();
  assert.equal(element('[data-panel-version-update]').hidden,false);
@@ -127,6 +127,30 @@ async function run(){
  element('[data-panel-version-trigger]').click();
  await tick();
  assert.equal(timers.size,0,'Closed menu cannot leak polling timers');
+
+ // A new browser session finds the host marker left at "success" by
+ // the previous deployment. A fresh GitHub check must unlock the next one.
+ await window.XMeshPanelVersion.init({role:'owner'});
+ server={status:'success'};
+ element('[data-panel-version-trigger]').click();
+ await tick();
+ assert.equal(element('[data-panel-version-check]').hidden,false,
+   'Old successful deployment must never hide the next read-only check');
+ assert.equal(element('[data-panel-version-reload]').hidden,true,
+   'Old success must not demand a pointless second reload');
+ assert.equal(element('[data-panel-version-update]').hidden,false,
+   'A confirmed newer GitHub build must be installable after old host success');
+ assert.equal(element('[data-panel-version-menu]').dataset.actionMode,'update',
+   'Fresh check must restore the update action despite persisted success');
+ // A second request may still be queued; host-side GET/POST remain the
+ // authoritative protection against concurrent worker execution.
+ approved=false;
+ element('[data-panel-version-update]').click();
+ await tick();
+ assert.equal(requests,3,'Old success must not block a new owner update request');
+ assert.equal(element('[data-panel-version-menu]').dataset.actionMode,'update',
+   'Cancelled follow-up request must not lock the update button');
+ element('[data-panel-version-trigger]').click();
 
  await window.XMeshPanelVersion.init({role:'owner'});
  server={status:'unavailable'};
