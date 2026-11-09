@@ -1,0 +1,19 @@
+name: Agent bootstrap transport
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  strict-path-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check out the exact paired Node adapter and service definition
+        uses: actions/checkout@v7
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 5a3f484bd2ddf705cd35c31ffdfd8cd5996b427d
+          path: .node-transport-fixture
+      - name: Exercise bootstrap and signed requests with the production strict PATH
+        run: python3 scripts/test-agent-bootstrap-transport.py --node-root .node-transport-fixture
