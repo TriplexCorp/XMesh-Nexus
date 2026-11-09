@@ -1302,3 +1302,111 @@
   #dlg.user-create-modal .user-create-username-row{grid-template-columns:minmax(0,1fr)}
   #dlg.user-create-modal .user-create-generate{margin-top:0}
 }
+
+/* Duration calendar: consistent Nexus text rhythm without microscopic labels.
+ * Calendar-only visual scale compensates for zoomed-out desktop CSS viewports;
+ * it never scales the creation form or the main panel. */
+#dlg.user-create-modal .user-create-duration-calendar{
+  --uc-cal-unit:16px;
+  box-sizing:border-box;
+  top:calc(1.3rem + var(--uc-control-h) + .35rem);
+  left:0;
+  right:auto;
+  width:min(calc(23 * var(--uc-cal-unit)),calc(100vw - 1.5rem));
+  max-width:calc(100vw - 1.5rem);
+  padding:calc(.52 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-duration-presets{
+  gap:calc(.18 * var(--uc-cal-unit));
+  margin-bottom:calc(.4 * var(--uc-cal-unit));
+  padding-bottom:calc(.4 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-duration-preset{
+  height:calc(1.88 * var(--uc-cal-unit));
+  min-height:calc(1.88 * var(--uc-cal-unit));
+  padding-inline:calc(.12 * var(--uc-cal-unit));
+  font-size:calc(.72 * var(--uc-cal-unit));
+  font-weight:700;
+  line-height:1.1;
+}
+#dlg.user-create-modal .user-create-cal-head{
+  grid-template-columns:calc(1.85 * var(--uc-cal-unit)) minmax(0,1fr) calc(1.85 * var(--uc-cal-unit));
+  gap:calc(.18 * var(--uc-cal-unit));
+  margin-bottom:calc(.32 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-cal-head strong{
+  font-size:calc(.91 * var(--uc-cal-unit));
+  font-weight:730;
+  line-height:1.2;
+}
+#dlg.user-create-modal .user-create-cal-nav{
+  width:calc(1.85 * var(--uc-cal-unit));
+  height:calc(1.85 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-cal-nav svg{
+  width:calc(.9 * var(--uc-cal-unit));
+  height:calc(.9 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-cal-weekdays,
+#dlg.user-create-modal .user-create-cal-grid{
+  gap:calc(.1 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-cal-weekdays{
+  margin-bottom:calc(.13 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-cal-weekdays span{
+  height:calc(1.28 * var(--uc-cal-unit));
+  font-size:calc(.73 * var(--uc-cal-unit));
+  font-weight:730;
+  line-height:1;
+}
+#dlg.user-create-modal .user-create-cal-empty{
+  min-height:calc(1.88 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-cal-day{
+  height:calc(1.88 * var(--uc-cal-unit));
+  min-height:calc(1.88 * var(--uc-cal-unit));
+  font-size:calc(.85 * var(--uc-cal-unit));
+  line-height:1;
+  font-weight:690;
+}
+#dlg.user-create-modal .user-create-cal-day:disabled{
+  opacity:.58;
+  color:var(--mu);
+}
+#dlg.user-create-modal .user-create-cal-day:focus-visible,
+#dlg.user-create-modal .user-create-duration-preset:focus-visible,
+#dlg.user-create-modal .user-create-cal-nav:focus-visible{
+  outline:2px solid var(--nx-focus);
+  outline-offset:1px;
+}
+#dlg.user-create-modal .user-create-cal-foot{
+  margin-top:calc(.4 * var(--uc-cal-unit));
+  padding-top:calc(.38 * var(--uc-cal-unit));
+  gap:calc(.35 * var(--uc-cal-unit));
+}
+#dlg.user-create-modal .user-create-cal-foot span,
+#dlg.user-create-modal .user-create-cal-foot button{
+  font-size:calc(.7 * var(--uc-cal-unit));
+  line-height:1.25;
+}
+#dlg.user-create-modal .user-create-cal-foot button{
+  padding:calc(.26 * var(--uc-cal-unit)) calc(.32 * var(--uc-cal-unit));
+}
+@media(min-width:2200px){
+  #dlg.user-create-modal .user-create-duration-calendar{
+    --uc-cal-unit:clamp(16px,.66vw,21px);
+  }
+}
+@media(max-width:680px){
+  #dlg.user-create-modal .user-create-duration-calendar{
+    position:static;
+    top:auto;
+    width:100%;
+    max-width:100%;
+    margin-top:var(--nx-space-2);
+  }
+  #dlg.user-create-modal .user-create-duration-presets{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
