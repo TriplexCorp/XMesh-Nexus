@@ -894,6 +894,9 @@ async function main() {
           const update=scope.locator('[data-bulk-action="agent-update"]');
           assert.equal(await update.count(),1,'Nodes must expose a mass Agent update command');
           assert(await update.isEnabled(),'Selected nodes must enable mass Agent update');
+          const xray=scope.locator('[data-bulk-action="xray-update"]');
+          assert.equal(await xray.count(),1,'Nodes must expose mass Xray update alongside Agent update');
+          assert(await xray.isEnabled(),'Selected nodes must enable mass Xray update');
         }
         await scope.locator('[data-bulk-action="all"]').click();
         const visible=await scope.locator(card+':visible').count();
