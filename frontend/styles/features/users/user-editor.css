@@ -1034,8 +1034,8 @@
   #dlg.user-create-modal .user-create-footer button{transition:none}
 }
 
-/* Concept restoration: inner controls retain their icons, real device toggle,
- * and visual scale when a zoomed-out browser reports a very wide CSS viewport. */
+/* Concept controls use a consistent, bounded scale. Browser zoom-out grows the CSS
+ * viewport, but must never make the form 175% of ordinary control dimensions. */
 #dlg.user-create-modal{--uc:1rem}
 #dlg.user-create-modal .user-create-input-wrap{
   display:block;position:relative;width:100%;min-width:0;height:2.85rem;
@@ -1084,8 +1084,10 @@
   flex:none;width:1rem;height:1rem;color:var(--a);
 }
 @media(min-width:2200px){
+  /* The dialog can grow horizontally at low zoom, but the entire control
+   * system has a strict 16–20px scale budget rather than an uncapped vw ramp. */
   #dlg.user-create-modal{
-    --uc:clamp(17px,.8vw,28px);
+    --uc:clamp(16px,.66vw,20px);
     width:min(58vw,1940px,calc(100vw - 2rem));
   }
   #dlg.user-create-modal .user-create-head{
