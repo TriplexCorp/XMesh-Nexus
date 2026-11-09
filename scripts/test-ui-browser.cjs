@@ -1713,7 +1713,11 @@ async function main() {
         'Basic user data must form two compact columns on desktop');
       const composition=await page.locator('#dlg').evaluate(d=>{
         const rect=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
-        const fields=[...d.querySelectorAll('.user-connection-card>.f')].map(el=>{
+        const connectionNames=['limit','cdnLimitGb','strategy','tag'];
+        const controls=connectionNames.map(name=>d.querySelector('.user-connection-card [name="'+name+'"]'));
+        const fields=controls.slice(0,2).map(control=>{
+          const el=control?.closest('.f');
+          if(!el)return null;
           const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width};
         });
         return{
@@ -1724,11 +1728,12 @@ async function main() {
           save:rect('.user-save-button'),
           actions:rect('.user-editor-actions'),
           fields,
+          connectionControls:controls.map(Boolean),
           rem:parseFloat(getComputedStyle(document.documentElement).fontSize)
         };
       });
-      assert(composition.fields.length===4,'Connection card must keep all four existing controls');
-      assert(Math.abs(composition.fields[0].x-composition.fields[1].x)>8&&Math.abs(composition.fields[0].y-composition.fields[1].y)<=4,
+      assert(composition.connectionControls.every(Boolean),'Connection card must preserve limit, CDN limit, reset strategy and tag fields');
+      assert(composition.fields.every(Boolean)&&Math.abs(composition.fields[0].x-composition.fields[1].x)>8&&Math.abs(composition.fields[0].y-composition.fields[1].y)<=4,
         'Connection controls must use two columns rather than a long vertical rail');
       assert(composition.note.x<=composition.basic.x+2&&composition.note.right>=composition.connection.right-2,
         'Note must span the full workspace below both settings cards');
