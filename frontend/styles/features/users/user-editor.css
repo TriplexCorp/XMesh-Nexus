@@ -1213,3 +1213,51 @@
     padding:calc(.6 * var(--uc)) calc(1.1 * var(--uc));
   }
 }
+
+/* The validation message is empty on first open. Do not reserve its margin
+ * and line-height as phantom content that creates a tiny desktop scrollbar.
+ * On validation errors the normal block resumes layout and can scroll. */
+#dlg.user-create-modal .user-create-error:empty{display:none}
+
+@media(min-width:2200px){
+  /* Keep the same text/control scale and sections; only remove spare bottom
+   * body padding at browser zoom-out, where every pixel affects the fit. */
+  #dlg.user-create-modal .user-create-body{
+    padding-bottom:calc(.7 * var(--uc));
+  }
+}
+
+/* Tall desktop dialogs with a little overflow should use compact *vertical*
+ * rhythm rather than reserving an invisible scroll range. Typography, controls
+ * and two-column geometry do not shrink. Shorter screens may scroll normally. */
+@media (min-width:2200px) and (min-height:1150px){
+  #dlg.user-create-modal .user-create-head{
+    min-height:calc(5.1 * var(--uc));
+    padding-block:calc(.95 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-body{
+    padding-top:calc(.8 * var(--uc));
+    padding-bottom:calc(.65 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-workspace{
+    row-gap:calc(.7 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-section{
+    padding-top:calc(.97 * var(--uc));
+    padding-bottom:calc(.97 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-section-head{
+    margin-bottom:calc(.82 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-contacts{
+    margin-top:.12rem;
+    padding-top:.72rem;
+  }
+  #dlg.user-create-modal .user-create-extra-grid{
+    row-gap:.72rem;
+  }
+  #dlg.user-create-modal .user-create-footer{
+    min-height:calc(4.5 * var(--uc));
+    padding-block:calc(.72 * var(--uc));
+  }
+}
