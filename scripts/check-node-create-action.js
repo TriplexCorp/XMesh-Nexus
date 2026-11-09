@@ -156,9 +156,9 @@ assert.match(dialogJs,/deviceLimitInput\.value=smartSwitch\.checked/,'Device-lim
 assert.match(dialogJs,/user-create-input-wrap/,'User contact, traffic and tag fields must retain their icons');
 assert.match(userCss,/@media\(min-width:2200px\)/,'Large effective viewport must retain legible user dialog geometry');
 assert.match(userCss,/width:min\(58vw,1940px,calc\(100vw - 2rem\)\)/,'Zoomed-out desktop modal must grow beyond its fixed 1140px cap');
-assert.doesNotMatch(userCss,/--uc:clamp\\(/,'Create-user type scale must not depend on viewport widths');
-assert.match(userCss,/--uc-control-h:max\\(42px,var\\(--nx-control-h\\)\\)/,'Create-user controls must inherit shared Nexus control height');
-assert.match(userCss,/font-size:var\\(--nx-text-sm\\)/,'Create-user type scale must use Nexus text tokens');
+assert.ok(!userCss.includes('--uc:clamp('),'Create-user type scale must not depend on viewport width');
+assert.ok(userCss.includes('--uc-control-h:max(42px,var(--nx-control-h))'),'Create-user controls must use shared Nexus control height');
+assert.ok(userCss.includes('font-size:var(--nx-text-sm)'),'Create-user text must use Nexus text tokens');
 assert.match(userCss,/\.user-create-smart-switch input:checked\+span/,'Smart device switch must have visible enabled styling');
 
 assert.match(userCss,/Premium creation dialog — approved visual concept/,
