@@ -98,7 +98,7 @@ def main():
                 result=worker().perform('v26.10.31',command)
                 (state/'config.json').write_bytes(original)
                 assert not result['success'] and result['code']==code and result['rollback']=='unchanged',result
-                assert json.loads(docker('inspect',name).stdout)[0]['Id']==old_id;transfer()
+                observed=json.loads(docker('inspect',name).stdout)[0];assert observed['Id']==old_id and observed['State']['StartedAt']==old['State']['StartedAt'];transfer()
                 print('PASS real preflight preserves TLS traffic:',code,flush=True)
             def invalid_config():
                 bad=json.loads(original);bad['inbounds'][0]['streamSettings']['network']='invalid-DO-NOT-UPLOAD';(state/'config.json').write_text(json.dumps(bad))

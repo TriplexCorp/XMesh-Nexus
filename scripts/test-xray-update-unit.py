@@ -90,6 +90,21 @@ class TransactionTests(unittest.TestCase):
     def test_target_cannot_change_on_redelivery(self):
         w=Fake(self.state);w.perform('26.10.31',1)
         with self.assertRaises(ValueError):w.perform('26.11.9',1)
+    def test_preserves_official_anonymous_volumes_and_working_directory(self):
+        w=Fake(self.state);w.logs=self.state
+        old=w.containers[w.name];old['Config']['WorkingDir']='/home/nonroot'
+        old['Mounts'].append({'Type':'volume','Name':'existing-log-volume','Source':'/private/docker/volume','Destination':'/var/log/xray','RW':True})
+        args=w.resources(old)
+        self.assertIn('type=volume,src=existing-log-volume,dst=/var/log/xray',args)
+        self.assertIn('/home/nonroot',args)
+    def test_exact_binary_version_is_required(self):
+        class Wrong(Fake):
+            def run(self,args,**kw):
+                rc,out,err=super().run(args,**kw)
+                return (rc,b'Xray 26.10.31-wrong\n',err) if args[0]=='run' and 'version' in args else (rc,out,err)
+        w=Wrong(self.state);result=w.perform('26.10.31',1)
+        self.assertEqual(result['code'],'image_identity');self.assertFalse(any(c[0]=='stop' for c in w.calls))
+
     def test_validation_reasons_are_closed_and_nonsecret(self):
         self.assertEqual(m.Updater.validation_code(b'open /etc/letsencrypt/fullchain.pem: no such file',23),'tls_resource_missing')
         self.assertEqual(m.Updater.validation_code(b'failed loading geosite.dat',23),'geodata_missing')
