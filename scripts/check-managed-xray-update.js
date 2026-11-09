@@ -41,6 +41,21 @@ assert.doesNotMatch(agent,/local image=ghcr\.io\/xtls\/xray-core:latest/);
 assert.match(agent,/xmesh-managed-xray/);
 assert.match(agent,/run -test -config \/etc\/xray\/config\.json/);
 assert.match(agent,/previous image restored/);
+assert.match(agent,/pull_pinned_xray_image\(\)/,'Agent must retry official GHCR image pulls');
+assert.match(agent,/timeout 115 docker pull "\$image"/,'Allow a bounded registry download window');
+assert.match(agent,/for attempt in 1 2;do/,'Download must retry once on transient GHCR failure');
+assert.match(agent,/registry connectivity or CDN failure/,'Reported failure must distinguish registry connectivity');
+assert.doesNotMatch(agent,/timeout 75 docker pull "\$image"/,'Old one-shot GHCR pull must not return');
+for(const source of ['backend/src/node_runtime.rs','backend/src/node_runtime_p0d_staged.rs','backend/src/node_runtime_legacy.rs']){
+ const rust=fs.readFileSync(source,'utf8');
+ assert.match(rust,/action='update_xray' AND requested_at<NOW\(\)-INTERVAL '10 minutes'/,
+  'Managed Xray lease must cover a bounded image download and rollback: '+source);
+}
+const bulk=fs.readFileSync('frontend/js/features/users/workspace-bulk-actions.js','utf8');
+assert.match(bulk,/action==='xray-update'/,'Bulk nodes toolbar must dispatch Xray update');
+assert.match(bulk,/st\.batch=\{action:'xray-update',version,items\}/,'Per-node Xray update outcomes are visible');
+assert.match(bulk,/const result=await ops\.updateOne\(Number\(item\.id\),version/,'Bulk update must use the single signed Xray updater');
+
 assert.doesNotMatch(agent,/\beval\b/,'Never evaluate remote commands');
 assert.match(frontend,/data-xray-update/);
 assert.match(frontend,/const selectNodeXrayRelease=/);
