@@ -59,7 +59,7 @@ def main():
         state=Path(tmp);tls=state/'certificates';live=tls/'live/update.test';archive=tls/'archive/update.test';live.mkdir(parents=True);archive.mkdir(parents=True)
         subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(archive/'privkey1.pem'),'-out',str(archive/'fullchain1.pem'),'-days','1','-subj','/CN=update.test','-addext','subjectAltName=DNS:update.test'],check=True,capture_output=True)
         for name in ('privkey','fullchain'):(live/(name+'.pem')).symlink_to('../../archive/update.test/'+name+'1.pem')
-        listen=port();config={'log':{'loglevel':'warning'},'inbounds':[{'listen':'127.0.0.1','port':listen,'protocol':'dokodemo-door','settings':{'address':'127.0.0.1','port':target_server.server_port,'network':'tcp'},'streamSettings':{'network':'raw','security':'tls','tlsSettings':{'certificates':[{'certificateFile':'/etc/letsencrypt/live/update.test/fullchain.pem','keyFile':'/etc/letsencrypt/live/update.test/privkey.pem'}]}}}],'outbounds':[{'protocol':'freedom','settings':{'finalRules':[{'action':'allow','ip':['127.0.0.1'],'port':str(target_server.server_port)}]}}]}
+        client_id=str(uuid.uuid4());listen=port();config={'log':{'loglevel':'warning'},'inbounds':[{'listen':'127.0.0.1','port':listen,'protocol':'vless','settings':{'decryption':'none','clients':[{'id':client_id}]},'streamSettings':{'network':'raw','security':'tls','tlsSettings':{'certificates':[{'certificateFile':'/etc/letsencrypt/live/update.test/fullchain.pem','keyFile':'/etc/letsencrypt/live/update.test/privkey.pem'}]}}}],'outbounds':[{'protocol':'freedom','settings':{'finalRules':[{'action':'allow','ip':['127.0.0.1'],'port':str(target_server.server_port)}]}}]}
         (state/'config.json').write_text(json.dumps(config));os.chmod(state/'config.json',0o600)
         mounts=['-v',str(state/'config.json')+':/etc/xray/config.json:ro']
         sandbox=['--user',(str(os.getuid())+':'+str(os.getgid()) if REPRO_ONLY else '0:0'),'--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--entrypoint','xray']
@@ -76,7 +76,12 @@ def main():
             ctx=ssl.create_default_context(cafile=str(archive/'fullchain1.pem'))
             with socket.create_connection(('127.0.0.1',listen),timeout=3) as raw:
                 with ctx.wrap_socket(raw,server_hostname='update.test') as s:
-                    s.sendall(b'GET / HTTP/1.0\r\nHost: update.test\r\n\r\n');data=b''
+                    header=b'\x00'+uuid.UUID(client_id).bytes+b'\x00\x01'+target_server.server_port.to_bytes(2,'big')+b'\x01\x7f\x00\x00\x01'
+                    s.sendall(header+b'GET / HTTP/1.0\r\nHost: update.test\r\n\r\n');data=b''
+                    response=b''
+                    while len(response)<2:
+                        part=s.recv(2-len(response));assert part,'VLESS stream closed before response';response+=part
+                    assert response==b'\x00\x00','VLESS response header must be accepted'
                     while True:
                         part=s.recv(4096)
                         if not part:break
