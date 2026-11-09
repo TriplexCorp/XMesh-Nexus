@@ -101,12 +101,12 @@ dialog#dlg.node-wide>form.box{
   background:var(--nx-dialog-bg);
 }
 
-/* User Details: canonical fixed-size workspace. The native dialog is a stable
- * 64 × 38.5rem frame on desktops (clamped to the viewport). The same frame
- * persists across all five mounted tabs; ONLY the central content scrolls.
- * Do not reintroduce fit-content or viewport-height canvas sizing. */
+/* User Details: one stable task workspace, with a viewport-responsive desktop
+ * footprint. A hard 38.5rem ceiling made the drawer physically tiny whenever
+ * browser zoom enlarged the effective CSS viewport. Every task keeps the same
+ * shell geometry; only the shared central content area scrolls. */
 dialog#dlg.user-modal{
-  --dialog-width:64rem;
+  --dialog-width:clamp(64rem,58vw,108rem);
   --modal-off:translateY(22px) scale(.972);
   box-sizing:border-box;
   width:min(var(--dialog-width),calc(100vw - 2rem));
@@ -117,8 +117,8 @@ dialog#dlg.user-modal{
   max-inline-size:calc(100vw - 2rem);
   min-height:0;
   min-block-size:0;
-  height:min(38.5rem,calc(100dvh - 2rem));
-  block-size:min(38.5rem,calc(100dvh - 2rem));
+  height:min(clamp(38.5rem,64dvh,49rem),calc(100dvh - 2rem));
+  block-size:min(clamp(38.5rem,64dvh,49rem),calc(100dvh - 2rem));
   max-height:calc(100dvh - 2rem);
   max-block-size:calc(100dvh - 2rem);
   overflow:hidden;
@@ -322,10 +322,14 @@ html[data-motion=off] #dlg.user-modal::backdrop{
   z-index:auto;
 }
 
-/* At zoomed-out desktop scales a 64rem user drawer becomes a narrow island.
- * Widen the workspace, not its typography or the fixed-height tab contract. */
+/* Browser zoom-out increases CSS viewport width while shrinking every rem in
+ * physical pixels. Grow the complete surface moderately, including its text,
+ * instead of only widening microscopic controls. 82dvh is a zoom-safe cap:
+ * even short wide screens retain a visible header and action footer. */
 @media(min-width:2200px){
   dialog#dlg.user-modal{
-    --dialog-width:82rem;
+    zoom:1.12;
+    height:min(clamp(38.5rem,64dvh,49rem),82dvh);
+    block-size:min(clamp(38.5rem,64dvh,49rem),82dvh);
   }
 }
