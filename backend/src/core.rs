@@ -401,7 +401,7 @@ impl CoreManager {
         if let Some((seen, status)) = self.node_image_status_cache.read().await.get(tag)
             && seen.elapsed() < Duration::from_secs(if *status == "available" { 600 } else { 60 })
         {
-            return status;
+            return *status;
         }
 
         let state = self.probe_ghcr_image(tag).await;
