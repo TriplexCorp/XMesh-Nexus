@@ -56,6 +56,12 @@ assert.match(bulk,/action==='xray-update'/,'Bulk nodes toolbar must dispatch Xra
 assert.match(bulk,/st\.batch=\{action:'xray-update',version,items\}/,'Per-node Xray update outcomes are visible');
 assert.match(bulk,/const result=await ops\.updateOne\(Number\(item\.id\),version/,'Bulk update must use the single signed Xray updater');
 
+const installer=fs.readFileSync('deploy/install-node-metrics-agent.sh','utf8');
+const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
+assert.match(installer,/TimeoutStartSec=420s/,'Fresh control services must allow bounded GHCR retries');
+assert.match(updater,/TimeoutStartSec=420s/,'Agent updates must also extend existing control services');
+assert.match(frontend,/window\.XMeshNodeXrayOps=XMeshNodeXrayOps/,'Single and bulk Xray must use one API operation');
+assert.match(frontend,/const verifyUntil=Date\.now\(\)\+45000/,'Command ACK requires heartbeat verification without stale-version false failures');
 assert.doesNotMatch(agent,/\beval\b/,'Never evaluate remote commands');
 assert.match(frontend,/data-xray-update/);
 assert.match(frontend,/const selectNodeXrayRelease=/);
