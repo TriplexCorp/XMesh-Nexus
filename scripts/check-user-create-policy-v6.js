@@ -44,6 +44,16 @@ assert.match(css,/\.user-create-duration-calendar\{/,
  'Duration picker must render as a dedicated calendar popover');
 assert.match(css,/\.user-create-cal-day\.is-selected/,
  'Selected calendar date must have an explicit state');
+const calendarStyles=fs.readFileSync('frontend/styles/features/users/user-editor.css','utf8');
+assert.ok(calendarStyles.includes('--uc-cal-unit:clamp(16px,.66vw,21px)'),
+ 'Zoomed-out calendar must grow independently of the dialog type scale');
+assert.ok(calendarStyles.includes('font-size:calc(.85 * var(--uc-cal-unit))'),
+ 'Calendar dates must not render in microscopic type');
+assert.ok(calendarStyles.includes('gap:calc(.1 * var(--uc-cal-unit))'),
+ 'Weekday and date grids must use a compact consistent gap');
+assert.ok(calendarStyles.includes('left:0;')&&calendarStyles.includes('right:auto;'),
+ 'Calendar should align within the limits card rather than overlapping the profile');
+
 assert.match(css,/\.user-create-section-extra\{container-type:inline-size;container-name:nx-user-extra\}/,
  'Metadata section must own container-responsive layout');
 assert.match(css,/@container nx-user-extra \(min-width:44rem\)/,
