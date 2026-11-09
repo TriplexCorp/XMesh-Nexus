@@ -1213,3 +1213,16 @@
     padding:calc(.6 * var(--uc)) calc(1.1 * var(--uc));
   }
 }
+
+/* The validation message is empty on first open. Do not reserve its margin
+ * and line-height as phantom content that creates a tiny desktop scrollbar.
+ * On validation errors the normal block resumes layout and can scroll. */
+#dlg.user-create-modal .user-create-error:empty{display:none}
+
+@media(min-width:2200px){
+  /* Keep the same text/control scale and sections; only remove spare bottom
+   * body padding at browser zoom-out, where every pixel affects the fit. */
+  #dlg.user-create-modal .user-create-body{
+    padding-bottom:calc(.7 * var(--uc));
+  }
+}
