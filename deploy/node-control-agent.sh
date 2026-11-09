@@ -159,6 +159,40 @@ persist_pinned_xray_image(){
  chmod 600 "$tmp"
  mv -f "$tmp" "$state/pinned-image"
 }
+# A fixed official registry reference is the only allowed pull target.
+# Keep Xray serving the old image until the new one has been downloaded,
+# validated with the current configuration and inspected by immutable ID.
+pull_pinned_xray_image(){
+ local image="$1" attempt rc=0 failure='registry request failed' log
+ [[ "$image" =~ ^ghcr[.]io/xtls/xray-core:[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]] || {
+  detail='Invalid official Xray image reference';return 1
+ }
+ log="$(mktemp /run/xmesh-xray-pull.XXXXXXXX)" || { detail='Cannot prepare Xray download diagnostic';return 1; }
+ chmod 600 "$log"
+ for attempt in 1 2;do
+  : > "$log"
+  if timeout 115 docker pull "$image" > "$log" 2>&1;then
+   rm -f "$log";return 0
+  else
+   rc=$?
+  fi
+  if [[ "$rc" == 124 || "$rc" == 137 ]];then
+   failure='timeout contacting GHCR'
+  elif grep -Eqi 'manifest unknown|manifest not found|not found' "$log";then
+   failure='official release image not found'
+  elif grep -Eqi 'unauthorized|denied|forbidden' "$log";then
+   failure='registry denied download'
+  elif grep -Eqi 'connection refused|no route to host|network is unreachable|i/o timeout|TLS handshake timeout|lookup .* no such host|context deadline exceeded|502 Bad Gateway|503 Service Unavailable|504 Gateway' "$log";then
+   failure='registry connectivity or CDN failure'
+  else
+   failure="Docker download failed (exit $rc)"
+  fi
+  if (( attempt < 2 ));then sleep 4;fi
+ done
+ rm -f "$log"
+ detail="Xray image download failed: $failure after 2 attempts. Check node access to ghcr.io and its image CDN"
+ return 1
+}
 update_managed_xray(){
  local version="${1:?Pinned Xray version required}"
  [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || {
@@ -188,9 +222,7 @@ update_managed_xray(){
  local old_image new_image
  old_image="$(docker inspect -f '{{.Image}}' "$name")" || return 1
  [[ "$old_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid previous image identity';return 1; }
- if ! timeout 75 docker pull "$image" >/dev/null;then
-  detail='Xray image download failed';return 1
- fi
+ if ! pull_pinned_xray_image "$image";then return 1;fi
  new_image="$(docker image inspect -f '{{.Id}}' "$image")" || return 1
  [[ "$new_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid new image identity';return 1; }
  if [[ "$old_image" == "$new_image" ]];then
