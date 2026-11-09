@@ -803,7 +803,10 @@ pub async fn request_verified_xray_update(
         .and_then(|object| object.get("version"))
         .and_then(Value::as_str)
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Некорректная версия Xray"))?;
-    let releases = state.core.all_node_releases().await
+    let releases = state
+        .core
+        .all_node_releases()
+        .await
         .map_err(|msg| ApiError::new(StatusCode::BAD_GATEWAY, msg))?;
     if !releases.iter().any(|release| release.version == target) {
         return Err(ApiError::new(
