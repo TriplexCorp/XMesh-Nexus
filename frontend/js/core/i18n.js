@@ -15,6 +15,22 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Выбранные узлы не найдены.": "Selected nodes were not found.",
+    "выбранных узлов": "selected nodes",
+    "Управляющий Agent не поддерживает обновление Xray. Обновите Agent.": "The control Agent cannot update Xray. Update the Agent.",
+    "Нет свежего подтверждения от управляющего Agent. Проверьте связь.": "No recent confirmation from the control Agent. Check connectivity.",
+    "На узле уже выполняется операция Xray.": "An Xray operation is already running on this node.",
+    "Нет свежего Agent heartbeat. Проверьте подключение узла.": "No recent Agent heartbeat. Check node connectivity.",
+    "Очередь команд узла изменилась.": "The node command queue has changed.",
+    "Обновление Xray не выполнено.": "The Xray update did not complete.",
+    "Агент не подтвердил обновление Xray за 10 минут.": "The Agent did not confirm the Xray update within 10 minutes.",
+    "обновление Xray недоступно. Обновите страницу.": "Xray update is unavailable. Reload the page.",
+    "Проверка агента": "Checking Agent",
+    "Постановка команды": "Queuing command",
+    "Загрузка и проверка Xray": "Downloading and validating Xray",
+    "Проверка версии Xray": "Verifying Xray version",
+    "Установлено, ожидается heartbeat": "Installed, awaiting heartbeat",
+    "Узлы обновляются по одному, с проверкой Agent и сохранением старого образа для отката.": "Nodes are updated one at a time with Agent validation and image rollback.",
     "Отсчёт": "Countdown",
     "Включить или отключить лимит устройств": "Enable or disable device limit",
     "Ограничивать число устройств": "Limit number of devices",
