@@ -2429,6 +2429,61 @@ async function main() {
       }
     });
 
+    // Calendar must remain readable when browser zoom increases CSS viewport
+    // dimensions; date rows should be dense without microscopic type.
+    for(const [width,height] of [[390,844],[1920,1080],[3200,1280]])await checked(`Create-user duration calendar density: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('users');
+      await page.locator('[data-nu]').first().click();
+      const dialog=page.locator('#dlg.user-create-modal[open]');
+      await dialog.waitFor({state:'visible'});
+      try{
+        await dialog.locator('[data-user-create-duration-open]').click();
+        const calendar=dialog.locator('[data-user-create-duration-calendar]');
+        await calendar.waitFor({state:'visible'});
+        const metrics=await calendar.evaluate(panel=>{
+          const font=selector=>Number.parseFloat(getComputedStyle(panel.querySelector(selector)).fontSize);
+          const grid=panel.querySelector('.user-create-cal-grid');
+          const day=panel.querySelector('.user-create-cal-day');
+          const box=panel.getBoundingClientRect();
+          return {
+            width:box.width,left:box.left,right:box.right,
+            position:getComputedStyle(panel).position,
+            monthFont:font('.user-create-cal-head strong'),
+            weekdayFont:font('.user-create-cal-weekdays span'),
+            dayFont:font('.user-create-cal-day'),
+            presetFont:font('.user-create-duration-preset'),
+            dayHeight:day.getBoundingClientRect().height,
+            gap:parseFloat(getComputedStyle(grid).rowGap),
+            weekCount:panel.querySelectorAll('.user-create-cal-weekdays span').length,
+            dayCount:panel.querySelectorAll('.user-create-cal-day').length,
+            viewportWidth:innerWidth
+          };
+        });
+        assert(metrics.weekCount===7&&metrics.dayCount>=28&&metrics.dayCount<=31,
+          'Calendar must render all weekdays and valid month dates');
+        assert(metrics.monthFont>=14&&metrics.weekdayFont>=11&&metrics.dayFont>=13&&metrics.presetFont>=11,
+          `Calendar labels and dates must be legible: ${JSON.stringify(metrics)}`);
+        assert(metrics.dayHeight/metrics.dayFont<=2.5&&metrics.gap<=4,
+          `Calendar row spacing must be proportional to its text: ${JSON.stringify(metrics)}`);
+        assert(metrics.left>=-1&&metrics.right<=metrics.viewportWidth+1,
+          `Calendar must stay within viewport: ${JSON.stringify(metrics)}`);
+        if(width>=2200)assert(metrics.width>=425,'Wide desktop calendar must not be a narrow miniature');
+        if(width<=680)assert(metrics.position==='static','Mobile calendar must stay in normal document flow');
+        const first=await calendar.getAttribute('data-month');
+        await calendar.locator('[data-user-create-calendar-nav="1"]').click();
+        assert.notEqual(await calendar.getAttribute('data-month'),first,'Month navigation must remain functional');
+        await calendar.locator('[data-user-create-days-preset="30"]').click();
+        assert.equal(await dialog.locator('input[name="days"]').inputValue(),'30',
+          'Duration presets must continue using the existing integer-day contract');
+        assert(await calendar.isHidden(),'Selecting a duration must close the calendar');
+        return metrics;
+      }finally{
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('dialog[open]',{state:'detached'});
+      }
+    });
+
     for(const [width,height] of [[2925,1250],[3200,1280]]) await checked(`Create-user desktop micro-scroll: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('users');
