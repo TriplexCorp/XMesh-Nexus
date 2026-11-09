@@ -2,7 +2,7 @@ use crate::{ApiError, AppState, node_auth};
 use axum::{
     Extension, Json,
     body::Bytes,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
 };
 use serde::Deserialize;
@@ -758,6 +758,71 @@ pub async fn available_xray_releases(
         })
         .collect();
     Ok(Json(json!({"items":items})))
+}
+
+// The release picker is advisory; the API must independently verify the
+// official GHCR manifest before passing a version to the signed control queue.
+// This remains API-only; the deployed Agent runtime contract is untouched.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XrayImageStatusQuery {
+    version: String,
+}
+
+pub async fn xray_image_status(
+    State(state): State<AppState>,
+    Query(query): Query<XrayImageStatusQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let releases = state.core.all_node_releases().await
+        .map_err(|msg| ApiError::new(StatusCode::BAD_GATEWAY, msg))?;
+    if !releases.iter().any(|release| release.version == query.version) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Версия отсутствует среди официальных релизов Xray",
+        ));
+    }
+    let image_status = state.core.node_image_status(&query.version).await;
+    Ok(Json(json!({"version":query.version,"image_status":image_status})))
+}
+
+pub async fn request_verified_xray_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<crate::auth::AuthUser>,
+    Path(node_id): Path<i64>,
+    Json(body): Json<Value>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    crate::require_mutation(&actor)?;
+    let target = body.as_object()
+        .filter(|object| object.len() == 1)
+        .and_then(|object| object.get("version"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Некорректная версия Xray"))?;
+    let releases = state.core.all_node_releases().await
+        .map_err(|msg| ApiError::new(StatusCode::BAD_GATEWAY, msg))?;
+    if !releases.iter().any(|release| release.version == target) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Выбранная версия отсутствует среди официальных релизов Xray",
+        ));
+    }
+    match state.core.node_image_status(target).await {
+        "available" => {}
+        "missing" => {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Docker-образ выбранного релиза Xray ещё не опубликован в GHCR. Обновление не запускалось.",
+            ));
+        }
+        _ => {
+            return Err(ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Не удалось проверить официальный Docker-образ GHCR. Команда обновления не отправлена.",
+            ));
+        }
+    }
+    crate::node_runtime::request_xray_update(
+        State(state), Extension(actor), Path(node_id), Json(body)
+    ).await
 }
 
 #[derive(Deserialize)]
