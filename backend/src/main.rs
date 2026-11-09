@@ -377,7 +377,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         )
         .route(
             "/nodes/{id}/xray-update",
-            post(node_runtime::request_xray_update),
+            post(node_runtime::request_verified_xray_update),
         )
         .route(
             "/nodes/{id}/agent-update",
