@@ -26,7 +26,7 @@ const css=panelStyles();
 assert.equal(fs.readFileSync('VERSION','utf8').trim(),'6.0.0');
 assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.9');
 assert.match(api,/\/nodes\/\{id\}\/agent-update/);
-assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]8";/);
+assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]9";/);
 assert.match(runtimeEntry,/control_v6_transition_active/);
 for(const v of ['control-v4','control-v5','control-v6']) assert.ok(runtimeEntry.includes(v),`v6 transition must accept ${v}`);
 assert.match(runtimeEntry,/VALUES\(\$1,'update_agent',\$2,\$3\)/);
@@ -59,7 +59,7 @@ assert.match(releaseAck,/XSP-v2 Agent release ACK identity mismatch/);
 assert.match(releaseAck,/NEW[.]release_ack_success IS DISTINCT FROM TRUE/);
 
 // v6 shell control worker remains the authority for the fixed command surface.
-assert.match(agent,/AGENT_VERSION="control-v6[.]0[.]8"/);
+assert.match(agent,/AGENT_VERSION="control-v6[.]0[.]9"/);
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
 assert.match(agent,/router_running\(\)/);
 assert.match(agent,/releaseIdentity/);
@@ -78,12 +78,12 @@ assert.match(updater,/MODE="\$\{1:-manual\}"/);
 assert.match(updater,/XMESH_TARGET_AWARE_UPDATER=1/,'Updater must expose stable target-aware marker');
 assert.match(agent,/sanitize_updater_error/,'Control Agent must preserve safe updater failure context');
 assert.doesNotMatch(agent,/systemctl start --wait "\$static_unit"/,'Signed path must not execute stale static updater');
-assert.match(updater,/AGENT_VERSION=\\?"control-v6[.]0[.]8/);
+assert.match(updater,/AGENT_VERSION=\\?"control-v6[.]0[.]9/);
 assert.match(updater,/XMesh-Node\/main/);
 assert.match(updater,/VERSION/);
 assert.match(updater,/6[.]0[.]0/);
 assert.match(updater,/AGENT_VERSION/);
-assert.match(updater,/control-v6[.]0[.]8/);
+assert.match(updater,/control-v6[.]0[.]9/);
 assert.match(updater,/install-xsp-v2-production-agent[.]sh/);
 assert.match(updater,/xmesh-agent-xspv2-activate --identity/);
 assert.match(updater,/xmesh-hot-user-reconcile[.]py/);
@@ -101,13 +101,13 @@ const movingMainFetch=updater.indexOf('https://raw.githubusercontent.com/Triplex
 assert.ok(boundDispatch>=0 && movingMainFetch>boundDispatch,'Manifest-bound apply must dispatch locally before moving-main fetch');
 
 // Fresh enrollment must also install a real v6 PQ runtime, not merely a badge.
-assert.match(installer,/AGENT_VERSION=\\?"control-v6[.]0[.]8/);
+assert.match(installer,/AGENT_VERSION=\\?"control-v6[.]0[.]9/);
 assert.match(installer,/install_v6_pq_runtime\(\)/);
 assert.match(installer,/install-xsp-v2-production-agent[.]sh/);
 assert.match(installer,/xmesh-agent-xspv2-activate --identity/);
 assert.match(installer,/VERSION/);
 assert.match(installer,/6[.]0[.]0/);
-assert.match(installer,/control-v6[.]0[.]8/);
+assert.match(installer,/control-v6[.]0[.]9/);
 assert.match(installer,/ReadWritePaths=.*\/usr\/local\/bin/);
 assert.match(installer,/ReadWritePaths=.*\/var\/lib\/xmesh-agent/);
 
