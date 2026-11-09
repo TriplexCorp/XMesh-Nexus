@@ -2265,7 +2265,7 @@ async function main() {
     // The create-user metadata section must adapt to the *section* width,
     // including browser zoom and a long list of squad names. It may scroll
     // vertically within the chips box, never horizontally across other fields.
-    for(const [width,height] of [[390,844],[768,1024],[1366,768],[1920,1080]]) await checked(`Create user metadata layout: ${width}×${height}`,async()=>{
+    for(const [width,height] of [[390,844],[768,1024],[1366,768],[1920,1080],[2560,1440],[3440,1440]]) await checked(`Create user metadata layout: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('users');
       await page.locator('[data-nu]').first().click();
@@ -2292,12 +2292,19 @@ async function main() {
             identity:bounds('.user-create-section-main'),
             limits:bounds('.user-create-section-limits'),
             metadata:bounds('.user-create-section-extra'),
-            footer:bounds('.user-create-footer')
+            footer:bounds('.user-create-footer'),
+            zoomScale:Number.parseFloat(getComputedStyle(dialog).getPropertyValue('--uc'))||16,
+            inputFont:font('input[name="limit"]')
           };
         });
         assert(design.titleFont>=22,'Create-user modal title must be clearly readable');
         assert(design.labelFont>=12,'Form labels must not shrink to micro text');
         assert(design.fieldHeight>=42,'Form controls must be comfortable to click');
+        if(width>=2200){
+          assert(design.zoomScale<=20.1,'Wide user creation dialog must have a bounded design scale');
+          assert(design.fieldHeight<=62,'Wide dialog must not enlarge form fields excessively');
+          assert(design.inputFont<=20.1,'Wide dialog input type must remain balanced with the other panel controls');
+        }
         assert(design.dialog.width<=width+2,'Create-user modal must fit viewport width');
         if(width>=941){
           assert(design.identity.right<design.limits.left+2,'Identity and limits must be side by side');
