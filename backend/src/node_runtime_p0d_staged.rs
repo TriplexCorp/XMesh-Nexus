@@ -252,7 +252,8 @@ async fn request_staging_agent_migration(
         "UPDATE node_restart_commands SET state='failed',
          result='Command expired before delivery',finished_at=NOW()
          WHERE node_id=$1 AND state IN ('pending','claimed')
-           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action='update_xray' AND requested_at<NOW()-INTERVAL '10 minutes') OR
+                (action NOT IN ('update_agent','update_xray') AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(node_id)
     .execute(&state.pool)
@@ -405,7 +406,8 @@ pub async fn poll_restart(
         "UPDATE node_restart_commands SET state='failed',
          result='Command expired before delivery',finished_at=NOW()
          WHERE node_id=$1 AND state='pending'
-           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action='update_xray' AND requested_at<NOW()-INTERVAL '10 minutes') OR
+                (action NOT IN ('update_agent','update_xray') AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(request.node_id)
     .execute(&state.pool)
