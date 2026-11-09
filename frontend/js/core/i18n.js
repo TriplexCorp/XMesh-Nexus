@@ -16,6 +16,13 @@ window.XMeshI18n=(()=>{
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
     "Некорректная версия Xray.": "Invalid Xray version.",
+    "Нет Docker-образа": "Docker image unavailable",
+    "Проверка GHCR…": "Checking GHCR…",
+    "Релиз есть на GitHub, но официальный Docker-образ ещё не опубликован в GHCR.": "The release exists on GitHub, but its official Docker image has not been published to GHCR.",
+    "Проверяем официальный Docker-образ в GHCR. Без подтверждения установка недоступна.": "Checking the official Docker image in GHCR. Installation is disabled until availability is confirmed.",
+    "Версия отсутствует среди официальных релизов Xray": "The version is not listed among official Xray releases",
+    "Docker-образ выбранного релиза Xray ещё не опубликован в GHCR. Обновление не запускалось.": "The selected Xray release has no published Docker image in GHCR. No update was started.",
+    "Не удалось проверить официальный Docker-образ GHCR. Команда обновления не отправлена.": "Could not verify the official Docker image in GHCR. No update command was sent.",
     "установлен": "installed",
     "»? При обновлении возможен краткий разрыв подключений. Агент проверит конфигурацию и при сбое восстановит старый образ.": "”? Updating may briefly interrupt connections. The Agent validates the configuration and restores the previous image if needed.",
     "Обновить Xray ·": "Update Xray ·",
