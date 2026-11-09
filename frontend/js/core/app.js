@@ -674,7 +674,25 @@ const selectNodeXrayRelease=(node,load,installed)=>new Promise(resolve=>{
  const cancel=document.createElement('button');cancel.type='button';cancel.className='gh';cancel.textContent='Отмена';
  const accept=document.createElement('button');accept.type='button';accept.className='btn';accept.textContent='Установить версию';accept.disabled=true;
  actions.append(cancel,accept);box.append(title,description,search,status,list,info,link,actions);dialog.append(box);document.body.append(dialog);
- let finished=false,releases=[],selected='';
+ let finished=false,releases=[],selected='',probeSerial=0;
+ // A GitHub release is not necessarily available in the official Docker registry.
+ // The Install button is enabled only for a confirmed GHCR manifest.
+ const verifyImage=async(version)=>{
+  const item=releases.find(r=>r.version===version);
+  if(!item||item.image_status==='available'||item.image_status==='missing')return;
+  const serial=++probeSerial;
+  try{
+   const response=await backendRequest('/api/v1/nodes/xray-image-status?version='+encodeURIComponent(version));
+   if(finished)return;
+   item.image_status=response.image_status==='available'||response.image_status==='missing'
+     ?response.image_status:'unknown';
+  }catch(error){
+   if(finished)return;
+   item.image_status='unknown';
+  }
+  if(!finished&&selected===version&&serial===probeSerial)render();
+ };
+
  const finish=v=>{if(finished)return;finished=true;resolve(v);dialog.close();dialog.remove()};
  const render=()=>{
   list.replaceChildren();
@@ -686,13 +704,20 @@ const selectNodeXrayRelease=(node,load,installed)=>new Promise(resolve=>{
    const row=document.createElement('button');row.type='button';row.className='xray-release-row'+(selected===item.version?' is-selected':'');
    row.setAttribute('role','radio');row.setAttribute('aria-checked',String(selected===item.version));
    const name=document.createElement('strong');name.textContent=item.version;
-   const meta=document.createElement('span');meta.className='xray-release-meta';meta.textContent=installedHere?'Установлена':item.prerelease?'Предварительная':'Стабильная';
-   row.append(name,meta);row.addEventListener('click',()=>{selected=item.version;render()});list.append(row);
+   const meta=document.createElement('span');meta.className='xray-release-meta';
+   meta.textContent=installedHere?'Установлена':item.image_status==='missing'
+     ?'Нет Docker-образа':item.image_status==='unknown'?'Проверка GHCR…':item.prerelease?'Предварительная':'Стабильная';
+   row.append(name,meta);row.addEventListener('click',()=>{selected=item.version;render();void verifyImage(selected)});list.append(row);
   }
   const chosen=releases.find(r=>r.version===selected);
   const installedChosen=selected.replace(/^v/,'')===String(installed||'').replace(/^v/,'');
-  accept.disabled=!chosen||installedChosen;
-  info.textContent=chosen?(chosen.prerelease?'Предварительный релиз':'Стабильный релиз')+' · '+(chosen.published_at||'Дата не указана'):'Выберите версию из списка';
+  accept.disabled=!chosen||installedChosen||chosen.image_status!=='available';
+  info.textContent=!chosen?'Выберите версию из списка':
+    chosen.image_status==='missing'
+      ?'Релиз есть на GitHub, но официальный Docker-образ ещё не опубликован в GHCR.'
+      :chosen.image_status!=='available'
+        ?'Проверяем официальный Docker-образ в GHCR. Без подтверждения установка недоступна.'
+        :(chosen.prerelease?'Предварительный релиз':'Стабильный релиз')+' · '+(chosen.published_at||'Дата не указана');
   const url=String(chosen?.url||'');
   if(/^https:\/\/github\.com\/XTLS\/Xray-core\/releases\/tag\/[A-Za-z0-9._+%-]+$/i.test(url)){link.href=url;link.hidden=false}
   else{link.removeAttribute('href');link.hidden=true}
@@ -704,12 +729,14 @@ const selectNodeXrayRelease=(node,load,installed)=>new Promise(resolve=>{
  dialog.showModal();
  Promise.resolve().then(load).then(result=>{
   if(finished)return;
-  installed=result.installed||installed;releases=(result.releases||[]).filter(r=>/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(r.version));
+  installed=result.installed||installed;releases=(result.releases||[])
+   .filter(r=>/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(r.version))
+   .map(r=>({...r,image_status:['available','missing'].includes(r.image_status)?r.image_status:'unknown'}));
   status.remove();search.disabled=false;
   if(!releases.length){info.textContent='Не удалось получить список релизов. Повторите попытку.';return}
   selected=releases.find(r=>r.version.replace(/^v/,'')===String(installed||'').replace(/^v/,''))?.version||releases.find(r=>!r.prerelease)?.version||releases[0].version;
   description.textContent='Текущая версия: '+(installed||'неизвестно')+' · Установка может прервать соединения.';
-  render();search.focus();
+  render();void verifyImage(selected);search.focus();
  }).catch(error=>{if(finished)return;status.remove();info.textContent='Не удалось загрузить версии: '+(error.message||'ошибка сети');});
 });
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
