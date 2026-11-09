@@ -722,7 +722,42 @@ pub async fn available_xray_releases(
         .all_node_releases()
         .await
         .map_err(|msg| ApiError::new(StatusCode::BAD_GATEWAY, msg))?;
-    Ok(Json(json!({"items":releases})))
+    // Probe only the newest releases eagerly. A GitHub release may exist
+    // while its independent official GHCR Docker workflow has failed.
+    // A bounded parallel probe makes the picker informative without delaying
+    // every historical release or confusing registry outages with 404s.
+    let mut tasks = tokio::task::JoinSet::new();
+    for release in releases.iter().take(8) {
+        let version = release.version.clone();
+        let core = state.core.clone();
+        tasks.spawn(async move {
+            let status = core.node_image_status(&version).await;
+            (version, status)
+        });
+    }
+    let mut statuses = std::collections::HashMap::new();
+    while let Some(result) = tasks.join_next().await {
+        if let Ok((version, status)) = result {
+            statuses.insert(version, status);
+        }
+    }
+    let items: Vec<Value> = releases
+        .into_iter()
+        .map(|release| {
+            let image_status = statuses
+                .get(&release.version)
+                .copied()
+                .unwrap_or("unknown");
+            json!({
+                "version": release.version,
+                "published_at": release.published_at,
+                "prerelease": release.prerelease,
+                "url": release.url,
+                "image_status": image_status
+            })
+        })
+        .collect();
+    Ok(Json(json!({"items":items})))
 }
 
 #[derive(Deserialize)]
