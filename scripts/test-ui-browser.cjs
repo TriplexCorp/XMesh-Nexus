@@ -2390,6 +2390,45 @@ async function main() {
       }
     });
 
+    // At zoomed-out desktop sizes the complete default form should fit.
+    // Previously an empty validation paragraph plus bottom padding created
+    // a 10–30px phantom scroll even with no content to reveal.
+    for(const [width,height] of [[2925,1115],[3200,1220]]) await checked(`Create-user desktop micro-scroll: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('users');
+      await page.locator('[data-nu]').first().click();
+      const dialog=page.locator('#dlg.user-create-modal[open]');
+      await dialog.waitFor({state:'visible'});
+      try{
+        const metrics=await dialog.evaluate(root=>{
+          const body=root.querySelector('.user-create-body');
+          const error=root.querySelector('.user-create-error');
+          const extra=root.querySelector('.user-create-section-extra');
+          const bodyRect=body.getBoundingClientRect();
+          const extraRect=extra.getBoundingClientRect();
+          return {
+            overflow:body.scrollHeight-body.clientHeight,
+            scrollTop:body.scrollTop,
+            errorDisplay:getComputedStyle(error).display,
+            extraBottom:extraRect.bottom,
+            bodyBottom:bodyRect.bottom,
+            viewportHeight:innerHeight
+          };
+        });
+        assert.equal(metrics.errorDisplay,'none','Empty form validation message must not reserve space');
+        assert(metrics.overflow<=2,`Default create-user form must not have phantom vertical scroll: ${JSON.stringify(metrics)}`);
+        assert(metrics.extraBottom<=metrics.bodyBottom+1,'Metadata section must fit without clipping');
+        await dialog.locator('#fe').evaluate(el=>{el.textContent='Проверка сообщения об ошибке.'});
+        assert(await dialog.locator('#fe').isVisible(),'Real validation errors must still be visible');
+        await dialog.locator('#fe').evaluate(el=>{el.textContent=''});
+        assert.equal(await dialog.locator('#fe').evaluate(el=>getComputedStyle(el).display),'none');
+        return metrics;
+      }finally{
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('dialog[open]',{state:'detached'});
+      }
+    });
+
     for(const [width,height] of [[1920,1080],[2560,1440],[768,900],[390,844]]) await checked(`Host assignments: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('hosts');
