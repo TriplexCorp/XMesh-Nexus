@@ -3016,7 +3016,10 @@ async function main() {
         const previous=await page.evaluate(()=>document.documentElement.dataset.motion);
         await page.route(catalogRoute,async route=>{await pendingCatalog;await route.fulfill({json:{items:[{
           version:'v26.10.30',published_at:'2026-10-30T00:00:00Z',prerelease:false,
-          url:'https://github.com/XTLS/Xray-core/releases/tag/v26.10.30'
+          image_status:'available',url:'https://github.com/XTLS/Xray-core/releases/tag/v26.10.30'
+        },{
+          version:'v26.11.9',published_at:'2026-11-09T00:00:00Z',prerelease:false,
+          image_status:'missing',url:'https://github.com/XTLS/Xray-core/releases/tag/v26.11.9'
         }]}})});
         try{
           await page.setViewportSize({width:1920,height:1080});
@@ -3063,6 +3066,18 @@ async function main() {
           assert.equal(await release.locator('strong').innerText(),'v26.10.30');
           assert.equal(await spinner.count(),0,'Loading indicator must disappear after the catalog arrives');
           assert(!(await page.locator('.xray-release-search').isDisabled()),'Loaded catalog enables search');
+          const missing=page.locator('.xray-release-row',{hasText:'v26.11.9'});
+          await missing.click();
+          assert.match(await missing.innerText(),/Нет Docker-образа/,
+            'A published GitHub release without GHCR must not appear installable');
+          assert(await page.locator('.xray-release-dialog .btn').isDisabled(),
+            'Unpublished GHCR image must never enable Install');
+          assert.match(await page.locator('.xray-release-info').innerText(),/не опубликован/,
+            'Missing Docker artifact must be explained in the picker');
+          await release.click();
+          assert(!(await page.locator('.xray-release-dialog .btn').isDisabled()),
+            'Only an available official Docker image can be installed');
+
           await page.locator('.xray-release-dialog .gh').click();
           await page.locator('.xray-release-dialog').waitFor({state:'detached'});
           return{first,second};
