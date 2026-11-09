@@ -22,7 +22,7 @@ new Function(nodeDialogs);
 const versionMatch=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(agentVersionRaw);
 assert.ok(versionMatch,'AGENT_VERSION must use control-vMAJOR.MINOR.PATCH');
 const versionTuple=versionMatch.slice(1).map(Number);
-assert.equal(agentVersionRaw,'control-v6.0.7','Nexus target Agent version must be control-v6.0.7');
+assert.equal(agentVersionRaw,'control-v6.0.8','Nexus target Agent version must be control-v6.0.8');
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
 assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]7"/);
