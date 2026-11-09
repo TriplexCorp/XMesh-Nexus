@@ -744,10 +744,7 @@ pub async fn available_xray_releases(
     let items: Vec<Value> = releases
         .into_iter()
         .map(|release| {
-            let image_status = statuses
-                .get(&release.version)
-                .copied()
-                .unwrap_or("unknown");
+            let image_status = statuses.get(&release.version).copied().unwrap_or("unknown");
             json!({
                 "version": release.version,
                 "published_at": release.published_at,
@@ -773,16 +770,24 @@ pub async fn xray_image_status(
     State(state): State<AppState>,
     Query(query): Query<XrayImageStatusQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let releases = state.core.all_node_releases().await
+    let releases = state
+        .core
+        .all_node_releases()
+        .await
         .map_err(|msg| ApiError::new(StatusCode::BAD_GATEWAY, msg))?;
-    if !releases.iter().any(|release| release.version == query.version) {
+    if !releases
+        .iter()
+        .any(|release| release.version == query.version)
+    {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "Версия отсутствует среди официальных релизов Xray",
         ));
     }
     let image_status = state.core.node_image_status(&query.version).await;
-    Ok(Json(json!({"version":query.version,"image_status":image_status})))
+    Ok(Json(
+        json!({"version":query.version,"image_status":image_status}),
+    ))
 }
 
 pub async fn request_verified_xray_update(
@@ -792,7 +797,8 @@ pub async fn request_verified_xray_update(
     Json(body): Json<Value>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     crate::require_mutation(&actor)?;
-    let target = body.as_object()
+    let target = body
+        .as_object()
         .filter(|object| object.len() == 1)
         .and_then(|object| object.get("version"))
         .and_then(Value::as_str)
@@ -821,8 +827,12 @@ pub async fn request_verified_xray_update(
         }
     }
     crate::node_runtime::request_xray_update(
-        State(state), Extension(actor), Path(node_id), Json(body)
-    ).await
+        State(state),
+        Extension(actor),
+        Path(node_id),
+        Json(body),
+    )
+    .await
 }
 
 #[derive(Deserialize)]
