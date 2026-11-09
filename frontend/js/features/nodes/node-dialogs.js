@@ -59,7 +59,7 @@
       return;
     }
 
-    const username=decorate('username','', 'user-create-username');
+    const username=decorate('username','', 'user-create-username').replace('name="username"','name="username" placeholder="Введите имя пользователя"');
     const xrayProfile=decorate('xrayProfileId','', 'user-create-xray');
     const telegram=decorate('tg','', 'user-create-tg');
     const email=decorate('email','', 'user-create-email');
@@ -76,7 +76,7 @@
       <header class="user-create-head">
         <div class="user-create-title-wrap">
           <span class="user-create-title-icon">${ic('users')}</span>
-          <div><span class="user-create-eyebrow">IDENTITY / ACCESS</span><h2>Новый пользователь</h2><p>Создайте учётную запись, назначьте доступ и политику использования.</p></div>
+          <div><span class="user-create-eyebrow">IDENTITY / ACCESS</span><h2>Новый пользователь</h2><p>Создайте учётную запись с нужным уровнем доступа и ограничениями.</p></div>
         </div>
         <button type="button" class="user-create-close" data-x aria-label="Закрыть">×</button>
       </header>
@@ -86,7 +86,7 @@
           <section class="user-create-section user-create-section-main">
             <div class="user-create-section-head">
               <span class="user-create-section-icon">${ic('layers')}</span>
-              <div><span class="user-create-section-kicker">IDENTITY & ACCESS</span><h3>Профиль доступа</h3><p>Учётная запись, подключение и контактные данные.</p></div>
+              <div><span class="user-create-section-kicker">IDENTITY & ACCESS</span><h3>Профиль доступа</h3><p>Основные параметры учётной записи.</p></div>
             </div>
             <div class="user-create-main-grid">
               <div class="user-create-username-row">
@@ -109,17 +109,17 @@
           <section class="user-create-section user-create-section-limits">
             <div class="user-create-section-head">
               <span class="user-create-section-icon">${ic('activity')}</span>
-              <div><span class="user-create-section-kicker">POLICY</span><h3>Ограничения</h3><p>Трафик, срок действия, сброс и устройства.</p></div>
+              <div><span class="user-create-section-kicker">POLICY</span><h3>Ограничения</h3><p>Доступ, трафик и устройства.</p></div>
             </div>
             <div class="user-create-limits-grid">${limit}${cdnLimit}${days}${strategy}${hwid}
-              <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>0 — без ограничений. При значении больше 0 лимит исполняется сервером по зарегистрированным HWID.</small></p></div>
+              <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>Автоматически проверяет зарегистрированные устройства, если лимит больше 0.</small></p></div>
             </div>
           </section>
 
           <section class="user-create-section user-create-section-extra">
             <div class="user-create-section-head">
               <span class="user-create-section-icon">${ic('sliders')}</span>
-              <div><span class="user-create-section-kicker">METADATA</span><h3>Дополнительно</h3><p>Группы доступа, служебный тег и параметры срока.</p></div>
+              <div><span class="user-create-section-kicker">METADATA</span><h3>Дополнительно</h3><p>Дополнительные параметры доступа и учётной записи.</p></div>
             </div>
             <div class="user-create-extra-grid">
               ${squads}

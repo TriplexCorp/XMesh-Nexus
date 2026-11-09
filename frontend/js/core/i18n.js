@@ -15,6 +15,12 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Создайте учётную запись с нужным уровнем доступа и ограничениями.": "Create an account with the required access level and limits.",
+    "Основные параметры учётной записи.": "Essential account details.",
+    "Доступ, трафик и устройства.": "Access, traffic and devices.",
+    "Дополнительные параметры доступа и учётной записи.": "Additional account and access options.",
+    "Автоматически проверяет зарегистрированные устройства, если лимит больше 0.": "Automatically checks registered devices when the limit is above zero.",
+    "Введите имя пользователя": "Enter username",
     "CDN: лимит должен быть от 0 до 1000000 ГБ.": "CDN: quota must be between 0 and 1,000,000 GB.",
 
     "Лимит CDN, ГБ": "CDN limit, GB",

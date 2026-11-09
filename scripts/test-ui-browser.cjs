@@ -2271,6 +2271,43 @@ async function main() {
       await page.locator('[data-nu]').first().click();
       await page.waitForSelector('dialog#dlg.user-create-modal[open] .user-create-extra-grid');
       try{
+        // Approved premium create-user design: readable typography, adequate
+        // hit targets and balanced desktop cards at real browser widths.
+        const design=await page.locator('#dlg.user-create-modal').evaluate(dialog=>{
+          const bounds=selector=>{
+            const el=dialog.querySelector(selector);
+            if(!el)return null;
+            const b=el.getBoundingClientRect();
+            return {left:b.left,right:b.right,top:b.top,bottom:b.bottom,width:b.width,height:b.height};
+          };
+          const font=selector=>{
+            const el=dialog.querySelector(selector);
+            return el?Number.parseFloat(getComputedStyle(el).fontSize):0;
+          };
+          return {
+            dialog:bounds('form.user-create-dialog'),
+            titleFont:font('.user-create-head h2'),
+            labelFont:font('.user-create-username>span'),
+            fieldHeight:bounds('input[name="username"]')?.height||0,
+            identity:bounds('.user-create-section-main'),
+            limits:bounds('.user-create-section-limits'),
+            metadata:bounds('.user-create-section-extra'),
+            footer:bounds('.user-create-footer')
+          };
+        });
+        assert(design.titleFont>=22,'Create-user modal title must be clearly readable');
+        assert(design.labelFont>=12,'Form labels must not shrink to micro text');
+        assert(design.fieldHeight>=42,'Form controls must be comfortable to click');
+        assert(design.dialog.width<=width+2,'Create-user modal must fit viewport width');
+        if(width>=941){
+          assert(design.identity.right<design.limits.left+2,'Identity and limits must be side by side');
+          assert(Math.abs(design.identity.top-design.limits.top)<2,'Top cards must share a baseline');
+          assert(Math.abs(design.identity.bottom-design.limits.bottom)<3,'Top cards must have matching heights');
+          assert(design.metadata.top>=design.identity.bottom-2,'Metadata card must be below the top cards');
+        }else{
+          assert(design.identity.bottom<=design.limits.top+2,'Narrow layout must stack sections without overlap');
+        }
+        assert(design.footer.height>=44,'Create/cancel footer must remain accessible');
         const bypassLimit=page.locator('#dlg.user-create-modal input[name="cdnLimitGb"]');
         assert(await bypassLimit.isVisible(),'Bypass traffic limit must be present when creating a user');
         await bypassLimit.fill('5');
