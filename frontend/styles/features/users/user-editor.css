@@ -1083,135 +1083,10 @@
 #dlg.user-create-modal .user-create-hold-caption .ic{
   flex:none;width:1rem;height:1rem;color:var(--a);
 }
+/* Preserve the approved width on zoomed-out desktops. Only the surface
+ * grows with viewport width; typography and controls follow Nexus tokens. */
 @media(min-width:2200px){
-  /* The dialog can grow horizontally at low zoom, but the entire control
-   * system has a strict 16–20px scale budget rather than an uncapped vw ramp. */
-  #dlg.user-create-modal{
-    --uc:clamp(16px,.66vw,20px);
-    width:min(58vw,1940px,calc(100vw - 2rem));
-  }
-  #dlg.user-create-modal .user-create-head{
-    min-height:calc(5.4 * var(--uc));
-    padding:calc(1.13 * var(--uc)) calc(1.5 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-head h2{font-size:calc(1.55 * var(--uc))}
-  #dlg.user-create-modal .user-create-head p{font-size:calc(.82 * var(--uc))}
-  #dlg.user-create-modal .user-create-title-icon{
-    width:calc(3.1 * var(--uc));height:calc(3.1 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-title-icon .ic{
-    width:calc(1.35 * var(--uc));height:calc(1.35 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-body{padding:var(--uc)}
-  #dlg.user-create-modal .user-create-workspace{gap:calc(.9 * var(--uc))}
-  #dlg.user-create-modal .user-create-section{
-    padding:calc(1.12 * var(--uc)) calc(1.2 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-section-head{
-    gap:calc(.75 * var(--uc));margin-bottom:var(--uc);
-  }
-  #dlg.user-create-modal .user-create-section-icon{
-    width:calc(2.55 * var(--uc));height:calc(2.55 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-section-icon .ic{
-    width:calc(1.08 * var(--uc));height:calc(1.08 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-section-head h3{font-size:calc(1.07 * var(--uc))}
-  #dlg.user-create-modal .user-create-section-head p{font-size:calc(.76 * var(--uc))}
-  #dlg.user-create-modal .user-create-field>span,
-  #dlg.user-create-modal .user-create-extra-grid>.user-create-field>span:first-child,
-  #dlg.user-create-modal .user-create-limits-grid>.user-create-field>span{
-    font-size:calc(.83 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-field>small,
-  #dlg.user-create-modal .user-create-limits-grid>.user-create-field>small{
-    font-size:calc(.69 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-field{gap:calc(.37 * var(--uc))}
-  #dlg.user-create-modal .user-create-main-grid{gap:calc(.8 * var(--uc))}
-  #dlg.user-create-modal .user-create-input-wrap{height:calc(2.85 * var(--uc))}
-  #dlg.user-create-modal input:not([type=checkbox]),
-  #dlg.user-create-modal select,
-  #dlg.user-create-modal .xm-select-trigger,
-  #dlg.user-create-modal .user-create-duration-trigger{
-    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
-    font-size:calc(.87 * var(--uc));
-    padding:calc(.6 * var(--uc)) calc(.8 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-field .user-create-input-wrap input:not([type=checkbox]){
-    padding-left:calc(2.55 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-input-icon{
-    left:calc(.8 * var(--uc));width:calc(1.1 * var(--uc));height:calc(1.1 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-generate{
-    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
-    margin-top:calc(1.47 * var(--uc));font-size:calc(.8 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-username-row{gap:calc(.7 * var(--uc))}
-  #dlg.user-create-modal .user-create-limits-grid{gap:calc(.78 * var(--uc))}
-  #dlg.user-create-modal .user-create-limits-grid>.user-create-field{
-    grid-template-rows:auto calc(2.85 * var(--uc)) minmax(0,auto);
-  }
-  #dlg.user-create-modal .user-create-limits-grid input:not([type=checkbox]),
-  #dlg.user-create-modal .user-create-limits-grid select,
-  #dlg.user-create-modal .user-create-limits-grid .xm-select-shell,
-  #dlg.user-create-modal .user-create-limits-grid .xm-select-trigger{
-    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-policy-note{
-    min-height:calc(5.65 * var(--uc));
-    grid-template-columns:calc(1.55 * var(--uc)) minmax(0,1fr) calc(2.8 * var(--uc));
-    gap:calc(.54 * var(--uc));padding:calc(.67 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-policy-note b{font-size:calc(.78 * var(--uc))}
-  #dlg.user-create-modal .user-create-policy-note small{font-size:calc(.66 * var(--uc))}
-  #dlg.user-create-modal .user-create-smart-switch{
-    width:calc(2.8 * var(--uc));min-width:calc(2.8 * var(--uc));
-    height:calc(1.65 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-smart-switch>span::after{
-    top:calc(.19 * var(--uc));left:calc(.2 * var(--uc));
-    width:calc(1.13 * var(--uc));height:calc(1.13 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-smart-switch input:checked+span::after{
-    transform:translateX(calc(1.1 * var(--uc)));
-  }
-  #dlg.user-create-modal .user-create-squads .ms{
-    min-height:calc(2.8 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-squads .ms .ck{
-    min-height:calc(2 * var(--uc));font-size:calc(.78 * var(--uc));
-    padding:calc(.35 * var(--uc)) calc(.55 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-tag input:not([type=checkbox]){
-    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-hold .sw{
-    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-hold .sw::before{font-size:calc(.77 * var(--uc))}
-  #dlg.user-create-modal .user-create-hold .sw>span{
-    width:calc(2.8 * var(--uc));height:calc(1.6 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-hold .sw>span::after{
-    width:calc(1.08 * var(--uc));height:calc(1.08 * var(--uc));
-    top:calc(.2 * var(--uc));left:calc(.22 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-hold .sw input:checked+span::after{
-    transform:translateX(calc(1.12 * var(--uc)));
-  }
-  #dlg.user-create-modal .user-create-desc textarea{
-    min-height:calc(4.4 * var(--uc));font-size:calc(.84 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-footer{
-    min-height:calc(4.7 * var(--uc));
-    padding:calc(.85 * var(--uc)) calc(1.2 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-footer button{
-    min-height:calc(2.9 * var(--uc));font-size:calc(.82 * var(--uc));
-    padding:calc(.6 * var(--uc)) calc(1.1 * var(--uc));
-  }
+  #dlg.user-create-modal{width:min(58vw,1940px,calc(100vw - 2rem))}
 }
 
 /* The validation message is empty on first open. Do not reserve its margin
@@ -1227,37 +1102,203 @@
   }
 }
 
-/* Tall desktop dialogs with a little overflow should use compact *vertical*
- * rhythm rather than reserving an invisible scroll range. Typography, controls
- * and two-column geometry do not shrink. Shorter screens may scroll normally. */
-@media (min-width:2200px) and (min-height:1150px){
-  #dlg.user-create-modal .user-create-head{
-    min-height:calc(5.1 * var(--uc));
-    padding-block:calc(.95 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-body{
-    padding-top:calc(.8 * var(--uc));
-    padding-bottom:calc(.65 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-workspace{
-    row-gap:calc(.7 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-section{
-    padding-top:calc(.97 * var(--uc));
-    padding-bottom:calc(.97 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-section-head{
-    margin-bottom:calc(.82 * var(--uc));
-  }
-  #dlg.user-create-modal .user-create-contacts{
-    margin-top:.12rem;
-    padding-top:.72rem;
-  }
-  #dlg.user-create-modal .user-create-extra-grid{
-    row-gap:.72rem;
-  }
-  #dlg.user-create-modal .user-create-footer{
-    min-height:calc(4.5 * var(--uc));
-    padding-block:calc(.72 * var(--uc));
-  }
+
+/* Unified creation-dialog scale.
+ * The section geometry is feature-specific; the type, controls, spacing and
+ * button sizes are Nexus system tokens, as on the Users/Nodes cards. Do not
+ * reintroduce a separate viewport-driven --uc typography/height scale. */
+#dlg.user-create-modal{
+  --uc-control-h:max(42px,var(--nx-control-h));
+  --uc-section-gap:var(--nx-space-3);
+}
+#dlg.user-create-modal .user-create-head{
+  min-height:4.25rem;
+  padding:.65rem var(--nx-section-pad);
+}
+#dlg.user-create-modal .user-create-title-wrap{gap:var(--nx-space-2)}
+#dlg.user-create-modal .user-create-title-icon{
+  width:2.45rem;height:2.45rem;
+}
+#dlg.user-create-modal .user-create-title-icon .ic{
+  width:1.05rem;height:1.05rem;
+}
+#dlg.user-create-modal .user-create-head h2{
+  margin:0 0 .12rem;
+  font-size:1.26rem;
+  font-weight:750;
+  line-height:1.15;
+}
+#dlg.user-create-modal .user-create-head p{
+  font-size:var(--nx-text-xs);
+  line-height:1.35;
+}
+#dlg.user-create-modal .user-create-body{
+  padding:var(--nx-space-3);
+}
+#dlg.user-create-modal .user-create-workspace{
+  gap:var(--uc-section-gap);
+}
+#dlg.user-create-modal .user-create-section{
+  padding:var(--nx-section-pad);
+}
+#dlg.user-create-modal .user-create-section-head{
+  gap:var(--nx-space-2);
+  margin-bottom:var(--nx-space-3);
+}
+#dlg.user-create-modal .user-create-section-icon{
+  width:2.1rem;height:2.1rem;
+}
+#dlg.user-create-modal .user-create-section-icon .ic{
+  width:.94rem;height:.94rem;
+}
+#dlg.user-create-modal .user-create-section-head h3{
+  font-size:var(--nx-text-lg);
+  font-weight:740;
+  margin:0 0 .1rem;
+  line-height:1.2;
+}
+#dlg.user-create-modal .user-create-section-head p{
+  font-size:var(--nx-text-xs);
+  line-height:1.35;
+}
+#dlg.user-create-modal .user-create-main-grid,
+#dlg.user-create-modal .user-create-contact-grid{
+  gap:var(--nx-space-3);
+}
+#dlg.user-create-modal .user-create-username-row{gap:var(--nx-space-2)}
+#dlg.user-create-modal .user-create-contacts{
+  margin-top:0;
+  padding-top:var(--nx-space-2);
+}
+#dlg.user-create-modal .user-create-contact-label{
+  margin-bottom:var(--nx-space-2);
+}
+#dlg.user-create-modal .user-create-contact-label>span,
+#dlg.user-create-modal .user-create-field>span,
+#dlg.user-create-modal .user-create-extra-grid>.user-create-field>span:first-child,
+#dlg.user-create-modal .user-create-limits-grid>.user-create-field>span{
+  font-size:var(--nx-text-sm);
+  font-weight:700;
+  line-height:1.25;
+}
+#dlg.user-create-modal .user-create-contact-label>small,
+#dlg.user-create-modal .user-create-field>small,
+#dlg.user-create-modal .user-create-limits-grid>.user-create-field>small{
+  font-size:var(--nx-text-xs);
+  line-height:1.3;
+}
+#dlg.user-create-modal .user-create-field,
+#dlg.user-create-modal .user-create-extra-grid>.user-create-field{
+  gap:.3rem;
+}
+#dlg.user-create-modal .user-create-input-wrap,
+#dlg.user-create-modal input:not([type=checkbox]),
+#dlg.user-create-modal select,
+#dlg.user-create-modal .xm-select-trigger,
+#dlg.user-create-modal .user-create-duration-trigger,
+#dlg.user-create-modal .user-create-generate,
+#dlg.user-create-modal .user-create-tag input:not([type=checkbox]),
+#dlg.user-create-modal .user-create-hold .sw{
+  height:var(--uc-control-h);
+  min-height:var(--uc-control-h);
+}
+#dlg.user-create-modal input:not([type=checkbox]),
+#dlg.user-create-modal select,
+#dlg.user-create-modal .xm-select-trigger,
+#dlg.user-create-modal .user-create-duration-trigger{
+  font-size:var(--nx-text-sm);
+  padding:.48rem .68rem;
+}
+#dlg.user-create-modal .user-create-input-icon{
+  left:.68rem;
+  width:1rem;height:1rem;
+}
+#dlg.user-create-modal .user-create-field .user-create-input-wrap input:not([type=checkbox]){
+  padding-left:2.25rem;
+}
+#dlg.user-create-modal .user-create-generate{
+  margin-top:1.26rem;
+  padding-inline:var(--nx-space-3);
+  font-size:var(--nx-text-sm);
+}
+#dlg.user-create-modal .user-create-limits-grid{
+  gap:var(--nx-space-2) var(--nx-space-3);
+}
+#dlg.user-create-modal .user-create-limits-grid>.user-create-field{
+  grid-template-rows:auto var(--uc-control-h) minmax(0,auto);
+  gap:.3rem;
+  min-height:0;
+}
+#dlg.user-create-modal .user-create-limits-grid .xm-select-shell,
+#dlg.user-create-modal .user-create-limits-grid .xm-select-trigger,
+#dlg.user-create-modal .user-create-limits-grid select,
+#dlg.user-create-modal .user-create-limits-grid input:not([type=checkbox]){
+  height:var(--uc-control-h);
+  min-height:var(--uc-control-h);
+}
+#dlg.user-create-modal .user-create-duration-trigger{
+  grid-template-columns:1.55rem minmax(0,1fr) 1rem;
+  gap:.35rem;
+}
+#dlg.user-create-modal .user-create-duration-icon{
+  width:1.55rem;height:1.55rem;
+}
+#dlg.user-create-modal .user-create-duration-copy b{font-size:var(--nx-text-sm)}
+#dlg.user-create-modal .user-create-duration-copy small{font-size:var(--nx-text-xs)}
+#dlg.user-create-modal .user-create-policy-note{
+  min-height:3.6rem;
+  padding:var(--nx-space-2);
+  gap:var(--nx-space-2);
+}
+#dlg.user-create-modal .user-create-policy-note b{
+  font-size:var(--nx-text-sm);
+  font-weight:700;
+}
+#dlg.user-create-modal .user-create-policy-note small{
+  font-size:var(--nx-text-xs);
+  line-height:1.3;
+}
+#dlg.user-create-modal .user-create-extra-grid{
+  gap:var(--nx-space-3);
+}
+#dlg.user-create-modal .user-create-squads .ms{
+  min-height:var(--uc-control-h);
+  padding:.3rem;
+  gap:.3rem;
+}
+#dlg.user-create-modal .user-create-squads .ms .ck{
+  min-height:1.8rem;
+  padding:.24rem .42rem;
+  font-size:var(--nx-text-xs);
+}
+#dlg.user-create-modal .user-create-hold .sw::before{
+  font-size:var(--nx-text-sm);
+}
+#dlg.user-create-modal .user-create-desc textarea{
+  min-height:3.8rem;
+  padding:.55rem .7rem;
+  font-size:var(--nx-text-sm);
+}
+#dlg.user-create-modal .user-create-footer{
+  min-height:3.9rem;
+  padding:var(--nx-space-2) var(--nx-section-pad);
+}
+#dlg.user-create-modal .user-create-footer-actions{gap:var(--nx-space-2)}
+#dlg.user-create-modal .user-create-footer button{
+  min-height:var(--nx-control-h-sm);
+  padding:.5rem var(--nx-space-3);
+  font-size:var(--nx-text-sm);
+}
+#dlg.user-create-modal .user-create-submit{min-width:11.8rem}
+/* Mobile layouts still get single-column inputs and 42px minimum targets.
+ * They never depend on the wide CSS viewport heuristic above. */
+@media(max-width:680px){
+  #dlg.user-create-modal .user-create-head{min-height:0}
+  #dlg.user-create-modal .user-create-head h2{font-size:max(22px,1.3rem)}
+  #dlg.user-create-modal .user-create-head p{display:none}
+  #dlg.user-create-modal .user-create-workspace{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-create-modal .user-create-section{padding:var(--nx-section-pad)}
+  #dlg.user-create-modal .user-create-limits-grid{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-create-modal .user-create-username-row{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-create-modal .user-create-generate{margin-top:0}
 }

@@ -156,7 +156,9 @@ assert.match(dialogJs,/deviceLimitInput\.value=smartSwitch\.checked/,'Device-lim
 assert.match(dialogJs,/user-create-input-wrap/,'User contact, traffic and tag fields must retain their icons');
 assert.match(userCss,/@media\(min-width:2200px\)/,'Large effective viewport must retain legible user dialog geometry');
 assert.match(userCss,/width:min\(58vw,1940px,calc\(100vw - 2rem\)\)/,'Zoomed-out desktop modal must grow beyond its fixed 1140px cap');
-assert.match(userCss,/--uc:clamp\(16px,\.66vw,20px\)/,'Zoomed-out dialog type and controls must never overshoot the moderate 125% scale ceiling');
+assert.ok(!userCss.includes('--uc:clamp('),'Create-user type scale must not depend on viewport width');
+assert.ok(userCss.includes('--uc-control-h:max(42px,var(--nx-control-h))'),'Create-user controls must use shared Nexus control height');
+assert.ok(userCss.includes('font-size:var(--nx-text-sm)'),'Create-user text must use Nexus text tokens');
 assert.match(userCss,/\.user-create-smart-switch input:checked\+span/,'Smart device switch must have visible enabled styling');
 
 assert.match(userCss,/Premium creation dialog — approved visual concept/,
@@ -165,9 +167,9 @@ assert.match(userCss,/#dlg\.user-create-modal\{\s*width:min\(1140px/,
  'Premium modal must have a balanced desktop width');
 assert.match(userCss,/#dlg\.user-create-modal \.user-create-workspace\{[\s\S]*grid-template-columns:minmax\(0,1\.43fr\) minmax\(0,1fr\)/,
  'Identity and limits must have balanced two-column proportions');
-assert.match(userCss,/#dlg\.user-create-modal \.user-create-head h2\{[\s\S]*font-size:clamp\(23px/,
+assert.match(userCss,/#dlg\.user-create-modal \.user-create-head h2\{[\s\S]*font-size:1\.26rem/,
  'Primary title must remain readable on desktop');
-assert.match(userCss,/#dlg\.user-create-modal \.user-create-footer\{[\s\S]*min-height:4\.7rem/,
+assert.match(userCss,/#dlg\.user-create-modal \.user-create-footer\{[\s\S]*min-height:3\.9rem/,
  'Primary create/cancel actions must remain in a readable fixed footer');
 assert.match(dialogJs,/placeholder="Введите имя пользователя"/,
  'Username must provide the concept placeholder without modifying its submission name');

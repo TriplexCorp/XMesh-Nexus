@@ -2393,6 +2393,42 @@ async function main() {
     // At zoomed-out desktop sizes the complete default form should fit.
     // Previously the empty validation paragraph and generous vertical rhythm
     // created a small scroll range at otherwise sufficiently tall desktops.
+
+    // Unlike the outer width, type and controls must follow Nexus tokens,
+    // not the large CSS viewport produced by zooming out.
+    for(const width of [1920,2560,3440])await checked(`Create-user shared design scale: ${width}×1200`,async()=>{
+      await page.setViewportSize({width,height:1200});
+      await navigate('users');
+      await page.locator('[data-nu]').first().click();
+      const dialog=page.locator('#dlg.user-create-modal[open]');
+      await dialog.waitFor({state:'visible'});
+      try{
+        const g=await dialog.evaluate(root=>{
+          const f=s=>parseFloat(getComputedStyle(root.querySelector(s)).fontSize);
+          const input=root.querySelector('input[name="limit"]');
+          return{
+            root:parseFloat(getComputedStyle(document.documentElement).fontSize),
+            title:f('.user-create-head h2'),section:f('.user-create-section-head h3'),
+            label:f('.user-create-limit>span'),hint:f('.user-create-limit>small'),
+            input:parseFloat(getComputedStyle(input).fontSize),
+            height:input.getBoundingClientRect().height,
+            mainWidth:root.querySelector('.user-create-section-main').getBoundingClientRect().width,
+            limitsWidth:root.querySelector('.user-create-section-limits').getBoundingClientRect().width
+          };
+        });
+        assert(g.title<=g.root*1.3+1,'Modal title must match shared typography');
+        assert(g.section<=g.root*1.1+1,'Section title must match panel card typography');
+        assert(g.label<=g.root*.83+1&&g.hint<=g.root*.75+1,'Field copy must use Nexus text tokens');
+        assert(g.input<=g.root*.84+1,'Input font must not scale separately from the panel');
+        assert(g.height<=Math.max(42,g.root*2.85)+1,'Input height must follow Nexus controls');
+        assert(g.mainWidth>g.limitsWidth,'Keep the approved two-column hierarchy');
+        return g;
+      }finally{
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('dialog[open]',{state:'detached'});
+      }
+    });
+
     for(const [width,height] of [[2925,1250],[3200,1280]]) await checked(`Create-user desktop micro-scroll: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('users');
