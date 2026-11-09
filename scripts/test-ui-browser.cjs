@@ -129,11 +129,33 @@ async function main() {
     await page.evaluate(() => document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()));
     await page.goto(base + dashboard + '#' + route, {waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
-    // Soft hash navigation can still be rendering the previous route at this point.
-    // Wait for the actual destination, not just a nonempty #view.
-    const destination = {admins:'[data-ne="admins"]',squads:'[data-ne="squads"]',templates:'.templates-workspace'}[route];
-    if(destination) await page.locator('#view').locator(destination).first().waitFor({state:'visible'});
-    await page.waitForTimeout(150);
+    // A hash-only navigation can keep the previous Settings subpage in the DOM
+    // until its async renderer has finished. A nonempty #view and a 150ms sleep
+    // are not evidence that the destination is ready.
+    const settingsAliases={
+      colors:'appearance',layout:'appearance',typography:'appearance',
+      integrations:'general',traffic:'system'
+    };
+    const settingsSlug=route.startsWith('set/')?route.slice(4):null;
+    const settingsCategory=settingsSlug?(settingsAliases[settingsSlug]||settingsSlug):
+      route==='admins'?'admins':route==='security'?'security':null;
+    if(settingsCategory){
+      await page.locator('#settings-subpage[data-settings-section="'+settingsCategory+'"]').waitFor({state:'visible'});
+      // The page-specific content must be mounted, not just the persistent
+      // Settings toolbar retained from the previous route.
+      const required={
+        general:'#start-page',appearance:'#palette-apply',
+        system:'#core-panel',security:'#security-tab-auth',
+        admins:'[data-ne="admins"]',data:'#appearance-import'
+      }[settingsCategory];
+      if(required)await page.locator('#settings-subpage').locator(required).first().waitFor({state:'attached'});
+    }else{
+      const destination={
+        admins:'[data-ne="admins"]',squads:'[data-ne="squads"]',
+        templates:'.templates-workspace'
+      }[route];
+      if(destination)await page.locator('#view').locator(destination).first().waitFor({state:'visible'});
+    }
     assert(!await page.locator('#login-form').count(), 'Сессия авторизации потеряна.');
   }
   let dashboard;
