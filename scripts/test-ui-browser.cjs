@@ -1673,20 +1673,20 @@ async function main() {
       return g;
     });
 
-    for(const [width,height] of [[1920,1080],[2560,1440],[3440,1440]]) await checked(`Reference User Details: ${width}×${height}`,async()=>{
+    for(const [width,height] of [[1920,1080],[2560,1440],[3077,1182],[3440,1440]]) await checked(`Reference User Details: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('users');
       await page.locator(`tr[data-id="${user.id}"]`).click();
       await page.waitForSelector('dialog[open] .user-canvas');
       await page.waitForTimeout(150);
       const g=await page.locator('#dlg').evaluate(dialog=>{
-        const box=el=>{const r=el.getBoundingClientRect();return {y:r.y,bottom:r.bottom,height:r.height}};
+        const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
         const q=s=>dialog.querySelector(s),body=q('.user-canvas-grid');
         return {dialog:box(dialog),header:box(q('.user-head')),footer:box(q('.user-canvas-foot')),body:box(body),scrollTop:body.scrollTop,scrollHeight:body.scrollHeight,clientHeight:body.clientHeight,
           panes:[...body.children].map(box),headings:[...body.querySelectorAll('[data-active=true] .user-pane-heading:first-child')].map(box),
           controls:[...q('.user-head-actions').children].map(box),usage:box(q('.user-usage-line')),identity:box(q('.user-identity-row')),
           maxHeight:getComputedStyle(dialog).maxHeight,cssHeight:getComputedStyle(dialog).height,
-          zoom:getComputedStyle(document.body).zoom,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),
+          zoom:getComputedStyle(document.body).zoom,modalZoom:getComputedStyle(dialog).zoom,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),
           paneScrolls:[...body.children].filter(p=>getComputedStyle(p).overflowY==='auto'||getComputedStyle(p).overflowY==='scroll').length};
       });
       assert.equal(g.scrollTop,0,'Body must start at top');
@@ -1701,9 +1701,14 @@ async function main() {
       assert.equal(g.paneScrolls,0,'Only the shared body may scroll');
       assert(g.clientHeight>0,'Fixed-size frame must retain a scrollable content region');
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
-      assert(Math.abs(g.dialog.height-Math.min(38.5*g.rem,height-2*g.rem))<=4,
-        'Desktop User Details must keep the compact fixed frame: '+JSON.stringify({actual:g.dialog.height,expected:Math.min(38.5*g.rem,height-2*g.rem),css:g.cssHeight,rem:g.rem,zoom:g.zoom}));
-      assert(g.dialog.height<=40*g.rem,'User Details must not occupy nearly the entire screen');
+      assert(g.dialog.width>=width*.52&&g.dialog.width<=width*.9,
+        'User Details must be a proportionate desktop workspace, not a narrow island: '+JSON.stringify(g.dialog));
+      assert(g.dialog.height>=height*.54&&g.dialog.height<=height*.88,
+        'User Details must occupy a balanced viewport height without clipping: '+JSON.stringify({box:g.dialog,css:g.cssHeight,rem:g.rem,zoom:g.modalZoom}));
+      if(width===3077){
+        assert(g.dialog.width>=width*.6&&g.dialog.height>=height*.67,
+          'Zoomed-out 2000×768 equivalent must remain a readable full workspace');
+      }
       const layout=await page.locator('#dlg').evaluate(d=>{
         const b=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}};
         const fields=[...d.querySelectorAll('.user-basic-card>.f')].map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y}});
@@ -1745,7 +1750,8 @@ async function main() {
       assert(composition.save.x<=composition.actions.x+composition.actions.width*.5,
         'Save action should be left-aligned consistently with Nexus dialogs');
       if(width>=2200){
-        assert(g.dialog.height<=38.5*g.rem+2,'Wider desktop canvas must preserve fixed height');
+        assert(Math.abs(Number(g.modalZoom)-1.12)<.01,
+          'Wide effective viewports must scale User Details text and controls with its shell');
         assert(Math.abs(composition.basic.width-composition.connection.width)<composition.connection.width*.25,
           'Settings cards must keep balanced proportions');
         assert(composition.body.width>=70*g.rem,'Zoomed-out desktop user drawer must not become a narrow island');
