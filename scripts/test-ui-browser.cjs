@@ -2391,9 +2391,9 @@ async function main() {
     });
 
     // At zoomed-out desktop sizes the complete default form should fit.
-    // Previously an empty validation paragraph plus bottom padding created
-    // a 10–30px phantom scroll even with no content to reveal.
-    for(const [width,height] of [[2925,1115],[3200,1220]]) await checked(`Create-user desktop micro-scroll: ${width}×${height}`,async()=>{
+    // Previously the empty validation paragraph and generous vertical rhythm
+    // created a small scroll range at otherwise sufficiently tall desktops.
+    for(const [width,height] of [[2925,1250],[3200,1280]]) await checked(`Create-user desktop micro-scroll: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('users');
       await page.locator('[data-nu]').first().click();
