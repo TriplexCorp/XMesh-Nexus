@@ -222,8 +222,12 @@ contract is enforced by `scripts/check-ui-system.js`.
 ### User Details
 
 `workspace-dialog-contract.css` owns final dialog geometry; `user-details.css`
-owns feature content. The desktop height budget uses the viewport minus its safe margin, so content
-can grow beyond the former 54rem cap when the screen has room. Header, usage band, task tabs, shared Save action and footer stay in flow without shrinking.
+owns feature content. The desktop frame adapts to available viewport width and height (38.5–49rem
+height target, capped by the viewport), instead of remaining a tiny 64 × 38.5rem
+island at reduced browser zoom. On effective widths above 2200px the entire
+surface, including text and controls, receives a modest bounded scale; shorter
+viewports still clamp its height. Never resize the frame based on the selected
+task or let a tab switch move its header or Save action. Header, usage band, task tabs, shared Save action and footer stay in flow without shrinking.
 Settings, Access & subscription, Traffic and Devices use one intrinsic panel grid.
 Inactive panels remain mounted with `inert` and `aria-hidden`, preserving the
 shared settings/access draft and dialog geometry. Arrow keys, Home and End move
@@ -235,7 +239,7 @@ Browser acceptance lives in `scripts/test-ui-browser.cjs`: real DOM rectangles,
 semantic icons after runtime refresh, neutral computed shadow, 4 + 4 + 1 actions,
 viewport-safe height without the former 54rem cap, pane baselines, and reopening after a real scroll.
 Artifacts include `nodes-{width}x{height}.png` and
-`user-details-{width}x{height}.png` at 1920×1080, 2560×1440 and 3440×1440.
+`user-details-{width}x{height}.png` at 1920×1080, 2560×1440, 3077×1182 (2000×768 at ~65% browser zoom) and 3440×1440.
 
 #### User creation: resilient metadata layout
 
