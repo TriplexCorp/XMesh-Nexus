@@ -21,7 +21,7 @@ use sqlx::Row;
 /// `XMesh` v6 is the first numbered POSTQUANTUM major control-Agent release.
 /// v4/v5 remain accepted only so an already enrolled node can perform the
 /// authenticated transition to v6; they are not the advertised target.
-pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.9";
+pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.10";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -244,6 +244,7 @@ pub async fn request_xray_update(
             "Для выбора версии требуется активный управляющий агент control-v3+.",
         ));
     }
+    crate::node_xray_update::require_supported(&state, node_id).await?;
     sqlx::query(
         "UPDATE node_restart_commands SET state='failed',
          result='Command expired before delivery',finished_at=NOW()
@@ -408,6 +409,27 @@ pub async fn poll_restart(
         return staged::poll_restart(State(state), headers, body).await;
     }
 
+    if crate::node_xray_update::retry(&state, request.node_id)
+        .await?
+        .is_some()
+    {
+        node_auth::authenticate_for(
+            &state,
+            &headers,
+            request.node_id,
+            &body,
+            "/api/v1/node/restart/poll",
+        )
+        .await?;
+        let disabled=sqlx::query_scalar::<_,bool>("SELECT COALESCE((data->>'disabled')::boolean,false) FROM panel_records WHERE collection='nodes' AND id=$1").bind(request.node_id).fetch_one(&state.pool).await?;
+        let command = if disabled {
+            None
+        } else {
+            crate::node_xray_update::retry(&state, request.node_id).await?
+        };
+        return Ok(Json(json!({"command":command,"enforceStop":disabled})).into_response());
+    }
+
     if claimed_bound_retry(&state, request.node_id)
         .await?
         .is_none()
@@ -442,6 +464,11 @@ fn exact_duplicate_ack(row: &sqlx::postgres::PgRow, report: &RetryAck) -> Result
     let state_name = row.try_get::<String, _>("state")?;
     if !matches!(state_name.as_str(), "succeeded" | "failed") {
         return Ok(false);
+    }
+    if row.try_get::<String, _>("action")? == "update_xray" && report.release_identity.is_none() {
+        return Ok(report.success == (state_name == "succeeded")
+            && row.try_get::<Option<String>, _>("result")?.as_deref()
+                == Some(report.detail.as_str()));
     }
     if row
         .try_get::<Option<i64>, _>("release_manifest_id")?
@@ -481,7 +508,7 @@ async fn completed_bound_row(
     command_id: i64,
 ) -> Result<Option<sqlx::postgres::PgRow>, ApiError> {
     Ok(sqlx::query(
-        "SELECT c.state,c.result,c.release_manifest_id,c.release_ack_version,
+        "SELECT c.state,c.result,c.action,c.release_manifest_id,c.release_ack_version,
                 c.release_ack_source_revision,c.release_ack_artifact_sha256,c.release_ack_success,
                 m.version AS release_version,m.source_revision,m.artifact_sha256
          FROM node_restart_commands c

@@ -94,8 +94,14 @@ Unit=xmesh-node-metrics.service
 WantedBy=timers.target
 EOF
 
+XRAY_UPDATE_TMP="$(mktemp)"
+curl -4 --retry 2 --retry-delay 2 --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xmesh-xray-update.py" -o "$XRAY_UPDATE_TMP"
+python3 -m py_compile "$XRAY_UPDATE_TMP";grep -Fxq 'AGENT_VERSION = "control-v6.0.10"' "$XRAY_UPDATE_TMP"
+install -d -m 0755 /usr/local/libexec
+install -o root -g root -m 0700 "$XRAY_UPDATE_TMP" /usr/local/libexec/xmesh-xray-update.py
+rm -f "$XRAY_UPDATE_TMP"
 curl -4 --retry 2 --retry-delay 2 --fail --silent --show-error --location "$RAW_BASE/node-control-agent.sh" -o "$CONTROL_TMP"
-bash -n "$CONTROL_TMP"; grep -Fxq 'AGENT_VERSION="control-v6.0.9"' "$CONTROL_TMP" || { echo "Nexus main does not expose Agent v6.0.9" >&2; exit 1; }
+bash -n "$CONTROL_TMP"; grep -Fxq 'AGENT_VERSION="control-v6.0.10"' "$CONTROL_TMP" || { echo "Nexus main does not expose Agent v6.0.9" >&2; exit 1; }
 install -o root -g root -m 0700 "$CONTROL_TMP" /usr/local/sbin/xmesh-node-control
 cat > /etc/systemd/system/xmesh-node-control.service <<'EOF'
 [Unit]
@@ -205,14 +211,14 @@ install_v6_pq_runtime(){
   [[ -f "$mounted" ]] || { echo "Cannot resolve XMesh-Node checkout for PQ runtime" >&2; return 1; }
   dir="$(dirname "$mounted")"
   [[ -d "$dir/.git" && -f "$dir/VERSION" && "$(tr -d '\r\n' < "$dir/VERSION")" == "6.0.0" ]] || { echo "Fresh enrollment source is not XMesh-Node v6.0.0" >&2; return 1; }
-  [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.9" ]] || { echo "Fresh enrollment source does not expose Agent control-v6.0.9" >&2; return 1; }
+  [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.10" ]] || { echo "Fresh enrollment source does not expose Agent control-v6.0.10" >&2; return 1; }
   [[ -f "$dir/deploy/install-xsp-v2-production-agent.sh" && ! -L "$dir/deploy/install-xsp-v2-production-agent.sh" ]] || { echo "v6 PQ runtime installer missing" >&2; return 1; }
   revision="$(git -C "$dir" rev-parse HEAD)"; [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || return 1
   bash "$dir/deploy/install-xsp-v2-production-agent.sh" "$revision" || return 1
   identity="$(/usr/local/bin/xmesh-agent-xspv2-activate --identity)" || return 1
   python3 - "$identity" "$revision" <<'PY'
 import json,sys
-v=json.loads(sys.argv[1]); assert v.get('version')=='control-v6.0.9',v; assert v.get('sourceRevision')==sys.argv[2],v; assert len(v.get('artifactSha256',''))==64,v
+v=json.loads(sys.argv[1]); assert v.get('version')=='control-v6.0.10',v; assert v.get('sourceRevision')==sys.argv[2],v; assert len(v.get('artifactSha256',''))==64,v
 PY
 }
 install_v6_pq_runtime || { echo "POSTQUANTUM v6 runtime installation failed; refusing incomplete node enrollment" >&2; exit 1; }

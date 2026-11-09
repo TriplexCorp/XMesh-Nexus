@@ -211,6 +211,33 @@ def main():
         assert_status(code,200,"admin reads confirmed agent-update status")
         assert last_command["state"]=="succeeded" and last_command["action"]=="update_agent"
 
+        # Real fixed-version queue and authenticated progress. No raw logs/config
+        # are accepted by the progress endpoint, even from an enrolled node.
+        code,_,_=signed_post("/node/heartbeat",{"node_id":node,"version":CONTROL_AGENT_VERSION,"xray_running":True,"router_running":True,"xray_version":"26.10.21"})
+        assert_status(code,200,"transaction-capable Agent heartbeat")
+        code,queued,_=request("POST",f"/nodes/{node}/xray-update",{"version":"v26.10.31"},cookie=cookie,origin=BASE)
+        assert_status(code,202,"queue verified official Xray release")
+        command_id=queued["id"]
+        code,claimed,_=signed_post("/node/restart/poll",{"node_id":node})
+        assert_status(code,200,"claim fixed Xray transaction")
+        code,retry,_=signed_post("/node/restart/poll",{"node_id":node})
+        assert_status(code,200,"redeliver claimed Xray transaction safely")
+        assert retry["command"]==claimed["command"] and retry["enforceStop"] is False
+        progress={"node_id":node,"command_id":command_id,"stage":"validating","code":"tls_resource_missing","exitCode":23,"rollback":"unchanged"}
+        code,_,_=signed_post("/node/restart/progress",dict(progress,stderr="private config must never be accepted"))
+        assert_status(code,400,"progress rejects raw diagnostic/config fields")
+        code,_,_=signed_post("/node/restart/progress",progress)
+        assert_status(code,200,"signed bounded Xray progress accepted")
+        code,view,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
+        assert_status(code,200,"operator sees actual Xray update stage")
+        assert view["progress"]["code"]=="tls_resource_missing" and view["progress"]["exitCode"]==23
+        ack={"node_id":node,"command_id":command_id,"success":False,"detail":"validating: TLS certificate/key unavailable (exit 23); old Xray unchanged"}
+        code,_,_=signed_post("/node/restart/ack",ack);assert_status(code,200,"acknowledge failed preflight without false success")
+        code,duplicate,_=signed_post("/node/restart/ack",ack);assert_status(code,200,"exact Xray ACK retry is idempotent")
+        assert duplicate["duplicate"] is True
+        code,_,_=signed_post("/node/restart/ack",dict(ack,success=True));assert_status(code,409,"changed Xray ACK cannot rewrite terminal evidence")
+        code,_,_=signed_post("/node/restart/progress",progress);assert_status(code,409,"late progress cannot rewrite completed command")
+
         # Real signed database accounting for two inbounds of the same user.
         code, new_user, _ = request("POST", "/collections/users",
             {"username": "ci_inbound_signed", "xrayId": "00000000-0000-0000-0000-000000000000"},

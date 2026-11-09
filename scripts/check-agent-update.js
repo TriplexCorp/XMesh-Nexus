@@ -23,12 +23,12 @@ new Function(nodeDialogs);
 const versionMatch=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(agentVersionRaw);
 assert.ok(versionMatch,'AGENT_VERSION must use control-vMAJOR.MINOR.PATCH');
 const versionTuple=versionMatch.slice(1).map(Number);
-assert.equal(agentVersionRaw,'control-v6.0.9','Nexus target Agent version must be control-v6.0.9');
+assert.equal(agentVersionRaw,'control-v6.0.10','Nexus target Agent version must be control-v6.0.10');
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
-assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]9"/);
-assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]8"/,
-  'rolling upgrade must keep v6.0.8 enrollable');
+assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]10"/);
+assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]9"/,
+  'rolling upgrade must keep v6.0.9 enrollable');
 assert.match(gateway,/olderAgentVersion\s*=\s*"control-v6[.]0[.]7"/,
   'nodes on v6.0.7 must remain enrollable during recovery');
 assert.match(gateway,/repairAgentVersion\s*=\s*"control-v6[.]0[.]0"/,

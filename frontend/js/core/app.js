@@ -4225,6 +4225,21 @@ function paintNodeXrayUpdate(nodeId){
 }
 // A single authenticated Xray update contract for individual and bulk actions.
 // The server chooses permitted releases; never accept a registry URL from the UI.
+const xrayUpdateStageLabel=stage=>{const label=({
+  downloading:'Скачивание образа',validating:'Проверка конфигурации',staging:'Подготовка контейнера',
+  starting:'Запуск новой версии',health_check:'Проверка работоспособности',committing:'Сохранение версии',
+  rolling_back:'Восстановление предыдущей версии',rolled_back:'Выполнен откат',completed:'Завершено',
+  preparing:'Проверка ресурсов',checking:'Проверка агента',sending:'Постановка команды',installing:'Ожидание Agent',verifying:'Проверка версии Xray'
+})[stage]||'Xray обновляется';return window.XMeshI18n?.getLanguage?.()==='en'?(window.XMeshI18n.translate(label)||label):label;};
+const xrayUpdateFailureMessage=status=>{
+  const p=status.progress;if(!p?.code)return status.result||'Обновление Xray не выполнено.';
+  const local=text=>window.XMeshI18n?.getLanguage?.()==='en'?(window.XMeshI18n.translate(text)||text):text;
+  const reason=({"disk_full":"На узле закончилось место","docker_unavailable":"Недоступен Docker на узле","download_failed":"Docker не смог загрузить образ","tls_resource_missing":"Недоступен TLS-сертификат или ключ","geodata_missing":"Недоступны необходимые GeoData","resource_permission":"Нет доступа к файлам конфигурации","config_invalid":"Новая версия Xray отклонила конфигурацию","registry_unavailable":"Недоступен официальный Docker Registry","image_not_found":"Официальный образ версии не найден","registry_denied":"Registry отклонил загрузку","image_identity":"Не совпала идентичность образа","docker_validation":"Docker не смог запустить проверку","timeout":"Превышено время операции","prepare_failed":"Не удалось подготовить ресурсы контейнера","start_failed":"Не удалось запустить новую версию","health_failed":"Новая версия не прошла проверку работоспособности","pin_failed":"Не удалось сохранить выбранную версию","interrupted":"Обновление было прервано","internal_error":"Локальная ошибка обновления"})[p.code]||'Обновление Xray не выполнено.';
+  const parts=[xrayUpdateStageLabel(p.stage),local(reason)];
+  if(Number.isInteger(p.exitCode))parts.push('exit '+p.exitCode);
+  if(p.rollback)parts.push(local(({unchanged:'Прежний Xray продолжает работать',rolled_back:'Предыдущая версия восстановлена и проверена',rollback_failed:'Откат не удался. Требуется вмешательство администратора.'})[p.rollback]||''));
+  return parts.join(' · ');
+};
 const XMeshNodeXrayOps=Object.freeze({
   isUpdating:id=>nodeXrayUpdating.has(Number(id)),
   chooseVersion:async ids=>{
@@ -4260,6 +4275,7 @@ const XMeshNodeXrayOps=Object.freeze({
       if(runtime.xrayUpdateSupported !== true)throw new Error(runtime.connected
         ?'Управляющий Agent не поддерживает обновление Xray. Обновите Agent.'
         :'Нет свежего Agent heartbeat. Проверьте подключение узла.');
+      if(runtime.xrayUpdateTransactionSupported===false)throw new Error('Для обновления Xray установите Agent control-v6.0.10 или новее.');
       onStage('sending');
       const command=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/xray-update',{
         method:'POST',body:JSON.stringify({version})
@@ -4271,7 +4287,8 @@ const XMeshNodeXrayOps=Object.freeze({
         await new Promise(resolve=>setTimeout(resolve,3000));
         status=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/restart');
         if(status.id!==command.id)throw new Error('Очередь команд узла изменилась.');
-        if(status.state==='failed')throw new Error(status.result||'Обновление Xray не выполнено.');
+        if(status.progress?.stage)onStage(status.progress.rollback==='rolled_back'?'rolled_back':status.progress.stage);
+        if(status.state==='failed'){const error=new Error(xrayUpdateFailureMessage(status));error.updateProgress=status.progress;throw error;}
         if(status.state==='succeeded')break;
       }
       if(status?.state!=='succeeded')throw new Error('Агент не подтвердил обновление Xray за 10 минут.');
@@ -4301,6 +4318,7 @@ const XMeshNodeXrayOps=Object.freeze({
   }
 });
 window.XMeshNodeXrayOps=XMeshNodeXrayOps;
+window.XMeshXrayUpdateStageLabel=xrayUpdateStageLabel;
 const PROFILE_CHECK_LABELS={
   policy_missing:'Нет сохранённой подписанной политики',
   active_config_missing:'Нет управляемой конфигурации',
@@ -5585,11 +5603,12 @@ the old node will lose access. Cancel and create a new Node ID if both must work
       );
       if(!ok)return;
       b.innerHTML='<span class="node-agent-spinner" aria-hidden="true"></span><span>Xray обновляется…</span>';
-      const result=await XMeshNodeXrayOps.updateOne(id,version);
+      const result=await XMeshNodeXrayOps.updateOne(id,version,{onStage:stage=>{if(b.isConnected)b.textContent=xrayUpdateStageLabel(stage);}});
       toast(node.name+': '+result.message+(result.warning?' · ожидается heartbeat':''));
       if(cur==='nodes')await render(1);
     }catch(error){
       toast('Обновление Xray: '+(error?.message||'ошибка API'));
+      await panelConfirm(String(error?.message||'ошибка API'),{title:'Диагностика обновления Xray',confirmLabel:'Закрыть'});
     }finally{
       delete b.dataset.loading;
       if(b.isConnected){b.disabled=false;b.innerHTML=original}
