@@ -129,11 +129,33 @@ async function main() {
     await page.evaluate(() => document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()));
     await page.goto(base + dashboard + '#' + route, {waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
-    // Soft hash navigation can still be rendering the previous route at this point.
-    // Wait for the actual destination, not just a nonempty #view.
-    const destination = {admins:'[data-ne="admins"]',squads:'[data-ne="squads"]',templates:'.templates-workspace'}[route];
-    if(destination) await page.locator('#view').locator(destination).first().waitFor({state:'visible'});
-    await page.waitForTimeout(150);
+    // A hash-only navigation can keep the previous Settings subpage in the DOM
+    // until its async renderer has finished. A nonempty #view and a 150ms sleep
+    // are not evidence that the destination is ready.
+    const settingsAliases={
+      colors:'appearance',layout:'appearance',typography:'appearance',
+      integrations:'general',traffic:'system'
+    };
+    const settingsSlug=route.startsWith('set/')?route.slice(4):null;
+    const settingsCategory=settingsSlug?(settingsAliases[settingsSlug]||settingsSlug):
+      route==='admins'?'admins':route==='security'?'security':null;
+    if(settingsCategory){
+      await page.locator('#settings-subpage[data-settings-section="'+settingsCategory+'"]').waitFor({state:'visible'});
+      // The page-specific content must be mounted, not just the persistent
+      // Settings toolbar retained from the previous route.
+      const required={
+        general:'#start-page',appearance:'#palette-apply',
+        system:'#core-panel',security:'#security-tab-auth',
+        admins:'[data-ne="admins"]',data:'#appearance-import'
+      }[settingsCategory];
+      if(required)await page.locator('#settings-subpage').locator(required).first().waitFor({state:'attached'});
+    }else{
+      const destination={
+        admins:'[data-ne="admins"]',squads:'[data-ne="squads"]',
+        templates:'.templates-workspace'
+      }[route];
+      if(destination)await page.locator('#view').locator(destination).first().waitFor({state:'visible'});
+    }
     assert(!await page.locator('#login-form').count(), 'Сессия авторизации потеряна.');
   }
   let dashboard;
@@ -2265,7 +2287,7 @@ async function main() {
     // The create-user metadata section must adapt to the *section* width,
     // including browser zoom and a long list of squad names. It may scroll
     // vertically within the chips box, never horizontally across other fields.
-    for(const [width,height] of [[390,844],[768,1024],[1366,768],[1920,1080]]) await checked(`Create user metadata layout: ${width}×${height}`,async()=>{
+    for(const [width,height] of [[390,844],[768,1024],[1366,768],[1920,1080],[2560,1440],[3440,1440]]) await checked(`Create user metadata layout: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('users');
       await page.locator('[data-nu]').first().click();
@@ -2292,12 +2314,19 @@ async function main() {
             identity:bounds('.user-create-section-main'),
             limits:bounds('.user-create-section-limits'),
             metadata:bounds('.user-create-section-extra'),
-            footer:bounds('.user-create-footer')
+            footer:bounds('.user-create-footer'),
+            zoomScale:Number.parseFloat(getComputedStyle(dialog).getPropertyValue('--uc'))||16,
+            inputFont:font('input[name="limit"]')
           };
         });
         assert(design.titleFont>=22,'Create-user modal title must be clearly readable');
         assert(design.labelFont>=12,'Form labels must not shrink to micro text');
         assert(design.fieldHeight>=42,'Form controls must be comfortable to click');
+        if(width>=2200){
+          assert(design.zoomScale<=20.1,'Wide user creation dialog must have a bounded design scale');
+          assert(design.fieldHeight<=62,'Wide dialog must not enlarge form fields excessively');
+          assert(design.inputFont<=20.1,'Wide dialog input type must remain balanced with the other panel controls');
+        }
         assert(design.dialog.width<=width+2,'Create-user modal must fit viewport width');
         if(width>=941){
           assert(design.identity.right<design.limits.left+2,'Identity and limits must be side by side');
@@ -2528,8 +2557,16 @@ async function main() {
 
     await checked('Motion: refresh и native dialogs используют единый premium-контракт',async()=>{
       await page.setViewportSize({width:1920,height:1080});
+      let previousMotion=null;
+      let motionCaptured=false;
+      try{
       await page.emulateMedia({reducedMotion:'no-preference'});
       await navigate('statistics');
+      previousMotion=await page.evaluate(()=>document.documentElement.dataset.motion??null);
+      motionCaptured=true;
+      // An earlier reduced-motion settings test may leave data-motion="off".
+      // Explicitly enable the feature under test without changing saved preferences.
+      await page.evaluate(()=>{document.documentElement.dataset.motion='on'});
       const refresh=await page.locator('#stats-refresh').evaluate(button=>{
         const icon=button.querySelector('.ic,svg');
         const before=getComputedStyle(button);
@@ -2558,6 +2595,16 @@ async function main() {
       assert.equal(reduced.animationName,'none','prefers-reduced-motion не отключает dialog animation.');
       await closeStudioDialog(selector);
       return{refresh,dialogMotion,reduced};
+      }finally{
+        // Always restore media and UI state, including when an assertion fails.
+        // Otherwise later Node geometry checks can sample the opening transition.
+        await page.emulateMedia({reducedMotion:'reduce'});
+        if(motionCaptured)await page.evaluate(previous=>{
+          if(previous===null)delete document.documentElement.dataset.motion;
+          else document.documentElement.dataset.motion=previous;
+        },previousMotion);
+        await page.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(d=>d.close()));
+      }
     });
 
     // Certificate-only profiles must not inflate the later squad inventory.
@@ -2570,6 +2617,9 @@ async function main() {
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
     for(const [width,height,edit] of [[1366,768,true],[1920,1080,true],[1920,1080,false],[390,844,false]])await checked(`Node editor TLS mode stability: ${edit?'edit':'create'} ${width}×${height}`,async()=>{
+      // This test compares stable layout geometry, not the dialog's opening
+      // animation. Never sample the in-flight transform at arbitrary frames.
+      await page.emulateMedia({reducedMotion:'reduce'});
       await page.setViewportSize({width,height});await navigate('nodes');
       const initialScale=await page.evaluate(()=>C.ts);
       await page.evaluate(()=>{C.ts=1.1;apply()});

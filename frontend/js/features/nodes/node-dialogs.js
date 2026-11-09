@@ -123,7 +123,7 @@
               <div><span class="user-create-section-kicker">POLICY</span><h3>Ограничения</h3><p>Доступ, трафик и устройства.</p></div>
             </div>
             <div class="user-create-limits-grid">${limit}${cdnLimit}${days}${strategy}${hwid}
-              <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>Включает лимит по числу зарегистрированных устройств. 0 — без лимита.</small></p><label class="user-create-smart-switch" title="Включить или отключить лимит устройств"><input type="checkbox" data-user-create-hwid-switch aria-label="Ограничивать число устройств"><span></span></label></div>
+              <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>Автоматический контроль при лимите больше 0.</small></p><label class="user-create-smart-switch" title="Включить или отключить лимит устройств"><input type="checkbox" data-user-create-hwid-switch aria-label="Ограничивать число устройств"><span></span></label></div>
             </div>
           </section>
 

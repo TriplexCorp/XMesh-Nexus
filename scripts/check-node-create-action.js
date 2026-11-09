@@ -156,6 +156,7 @@ assert.match(dialogJs,/deviceLimitInput\.value=smartSwitch\.checked/,'Device-lim
 assert.match(dialogJs,/user-create-input-wrap/,'User contact, traffic and tag fields must retain their icons');
 assert.match(userCss,/@media\(min-width:2200px\)/,'Large effective viewport must retain legible user dialog geometry');
 assert.match(userCss,/width:min\(58vw,1940px,calc\(100vw - 2rem\)\)/,'Zoomed-out desktop modal must grow beyond its fixed 1140px cap');
+assert.match(userCss,/--uc:clamp\(16px,\.66vw,20px\)/,'Zoomed-out dialog type and controls must never overshoot the moderate 125% scale ceiling');
 assert.match(userCss,/\.user-create-smart-switch input:checked\+span/,'Smart device switch must have visible enabled styling');
 
 assert.match(userCss,/Premium creation dialog — approved visual concept/,
