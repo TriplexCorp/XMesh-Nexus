@@ -10,7 +10,7 @@ use crate::{ApiError, AppState, node_auth};
 use axum::{
     Extension, Json,
     body::Bytes,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
@@ -185,6 +185,33 @@ pub async fn request_restart(
     ))
 }
 
+// GHCR manifest status is distinct from the upstream GitHub release catalog.
+// Query parameters cannot select an arbitrary registry/image or command.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XrayImageStatusQuery {
+    version: String,
+}
+
+pub async fn xray_image_status(
+    State(state): State<AppState>,
+    Query(query): Query<XrayImageStatusQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let releases = state
+        .core
+        .all_node_releases()
+        .await
+        .map_err(|msg| ApiError::new(StatusCode::BAD_GATEWAY, msg))?;
+    if !releases.iter().any(|r| r.version == query.version) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Версия отсутствует среди официальных релизов Xray",
+        ));
+    }
+    let availability = state.core.node_image_status(&query.version).await;
+    Ok(Json(json!({"version":query.version,"image_status":availability})))
+}
+
 /// v6 shadow for fixed, allow-listed Xray release updates. Request shape stays
 /// exactly `{version}`; no image URL, path or command enters from the client.
 pub async fn request_xray_update(
@@ -227,6 +254,21 @@ pub async fn request_xray_update(
             StatusCode::BAD_REQUEST,
             "Выбранная версия отсутствует среди официальных релизов Xray",
         ));
+    }
+    match state.core.node_image_status(target).await {
+        "available" => {}
+        "missing" => {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Docker-образ выбранного релиза Xray ещё не опубликован в GHCR. Обновление не запускалось.",
+            ));
+        }
+        _ => {
+            return Err(ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Не удалось проверить официальный Docker-образ GHCR. Команда обновления не отправлена.",
+            ));
+        }
     }
     let node = sqlx::query_scalar::<_, Value>(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
