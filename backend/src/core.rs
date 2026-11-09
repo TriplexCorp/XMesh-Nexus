@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::{
@@ -8,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{
     fs,
@@ -63,7 +64,35 @@ struct GithubAsset {
     digest: Option<String>,
 }
 
-type ReleaseCache = Arc<RwLock<Option<(std::time::Instant, Vec<ReleaseInfo>)>>>;
+type ReleaseCache = Arc<RwLock<Option<(Instant, Vec<ReleaseInfo>)>>>;
+type ImageStatusCache = Arc<RwLock<HashMap<String, (Instant, &'static str)>>>;
+
+// GitHub releases and published Docker images are separate upstream artifacts.
+// A release is installable on a managed node only when GHCR has its manifest.
+#[derive(Deserialize)]
+struct GhcrAnonymousToken {
+    token: String,
+}
+
+fn official_xray_image_tag(version: &str) -> Option<&str> {
+    let tag = version.strip_prefix('v')?;
+    if tag.len() > 64 || !tag.bytes().all(|c|
+        c.is_ascii_alphanumeric() || b"._+-".contains(&c)
+    ) || tag.split('.').take(3).count() != 3
+       || !tag.bytes().next().is_some_and(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    Some(tag)
+}
+
+fn ghcr_manifest_status(status: reqwest::StatusCode) -> &'static str {
+    match status.as_u16() {
+        200 => "available",
+        404 => "missing",
+        _ => "unknown",
+    }
+}
 
 #[derive(Clone)]
 pub struct CoreManager {
@@ -73,6 +102,7 @@ pub struct CoreManager {
     update_lock: Arc<Mutex<()>>,
     client: reqwest::Client,
     node_release_cache: ReleaseCache,
+    node_image_status_cache: ImageStatusCache,
 }
 
 impl CoreManager {
@@ -115,6 +145,7 @@ impl CoreManager {
             update_lock: Arc::new(Mutex::new(())),
             client,
             node_release_cache: Arc::new(RwLock::new(None)),
+            node_image_status_cache: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -357,6 +388,71 @@ impl CoreManager {
         }
         *self.node_release_cache.write().await = Some((std::time::Instant::now(), all.clone()));
         Ok(all)
+    }
+
+    /// Returns available / missing / unknown. Unknown is never treated as
+    /// installable: a registry outage must not queue an unverified update.
+    /// The URL, registry owner and scope are fixed; the request supplies only
+    /// an exact official Xray release tag validated separately by the API.
+    pub async fn node_image_status(&self, version: &str) -> &'static str {
+        let Some(tag) = official_xray_image_tag(version) else {
+            return "unknown";
+        };
+        if let Some((seen, status)) = self.node_image_status_cache.read().await.get(tag)
+            && seen.elapsed() < Duration::from_secs(if *status == "available" { 600 } else { 60 })
+        {
+            return status;
+        }
+
+        let state = self.probe_ghcr_image(tag).await;
+        if state != "unknown" {
+            self.node_image_status_cache
+                .write()
+                .await
+                .insert(tag.to_owned(), (Instant::now(), state));
+        }
+        state
+    }
+
+    async fn probe_ghcr_image(&self, tag: &str) -> &'static str {
+        // GHCR is a bearer-token registry even for publicly visible packages.
+        // The unauthenticated /v2/ 401 challenge does not tell us whether a
+        // release-specific manifest actually exists.
+        let Ok(response) = self.client
+            .get("https://ghcr.io/token")
+            .query(&[
+                ("service", "ghcr.io"),
+                ("scope", "repository:xtls/xray-core:pull"),
+            ])
+            .timeout(Duration::from_secs(10))
+            .send().await
+        else {
+            return "unknown";
+        };
+        if !response.status().is_success() {
+            return "unknown";
+        }
+        let Ok(auth) = response.json::<GhcrAnonymousToken>().await else {
+            return "unknown";
+        };
+        if auth.token.is_empty() || auth.token.len() > 16_384 {
+            return "unknown";
+        }
+
+        let uri = format!("https://ghcr.io/v2/xtls/xray-core/manifests/{tag}");
+        let Ok(manifest) = self.client
+            .head(&uri)
+            .bearer_auth(auth.token)
+            .header(
+                reqwest::header::ACCEPT,
+                "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json",
+            )
+            .timeout(Duration::from_secs(10))
+            .send().await
+        else {
+            return "unknown";
+        };
+        ghcr_manifest_status(manifest.status())
     }
 
     async fn verify_staged_binary(&self, staging_dir: &Path, version: &str) -> Result<(), String> {
@@ -814,7 +910,7 @@ fn chrono_free_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_version, parse_ech_output, parse_vless_encryption_output,
+        ghcr_manifest_status, official_xray_image_tag, normalize_version, parse_ech_output, parse_vless_encryption_output,
         validate_ech_public_name,
     };
 
@@ -861,6 +957,18 @@ mod tests {
         );
         assert!(parse_ech_output(&corrupt).is_err());
         assert!(parse_ech_output("ECH config list: \nnot-base64").is_err());
+    }
+
+    #[test]
+    fn ghcr_manifest_status_distinguishes_missing_release_from_outage() {
+        use reqwest::StatusCode;
+        assert_eq!(ghcr_manifest_status(StatusCode::OK), "available");
+        assert_eq!(ghcr_manifest_status(StatusCode::NOT_FOUND), "missing");
+        assert_eq!(ghcr_manifest_status(StatusCode::UNAUTHORIZED), "unknown");
+        assert_eq!(ghcr_manifest_status(StatusCode::SERVICE_UNAVAILABLE), "unknown");
+        assert_eq!(official_xray_image_tag("v26.11.9"), Some("26.11.9"));
+        assert_eq!(official_xray_image_tag("../../bad"), None);
+        assert_eq!(official_xray_image_tag("https://host/"), None);
     }
 
     #[test]
