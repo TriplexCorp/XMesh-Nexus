@@ -1033,3 +1033,181 @@
   #dlg.user-create-modal .user-create-generate,
   #dlg.user-create-modal .user-create-footer button{transition:none}
 }
+
+/* Concept restoration: inner controls retain their icons, real device toggle,
+ * and visual scale when a zoomed-out browser reports a very wide CSS viewport. */
+#dlg.user-create-modal{--uc:1rem}
+#dlg.user-create-modal .user-create-input-wrap{
+  display:block;position:relative;width:100%;min-width:0;height:2.85rem;
+  box-sizing:border-box;font-size:inherit;font-weight:normal;
+}
+#dlg.user-create-modal .user-create-input-icon{
+  position:absolute;top:50%;left:.8rem;z-index:1;
+  transform:translateY(-50%);width:1.1rem;height:1.1rem;
+  display:grid;place-items:center;color:var(--mu);pointer-events:none;
+}
+#dlg.user-create-modal .user-create-input-icon .ic{width:100%;height:100%}
+#dlg.user-create-modal .user-create-input-wrap:focus-within .user-create-input-icon{color:var(--a)}
+#dlg.user-create-modal .user-create-field .user-create-input-wrap input:not([type=checkbox]){
+  box-sizing:border-box;width:100%;height:100%;min-height:100%;padding-left:2.55rem;
+}
+#dlg.user-create-modal .user-create-policy-note{
+  grid-template-columns:1.55rem minmax(0,1fr) 2.8rem;align-items:center;
+}
+#dlg.user-create-modal .user-create-smart-switch{
+  position:relative;display:block;width:2.8rem;min-width:2.8rem;height:1.65rem;cursor:pointer;
+}
+#dlg.user-create-modal .user-create-smart-switch input{
+  position:absolute;inset:0;z-index:2;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;
+}
+#dlg.user-create-modal .user-create-smart-switch>span{
+  position:absolute;inset:0;border:1px solid var(--nx-border-strong);
+  border-radius:999px;background:var(--nx-control-bg);
+  transition:background .18s ease,border-color .18s ease;
+}
+#dlg.user-create-modal .user-create-smart-switch>span::after{
+  content:"";position:absolute;top:.19rem;left:.2rem;
+  width:1.13rem;height:1.13rem;border-radius:50%;background:var(--mu);
+  transition:transform .2s ease,background .18s ease;
+}
+#dlg.user-create-modal .user-create-smart-switch input:checked+span{
+  background:color-mix(in srgb,var(--a) 25%,var(--nx-section-bg));border-color:var(--a);
+}
+#dlg.user-create-modal .user-create-smart-switch input:checked+span::after{
+  transform:translateX(1.1rem);background:var(--a);
+}
+#dlg.user-create-modal .user-create-smart-switch input:focus-visible+span{
+  outline:2px solid var(--nx-focus);outline-offset:2px;
+}
+#dlg.user-create-modal .user-create-hold-caption{display:flex;align-items:center;gap:.45rem}
+#dlg.user-create-modal .user-create-hold-caption .ic{
+  flex:none;width:1rem;height:1rem;color:var(--a);
+}
+@media(min-width:2200px){
+  #dlg.user-create-modal{
+    --uc:clamp(17px,.8vw,28px);
+    width:min(58vw,1940px,calc(100vw - 2rem));
+  }
+  #dlg.user-create-modal .user-create-head{
+    min-height:calc(5.4 * var(--uc));
+    padding:calc(1.13 * var(--uc)) calc(1.5 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-head h2{font-size:calc(1.55 * var(--uc))}
+  #dlg.user-create-modal .user-create-head p{font-size:calc(.82 * var(--uc))}
+  #dlg.user-create-modal .user-create-title-icon{
+    width:calc(3.1 * var(--uc));height:calc(3.1 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-title-icon .ic{
+    width:calc(1.35 * var(--uc));height:calc(1.35 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-body{padding:var(--uc)}
+  #dlg.user-create-modal .user-create-workspace{gap:calc(.9 * var(--uc))}
+  #dlg.user-create-modal .user-create-section{
+    padding:calc(1.12 * var(--uc)) calc(1.2 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-section-head{
+    gap:calc(.75 * var(--uc));margin-bottom:var(--uc);
+  }
+  #dlg.user-create-modal .user-create-section-icon{
+    width:calc(2.55 * var(--uc));height:calc(2.55 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-section-icon .ic{
+    width:calc(1.08 * var(--uc));height:calc(1.08 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-section-head h3{font-size:calc(1.07 * var(--uc))}
+  #dlg.user-create-modal .user-create-section-head p{font-size:calc(.76 * var(--uc))}
+  #dlg.user-create-modal .user-create-field>span,
+  #dlg.user-create-modal .user-create-extra-grid>.user-create-field>span:first-child,
+  #dlg.user-create-modal .user-create-limits-grid>.user-create-field>span{
+    font-size:calc(.83 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-field>small,
+  #dlg.user-create-modal .user-create-limits-grid>.user-create-field>small{
+    font-size:calc(.69 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-field{gap:calc(.37 * var(--uc))}
+  #dlg.user-create-modal .user-create-main-grid{gap:calc(.8 * var(--uc))}
+  #dlg.user-create-modal .user-create-input-wrap{height:calc(2.85 * var(--uc))}
+  #dlg.user-create-modal input:not([type=checkbox]),
+  #dlg.user-create-modal select,
+  #dlg.user-create-modal .xm-select-trigger,
+  #dlg.user-create-modal .user-create-duration-trigger{
+    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
+    font-size:calc(.87 * var(--uc));
+    padding:calc(.6 * var(--uc)) calc(.8 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-field .user-create-input-wrap input:not([type=checkbox]){
+    padding-left:calc(2.55 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-input-icon{
+    left:calc(.8 * var(--uc));width:calc(1.1 * var(--uc));height:calc(1.1 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-generate{
+    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
+    margin-top:calc(1.47 * var(--uc));font-size:calc(.8 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-username-row{gap:calc(.7 * var(--uc))}
+  #dlg.user-create-modal .user-create-limits-grid{gap:calc(.78 * var(--uc))}
+  #dlg.user-create-modal .user-create-limits-grid>.user-create-field{
+    grid-template-rows:auto calc(2.85 * var(--uc)) minmax(0,auto);
+  }
+  #dlg.user-create-modal .user-create-limits-grid input:not([type=checkbox]),
+  #dlg.user-create-modal .user-create-limits-grid select,
+  #dlg.user-create-modal .user-create-limits-grid .xm-select-shell,
+  #dlg.user-create-modal .user-create-limits-grid .xm-select-trigger{
+    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-policy-note{
+    min-height:calc(5.65 * var(--uc));
+    grid-template-columns:calc(1.55 * var(--uc)) minmax(0,1fr) calc(2.8 * var(--uc));
+    gap:calc(.54 * var(--uc));padding:calc(.67 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-policy-note b{font-size:calc(.78 * var(--uc))}
+  #dlg.user-create-modal .user-create-policy-note small{font-size:calc(.66 * var(--uc))}
+  #dlg.user-create-modal .user-create-smart-switch{
+    width:calc(2.8 * var(--uc));min-width:calc(2.8 * var(--uc));
+    height:calc(1.65 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-smart-switch>span::after{
+    top:calc(.19 * var(--uc));left:calc(.2 * var(--uc));
+    width:calc(1.13 * var(--uc));height:calc(1.13 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-smart-switch input:checked+span::after{
+    transform:translateX(calc(1.1 * var(--uc)));
+  }
+  #dlg.user-create-modal .user-create-squads .ms{
+    min-height:calc(2.8 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-squads .ms .ck{
+    min-height:calc(2 * var(--uc));font-size:calc(.78 * var(--uc));
+    padding:calc(.35 * var(--uc)) calc(.55 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-tag input:not([type=checkbox]){
+    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-hold .sw{
+    height:calc(2.85 * var(--uc));min-height:calc(2.85 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-hold .sw::before{font-size:calc(.77 * var(--uc))}
+  #dlg.user-create-modal .user-create-hold .sw>span{
+    width:calc(2.8 * var(--uc));height:calc(1.6 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-hold .sw>span::after{
+    width:calc(1.08 * var(--uc));height:calc(1.08 * var(--uc));
+    top:calc(.2 * var(--uc));left:calc(.22 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-hold .sw input:checked+span::after{
+    transform:translateX(calc(1.12 * var(--uc)));
+  }
+  #dlg.user-create-modal .user-create-desc textarea{
+    min-height:calc(4.4 * var(--uc));font-size:calc(.84 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-footer{
+    min-height:calc(4.7 * var(--uc));
+    padding:calc(.85 * var(--uc)) calc(1.2 * var(--uc));
+  }
+  #dlg.user-create-modal .user-create-footer button{
+    min-height:calc(2.9 * var(--uc));font-size:calc(.82 * var(--uc));
+    padding:calc(.6 * var(--uc)) calc(1.1 * var(--uc));
+  }
+}

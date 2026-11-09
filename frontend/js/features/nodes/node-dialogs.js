@@ -45,12 +45,23 @@
 (()=>{
   const defaults={limit:0,days:0,strategy:'NO_RESET',hwid:0,squads:[]};
   const spec=key=>FU.find(item=>item.k===key);
+
+  const inputGlyph=key=>{
+    if(key==='tg')return '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg>';
+    if(key==='email')return '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg>';
+    if(key==='tag')return '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m20 13-7 7a2 2 0 0 1-2.83 0L3 12.83V4h8.83L20 12.17a2 2 0 0 1 0 2.83Z"/><circle cx="8" cy="8.5" r="1"/></svg>';
+    const name={limit:'activity',cdnLimitGb:'globe',hwid:'monitor'}[key];
+    return name?ic(name):'';
+  };
   const decorate=(key,value=defaults[key],extra='')=>{
     const markup=field(spec(key),value);
     // Keep the generated HTML valid. The previous replacement accidentally
     // dropped the closing quote of class="...", causing every following select
     // and section to be reparsed as broken markup by the browser.
-    return markup.replace('class="f"',`class="f user-create-field ${extra}"`.trim());
+    const decorated=markup.replace('class="f"',`class="f user-create-field ${extra}"`.trim());
+    if(key==='hold')return decorated.replace('<span>Отсчёт',`<span class="user-create-hold-caption">${ic('calendar')}Отсчёт`);
+    const glyph=inputGlyph(key);
+    return glyph?decorated.replace(/(<input\b[^>]*>)/,`<span class="user-create-input-wrap"><span class="user-create-input-icon" aria-hidden="true">${glyph}</span>$1</span>`):decorated;
   };
 
   userNew=function userNewRedesigned(){
@@ -112,7 +123,7 @@
               <div><span class="user-create-section-kicker">POLICY</span><h3>Ограничения</h3><p>Доступ, трафик и устройства.</p></div>
             </div>
             <div class="user-create-limits-grid">${limit}${cdnLimit}${days}${strategy}${hwid}
-              <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>Автоматически проверяет зарегистрированные устройства, если лимит больше 0.</small></p></div>
+              <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>Включает лимит по числу зарегистрированных устройств. 0 — без лимита.</small></p><label class="user-create-smart-switch" title="Включить или отключить лимит устройств"><input type="checkbox" data-user-create-hwid-switch aria-label="Ограничивать число устройств"><span></span></label></div>
             </div>
           </section>
 
@@ -148,6 +159,25 @@
     // Dynamic selects are enhanced synchronously after the complete valid form
     // exists, avoiding a one-frame native/fallback flash inside the modal.
     window.XMeshSelects?.refresh?.(dlg);
+    // The switch controls the existing server-enforced hwid limit:
+    // off = 0; on = the previous positive value or 1.
+    const deviceLimitInput=dlg.querySelector('input[name="hwid"]');
+    const smartSwitch=dlg.querySelector('[data-user-create-hwid-switch]');
+    if(deviceLimitInput&&smartSwitch){
+      let previousPositiveLimit=1;
+      const syncSmartSwitch=()=>{
+        const value=Math.max(0,Number(deviceLimitInput.value)||0);
+        if(value>0)previousPositiveLimit=value;
+        smartSwitch.checked=value>0;
+      };
+      deviceLimitInput.addEventListener('input',syncSmartSwitch);
+      smartSwitch.addEventListener('change',()=>{
+        deviceLimitInput.value=smartSwitch.checked?String(previousPositiveLimit):'0';
+        deviceLimitInput.dispatchEvent(new Event('input',{bubbles:true}));
+      });
+      dlg.querySelector('#tplsel')?.addEventListener('change',()=>setTimeout(syncSmartSwitch,0));
+      syncSmartSwitch();
+    }
     setTimeout(()=>$('[name=username]')?.focus(),60);
   };
 })();
