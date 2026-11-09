@@ -24,7 +24,7 @@ const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const css=panelStyles();
 
 assert.equal(fs.readFileSync('VERSION','utf8').trim(),'6.0.0');
-assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.8');
+assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.9');
 assert.match(api,/\/nodes\/\{id\}\/agent-update/);
 assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]8";/);
 assert.match(runtimeEntry,/control_v6_transition_active/);
@@ -148,4 +148,4 @@ assert.equal(staged.status,0,'Staged Agent lifecycle test failed:\n'+(staged.std
 assert.match(staged.stdout,/staged Agent package apply\/rollback lifecycle: OK/);
 const syntax=spawnSync(process.execPath,['--check','frontend/js/core/app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('XMesh control-v6.0.8 POSTQUANTUM Agent upgrade/install and immutable staged migration contract: OK');
+console.log('XMesh control-v6.0.9 POSTQUANTUM Agent upgrade/install and immutable staged migration contract: OK');
