@@ -17,17 +17,20 @@ const agentVersionRaw=originalReadFileSync('AGENT_VERSION','utf8').trim();
 const agentPolicy=originalReadFileSync('docs/AGENT_RELEASE_POLICY.md','utf8');
 const gateway=originalReadFileSync('deploy/xsp-v2-product-gateway/main.go','utf8');
 const controlAgent=originalReadFileSync('deploy/node-control-agent.sh','utf8');
+const updater=originalReadFileSync('deploy/update-node-control-agent.sh','utf8');
 new Function(nodeDialogs);
 
 const versionMatch=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(agentVersionRaw);
 assert.ok(versionMatch,'AGENT_VERSION must use control-vMAJOR.MINOR.PATCH');
 const versionTuple=versionMatch.slice(1).map(Number);
-assert.equal(agentVersionRaw,'control-v6.0.8','Nexus target Agent version must be control-v6.0.8');
+assert.equal(agentVersionRaw,'control-v6.0.9','Nexus target Agent version must be control-v6.0.9');
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
-assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]8"/);
-assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]7"/,
-  'rolling upgrade must keep the immediately previous Agent release enrollable');
+assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]9"/);
+assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]8"/,
+  'rolling upgrade must keep v6.0.8 enrollable');
+assert.match(gateway,/olderAgentVersion\s*=\s*"control-v6[.]0[.]7"/,
+  'nodes on v6.0.7 must remain enrollable during recovery');
 assert.match(gateway,/repairAgentVersion\s*=\s*"control-v6[.]0[.]0"/,
   'v6.0.0 bootstrap-hole nodes remain temporarily repairable');
 assert.match(controlAgent,/local expected_version="\$\{1:-\}"/,
@@ -40,7 +43,7 @@ assert.match(controlAgent,/run_agent_updater "\$target_version"/,
   'legacy fixed updates must pass the backend target version into updater repair');
 assert.doesNotMatch(controlAgent,/grep -Fq ['"]AGENT_VERSION=\\"control-v6[.]0[.]6\\"['"] "\$bootstrap"/,
   'repair bootstrap must never pin validation to the running Agent release literal');
-assert.match(controlAgent,/update-node-control-agent[.]sh -o "\$bootstrap"/,
+assert.match(controlAgent,/update-node-control-agent[.]sh[\s\\]+-o "\$bootstrap"/,
   'signed update path must fetch a fresh updater bootstrap for every target release');
 assert.match(controlAgent,/grep -Fq 'XMESH_TARGET_AWARE_UPDATER=1' "\$bootstrap"/,
   'fresh updater bootstrap must advertise the target-aware contract');
@@ -52,6 +55,14 @@ assert.doesNotMatch(controlAgent,/systemctl start --wait "\$static_unit"/,
   'signed updates must never blindly execute the updater frozen into the previous release');
 assert.match(controlAgent,/verify_agent_install "\$target_version"/,
   'legacy update success must require the full post-install runtime self-test');
+assert.match(controlAgent,/for attempt in 1 2 3;do/,
+  'Agent bootstrap must retry failed IPv4 requests within bounded attempts');
+assert.match(controlAgent,/curl -4 --proto '=https' --tlsv1[.]2 -fsSL --connect-timeout 8 --max-time 30/,
+  'Agent bootstrap must avoid broken IPv6 paths');
+assert.match(controlAgent,/UPDATER_ERROR="Fresh Agent updater download failed: \$fetch_reason/,
+  'Failed downloads must report a safe actionable category');
+assert.match(updater,/curl -4 --retry 2 --retry-delay 2/,
+  'Manual updater must also prefer IPv4 for official bootstrap payloads');
 assert.match(controlAgent,/sanitize_updater_error/,
   'failed updates must return a bounded sanitized updater reason instead of a generic systemd exit code');
 

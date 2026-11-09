@@ -42,6 +42,8 @@ assert.match(agent,/xmesh-managed-xray/);
 assert.match(agent,/run -test -config \/etc\/xray\/config\.json/);
 assert.match(agent,/previous image restored/);
 assert.match(agent,/pull_pinned_xray_image\(\)/,'Agent must retry official GHCR image pulls');
+assert.match(agent,/GHCR API reachable over IPv4, check Docker daemon or image CDN reachability/,
+ 'GHCR registry preflight must not be mistaken for a successful Docker layer download');
 assert.match(agent,/timeout 115 docker pull "\$image"/,'Allow a bounded registry download window');
 assert.match(agent,/for attempt in 1 2;do/,'Download must retry once on transient GHCR failure');
 assert.match(agent,/registry connectivity or CDN failure/,'Reported failure must distinguish registry connectivity');

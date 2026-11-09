@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.8"
+AGENT_VERSION="control-v6.0.9"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -190,7 +190,17 @@ pull_pinned_xray_image(){
   if (( attempt < 2 ));then sleep 4;fi
  done
  rm -f "$log"
- detail="Xray image download failed: $failure after 2 attempts. Check node access to ghcr.io and its image CDN"
+ # ghcr.io/v2/ normally responds 401 to unauthenticated curl requests.
+ # This distinguishes a host-side route failure from a Docker daemon/blob-CDN
+ # failure, without treating the registry probe as proof that layers work.
+ local probe_status=''
+ probe_status="$(curl -4 --proto '=https' --tlsv1.2 -sS -o /dev/null \
+  -w '%{http_code}' --connect-timeout 5 --max-time 10 https://ghcr.io/v2/ 2>/dev/null || true)"
+ if [[ "$probe_status" == 401 ]];then
+  detail="Xray image download failed: $failure after 2 attempts. GHCR API reachable over IPv4, check Docker daemon or image CDN reachability"
+ else
+  detail="Xray image download failed: $failure after 2 attempts. GHCR IPv4 probe HTTP ${probe_status:-000}; check node registry/CDN reachability"
+ fi
  return 1
 }
 update_managed_xray(){
@@ -360,9 +370,35 @@ run_agent_updater(){
  [[ "$expected_version" =~ ^control-v6\.[0-9]+\.[0-9]+$ ]] || { UPDATER_ERROR='Invalid expected Agent target version'; return 1; }
  install -d -m 0700 /run/xmesh-node-control || { UPDATER_ERROR='Cannot prepare Agent updater state';return 1; }
  rm -f "$bootstrap" "$log"
- if ! curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$bootstrap";then
-  UPDATER_ERROR='Fresh Agent updater download failed';return 1
+ # The node may have broken IPv6 egress although root's IPv4 HTTPS works.
+ # Bound the fetch to three short IPv4 attempts; never execute a failed/partial file.
+ local attempt fetch_rc=0 fetch_reason='network failure'
+ for attempt in 1 2 3;do
+  rm -f "$bootstrap"
+  if curl -4 --proto '=https' --tlsv1.2 -fsSL --connect-timeout 8 --max-time 30 \
+    https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh \
+    -o "$bootstrap" 2>"$log";then
+   fetch_rc=0
+   break
+  else
+   fetch_rc=$?
+  fi
+  case "$fetch_rc" in
+   6) fetch_reason='DNS resolution failed';;
+   7) fetch_reason='TCP connection failed';;
+   22) fetch_reason='HTTP download rejected';;
+   28) fetch_reason='connection timeout';;
+   35|60) fetch_reason='TLS negotiation or validation failed';;
+   *) fetch_reason="curl exit $fetch_rc";;
+  esac
+  if (( attempt < 3 ));then sleep 3;fi
+ done
+ if (( fetch_rc != 0 ));then
+  rm -f "$bootstrap" "$log"
+  UPDATER_ERROR="Fresh Agent updater download failed: $fetch_reason (IPv4, 3 attempts)"
+  return 1
  fi
+ rm -f "$log"
  if ! bash -n "$bootstrap" || ! grep -Fq 'XMESH_TARGET_AWARE_UPDATER=1' "$bootstrap" || ! grep -Fq "AGENT_VERSION=\"$expected_version\"" "$bootstrap" || ! grep -Fq 'xmesh-node-agent-upgrade.service' "$bootstrap";then
   rm -f "$bootstrap";UPDATER_ERROR='Fresh Agent updater failed target validation';return 1
  fi
