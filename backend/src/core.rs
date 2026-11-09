@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+use std::collections::HashMap;
 use std::{
     io::{Cursor, Read},
     os::unix::fs::{PermissionsExt, symlink},
@@ -76,10 +76,12 @@ struct GhcrAnonymousToken {
 
 fn official_xray_image_tag(version: &str) -> Option<&str> {
     let tag = version.strip_prefix('v')?;
-    if tag.len() > 64 || !tag.bytes().all(|c|
-        c.is_ascii_alphanumeric() || b"._+-".contains(&c)
-    ) || tag.split('.').take(3).count() != 3
-       || !tag.bytes().next().is_some_and(|c| c.is_ascii_digit())
+    if tag.len() > 64
+        || !tag
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"._+-".contains(&c))
+        || tag.split('.').take(3).count() != 3
+        || !tag.bytes().next().is_some_and(|c| c.is_ascii_digit())
     {
         return None;
     }
@@ -418,14 +420,16 @@ impl CoreManager {
         // GHCR is a bearer-token registry even for publicly visible packages.
         // The unauthenticated /v2/ 401 challenge does not tell us whether a
         // release-specific manifest actually exists.
-        let Ok(response) = self.client
+        let Ok(response) = self
+            .client
             .get("https://ghcr.io/token")
             .query(&[
                 ("service", "ghcr.io"),
                 ("scope", "repository:xtls/xray-core:pull"),
             ])
             .timeout(Duration::from_secs(10))
-            .send().await
+            .send()
+            .await
         else {
             return "unknown";
         };
@@ -910,8 +914,8 @@ fn chrono_free_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ghcr_manifest_status, official_xray_image_tag, normalize_version, parse_ech_output, parse_vless_encryption_output,
-        validate_ech_public_name,
+        ghcr_manifest_status, normalize_version, official_xray_image_tag, parse_ech_output,
+        parse_vless_encryption_output, validate_ech_public_name,
     };
 
     #[test]
@@ -965,7 +969,10 @@ mod tests {
         assert_eq!(ghcr_manifest_status(StatusCode::OK), "available");
         assert_eq!(ghcr_manifest_status(StatusCode::NOT_FOUND), "missing");
         assert_eq!(ghcr_manifest_status(StatusCode::UNAUTHORIZED), "unknown");
-        assert_eq!(ghcr_manifest_status(StatusCode::SERVICE_UNAVAILABLE), "unknown");
+        assert_eq!(
+            ghcr_manifest_status(StatusCode::SERVICE_UNAVAILABLE),
+            "unknown"
+        );
         assert_eq!(official_xray_image_tag("v26.11.9"), Some("26.11.9"));
         assert_eq!(official_xray_image_tag("../../bad"), None);
         assert_eq!(official_xray_image_tag("https://host/"), None);
