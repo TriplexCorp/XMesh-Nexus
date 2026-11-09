@@ -15,6 +15,16 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Некорректная версия Xray.": "Invalid Xray version.",
+    "установлен": "installed",
+    "»? При обновлении возможен краткий разрыв подключений. Агент проверит конфигурацию и при сбое восстановит старый образ.": "”? Updating may briefly interrupt connections. The Agent validates the configuration and restores the previous image if needed.",
+    "Обновить Xray ·": "Update Xray ·",
+    "· ожидается heartbeat": "· awaiting heartbeat",
+    "Ход обновления Xray": "Xray update progress",
+    "Обновление Xray недоступно. Обновите страницу.": "Xray update is unavailable. Reload the page.",
+    "Обновление Xray завершено:": "Xray update finished:",
+    "Ошибка выбора версии Xray:": "Xray version selection failed:",
+    "Версия:": "Version:",
     "Выбранные узлы не найдены.": "Selected nodes were not found.",
     "выбранных узлов": "selected nodes",
     "Управляющий Agent не поддерживает обновление Xray. Обновите Agent.": "The control Agent cannot update Xray. Update the Agent.",
