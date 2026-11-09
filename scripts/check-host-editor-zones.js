@@ -125,10 +125,9 @@ assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*position:static[^}]*z
 assert.match(css,/@media \(max-width:900px\)[\s\S]*?\.host-connection-workspace,\.host-preview-workspace\{grid-template-columns:minmax\(0,1fr\)/,'Narrow task workspaces must stack');
 assert.match(css,/@media \(max-width:560px\)[\s\S]*?\.host-connect-fields,\.host-public-fields,\.host-advanced-fields\{grid-template-columns:minmax\(0,1fr\)/,'Phone fields must keep usable widths');
 
-// User Details has one compact, fixed-size shell, shared by all five task
-// panels. The canonical workspace-dialog-contract.css (loaded last) owns it.
-assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:64rem[\s\S]*?min-inline-size:0[\s\S]*?height:min\(38\.5rem,calc\(100dvh - 2rem\)\)[\s\S]*?max-block-size:calc\(100dvh - 2rem\)/,
- 'User Details must use the canonical 64 × 38.5rem viewport-clamped frame');
+// User Details keeps a stable tab frame while adapting to viewport and zoom.
+assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:clamp\(64rem,58vw,108rem\)[\s\S]*?height:min\(clamp\(38\.5rem,64dvh,49rem\),calc\(100dvh - 2rem\)\)[\s\S]*?max-block-size:calc\(100dvh - 2rem\)/,
+ 'User Details must use the viewport-responsive width and bounded desktop height');
 assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?opacity \.34s[\s\S]*?transform \.50s[\s\S]*?overlay \.50s allow-discrete/,
  'User Details must retain its accessible premium open/close motion');
 assert.match(css,/dialog#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:100%[\s\S]*?max-block-size:100%[\s\S]*?display:grid[\s\S]*?grid-template-rows:auto auto auto minmax\(0,1fr\) auto auto auto[\s\S]*?border:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
@@ -145,8 +144,10 @@ assert.match(css,/html\[data-motion=off\] #dlg\.user-modal[\s\S]*?transition:non
  'User details premium motion must respect the animation setting');
 const userDetailsCss=fs.readFileSync('frontend/styles/features/users/user-details.css','utf8');
 const canonicalDialogsCss=fs.readFileSync('frontend/styles/system/workspace-dialog-contract.css','utf8');
-assert.ok(canonicalDialogsCss.includes('--dialog-width:82rem'),
- 'User drawer must widen at effective wide desktop viewports without changing its fixed height');
+assert.ok(canonicalDialogsCss.includes('zoom:1.12;') &&
+ canonicalDialogsCss.includes('height:min(clamp(38.5rem,64dvh,49rem),82dvh);') &&
+ canonicalDialogsCss.includes('block-size:min(clamp(38.5rem,64dvh,49rem),82dvh);'),
+ 'Wide User Details must proportionally scale typography and keep a viewport-safe height');
 assert.ok(userDetailsCss.includes('.user-settings-cards>.user-connection-card'),
  'Connection card must have explicit two-column desktop ownership');
 assert.match(userDetailsCss,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,
