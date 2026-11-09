@@ -88,7 +88,7 @@ fn official_xray_image_tag(version: &str) -> Option<&str> {
     Some(tag)
 }
 
-fn ghcr_manifest_status(status: reqwest::StatusCode) -> &'static str {
+const fn ghcr_manifest_status(status: reqwest::StatusCode) -> &'static str {
     match status.as_u16() {
         200 => "available",
         404 => "missing",
