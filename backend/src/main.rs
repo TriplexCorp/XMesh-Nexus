@@ -388,6 +388,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
             get(node_runtime::available_xray_releases),
         )
         .route(
+            "/nodes/xray-image-status",
+            get(node_runtime::xray_image_status),
+        )
+        .route(
             "/users/{id}/subscription",
             get(user_subscriptions::status)
                 .post(user_subscriptions::create)
