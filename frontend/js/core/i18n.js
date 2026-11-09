@@ -18,7 +18,7 @@ window.XMeshI18n=(()=>{
     "Отсчёт": "Countdown",
     "Включить или отключить лимит устройств": "Enable or disable device limit",
     "Ограничивать число устройств": "Limit number of devices",
-    "Включает лимит по числу зарегистрированных устройств. 0 — без лимита.": "Applies the registered-device limit. 0 means unlimited.",
+    "Автоматический контроль при лимите больше 0.": "Automatically checks registered devices when the limit is above 0.",
     "Создайте учётную запись с нужным уровнем доступа и ограничениями.": "Create an account with the required access level and limits.",
     "Основные параметры учётной записи.": "Essential account details.",
     "Доступ, трафик и устройства.": "Access, traffic and devices.",
