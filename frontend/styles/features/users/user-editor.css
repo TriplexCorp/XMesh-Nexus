@@ -1294,7 +1294,7 @@
  * They never depend on the wide CSS viewport heuristic above. */
 @media(max-width:680px){
   #dlg.user-create-modal .user-create-head{min-height:0}
-  #dlg.user-create-modal .user-create-head h2{font-size:1.2rem}
+  #dlg.user-create-modal .user-create-head h2{font-size:max(22px,1.3rem)}
   #dlg.user-create-modal .user-create-head p{display:none}
   #dlg.user-create-modal .user-create-workspace{grid-template-columns:minmax(0,1fr)}
   #dlg.user-create-modal .user-create-section{padding:var(--nx-section-pad)}
