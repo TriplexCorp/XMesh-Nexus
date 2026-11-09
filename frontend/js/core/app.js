@@ -4249,13 +4249,20 @@ const XMeshNodeXrayOps=Object.freeze({
       }
       if(status?.state!=='succeeded')throw new Error('Агент не подтвердил обновление Xray за 10 минут.');
       onStage('verifying');
-      const fresh=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-      updateNodeRuntimeBadges(node,fresh);
-      const installed=String(fresh.xrayVersion||'').replace(/^v/,'');
       const target=version.replace(/^v/,'');
-      if(installed&&installed!==target)throw new Error('Агент подтвердил команду, но heartbeat сообщает Xray '+installed+' вместо '+target+'.');
+      let observed=null;
+      const verifyUntil=Date.now()+45000;
+      while(Date.now()<verifyUntil){
+        observed=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+        updateNodeRuntimeBadges(node,observed);
+        if(String(observed.xrayVersion||'').replace(/^v/,'')===target)break;
+        await new Promise(resolve=>setTimeout(resolve,2500));
+      }
+      // Command ACK is authoritative for installation. A lagging heartbeat
+      // is reported as pending verification rather than a false failure.
+      const warning=String(observed?.xrayVersion||'').replace(/^v/,'')!==target;
       return {id,name:node.name,version,targetVersion:target,
-        message:status.result||'Xray '+target+' установлен',warning:!installed};
+        message:status.result||'Xray '+target+' установлен',warning};
     }finally{
       nodeXrayUpdating.delete(id);
       paintNodeXrayUpdate(id);
