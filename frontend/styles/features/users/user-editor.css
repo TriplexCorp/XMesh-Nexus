@@ -1370,6 +1370,10 @@
   line-height:1;
   font-weight:690;
 }
+#dlg.user-create-modal .user-create-cal-day:disabled{
+  opacity:.58;
+  color:var(--mu);
+}
 #dlg.user-create-modal .user-create-cal-day:focus-visible,
 #dlg.user-create-modal .user-create-duration-preset:focus-visible,
 #dlg.user-create-modal .user-create-cal-nav:focus-visible{
