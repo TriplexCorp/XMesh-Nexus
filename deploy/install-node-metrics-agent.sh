@@ -95,7 +95,7 @@ WantedBy=timers.target
 EOF
 
 curl --fail --silent --show-error --location "$RAW_BASE/node-control-agent.sh" -o "$CONTROL_TMP"
-bash -n "$CONTROL_TMP"; grep -Fxq 'AGENT_VERSION="control-v6.0.8"' "$CONTROL_TMP" || { echo "Nexus main does not expose Agent v6.0.7" >&2; exit 1; }
+bash -n "$CONTROL_TMP"; grep -Fxq 'AGENT_VERSION="control-v6.0.8"' "$CONTROL_TMP" || { echo "Nexus main does not expose Agent v6.0.8" >&2; exit 1; }
 install -o root -g root -m 0700 "$CONTROL_TMP" /usr/local/sbin/xmesh-node-control
 cat > /etc/systemd/system/xmesh-node-control.service <<'EOF'
 [Unit]
