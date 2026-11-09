@@ -321,3 +321,11 @@ html[data-motion=off] #dlg.user-modal::backdrop{
   margin:0;
   z-index:auto;
 }
+
+/* At zoomed-out desktop scales a 64rem user drawer becomes a narrow island.
+ * Widen the workspace, not its typography or the fixed-height tab contract. */
+@media(min-width:2200px){
+  dialog#dlg.user-modal{
+    --dialog-width:82rem;
+  }
+}

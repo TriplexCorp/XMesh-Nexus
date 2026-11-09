@@ -1725,3 +1725,132 @@ dialog.user-modal .user-pane {
   #dlg.user-modal .user-overview-band>.user-identity-row{grid-column:1;grid-row:3}
   #dlg.user-modal .user-overview-band>.user-usage-line:not(:first-child){grid-column:1;grid-row:4}
 }
+
+/* User workstation / Settings composition.
+ * Reuse Nexus materials and control type; give existing user fields the same
+ * dense two-column reading order as other panel cards. */
+@media(min-width:1100px){
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);
+    grid-template-rows:auto auto;
+    align-items:stretch;
+    column-gap:var(--nx-space-3);
+    row-gap:var(--nx-space-3);
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-basic-card{
+    grid-column:1;grid-row:1;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    align-content:start;
+    gap:var(--nx-space-2) var(--nx-space-3);
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-connection-card{
+    grid-column:2;grid-row:1;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    align-content:start;
+    gap:var(--nx-space-2) var(--nx-space-3);
+  }
+  dialog#dlg.user-modal .user-pane-settings :is(.user-basic-card,.user-connection-card)>.user-card-title{
+    grid-column:1/-1;
+  }
+  dialog#dlg.user-modal .user-pane-settings :is(.user-basic-card,.user-connection-card)>.f{
+    grid-column:auto;
+    min-width:0;
+    margin:0;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-note-card{
+    grid-column:1/-1;
+    grid-row:2;
+    min-width:0;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-note-card textarea{
+    min-height:3.55rem;
+    max-height:10rem;
+  }
+}
+@media(min-width:761px) and (max-width:1099px){
+  dialog#dlg.user-modal .user-pane-settings .user-settings-cards{
+    grid-template-columns:minmax(0,1fr);
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-connection-card{
+    grid-column:1;
+  }
+}
+#dlg.user-modal .user-detail-card{
+  gap:var(--nx-space-2);
+  padding:var(--nx-space-3) var(--nx-space-4);
+}
+#dlg.user-modal .user-detail-card .user-card-title{
+  gap:var(--nx-space-2);
+  padding-bottom:var(--nx-space-2);
+}
+#dlg.user-modal .user-detail-card .user-card-title>.ic{
+  width:1.1rem;
+  height:1.1rem;
+}
+#dlg.user-modal .user-detail-card .user-card-title h3{
+  font-size:var(--nx-text-md);
+  font-weight:735;
+}
+#dlg.user-modal .user-detail-card .user-card-title p{
+  font-size:var(--nx-text-xs);
+  line-height:1.3;
+}
+dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f{
+  gap:.28rem;
+  min-width:0;
+}
+dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
+  font-size:var(--nx-text-sm);
+  line-height:1.25;
+  font-weight:670;
+}
+#dlg.user-modal .user-detail-card :is(input:not([type=checkbox]):not([type=radio]),select,.xm-select-trigger,.user-date-trigger){
+  min-width:0;
+  width:100%;
+  height:var(--nx-control-h);
+  min-height:var(--nx-control-h);
+  font-size:var(--nx-text-sm);
+}
+#dlg.user-modal .user-overview-band{
+  column-gap:var(--nx-space-3);
+  row-gap:var(--nx-space-1);
+}
+#dlg.user-modal .user-editor-tabs{
+  gap:var(--nx-space-1);
+  padding-block:.25rem .38rem;
+}
+#dlg.user-modal .user-editor-tabs [role=tab]{
+  padding:.4rem .68rem;
+  font-size:var(--nx-text-sm);
+}
+#dlg.user-modal .user-canvas-grid{
+  padding-block:var(--nx-space-2);
+}
+#dlg.user-modal .user-editor-actions{
+  gap:var(--nx-space-2);
+  min-height:2.65rem;
+  padding:.36rem 0;
+}
+#dlg.user-modal .user-editor-actions .user-save-button{
+  order:-1;
+  margin-inline-start:0;
+}
+#dlg.user-modal .user-editor-actions .user-edit-dirty{
+  order:1;
+  margin-inline-start:auto;
+  text-align:end;
+}
+@media(max-width:760px){
+  #dlg.user-modal .user-detail-card{
+    padding:var(--nx-space-3);
+  }
+  #dlg.user-modal .user-editor-actions{
+    flex-wrap:wrap;
+  }
+  #dlg.user-modal .user-editor-actions .user-save-button{
+    max-width:100%;
+  }
+}

@@ -1711,6 +1711,42 @@ async function main() {
         'Administrator note must follow the basic data on the left');
       assert(layout.fields.length===4&&Math.abs(layout.fields[0].x-layout.fields[1].x)>8,
         'Basic user data must form two compact columns on desktop');
+      const composition=await page.locator('#dlg').evaluate(d=>{
+        const rect=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+        const connectionNames=['limit','cdnLimitGb','strategy','tag'];
+        const controls=connectionNames.map(name=>d.querySelector('.user-connection-card [name="'+name+'"]'));
+        const fields=controls.slice(0,2).map(control=>{
+          const el=control?.closest('.f');
+          if(!el)return null;
+          const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width};
+        });
+        return{
+          body:rect('.user-canvas-grid'),
+          basic:rect('.user-basic-card'),
+          connection:rect('.user-connection-card'),
+          note:rect('.user-note-card'),
+          save:rect('.user-save-button'),
+          actions:rect('.user-editor-actions'),
+          fields,
+          connectionControls:controls.map(Boolean),
+          rem:parseFloat(getComputedStyle(document.documentElement).fontSize)
+        };
+      });
+      assert(composition.connectionControls.every(Boolean),'Connection card must preserve limit, CDN limit, reset strategy and tag fields');
+      assert(composition.fields.every(Boolean)&&Math.abs(composition.fields[0].x-composition.fields[1].x)>8&&Math.abs(composition.fields[0].y-composition.fields[1].y)<=4,
+        'Connection controls must use two columns rather than a long vertical rail');
+      assert(composition.note.x<=composition.basic.x+2&&composition.note.right>=composition.connection.right-2,
+        'Note must span the full workspace below both settings cards');
+      assert(composition.note.y>=Math.max(composition.basic.bottom,composition.connection.bottom)-2,
+        'Note must follow both upper cards without overlapping either');
+      assert(composition.save.x<=composition.actions.x+composition.actions.width*.5,
+        'Save action should be left-aligned consistently with Nexus dialogs');
+      if(width>=2200){
+        assert(g.dialog.height<=38.5*g.rem+2,'Wider desktop canvas must preserve fixed height');
+        assert(Math.abs(composition.basic.width-composition.connection.width)<composition.connection.width*.25,
+          'Settings cards must keep balanced proportions');
+        assert(composition.body.width>=70*g.rem,'Zoomed-out desktop user drawer must not become a narrow island');
+      }
       for(const key of ['acc','routing','traffic','dev','ov']){
         await page.locator(`[data-user-editor-tab="${key}"]`).click();
         const bounds=await page.locator('#dlg').boundingBox();
