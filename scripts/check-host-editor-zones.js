@@ -143,4 +143,16 @@ assert.match(css,/#dlg\.user-modal \.user-canvas-foot\s*\{[\s\S]*?flex:0 0 auto[
  'User details footer must remain metadata, not render as a second material strip');
 assert.match(css,/html\[data-motion=off\] #dlg\.user-modal[\s\S]*?transition:none!important/,
  'User details premium motion must respect the animation setting');
+const userDetailsCss=fs.readFileSync('frontend/styles/features/users/user-details.css','utf8');
+const canonicalDialogsCss=fs.readFileSync('frontend/styles/system/workspace-dialog-contract.css','utf8');
+assert.ok(canonicalDialogsCss.includes('--dialog-width:82rem'),
+ 'User drawer must widen at effective wide desktop viewports without changing its fixed height');
+assert.ok(userDetailsCss.includes('.user-settings-cards>.user-connection-card'),
+ 'Connection card must have explicit two-column desktop ownership');
+assert.match(userDetailsCss,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,
+ 'Connection fields must form compact readable columns');
+assert.ok(userDetailsCss.includes('.user-settings-cards>.user-note-card'),
+ 'The note must have a full-width workspace row');
+assert.ok(userDetailsCss.includes('.user-editor-actions .user-save-button'),
+ 'The save action must be consistently aligned in the workspace footer');
 console.log('Workspace dialogs: accessible Host tasks, stable frame and User details OK');
