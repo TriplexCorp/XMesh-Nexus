@@ -21,6 +21,7 @@ const legacy=fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 const api=entry+'\n'+legacy;
 const router=fs.readFileSync('backend/src/main.rs','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
+const worker=fs.readFileSync('deploy/xmesh-xray-update.py','utf8');
 const frontend=fs.readFileSync('frontend/js/core/app.js','utf8');
 assert.match(router,/\/nodes\/\{id\}\/xray-update/);
 assert.match(api,/pub async fn request_xray_update/);
@@ -36,18 +37,19 @@ assert.match(api,/if disabled \{/,'Disabled nodes must enforce Xray shutdown via
 assert.match(api,/version LIKE 'control-v3%'/);
 assert.match(api,/node\.xray\.update\.requested/);
 assert.match(agent,/update_managed_xray\(\)/);
-assert.match(agent,/ghcr\.io\/xtls\/xray-core:\$image_tag/);
-assert.doesNotMatch(agent,/local image=ghcr\.io\/xtls\/xray-core:latest/);
-assert.match(agent,/xmesh-managed-xray/);
-assert.match(agent,/run -test -config \/etc\/xray\/config\.json/);
-assert.match(agent,/previous image restored/);
-assert.match(agent,/pull_pinned_xray_image\(\)/,'Agent must retry official GHCR image pulls');
-assert.match(agent,/GHCR API reachable over IPv4, check Docker daemon or image CDN reachability/,
- 'GHCR registry preflight must not be mistaken for a successful Docker layer download');
-assert.match(agent,/timeout 115 docker pull "\$image"/,'Allow a bounded registry download window');
-assert.match(agent,/for attempt in 1 2;do/,'Download must retry once on transient GHCR failure');
-assert.match(agent,/registry connectivity or CDN failure/,'Reported failure must distinguish registry connectivity');
-assert.doesNotMatch(agent,/timeout 75 docker pull "\$image"/,'Old one-shot GHCR pull must not return');
+assert.match(agent,/xmesh-xray-update[.]py/);
+assert.match(worker,/OFFICIAL = "ghcr.io\/xtls\/xray-core:"/);
+assert.doesNotMatch(worker,/xray-core:latest/);
+assert.ok(worker.includes("[identity, 'run', '-test', '-config', '/etc/xray/config.json']"));
+assert.ok(worker.includes("['rename', self.name, self.backup]"),'Exact old container must survive switching');
+assert.ok(worker.includes("self.health(self.name, self.record['oldImage'])"),'Rollback must be checked');
+assert.ok(worker.includes("self.record['result']"),'Result must be durable for duplicate delivery');
+assert.ok(worker.includes("['pull', image], timeout=115"));
+assert.ok(worker.includes('for attempt in range(2)'));
+assert.match(worker,/registry_unavailable/);
+assert.match(worker,/pinned-release[.]json/);
+const transaction=spawnSync('python3',['scripts/test-xray-update-unit.py'],{encoding:'utf8'});
+assert.equal(transaction.status,0,'Executable transaction tests: '+transaction.stderr);
 for(const source of ['backend/src/node_runtime.rs','backend/src/node_runtime_p0d_staged.rs','backend/src/node_runtime_legacy.rs']){
  const rust=fs.readFileSync(source,'utf8');
  assert.match(rust,/action='update_xray' AND requested_at<NOW\(\)-INTERVAL '10 minutes'/,

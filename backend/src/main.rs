@@ -12,6 +12,7 @@ mod node_policy;
 mod node_rotation;
 mod node_routing;
 mod node_runtime;
+mod node_xray_update;
 mod panel_version;
 
 mod protocol_credentials;
@@ -494,6 +495,7 @@ fn application_router(state: AppState) -> Router {
         .route("/node/heartbeat", post(node_runtime::heartbeat))
         .route("/node/restart/poll", post(node_runtime::poll_restart))
         .route("/node/restart/ack", post(node_runtime::acknowledge_restart))
+        .route("/node/restart/progress", post(node_xray_update::progress))
         .route("/node/desired-config", post(node_runtime::desired_config))
         .route("/node/enroll", post(node_enrollment::claim))
         .route("/sub/{token}", get(user_subscriptions::serve))
@@ -765,6 +767,7 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
             | "/api/v1/node/heartbeat"
             | "/api/v1/node/desired-config"
             | "/api/v1/node/restart/poll"
+            | "/api/v1/node/restart/progress"
             | "/api/v1/node/restart/ack" => request.headers().contains_key("x-xmesh-signature"),
             "/api/v1/node/enroll" => request
                 .headers()

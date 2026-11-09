@@ -1,0 +1,28 @@
+name: Managed Xray transaction
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  real-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Pull two actually published official Xray images
+        run: |
+          docker pull ghcr.io/xtls/xray-core:26.10.21
+          docker pull ghcr.io/xtls/xray-core:26.10.31
+      - name: Reproduce TLS mount bug, transfer traffic and verify update/rollback
+        run: sudo -E python3 scripts/test-managed-xray-transaction.py
+      - name: Deterministic transaction and diagnostics tests
+        run: python3 scripts/test-xray-update-unit.py
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Single and bulk UI stages and independent outcomes
+        run: node scripts/test-xray-update-ui.cjs

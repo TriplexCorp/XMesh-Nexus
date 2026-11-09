@@ -256,7 +256,7 @@
       item.status='running';item.message=stages.checking;update(area,spec);
       try{
         const result=await ops.updateOne(Number(item.id),version,{
-          onStage:stage=>{item.message=stages[stage]||stages.checking;update(area,spec);}
+          onStage:stage=>{item.message=stages[stage]||window.XMeshXrayUpdateStageLabel?.(stage)||trans('Xray обновляется','Xray updating');update(area,spec);}
         });
         item.status='success';
         item.message=result.warning

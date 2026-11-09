@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.9"
+AGENT_VERSION="control-v6.0.10"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -149,127 +149,27 @@ restart_xray(){
 }
 # Only the specifically managed container may be upgraded. A non-managed
 # Xray, arbitrary Docker container or remote-selected image is never modified.
-persist_pinned_xray_image(){
- local image="$1"
- [[ "$image" =~ ^ghcr[.]io/xtls/xray-core:[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]] || return 1
- local state=/var/lib/xmesh-xray-sync
- local tmp
- tmp="$(mktemp "$state/pin.XXXXXXXX")" || return 1
- printf '%s\n' "$image" > "$tmp"
- chmod 600 "$tmp"
- mv -f "$tmp" "$state/pinned-image"
-}
-# A fixed official registry reference is the only allowed pull target.
-# Keep Xray serving the old image until the new one has been downloaded,
-# validated with the current configuration and inspected by immutable ID.
-pull_pinned_xray_image(){
- local image="$1" attempt rc=0 failure='registry request failed' log
- [[ "$image" =~ ^ghcr[.]io/xtls/xray-core:[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]] || {
-  detail='Invalid official Xray image reference';return 1
- }
- log="$(mktemp /run/xmesh-xray-pull.XXXXXXXX)" || { detail='Cannot prepare Xray download diagnostic';return 1; }
- chmod 600 "$log"
- for attempt in 1 2;do
-  : > "$log"
-  if timeout 115 docker pull "$image" > "$log" 2>&1;then
-   rm -f "$log";return 0
-  else
-   rc=$?
-  fi
-  if [[ "$rc" == 124 || "$rc" == 137 ]];then
-   failure='timeout contacting GHCR'
-  elif grep -Eqi 'manifest unknown|manifest not found|not found' "$log";then
-   failure='official release image not found'
-  elif grep -Eqi 'unauthorized|denied|forbidden' "$log";then
-   failure='registry denied download'
-  elif grep -Eqi 'connection refused|no route to host|network is unreachable|i/o timeout|TLS handshake timeout|lookup .* no such host|context deadline exceeded|502 Bad Gateway|503 Service Unavailable|504 Gateway' "$log";then
-   failure='registry connectivity or CDN failure'
-  else
-   failure="Docker download failed (exit $rc)"
-  fi
-  if (( attempt < 2 ));then sleep 4;fi
- done
- rm -f "$log"
- # ghcr.io/v2/ normally responds 401 to unauthenticated curl requests.
- # This distinguishes a host-side route failure from a Docker daemon/blob-CDN
- # failure, without treating the registry probe as proof that layers work.
- local probe_status=''
- probe_status="$(curl -4 --proto '=https' --tlsv1.2 -sS -o /dev/null \
-  -w '%{http_code}' --connect-timeout 5 --max-time 10 https://ghcr.io/v2/ 2>/dev/null || true)"
- if [[ "$probe_status" == 401 ]];then
-  detail="Xray image download failed: $failure after 2 attempts. GHCR API reachable over IPv4, check Docker daemon or image CDN reachability"
- else
-  detail="Xray image download failed: $failure after 2 attempts. GHCR IPv4 probe HTTP ${probe_status:-000}; check node registry/CDN reachability"
- fi
- return 1
-}
 update_managed_xray(){
- local version="${1:?Pinned Xray version required}"
- [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || {
-  detail='Invalid pinned release version';return 1
- }
- command -v docker >/dev/null || { detail='Docker not installed';return 1; }
- local name=xmesh-managed-xray
- # Official GitHub tags are v26.x.y; GHCR uses 26.x.y (without v).
- local image_tag="${version#v}"
- [[ "$image_tag" =~ ^[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]] || {
-  detail='Release tag has no compatible official GHCR image';return 1
- }
- local image="ghcr.io/xtls/xray-core:$image_tag"
- local config=/var/lib/xmesh-xray-sync/config.json
- # The reconciliation worker uses this same lock. Never race deployments.
- [[ -d /var/lib/xmesh-xray-sync ]] || { detail='Managed Xray state missing';return 1; }
- exec 8>/var/lib/xmesh-xray-sync/lock
- flock -w 10 8 || { detail='Xray configuration sync currently busy';return 1; }
- if ! docker inspect "$name" >/dev/null 2>&1;then
-  detail='Managed Xray container not found';return 1
- fi
- [[ -f "$config" ]] || { detail='Managed Xray config not found';return 1; }
- local geo_mount=()
- if compgen -G "/var/lib/xmesh-xray-sync/assets/*.dat" >/dev/null;then
-  geo_mount=(-e XRAY_LOCATION_ASSET=/usr/local/share/xray -v /var/lib/xmesh-xray-sync/assets:/usr/local/share/xray:ro)
- fi
- local old_image new_image
- old_image="$(docker inspect -f '{{.Image}}' "$name")" || return 1
- [[ "$old_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid previous image identity';return 1; }
- if ! pull_pinned_xray_image "$image";then return 1;fi
- new_image="$(docker image inspect -f '{{.Id}}' "$image")" || return 1
- [[ "$new_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid new image identity';return 1; }
- if [[ "$old_image" == "$new_image" ]];then
-  persist_pinned_xray_image "$image" || { detail='Failed to persist image pin';return 1; }
-  detail="Xray $version already installed";return 0
- fi
- if ! timeout 25 docker run --rm --network none --user 0:0 --cap-drop ALL \
-  --security-opt no-new-privileges --entrypoint xray \
-  -v "$config:/etc/xray/config.json:ro" "${geo_mount[@]}" "$new_image" \
-  run -test -config /etc/xray/config.json >/dev/null;then
-  detail='New Xray image failed config validation';return 1
- fi
- docker rm -f "$name" >/dev/null || { detail='Could not stop previous Xray';return 1; }
- if docker run -d --name "$name" --restart unless-stopped --network host \
-  --user 0:0 --read-only --security-opt no-new-privileges --cap-drop ALL \
-  -v "$config:/etc/xray/config.json:ro" "${geo_mount[@]}" "$new_image" \
-  run -config /etc/xray/config.json >/dev/null;then
-   sleep 3
-   if docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null | grep -qx true;then
-    if ! persist_pinned_xray_image "$image";then
-     detail='Xray installed but image pin could not be persisted';return 1
-    fi
-    detail="Xray $version installed and running";return 0
-   fi
- fi
- docker rm -f "$name" >/dev/null 2>&1 || true
- # Roll back to the exact locally cached prior image, never a moving tag.
- if docker run -d --name "$name" --restart unless-stopped --network host \
-  --user 0:0 --read-only --security-opt no-new-privileges --cap-drop ALL \
-  -v "$config:/etc/xray/config.json:ro" "${geo_mount[@]}" "$old_image" \
-  run -config /etc/xray/config.json >/dev/null;then
-   detail='New image failed health check; previous image restored'
- else
-   detail='New image failed; automatic rollback also failed'
- fi
- return 1
+ local version="${1:?Pinned Xray version required}" worker=/usr/local/libexec/xmesh-xray-update.py event kind payload outcome=false
+ [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.10"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
+ # Only fixed JSON stages and a sanitized final result cross the signed channel.
+ # The worker preserves the exact old container until preflight succeeds and
+ # validates all actual TLS/GeoData mounts with run -test before switching.
+ while IFS= read -r event;do
+  kind="$(printf '%s' "$event" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("kind",""))')" || continue
+  if [[ "$kind" == progress ]];then
+   payload="$(python3 -c 'import json,sys;d=json.loads(sys.argv[1]);d.pop("kind",None);d.update(node_id=int(sys.argv[2]),command_id=int(sys.argv[3]));print(json.dumps(d))' "$event" "$XMESH_NODE_ID" "$command_id")"
+   signed_post '/api/v1/node/restart/progress' "$payload" >/dev/null || true
+  elif [[ "$kind" == result ]];then
+   detail="$(printf '%s' "$event" | python3 -c 'import json,sys;print(json.load(sys.stdin)["detail"])')"
+   outcome="$(printf '%s' "$event" | python3 -c 'import json,sys;print("true" if json.load(sys.stdin)["success"] else "false")')"
+   payload="$(python3 -c 'import json,sys;d=json.loads(sys.argv[1]);p={k:d[k] for k in ("stage","code","exitCode","rollback") if k in d and d[k] is not None};p.update(node_id=int(sys.argv[2]),command_id=int(sys.argv[3]));print(json.dumps(p))' "$event" "$XMESH_NODE_ID" "$command_id")"
+   signed_post '/api/v1/node/restart/progress' "$payload" >/dev/null || true
+  fi
+ done < <(python3 "$worker" --version "$version" --command-id "$command_id")
+ [[ "$outcome" == true ]]
 }
+
 # Persistent quota/manual shutdown marker. Prevent systemd reboot activation and
 # docker restart after a denied node is stopped.
 STATE_DIR=/var/lib/xmesh-node-control
@@ -549,7 +449,7 @@ else
 fi
 ack_identity=''
 if [[ "$release_version" != - ]];then ack_identity=",\"releaseIdentity\":{\"version\":\"$release_version\",\"sourceRevision\":\"$source_revision\",\"artifactSha256\":\"$artifact_sha256\"}";fi
-ack_payload="{\"node_id\":$XMESH_NODE_ID,\"command_id\":$command_id,\"success\":$success,\"detail\":\"$detail\"$ack_identity}"
+ack_payload="$(python3 -c 'import json,sys;d={"node_id":int(sys.argv[1]),"command_id":int(sys.argv[2]),"success":sys.argv[3]=="true","detail":sys.argv[4]};d.update(json.loads("{"+sys.argv[5].lstrip(",")+"}"));print(json.dumps(d))' "$XMESH_NODE_ID" "$command_id" "$success" "$detail" "$ack_identity")"
 if signed_post '/api/v1/node/restart/ack' "$ack_payload" >/dev/null;then
  if [[ "$release_version" != - ]];then clear_agent_release_identity;fi
 else

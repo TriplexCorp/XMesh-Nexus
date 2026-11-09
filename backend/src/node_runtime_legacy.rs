@@ -535,6 +535,7 @@ pub async fn status(
                 // The server's fixed-update gate and this read-only status
                 // are compared by the Xray release regression contract.
                 "xrayUpdateSupported":fresh && supports_managed_xray_update(&agent_version),
+                "xrayUpdateTransactionSupported":fresh && crate::node_xray_update::supported(&agent_version),
                 "routerRunning":row.try_get::<bool,_>("router_running")?,
                 "xrayRunning":row.try_get::<bool,_>("xray_running")?,
                 "xrayVersion":row.try_get::<Option<String>,_>("xray_version")?,
@@ -1059,7 +1060,7 @@ pub async fn restart_status(
     .execute(&state.pool)
     .await?;
     let item = sqlx::query(
-        "SELECT id,action,target_version,state,result,requested_by,
+        "SELECT id,action,target_version,state,result,requested_by,progress,
           (EXTRACT(EPOCH FROM requested_at)*1000)::BIGINT AS requested_ms,
           (EXTRACT(EPOCH FROM finished_at)*1000)::BIGINT AS finished_ms
          FROM node_restart_commands WHERE node_id=$1 ORDER BY id DESC LIMIT 1",
@@ -1076,6 +1077,7 @@ pub async fn restart_status(
             "state":row.try_get::<String,_>("state")?,
             "result":row.try_get::<String,_>("result")?,
             "requestedBy":row.try_get::<String,_>("requested_by")?,
+            "progress":row.try_get::<Option<Value>,_>("progress")?,
             "requestedAt":row.try_get::<i64,_>("requested_ms")?,
             "finishedAt":row.try_get::<Option<i64>,_>("finished_ms")?
         }),
