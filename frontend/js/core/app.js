@@ -4208,7 +4208,7 @@ const XMeshNodeXrayOps=Object.freeze({
       let installed='';
       if(one){
         const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime');
-        if(runtime.xrayUpdateSupported!==true)throw new Error(runtime.connected
+        if(runtime.xrayUpdateSupported !== true)throw new Error(runtime.connected
           ?'Управляющий Agent не поддерживает обновление Xray. Обновите Agent.'
           :'Нет свежего подтверждения от управляющего Agent. Проверьте связь.');
         installed=runtime.xrayVersion||'';
@@ -4230,7 +4230,7 @@ const XMeshNodeXrayOps=Object.freeze({
     try{
       onStage('checking');
       const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-      if(runtime.xrayUpdateSupported!==true)throw new Error(runtime.connected
+      if(runtime.xrayUpdateSupported !== true)throw new Error(runtime.connected
         ?'Управляющий Agent не поддерживает обновление Xray. Обновите Agent.'
         :'Нет свежего Agent heartbeat. Проверьте подключение узла.');
       onStage('sending');
