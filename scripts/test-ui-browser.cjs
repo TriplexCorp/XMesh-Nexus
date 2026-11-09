@@ -2557,8 +2557,16 @@ async function main() {
 
     await checked('Motion: refresh и native dialogs используют единый premium-контракт',async()=>{
       await page.setViewportSize({width:1920,height:1080});
+      let previousMotion=null;
+      let motionCaptured=false;
+      try{
       await page.emulateMedia({reducedMotion:'no-preference'});
       await navigate('statistics');
+      previousMotion=await page.evaluate(()=>document.documentElement.dataset.motion??null);
+      motionCaptured=true;
+      // An earlier reduced-motion settings test may leave data-motion="off".
+      // Explicitly enable the feature under test without changing saved preferences.
+      await page.evaluate(()=>{document.documentElement.dataset.motion='on'});
       const refresh=await page.locator('#stats-refresh').evaluate(button=>{
         const icon=button.querySelector('.ic,svg');
         const before=getComputedStyle(button);
@@ -2587,6 +2595,16 @@ async function main() {
       assert.equal(reduced.animationName,'none','prefers-reduced-motion не отключает dialog animation.');
       await closeStudioDialog(selector);
       return{refresh,dialogMotion,reduced};
+      }finally{
+        // Always restore media and UI state, including when an assertion fails.
+        // Otherwise later Node geometry checks can sample the opening transition.
+        await page.emulateMedia({reducedMotion:'reduce'});
+        if(motionCaptured)await page.evaluate(previous=>{
+          if(previous===null)delete document.documentElement.dataset.motion;
+          else document.documentElement.dataset.motion=previous;
+        },previousMotion);
+        await page.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(d=>d.close()));
+      }
     });
 
     // Certificate-only profiles must not inflate the later squad inventory.
@@ -2599,6 +2617,9 @@ async function main() {
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
     for(const [width,height,edit] of [[1366,768,true],[1920,1080,true],[1920,1080,false],[390,844,false]])await checked(`Node editor TLS mode stability: ${edit?'edit':'create'} ${width}×${height}`,async()=>{
+      // This test compares stable layout geometry, not the dialog's opening
+      // animation. Never sample the in-flight transform at arbitrary frames.
+      await page.emulateMedia({reducedMotion:'reduce'});
       await page.setViewportSize({width,height});await navigate('nodes');
       const initialScale=await page.evaluate(()=>C.ts);
       await page.evaluate(()=>{C.ts=1.1;apply()});
