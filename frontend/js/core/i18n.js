@@ -15,6 +15,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Отсчёт": "Countdown",
+    "Включить или отключить лимит устройств": "Enable or disable device limit",
+    "Ограничивать число устройств": "Limit number of devices",
+    "Включает лимит по числу зарегистрированных устройств. 0 — без лимита.": "Applies the registered-device limit. 0 means unlimited.",
     "Создайте учётную запись с нужным уровнем доступа и ограничениями.": "Create an account with the required access level and limits.",
     "Основные параметры учётной записи.": "Essential account details.",
     "Доступ, трафик и устройства.": "Access, traffic and devices.",
