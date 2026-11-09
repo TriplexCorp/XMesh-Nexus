@@ -125,6 +125,10 @@ install -d -o root -g root -m 0755 /etc/systemd/system/xmesh-node-control.servic
 cat >/etc/systemd/system/xmesh-node-control.service.d/quota-stop.conf <<'EOF'
 [Service]
 ReadWritePaths=/var/lib/xmesh-node-control
+# Xray update downloads can require two bounded GHCR attempts.
+# Keep the old daemon running while pulling, but do not kill the control
+# worker before it can ACK the actual result.
+TimeoutStartSec=420s
 EOF
 cat >/etc/systemd/system/xmesh-node-control.timer <<'EOF'
 [Unit]
