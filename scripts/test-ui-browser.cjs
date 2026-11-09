@@ -894,6 +894,9 @@ async function main() {
           const update=scope.locator('[data-bulk-action="agent-update"]');
           assert.equal(await update.count(),1,'Nodes must expose a mass Agent update command');
           assert(await update.isEnabled(),'Selected nodes must enable mass Agent update');
+          const xray=scope.locator('[data-bulk-action="xray-update"]');
+          assert.equal(await xray.count(),1,'Nodes must expose mass Xray update alongside Agent update');
+          assert(await xray.isEnabled(),'Selected nodes must enable mass Xray update');
         }
         await scope.locator('[data-bulk-action="all"]').click();
         const visible=await scope.locator(card+':visible').count();
@@ -2977,7 +2980,7 @@ async function main() {
     const runtimePattern=/\/api\/v1\/nodes\/\d+\/runtime(?:\?.*)?$/;
     const runtimeFixture=async route=>{
       if(![node.id,hostPresetNode.id].some(id=>new URL(route.request().url()).pathname===`/api/v1/nodes/${id}/runtime`))return route.continue();
-      await route.fulfill({json:{connected:true,xrayUpdateSupported:true,version:'control-v6.0.7',xrayVersion:'26.10.31',xrayRunning:true,routerRunning:true,desiredRevisionSource:'current',desiredRevision:'fixture',appliedRevision:'fixture',tlsStatus:{state:'valid',daysRemaining:87},geoData:{state:'current',files:{geoip:{},geosite:{}}}}});
+      await route.fulfill({json:{connected:true,xrayUpdateSupported:true,version:'control-v6.0.8',xrayVersion:'26.10.31',xrayRunning:true,routerRunning:true,desiredRevisionSource:'current',desiredRevision:'fixture',appliedRevision:'fixture',tlsStatus:{state:'valid',daysRemaining:87},geoData:{state:'current',files:{geoip:{},geosite:{}}}}});
     };
     const metricsPattern='**/api/v1/statistics/overview';
     const metricsFixture=async route=>{

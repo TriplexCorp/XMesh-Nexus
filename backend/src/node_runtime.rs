@@ -21,7 +21,7 @@ use sqlx::Row;
 /// `XMesh` v6 is the first numbered POSTQUANTUM major control-Agent release.
 /// v4/v5 remain accepted only so an already enrolled node can perform the
 /// authenticated transition to v6; they are not the advertised target.
-pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.7";
+pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.8";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -150,7 +150,8 @@ pub async fn request_restart(
          result='Управляющий агент не подтвердил выполнение вовремя',finished_at=NOW()
          WHERE node_id=$1 AND state IN ('pending','claimed')
            AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
-                (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
+                (action='update_xray' AND requested_at<NOW()-INTERVAL '10 minutes') OR
+                (action NOT IN ('update_agent','update_xray') AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(node_id)
     .execute(&state.pool)
@@ -248,7 +249,8 @@ pub async fn request_xray_update(
          result='Command expired before delivery',finished_at=NOW()
          WHERE node_id=$1 AND state IN ('pending','claimed')
            AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
-                (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
+                (action='update_xray' AND requested_at<NOW()-INTERVAL '10 minutes') OR
+                (action NOT IN ('update_agent','update_xray') AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(node_id)
     .execute(&state.pool)
@@ -348,7 +350,8 @@ pub async fn request_agent_update(
          result='Command expired before delivery',finished_at=NOW()
          WHERE node_id=$1 AND state IN ('pending','claimed')
            AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
-                (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
+                (action='update_xray' AND requested_at<NOW()-INTERVAL '10 minutes') OR
+                (action NOT IN ('update_agent','update_xray') AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(node_id)
     .execute(&state.pool)

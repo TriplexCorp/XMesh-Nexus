@@ -4,7 +4,7 @@
  * server-side bulk endpoint: every change uses the existing validated API. */
 (()=>{
  const specs=[
-  {kind:'nodes',root:'.nodes-page',toolbar:'.nodes-toolbar',cards:'[data-node-card-id]',key:'data-node-card-id',actions:['enable','disable','agent-update','delete']},
+  {kind:'nodes',root:'.nodes-page',toolbar:'.nodes-toolbar',cards:'[data-node-card-id]',key:'data-node-card-id',actions:['enable','disable','agent-update','xray-update','delete']},
   {kind:'hosts',root:'.host-directory',toolbar:'.host-directory-toolbar',cards:'[data-host-card-id]',key:'data-host-card-id',actions:['enable','disable','delete']},
   {kind:'squads',root:'.squad-directory',toolbar:'.squad-directory-toolbar',cards:'[data-squad-card]',key:'data-squad-card',actions:['delete']},
   {kind:'tpls',root:'[data-template-section="tpls"]',toolbar:'.template-section-tools',cards:'[data-template-card^="tpls:"]',key:'data-template-card',actions:['delete']},
@@ -26,10 +26,11 @@
  const actionText=action=>({
   enable:trans('Включить','Enable'),disable:trans('Отключить','Disable'),
   delete:trans('Удалить','Delete'),
-  'agent-update':trans('Обновить Agent','Update Agent')
+  'agent-update':trans('Обновить Agent','Update Agent'),
+  'xray-update':trans('Обновить Xray','Update Xray')
  })[action];
  const bulkIcon=(name,label)=>ic(name)+'<span class="nx-bulk-action-label">'+label+'</span>';
- const actionIcon=action=>({enable:'play',disable:'pause',delete:'trash','agent-update':'refresh-cw'})[action]||'sliders';
+ const actionIcon=action=>({enable:'play',disable:'pause',delete:'trash','agent-update':'refresh-cw','xray-update':'download'})[action]||'sliders';
  const cardName=(kind,id)=>{
   if(kind==='balancers')return '#'+id;
   const record=(DB[kind]||[]).find(row=>String(row.id)===String(id));
@@ -143,14 +144,17 @@
   if(st.batch){
     const report=document.createElement('details');
     report.className='nx-bulk-report';report.open=reportOpen;
-    report.setAttribute('aria-label',trans('Ход обновления Agent','Agent update progress'));
+    const isXray=st.batch.action==='xray-update';
+    report.setAttribute('aria-label',isXray
+      ?trans('Ход обновления Xray','Xray update progress')
+      :trans('Ход обновления Agent','Agent update progress'));
     const total=st.batch.items.length,done=st.batch.items.filter(item=>['success','error'].includes(item.status)).length;
     const failed=st.batch.items.filter(item=>item.status==='error').length;
     const title=document.createElement('summary');
     title.className='nx-bulk-report-summary';
     title.innerHTML=ic('refresh-cw');
     const titleText=document.createElement('span');
-    titleText.textContent=trans('Обновление Agent: ','Agent update: ')+done+' / '+total+
+    titleText.textContent=(isXray?trans('Обновление Xray: ','Xray update: '):trans('Обновление Agent: ','Agent update: '))+done+' / '+total+
       (failed?' · '+trans('ошибок: ','failed: ')+failed:'');
     title.append(titleText);
     const list=document.createElement('div');
@@ -178,7 +182,7 @@
   const items=eligible.map(id=>({
    id,name:cardName('nodes',id),status:'pending',message:trans('Ожидает','Pending')
   }));
-  st.batch={items};
+  st.batch={action:'agent-update',items};
   update(area,spec);
   let cursor=0;
   const stageLabels={
@@ -227,6 +231,55 @@
   toast(trans('Обновление Agent завершено: ','Agent update finished: ')+
    succeeded+'/'+items.length+(failed?' · '+trans('ошибок: ','failed: ')+failed:''));
  }
+ async function updateNodeXrays(area,spec,eligible,version){
+  const st=selection(spec.kind),ops=window.XMeshNodeXrayOps;
+  if(!ops||typeof ops.updateOne!=='function'){
+    st.busy=false;update(area,spec);
+    toast(trans('Обновление Xray недоступно. Обновите страницу.','Xray update is unavailable. Reload the page.'));
+    return;
+  }
+  const items=eligible.map(id=>({id,name:cardName('nodes',id),status:'pending',message:trans('Ожидает','Pending')}));
+  st.batch={action:'xray-update',version,items};
+  update(area,spec);
+  let cursor=0;
+  const stages={
+    checking:trans('Проверка агента','Checking Agent'),
+    sending:trans('Постановка команды','Queuing command'),
+    installing:trans('Загрузка и проверка Xray','Downloading and validating Xray'),
+    verifying:trans('Проверка версии Xray','Checking Xray version')
+  };
+  // Registry pulls can be heavy. Limit updates to one node at a time:
+  // unrelated nodes keep serving traffic and no global fleet restart occurs.
+  const worker=async()=>{
+    while(cursor<items.length){
+      const item=items[cursor++];
+      item.status='running';item.message=stages.checking;update(area,spec);
+      try{
+        const result=await ops.updateOne(Number(item.id),version,{
+          onStage:stage=>{item.message=stages[stage]||stages.checking;update(area,spec);}
+        });
+        item.status='success';
+        item.message=result.warning
+          ?trans('Установлено, ожидается heartbeat','Installed, awaiting heartbeat')
+          :trans('Xray '+version+' установлен','Xray '+version+' installed');
+        st.ids.delete(item.id);
+      }catch(error){
+        item.status='error';
+        item.message=String(error?.message||error||trans('Ошибка обновления','Update failed'));
+      }
+      update(area,spec);
+    }
+  };
+  try{await worker();}
+  finally{
+    if(items.length&&items.every(item=>item.status==='success')){st.mode=false;st.ids.clear();}
+    st.busy=false;
+    update(area,spec);
+  }
+  const succeeded=items.filter(item=>item.status==='success').length,failed=items.length-succeeded;
+  toast(trans('Обновление Xray завершено: ','Xray update finished: ')+succeeded+'/'+items.length+
+    (failed?' · '+trans('ошибок: ','failed: ')+failed:''));
+ }
  async function execute(area,spec,action){
   const st=selection(spec.kind),ids=[...st.ids];
   if(!ids.length||st.busy||typeof viewerMode==='function'&&viewerMode())return;
@@ -246,6 +299,20 @@
      'Updates run on at most two nodes at a time. The server checks connectivity and update eligibility.');
   }
   st.busy=true;update(area,spec);
+  let xrayVersion='';
+  if(action==='xray-update'){
+    try{
+      const ops=window.XMeshNodeXrayOps;
+      if(!ops||typeof ops.chooseVersion!=='function')throw new Error(trans('Обновление Xray недоступно. Обновите страницу.','Xray update is unavailable. Reload the page.'));
+      xrayVersion=await ops.chooseVersion(eligible);
+    }catch(error){
+      toast(trans('Ошибка выбора версии Xray: ','Xray release selection failed: ')+(error?.message||error));
+    }
+    if(!xrayVersion){st.busy=false;update(area,spec);return;}
+    warning+=' '+trans('Версия: ','Version: ')+xrayVersion+'. '+
+      trans('Узлы обновляются по одному, с проверкой Agent и сохранением старого образа для отката.',
+        'Nodes are updated one at a time, with Agent validation and an image rollback path.');
+  }
   let ok=false;
   try{ok=await panelConfirm(warning,{
    title:trans('Массовые операции','Bulk operations'),
@@ -257,6 +324,10 @@
   if(!ok){st.busy=false;update(area,spec);return}
   if(action==='agent-update'){
    await updateNodeAgents(area,spec,eligible);
+   return;
+  }
+  if(action==='xray-update'){
+   await updateNodeXrays(area,spec,eligible,xrayVersion);
    return;
   }
   st.batch=null;update(area,spec);

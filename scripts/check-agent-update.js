@@ -22,11 +22,11 @@ new Function(nodeDialogs);
 const versionMatch=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(agentVersionRaw);
 assert.ok(versionMatch,'AGENT_VERSION must use control-vMAJOR.MINOR.PATCH');
 const versionTuple=versionMatch.slice(1).map(Number);
-assert.equal(agentVersionRaw,'control-v6.0.7','Nexus target Agent version must be control-v6.0.7');
+assert.equal(agentVersionRaw,'control-v6.0.8','Nexus target Agent version must be control-v6.0.8');
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
-assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]7"/);
-assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]6"/,
+assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]8"/);
+assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]7"/,
   'rolling upgrade must keep the immediately previous Agent release enrollable');
 assert.match(gateway,/repairAgentVersion\s*=\s*"control-v6[.]0[.]0"/,
   'v6.0.0 bootstrap-hole nodes remain temporarily repairable');
@@ -162,8 +162,11 @@ new Function(bulkActions);
 assert.match(nodeDialogs,/window\.XMeshNodeAgentOps=Object\.freeze/);
 assert.match(nodeDialogs,/pendingAgentUpdates\.has\(id\)/);
 assert.match(nodeDialogs,/updateOne:\(id,options\)=>updateOneAgent/);
-assert.match(bulkActions,/actions:\['enable','disable','agent-update','delete'\]/);
+assert.match(bulkActions,/actions:\['enable','disable','agent-update','xray-update','delete'\]/);
 assert.match(bulkActions,/'agent-update':trans\('Обновить Agent','Update Agent'\)/);
+assert.match(bulkActions,/'xray-update':trans\('Обновить Xray','Update Xray'\)/);
+assert.match(bulkActions,/await ops\.updateOne\(Number\(item\.id\),version/);
+assert.match(bulkActions,/await worker\(\)/,'Xray fleet must download sequentially, never saturate the registry');
 assert.match(bulkActions,/Math\.min\(2,items\.length\)/);
 assert.match(bulkActions,/await ops\.updateOne\(Number\(item\.id\)/);
 assert.match(bulkActions,/const actions=toolbar\.querySelector/);

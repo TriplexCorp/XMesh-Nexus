@@ -4196,6 +4196,84 @@ function paintNodeXrayUpdate(nodeId){
     badge.removeAttribute('aria-label');
   }
 }
+// A single authenticated Xray update contract for individual and bulk actions.
+// The server chooses permitted releases; never accept a registry URL from the UI.
+const XMeshNodeXrayOps=Object.freeze({
+  isUpdating:id=>nodeXrayUpdating.has(Number(id)),
+  chooseVersion:async ids=>{
+    const nodes=ids.map(id=>DB.nodes.find(n=>Number(n.id)===Number(id))).filter(Boolean);
+    if(!nodes.length)throw new Error('Выбранные узлы не найдены.');
+    const one=nodes.length===1,n=one?nodes[0]:{name:nodes.length+' выбранных узлов'};
+    return selectNodeXrayRelease(n,async()=>{
+      let installed='';
+      if(one){
+        const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime');
+        if(runtime.xrayUpdateSupported !== true)throw new Error(runtime.connected
+          ?'Управляющий Agent не поддерживает обновление Xray. Обновите Agent.'
+          :'Нет свежего подтверждения от управляющего Agent. Проверьте связь.');
+        installed=runtime.xrayVersion||'';
+      }
+      const catalog=await backendRequest('/api/v1/nodes/xray-releases');
+      return {installed,releases:Array.isArray(catalog.items)?catalog.items:[]};
+    });
+  },
+  updateOne:async(id,version,{onStage=()=>{}}={})=>{
+    id=Number(id);
+    const node=DB.nodes.find(n=>Number(n.id)===id);
+    if(!node)throw new Error('Узел не найден.');
+    if(nodeXrayRestarting.has(id)||nodeXrayUpdating.has(id))
+      throw new Error('На узле уже выполняется операция Xray.');
+    if(!/^v?[0-9]+\.[0-9]+\.[0-9]+(?:[._+-][A-Za-z0-9._+-]+)?$/.test(String(version)))
+      throw new Error('Некорректная версия Xray.');
+    nodeXrayUpdating.add(id);
+    paintNodeXrayUpdate(id);
+    try{
+      onStage('checking');
+      const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+      if(runtime.xrayUpdateSupported !== true)throw new Error(runtime.connected
+        ?'Управляющий Agent не поддерживает обновление Xray. Обновите Agent.'
+        :'Нет свежего Agent heartbeat. Проверьте подключение узла.');
+      onStage('sending');
+      const command=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/xray-update',{
+        method:'POST',body:JSON.stringify({version})
+      });
+      onStage('installing');
+      const deadline=Date.now()+600000;
+      let status=null;
+      while(Date.now()<deadline){
+        await new Promise(resolve=>setTimeout(resolve,3000));
+        status=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/restart');
+        if(status.id!==command.id)throw new Error('Очередь команд узла изменилась.');
+        if(status.state==='failed')throw new Error(status.result||'Обновление Xray не выполнено.');
+        if(status.state==='succeeded')break;
+      }
+      if(status?.state!=='succeeded')throw new Error('Агент не подтвердил обновление Xray за 10 минут.');
+      onStage('verifying');
+      const target=version.replace(/^v/,'');
+      let observed=null;
+      const verifyUntil=Date.now()+45000;
+      while(Date.now()<verifyUntil){
+        observed=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+        updateNodeRuntimeBadges(node,observed);
+        if(String(observed.xrayVersion||'').replace(/^v/,'')===target)break;
+        await new Promise(resolve=>setTimeout(resolve,2500));
+      }
+      // Command ACK is authoritative for installation. A lagging heartbeat
+      // is reported as pending verification rather than a false failure.
+      const warning=String(observed?.xrayVersion||'').replace(/^v/,'')!==target;
+      return {id,name:node.name,version,targetVersion:target,
+        message:status.result||'Xray '+target+' установлен',warning};
+    }finally{
+      nodeXrayUpdating.delete(id);
+      paintNodeXrayUpdate(id);
+      try{
+        const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+        updateNodeRuntimeBadges(node,runtime);
+      }catch(_){}
+    }
+  }
+});
+window.XMeshNodeXrayOps=XMeshNodeXrayOps;
 const PROFILE_CHECK_LABELS={
   policy_missing:'Нет сохранённой подписанной политики',
   active_config_missing:'Нет управляемой конфигурации',
@@ -5468,65 +5546,26 @@ the old node will lose access. Cancel and create a new Node ID if both must work
   else if(b=g('[data-xray-update]')){
     const id=Number(b.dataset.xrayUpdate),node=DB.nodes.find(n=>Number(n.id)===id);
     if(!node){toast('Узел не найден.');return}
-    if(b.dataset.loading==='1'||nodeXrayRestarting.has(id))return;
-    b.dataset.loading='1';b.disabled=true;
+    if(b.dataset.loading==='1'||nodeXrayRestarting.has(id)||nodeXrayUpdating.has(id))return;
     const original=b.innerHTML;
+    b.dataset.loading='1';b.disabled=true;
     try{
-      const version=await selectNodeXrayRelease(node,async()=>{
-        const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-        // Eligibility comes from the authenticated backend heartbeat policy,
-        // shared with POST /xray-update. Never maintain another agent-major
-        // allow-list in the browser (v5/v6 were incorrectly rejected here).
-        if(runtime.xrayUpdateSupported !== true){
-          throw new Error(runtime.connected
-            ? 'Управляющий агент ноды не поддерживает управляемое обновление Xray. Обновите Agent.'
-            : 'Нет свежего подтверждения от управляющего агента ноды. Проверьте подключение.');
-        }
-        const catalog=await backendRequest('/api/v1/nodes/xray-releases');
-        return {installed:runtime.xrayVersion,releases:Array.isArray(catalog.items)?catalog.items:[]};
-      });
+      const version=await XMeshNodeXrayOps.chooseVersion([id]);
       if(!version)return;
-      const confirmed=await panelConfirm(
-        'Установить Xray '+version+' на «'+node.name+'»? Управляемый Docker-агент проверит конфигурацию и при ошибке попытается восстановить предыдущий образ. Активные подключения могут прерваться.',
-        {title:'Подтвердить установку Xray '+version,confirmLabel:'Установить '+version}
+      const ok=await panelConfirm(
+        'Установить Xray '+version+' на «'+node.name+'»? При обновлении возможен краткий разрыв подключений. Агент проверит конфигурацию и при сбое восстановит старый образ.',
+        {title:'Обновить Xray · '+node.name,confirmLabel:'Установить '+version}
       );
-      if(!confirmed)return;
-      nodeXrayUpdating.add(id);
-      paintNodeXrayUpdate(id);
+      if(!ok)return;
       b.innerHTML='<span class="node-agent-spinner" aria-hidden="true"></span><span>Xray обновляется…</span>';
-      b.setAttribute('aria-label','Xray обновляется');
-      const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/xray-update',{
-        method:'POST',body:JSON.stringify({version})
-      });
-      toast('Обновление поставлено в очередь. Ожидаем результат узла.');
-      const deadline=Date.now()+180000;
-      let status=null;
-      while(Date.now()<deadline){
-        await new Promise(resolve=>setTimeout(resolve,3000));
-        status=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/restart');
-        if(status.id!==request.id)throw new Error('Очередь команд изменилась.');
-        if(status.state==='succeeded')break;
-        if(status.state==='failed')throw new Error(status.result||'Ошибка обновления');
-      }
-      if(status?.state!=='succeeded')throw new Error('Узел не подтвердил обновление за три минуты.');
-      toast(node.name+': '+(status.result||'обновление успешно'));
-      if(cur==='nodes')render(1);
-    }catch(error){toast('Обновление Xray: '+(error.message||'ошибка API'))}
-    finally{
-      nodeXrayUpdating.delete(id);
-      if(cur==='nodes'){
-        try{
-          const fresh=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-          updateNodeRuntimeBadges(node,fresh);
-        }catch(_){
-          paintNodeXrayUpdate(id);
-          const badge=document.querySelector('[data-node-card-id="'+id+'"] [data-node-xray-version]');
-          if(badge)badge.textContent='Xray —';
-        }
-      }
-      b.removeAttribute('aria-label');
-      if(b.isConnected){b.innerHTML=original;b.disabled=false}
+      const result=await XMeshNodeXrayOps.updateOne(id,version);
+      toast(node.name+': '+result.message+(result.warning?' · ожидается heartbeat':''));
+      if(cur==='nodes')await render(1);
+    }catch(error){
+      toast('Обновление Xray: '+(error?.message||'ошибка API'));
+    }finally{
       delete b.dataset.loading;
+      if(b.isConnected){b.disabled=false;b.innerHTML=original}
     }
   }
   else if(b=g('[data-nr]')){
