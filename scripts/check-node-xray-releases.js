@@ -14,6 +14,16 @@ assert.match(core,/pub async fn all_node_releases\(&self\)/);
 assert.match(core,/releases\?per_page=100&page=\{page\}/);
 assert.match(core,/if\s+count\s*<\s*100\s*\{\s*break\s*;\s*\}/);
 assert.match(core,/node_release_cache/);
+assert.match(core,/async fn probe_ghcr_image/,'Node releases must be checked against the official GHCR manifest');
+assert.match(core,/repository:xtls\/xray-core:pull/,'GHCR authentication scope must be fixed and official');
+assert.match(core,/ghcr_manifest_status/,'Registry 404 must be distinguished from network failure');
+assert.match(routes,/\/nodes\/xray-image-status/,'Picker must support on-demand image checks');
+assert.match(runtime,/pub async fn xray_image_status/,'Selected historical versions require an image check');
+assert.match(runtime,/state\.core\.node_image_status\(target\)\.await/,'Server must verify availability before queueing');
+assert.match(runtime,/Docker-образ выбранного релиза Xray ещё не опубликован/);
+assert.match(ui,/accept\.disabled=!chosen\|\|installedChosen\|\|chosen\.image_status!=='available'/);
+assert.match(ui,/Нет Docker-образа/);
+
 assert.match(core,/prerelease\s*:\s*r\.prerelease/);
 assert.match(routes,/\/nodes\/xray-releases/);
 assert.match(runtime,/pub async fn available_xray_releases/);

@@ -377,7 +377,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         )
         .route(
             "/nodes/{id}/xray-update",
-            post(node_runtime::request_xray_update),
+            post(node_runtime::request_verified_xray_update),
         )
         .route(
             "/nodes/{id}/agent-update",
@@ -386,6 +386,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route(
             "/nodes/xray-releases",
             get(node_runtime::available_xray_releases),
+        )
+        .route(
+            "/nodes/xray-image-status",
+            get(node_runtime::xray_image_status),
         )
         .route(
             "/users/{id}/subscription",
