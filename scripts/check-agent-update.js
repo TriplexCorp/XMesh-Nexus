@@ -25,8 +25,8 @@ const versionTuple=versionMatch.slice(1).map(Number);
 assert.equal(agentVersionRaw,'control-v6.0.8','Nexus target Agent version must be control-v6.0.8');
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
-assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]7"/);
-assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]6"/,
+assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]8"/);
+assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]7"/,
   'rolling upgrade must keep the immediately previous Agent release enrollable');
 assert.match(gateway,/repairAgentVersion\s*=\s*"control-v6[.]0[.]0"/,
   'v6.0.0 bootstrap-hole nodes remain temporarily repairable');
