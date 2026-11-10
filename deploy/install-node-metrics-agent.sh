@@ -101,7 +101,7 @@ install -d -m 0755 /usr/local/libexec
 install -o root -g root -m 0700 "$XRAY_UPDATE_TMP" /usr/local/libexec/xmesh-xray-update.py
 rm -f "$XRAY_UPDATE_TMP"
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --fail --silent --show-error --location "$RAW_BASE/node-control-agent.sh" -o "$CONTROL_TMP"
-bash -n "$CONTROL_TMP"; grep -Fxq 'AGENT_VERSION="control-v6.0.11"' "$CONTROL_TMP" || { echo "Nexus main does not expose Agent v6.0.9" >&2; exit 1; }
+bash -n "$CONTROL_TMP"; grep -Fxq 'AGENT_VERSION="control-v6.0.11"' "$CONTROL_TMP" || { echo "Nexus main does not expose the required Agent version" >&2; exit 1; }
 install -o root -g root -m 0700 "$CONTROL_TMP" /usr/local/sbin/xmesh-node-control
 cat > /etc/systemd/system/xmesh-node-control.service <<'EOF'
 [Unit]
@@ -228,7 +228,7 @@ systemctl enable xmesh-node-control.timer; systemctl restart xmesh-node-control.
 systemctl enable xmesh-node-metrics.timer; systemctl restart xmesh-node-metrics.timer
 if [[ -r /usr/local/libexec/xmesh-policy-guard.py ]]; then systemctl enable xmesh-node-user-meter.timer; systemctl restart xmesh-node-user-meter.timer; fi
 
-echo "XMesh Agent v6.0.5 POSTQUANTUM installed."
+echo "XMesh Agent POSTQUANTUM installed."
 echo "Node ID: $NODE_ID"
 echo "Network interface: $INTERFACE (auto detects the default-route interface)"
 echo "Control Agent and strict-PQ production binary are both installed and identity-verified."

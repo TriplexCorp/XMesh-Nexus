@@ -215,4 +215,4 @@ if systemctl list-unit-files xmesh-xray-sync.service --no-legend 2>/dev/null | g
 if [[ "$MODE" != --remote ]]; then systemctl start xmesh-node-control.service;fi
 grep -Fxq 'AGENT_VERSION="control-v6.0.11"' /usr/local/sbin/xmesh-node-control || { echo "v6 Agent version verification failed" >&2; exit 1; }
 /usr/local/bin/xmesh-agent-xspv2-activate --identity | python3 -c 'import json,sys;v=json.load(sys.stdin);assert v["version"]=="control-v6.0.11" and len(v["artifactSha256"])==64'
-echo "XMesh Agent v6.0.8 POSTQUANTUM installed: signed control, verified PQ runtime, offline policy and pinned Xray synchronizer are active."
+echo "XMesh Agent POSTQUANTUM installed: signed control, verified PQ runtime, offline policy and pinned Xray synchronizer are active."
