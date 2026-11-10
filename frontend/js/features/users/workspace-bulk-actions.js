@@ -184,43 +184,46 @@
   }));
   st.batch={action:'agent-update',items};
   update(area,spec);
-  let cursor=0;
   const stageLabels={
    checking:trans('Проверка связи','Checking connection'),
    sending:trans('Отправка команды','Sending command'),
    installing:trans('Установка Agent','Installing Agent'),
    verifying:trans('Проверка версии','Verifying version')
   };
-  // A maximum of two live commands. Per-node in-flight locking also
-  // prevents a repeated single-card update while a fleet job is running.
-  const worker=async()=>{
-   while(cursor<items.length){
-    const item=items[cursor++];
-    item.status='running';item.message=stageLabels.checking;update(area,spec);
-    try{
-     const result=await ops.updateOne(Number(item.id),{
-      onStage:stage=>{
-       item.message=stageLabels[stage]||stageLabels.checking;
-       update(area,spec);
-      }
-     });
-     item.status='success';
-     item.message=result.warning
-      ?trans('Команда выполнена, ожидается heartbeat','Command succeeded, awaiting heartbeat')
-      :trans('Agent обновлён','Agent updated');
-     st.ids.delete(item.id);
-    }catch(error){
-     item.status='error';
-     item.message=String(error?.message||error||trans('Ошибка обновления','Update failed'));
-    }
-    update(area,spec);
+  // Coalesce simultaneous stage changes instead of rebuilding the report per node.
+  let refreshPending=false;
+  const refresh=()=>{
+   if(refreshPending)return;
+   refreshPending=true;
+   queueMicrotask(()=>{refreshPending=false;update(area,spec);});
+  };
+  // Start every selected node independently. The shared operation retains
+  // its per-node lock against duplicate single-card or fleet requests.
+  const updateItem=async item=>{
+   item.status='running';item.message=stageLabels.checking;refresh();
+   try{
+    const result=await ops.updateOne(Number(item.id),{
+     onStage:stage=>{
+      item.message=stageLabels[stage]||stageLabels.checking;
+      refresh();
+     }
+    });
+    item.status='success';
+    item.message=result.warning
+     ?trans('Команда выполнена, ожидается heartbeat','Command succeeded, awaiting heartbeat')
+     :trans('Agent обновлён','Agent updated');
+    st.ids.delete(item.id);
+   }catch(error){
+    item.status='error';
+    item.message=String(error?.message||error||trans('Ошибка обновления','Update failed'));
    }
+   refresh();
   };
   try{
-   await Promise.all(Array.from({length:Math.min(2,items.length)},()=>worker()));
+   await Promise.all(items.map(updateItem));
   }finally{
    // A fully successful upgrade exits selection automatically; retain its
-   // collapsed result summary so the user can inspect all four outcomes.
+   // collapsed result summary so the user can inspect every node outcome.
    if(items.length&&items.every(item=>item.status==='success')){
     st.mode=false;st.ids.clear();
    }
@@ -295,8 +298,8 @@
    warning+=' '+trans('Доступ пользователей, связанных со сквадами, может измениться.','Users linked to these squads may lose access.');
   }
   if(action==='agent-update'){
-   warning+=' '+trans('Обновления выполняются не более чем на двух нодах одновременно. Доступность и поддержку самообновления проверит сервер.',
-     'Updates run on at most two nodes at a time. The server checks connectivity and update eligibility.');
+   warning+=' '+trans('Обновления запускаются одновременно на всех выбранных узлах. Доступность и поддержку самообновления проверит сервер.',
+     'Updates start on all selected nodes at once. The server checks connectivity and update eligibility.');
   }
   st.busy=true;update(area,spec);
   let xrayVersion='';

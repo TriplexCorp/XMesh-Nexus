@@ -167,7 +167,7 @@ assert.match(nodeDialogs,/No client-side version allow-list/,
 
 
 /* Single and bulk Agent updates must share the signed backend command, with
- * per-node locking, bounded concurrency and no browser-side version gate. */
+ * per-node locking, parallel fleet dispatch and no browser-side version gate. */
 const bulkActions=originalReadFileSync('frontend/js/features/users/workspace-bulk-actions.js','utf8');
 new Function(bulkActions);
 assert.match(nodeDialogs,/window\.XMeshNodeAgentOps=Object\.freeze/);
@@ -178,7 +178,8 @@ assert.match(bulkActions,/'agent-update':trans\('Обновить Agent','Update
 assert.match(bulkActions,/'xray-update':trans\('Обновить Xray','Update Xray'\)/);
 assert.match(bulkActions,/await ops\.updateOne\(Number\(item\.id\),version/);
 assert.match(bulkActions,/await worker\(\)/,'Xray fleet must download sequentially, never saturate the registry');
-assert.match(bulkActions,/Math\.min\(2,items\.length\)/);
+assert.match(bulkActions,/await Promise\.all\(items\.map\(updateItem\)\)/,
+  'Agent fleet must start all selected nodes without a two-node queue');
 assert.match(bulkActions,/await ops\.updateOne\(Number\(item\.id\)/);
 assert.match(bulkActions,/const actions=toolbar\.querySelector/);
 assert.match(bulkActions,/toolbar\.insertBefore\(group,actions\|\|null\)/,
