@@ -10,7 +10,8 @@ window.XMeshStudioHosts=(()=>{
      '<div class="sv-endpoint-list" data-endpoint-list role="list"></div>'+
      '<div class="sv-endpoint-editor" data-endpoint-editor hidden>'+
      '<header><b data-endpoint-title>Новое подключение</b><button type="button" data-endpoint-action="cancel" aria-label="Закрыть">✕</button></header>'+
-     '<div class="sv-two">'+field('Название','remark','🇵🇱 Польша-1')+field('Публичный адрес','address','vpn.example.com')+'</div>'+
+     '<div class="sv-two">'+field('Название / Remark','remark','🇵🇱 Польша-1')+field('Публичный адрес','address','vpn.example.com')+'</div>'+
+     (window.XMeshRemarkPicker?.markup()||'')+
      '<div class="sv-two">'+field('Внешний порт','port','443','number')+
        '<label class="sv-field"><span>Статус</span><select data-endpoint="enabled"><option value="yes">Включено</option><option value="no">Отключено</option></select></label></div>'+
      '<details class="sv-advanced"><summary>Клиентские переопределения</summary><p class="sv-muted">Укажите только отличия от настроек inbound. Transport и Security не дублируются.</p>'+
@@ -27,6 +28,7 @@ window.XMeshStudioHosts=(()=>{
   }
   function mount(root,ctx){
     const qs=s=>root.querySelector(s);
+    window.XMeshRemarkPicker?.bind(root,'[data-endpoint="remark"]');
     const text=(type,cls,content)=>{const el=document.createElement(type);el.className=cls;if(content!=null)el.textContent=String(content);return el;};
     const value=k=>qs('[data-endpoint="'+k+'"]')?.value?.trim()||'';
     const set=(k,v)=>{const el=qs('[data-endpoint="'+k+'"]');if(el)el.value=v==null?'':v;};
