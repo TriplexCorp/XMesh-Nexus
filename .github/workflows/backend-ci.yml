@@ -139,6 +139,8 @@ jobs:
         run: node scripts/check-english-coverage.js
       - name: Check subscription studio and independent deployment blueprint
         run: node scripts/check-subscription-studio.js
+      - name: Verify personalized VPN client announcement templates and CDN balances
+        run: node scripts/check-personalized-announcements.cjs
       - name: Enforce customer portal navigation, privacy and preview parity
         run: node scripts/check-subscription-cabinet.js
       - name: Verify real admin RBAC, authentication boundaries and CSP
