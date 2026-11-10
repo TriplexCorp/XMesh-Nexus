@@ -1727,26 +1727,31 @@ dialog.user-modal .user-pane {
 }
 
 /* User workstation / Settings composition.
- * Reuse Nexus materials and control type; give existing user fields the same
- * dense two-column reading order as other panel cards. */
+ * Content-first grid: Basic + Note in the left column and Connection in the
+ * right. Never stretch the shorter Basic card to the taller Connection card;
+ * that created an enormous blank block and hid Note under the scroll fold.
+ * Use established Nexus tokens and the existing shared modal frame. */
 @media(min-width:1100px){
   dialog#dlg.user-modal .user-pane-settings .user-settings-cards{
     display:grid;
-    grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);
-    grid-template-rows:auto auto;
-    align-items:stretch;
+    grid-template-columns:minmax(0,1fr) minmax(0,1.06fr);
+    grid-template-rows:max-content max-content;
+    align-items:start;
+    align-content:start;
     column-gap:var(--nx-space-3);
     row-gap:var(--nx-space-3);
   }
   dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-basic-card{
     grid-column:1;grid-row:1;
+    align-self:start;
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     align-content:start;
     gap:var(--nx-space-2) var(--nx-space-3);
   }
   dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-connection-card{
-    grid-column:2;grid-row:1;
+    grid-column:2;grid-row:1 / span 2;
+    align-self:start;
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     align-content:start;
@@ -1761,12 +1766,13 @@ dialog.user-modal .user-pane {
     margin:0;
   }
   dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-note-card{
-    grid-column:1/-1;
+    grid-column:1;
     grid-row:2;
+    align-self:start;
     min-width:0;
   }
   dialog#dlg.user-modal .user-pane-settings .user-note-card textarea{
-    min-height:3.55rem;
+    min-height:4.35rem;
     max-height:10rem;
   }
 }
@@ -1781,6 +1787,8 @@ dialog.user-modal .user-pane {
 #dlg.user-modal .user-detail-card{
   gap:var(--nx-space-2);
   padding:var(--nx-space-3) var(--nx-space-4);
+  align-self:start;
+  height:max-content;
 }
 #dlg.user-modal .user-detail-card .user-card-title{
   gap:var(--nx-space-2);
@@ -1791,11 +1799,11 @@ dialog.user-modal .user-pane {
   height:1.1rem;
 }
 #dlg.user-modal .user-detail-card .user-card-title h3{
-  font-size:var(--nx-text-md);
+  font-size:max(var(--nx-text-md),.96rem);
   font-weight:735;
 }
 #dlg.user-modal .user-detail-card .user-card-title p{
-  font-size:var(--nx-text-xs);
+  font-size:max(var(--nx-text-xs),.76rem);
   line-height:1.3;
 }
 dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f{
@@ -1803,7 +1811,7 @@ dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f{
   min-width:0;
 }
 dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
-  font-size:var(--nx-text-sm);
+  font-size:max(var(--nx-text-sm),.86rem);
   line-height:1.25;
   font-weight:670;
 }
@@ -1812,7 +1820,11 @@ dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
   width:100%;
   height:var(--nx-control-h);
   min-height:var(--nx-control-h);
-  font-size:var(--nx-text-sm);
+  font-size:max(var(--nx-text-sm),.9rem);
+}
+#dlg.user-modal .user-pane-settings .user-note-card textarea{
+  font-size:max(var(--nx-text-sm),.9rem);
+  line-height:1.42;
 }
 #dlg.user-modal .user-overview-band{
   column-gap:var(--nx-space-3);
@@ -1824,7 +1836,7 @@ dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
 }
 #dlg.user-modal .user-editor-tabs [role=tab]{
   padding:.4rem .68rem;
-  font-size:var(--nx-text-sm);
+  font-size:max(var(--nx-text-sm),.85rem);
 }
 #dlg.user-modal .user-canvas-grid{
   padding-block:var(--nx-space-2);
