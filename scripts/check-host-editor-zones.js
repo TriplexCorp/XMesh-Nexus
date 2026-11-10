@@ -166,6 +166,8 @@ assert.match(userDetailsCss,/\.user-settings-cards>\.user-connection-card\{[\s\S
  'Connection must occupy the right column without stretching Basic');
 assert.match(userDetailsCss,/grid-template-rows:max-content max-content;[\s\S]*?align-items:start;/,
  'Settings cards must size to their content rather than creating empty equal-height slabs');
-assert.ok(userDetailsCss.includes('.user-editor-actions .user-save-button'),
- 'The save action must be consistently aligned in the workspace footer');
+assert.match(userDetailsCss,/\.user-editor-actions \.user-save-button\{\s*order:1;\s*margin-inline-start:auto;/,
+ 'Save must sit at the trailing edge of the user footer');
+assert.match(userDetailsCss,/\.user-editor-actions \.user-edit-dirty\{\s*order:0;\s*margin-inline-start:0;\s*text-align:start;/,
+ 'Unsaved-change status must remain at the leading edge of the user footer');
 console.log('Workspace dialogs: accessible Host tasks, stable frame and User details OK');
