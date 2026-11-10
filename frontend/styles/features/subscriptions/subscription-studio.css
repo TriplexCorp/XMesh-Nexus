@@ -292,3 +292,14 @@
 .subscription-preview[data-portal-font=source]{font-family:"Source Sans 3",system-ui,sans-serif}
 .subscription-preview[data-portal-font=fira]{font-family:"Fira Sans",system-ui,sans-serif}
 .subscription-preview[data-portal-font=jost]{font-family:Jost,system-ui,sans-serif}
+
+/* User-configurable client label status emoji mapping. */
+.subscription-status-emojis{margin:.65rem 0;padding:.65rem .85rem;border:1px solid var(--nx-border,var(--bd));border-radius:var(--nx-section-radius,10px);background:var(--nx-section-bg,transparent);min-width:0}
+.subscription-status-emojis>summary{cursor:pointer;color:var(--tx);font-size:.89rem;font-weight:670}
+.subscription-status-emojis>summary small{font-weight:450;font-size:.74rem;color:var(--mu);margin-left:.4rem}
+.subscription-emoji-hint{margin:.75rem 0;font-size:.8rem;line-height:1.5;color:var(--mu)}
+.subscription-emoji-hint code{color:var(--a);font-weight:650}
+.subscription-status-emojis .subscription-studio-pair{margin-top:.65rem}
+.subscription-status-emojis .subscription-field{min-width:0}
+.subscription-status-emojis .subscription-field input{font-size:1.02rem}
+
