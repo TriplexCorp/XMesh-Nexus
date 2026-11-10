@@ -149,7 +149,7 @@ assert.ok(canonicalDialogsCss.includes('zoom:1.12;') &&
  canonicalDialogsCss.includes('block-size:min(clamp(38.5rem,64dvh,49rem),82dvh);'),
  'Wide User Details must proportionally scale typography and keep a viewport-safe height');
 assert.ok(canonicalDialogsCss.includes('@media(min-width:1100px) and (max-width:2199px)') &&
- canonicalDialogsCss.includes('height:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));'),
+ canonicalDialogsCss.includes('height:min(clamp(36rem,70dvh,47rem),calc(100dvh - 2rem));'),
  'Normal desktop workspaces may use the taller form, without making 768px tablet dialogs oversized');
 assert.ok(canonicalDialogsCss.includes('@media(min-width:2800px) and (max-height:1300px)') &&
  canonicalDialogsCss.includes('--dialog-width:78rem;') &&
