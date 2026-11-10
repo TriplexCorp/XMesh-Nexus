@@ -1397,6 +1397,13 @@
   #dlg.user-create-modal .user-create-duration-calendar{
     --uc-cal-unit:clamp(16px,.66vw,21px);
   }
+  /* Whole-dialog zoom also enlarges the day boxes. Keep their visual height
+   * near twice the text size instead of leaving oversized calendar rows. */
+  #dlg.user-create-modal .user-create-cal-day,
+  #dlg.user-create-modal .user-create-cal-empty{
+    height:calc(1.55 * var(--uc-cal-unit));
+    min-height:calc(1.55 * var(--uc-cal-unit));
+  }
 }
 @media(max-width:680px){
   #dlg.user-create-modal .user-create-duration-calendar{
