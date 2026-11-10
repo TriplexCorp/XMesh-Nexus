@@ -387,11 +387,13 @@ pub fn render_with_context(
     server_address: &str,
     traffic: TrafficContext,
 ) -> String {
-    sanitize_text(
-        &expand_template(template, user, inbound, host, settings, now_ms, server_address, traffic),
-        100,
-        false,
-    )
+    // Remark's established limit is 100 Unicode characters, not bytes.
+    // Announcement headers have a separate byte-based cap.
+    expand_template(template, user, inbound, host, settings, now_ms, server_address, traffic)
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(100)
+        .collect()
 }
 
 /// VPN client announcement headers are user-specific, but have no endpoint or
@@ -669,6 +671,15 @@ mod tests {
         );
         assert_eq!(rendered, "{STATUS_EMOJI}|—|—|—|—|—");
         assert_eq!(render_announcement("{UNKNOWN}", &user, &json!({}), 0, None), "{UNKNOWN}");
+    }
+
+    #[test]
+    fn remarks_keep_the_existing_unicode_character_limit() {
+        let name = "🇵🇱".repeat(70);
+        let result = render(&name, &json!({}), &json!({}), &json!({}),
+            &json!({}), 0, "");
+        assert_eq!(result.chars().count(), 100);
+        assert!(result.len() > 100, "UTF-8 remarks must not be cut to 100 bytes");
     }
 
     #[test]
