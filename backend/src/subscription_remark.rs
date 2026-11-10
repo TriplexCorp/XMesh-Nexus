@@ -212,9 +212,12 @@ mod tests {
         let user = json!({"username":"alice","used":2.5,"limit":10.0});
         let inbound = json!({"protocol":"vless","streamSettings":{"network":"xhttp"}});
         let host = json!({"remark":"unused"});
-        let text = VARIABLES.iter().map(|v| format!("{{{v}}}")).collect::<Vec<_>>().join(" ");
-        let output = render(&text, &user, &inbound, &host, &json!({}), 1_800_000_000_000, "203.0.113.7");
-        assert!(!output.contains("{STATUS_EMOJI}"));
+        for variable in VARIABLES {
+            let token = format!("{{{variable}}}");
+            let resolved = render(&token, &user, &inbound, &host, &json!({}), 1_800_000_000_000, "203.0.113.7");
+            assert_ne!(resolved, token, "variable {variable} was not resolved");
+        }
+        let output = render("{USERNAME} {PROTOCOL} {TRANSPORT}", &user, &inbound, &host, &json!({}), 1_800_000_000_000, "203.0.113.7");
         assert!(output.contains("alice") && output.contains("VLESS") && output.contains("xhttp"));
         assert!(render("Hi {TYPO}", &user, &inbound, &host, &json!({}), 0, "").contains("{TYPO}"));
     }
