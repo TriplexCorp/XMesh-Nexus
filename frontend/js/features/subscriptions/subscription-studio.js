@@ -55,8 +55,8 @@ window.XMeshSubscriptionStudio = (() => {
     JALALI_EXPIRE_DATE:'1405-09-14',STATUS_TEXT:'Активна',STATUS_EMOJI:'✅'
   });
   const demoAnnouncement=text=>{
-    const selected=String(text||'').split('\\n---\\n').map(x=>x.trim()).find(Boolean)||'';
-    return selected.replace(/\\{([A-Z_]+)\\}/g,(full,key)=>
+    const selected=String(text||'').split('\n---\n').map(x=>x.trim()).find(Boolean)||'';
+    return selected.replace(/\{([A-Z_]+)\}/g,(full,key)=>
       Object.prototype.hasOwnProperty.call(announcementExamples,key)?announcementExamples[key]:full);
   };
   const announcementHelp=()=>'<div class="subscription-announcement-tools">'+
@@ -195,7 +195,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
-      field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Сообщения чередуются с заданной ниже периодичностью.',{area:true,rows:3,max:4000,placeholder:'Пользователь: {USERNAME}\\nОсталось LTE: {CDN_DATA_LEFT}'}),
+      field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Сообщения чередуются с заданной ниже периодичностью.',{area:true,rows:3,max:4000,placeholder:'Пользователь: {USERNAME}\nОсталось LTE: {CDN_DATA_LEFT}'}),
       announcementHelp(),
       field('subscriptionAnnouncementRotationHours','Ротация анонсов (ч)',data.subscriptionAnnouncementRotationHours,'От 1 до 720 часов. По умолчанию 24 часа. Период отсчитывается по UTC.',{type:'number',min:1,max:720}),
       field('subscriptionUpdateInterval','Интервал обновления подписки (ч)',data.subscriptionUpdateInterval,'Подсказка для поддерживающих клиентов: от 1 до 168 часов.',{type:'number',min:1,max:168}),
