@@ -55,9 +55,13 @@ window.XMeshRemarkPicker=(()=>{
       const field=input();if(!field)return;
       event.preventDefault();
       const token='{'+button.dataset.remarkInsert+'}';
-      const start=Number.isInteger(field.selectionStart)?field.selectionStart:field.value.length;
-      const end=Number.isInteger(field.selectionEnd)?field.selectionEnd:start;
-      field.setRangeText(token,start,end,'end');
+      // Variable buttons take focus away from the Remark input, so its
+      // selection can point to index 0. Always append after the server name
+      // instead of replacing a selection or inserting before the name.
+      const name=String(field.value||'').trimEnd();
+      field.value=name ? name+' '+token : token;
+      const end=field.value.length;
+      field.setSelectionRange?.(end,end);
       field.dispatchEvent(new Event('input',{bubbles:true}));
       field.focus();
       draw();
