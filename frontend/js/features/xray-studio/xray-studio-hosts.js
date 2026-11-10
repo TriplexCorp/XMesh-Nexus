@@ -68,6 +68,7 @@ window.XMeshStudioHosts=(()=>{
       editing=h?.id??null;
       qs('[data-endpoint-title]').textContent=h?'Изменить подключение':'Новое подключение';
       for(const k of ['remark','address','sni','host','path','publicKey','shortId','alpn','serviceName','spiderX','countryCode','clientEncryption'])set(k,h?.[k]||'');
+      qs('[data-endpoint="remark"]')?.dispatchEvent(new Event('input',{bubbles:true}));
       set('fp',h?.fp||'chrome');
       set('port',h?.port||443);set('enabled',h?.disabled?'no':'yes');
       const nodes=qs('[data-endpoint-nodes]');nodes.replaceChildren();
