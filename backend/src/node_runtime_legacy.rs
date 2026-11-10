@@ -1352,6 +1352,18 @@ fn allowed_inbound_squads(squads: &[Value], tag: &str) -> std::collections::Hash
     allowed
 }
 
+/// Use one inbound tag classifier for both preview and signed desired config.
+fn managed_inbound_tags(config: &Value) -> Vec<String> {
+    config
+        .get("inbounds")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|inbound| inbound.get("tag").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect()
+}
+
 fn quota_gb_to_bytes(gb: f64) -> i64 {
     crate::gb_to_bytes_i64(gb)
 }
@@ -1704,14 +1716,7 @@ pub async fn preview_routing(
         .try_into()
         .unwrap_or(i64::MAX);
     let settings = crate::read_settings(&state.pool).await?;
-    let inbound_tags = config
-        .get("inbounds")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|inbound| inbound.get("tag").and_then(Value::as_str))
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
+    let inbound_tags = managed_inbound_tags(&config);
     let cdn_tags = crate::cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?;
     provision_proxy_users(&mut config, node_id, &users, &squads, now, &cdn_tags)?;
     let geo = crate::node_geodata::apply(&node, &mut config)?;
@@ -2157,14 +2162,7 @@ async fn compile_node_profile(
         .try_into()
         .unwrap_or(i64::MAX);
     let settings = crate::read_settings(&state.pool).await?;
-    let inbound_tags = config
-        .get("inbounds")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|inbound| inbound.get("tag").and_then(Value::as_str))
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
+    let inbound_tags = managed_inbound_tags(&config);
     let cdn_tags = crate::cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?;
     provision_proxy_users(&mut config, node_id, &users, &squads, now, &cdn_tags)?;
     // Keep the source XRAY STUDIO profile immutable: every source node gets
