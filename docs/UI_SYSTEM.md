@@ -225,8 +225,10 @@ contract is enforced by `scripts/check-ui-system.js`.
 owns feature content. The desktop frame adapts to available viewport width and height (38.5–49rem
 height target, capped by the viewport), instead of remaining a tiny 64 × 38.5rem
 island at reduced browser zoom. On effective widths above 2200px the entire
-surface, including text and controls, receives a modest bounded scale; shorter
-viewports still clamp its height. Never resize the frame based on the selected
+surface, including text and controls, receives a modest bounded scale; short,
+very wide effective viewports use an 88rem reading width with a 1.28 scale so
+zoomed-out UIs do not turn into microscopic panoramic forms. The frame remains
+viewport-clamped. Never resize the frame based on the selected
 task or let a tab switch move its header or Save action. Header, usage band, task tabs, shared Save action and footer stay in flow without shrinking.
 Settings, Access & subscription, Traffic and Devices use one intrinsic panel grid.
 Inactive panels remain mounted with `inert` and `aria-hidden`, preserving the
@@ -234,6 +236,13 @@ shared settings/access draft and dialog geometry. Arrow keys, Home and End move
 between tabs. Validation reveals the affected panel; errors stay outside panels. `.user-canvas-grid` is the single scroll owner
 with a stable scrollbar gutter. `userDrawer()` resets that owner's scroll
 position after mounting, including when another user replaces an open dialog.
+On desktop Settings, Basic Data and Note share the left reading column, while
+Connection Parameters use the right. The cards are content-sized, not stretched
+to the height of their neighbors. The Note begins immediately after Basic Data
+and should remain visible without initial scrolling at the zoomed-out
+2000×768 reference. Controls, labels and headings reuse Nexus size tokens with
+a minimum readable text size; desktop viewport scaling affects the entire
+surface, not just its borders.
 
 Browser acceptance lives in `scripts/test-ui-browser.cjs`: real DOM rectangles,
 semantic icons after runtime refresh, neutral computed shadow, 4 + 4 + 1 actions,
