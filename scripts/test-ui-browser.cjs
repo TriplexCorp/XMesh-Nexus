@@ -2507,6 +2507,7 @@ async function main() {
           const input=root.querySelector('input[name="limit"]');
           return{
             root:parseFloat(getComputedStyle(document.documentElement).fontSize),
+            zoom:Number.parseFloat(getComputedStyle(root).zoom)||1,
             title:f('.user-create-head h2'),section:f('.user-create-section-head h3'),
             label:f('.user-create-limit>span'),hint:f('.user-create-limit>small'),
             input:parseFloat(getComputedStyle(input).fontSize),
@@ -2520,8 +2521,10 @@ async function main() {
         assert(g.label<=g.root*.83+1&&g.hint<=g.root*.75+1,'Field copy must use Nexus text tokens');
         assert(g.input>=g.label*.94&&g.input<=g.label*1.24+1,
           'Input typography must stay proportionate to the shared form label, including browser zoom: '+JSON.stringify(g));
-        assert(g.height<=Math.max(42,g.root*2.85)+1,'Input height must follow Nexus controls');
-        assert(g.mainWidth>g.limitsWidth,'Keep the approved two-column hierarchy');
+        assert(g.height<=Math.max(42,g.root*2.85)*g.zoom+2,
+          'Input height must follow Nexus control tokens after whole-dialog zoom: '+JSON.stringify(g));
+        assert(g.mainWidth/g.limitsWidth>.88&&g.mainWidth/g.limitsWidth<1.15,
+          'Create and edit must share balanced two-column cards, not a dominant rail: '+JSON.stringify(g));
         return g;
       }finally{
         await page.keyboard.press('Escape');
