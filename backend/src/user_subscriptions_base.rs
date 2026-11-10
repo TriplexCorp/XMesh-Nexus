@@ -930,6 +930,59 @@ fn log_subscription_candidate(profile: &Value, inbound: &Value, nodes: &[Value],
      "Subscription endpoint candidate");
 }
 
+/// Candidate node identities for this exact Host placement (not geographic
+/// guesses or the public CDN domain). Stable IDs are needed for per-node caps.
+fn host_candidate_node_ids(host: &Value, profile: &Value, nodes: &[Value]) -> Vec<i64> {
+    let pins = host
+        .get("nodes")
+        .and_then(Value::as_array)
+        .filter(|v| !v.is_empty());
+    nodes
+        .iter()
+        .filter(|node| {
+            node.get("disabled") != Some(&Value::Bool(true))
+                && same_record_id(node.get("profileId"), profile.get("id"))
+                && pins.is_none_or(|list| {
+                    list.iter()
+                        .any(|id| same_record_id(Some(id), node.get("id")))
+                })
+        })
+        .filter_map(|node| node.get("id").and_then(record_id))
+        .collect()
+}
+
+/// Optional server-derived per-node meter used only for generated labels.
+/// Accounting errors never replace the existing working client feed with 500.
+async fn remark_node_meter(
+    state: &AppState,
+    user: &Value,
+    hosts: &[Value],
+) -> Option<std::collections::HashMap<i64, crate::node_user_quotas::NodeUsage>> {
+    let configured = user
+        .get("nodeTrafficLimits")
+        .and_then(Value::as_object)
+        .is_some_and(|items| !items.is_empty());
+    if !configured
+        || !hosts.iter().any(|host| {
+            host.get("remark")
+                .and_then(Value::as_str)
+                .is_some_and(|remark| {
+                    remark.contains("{NODE_DATA_LEFT}") || remark.contains("{TRAFFIC_LEFT}")
+                })
+        })
+    {
+        return None;
+    }
+    let id = user.get("id").and_then(record_id)?;
+    match crate::node_user_quotas::usage_for_user(&state.pool, id).await {
+        Ok(usage) => Some(usage),
+        Err(error) => {
+            tracing::warn!(user_id=id, error=%error.message, "Node Remark meter unavailable");
+            None
+        }
+    }
+}
+
 /// Read a server-authoritative CDN meter once for the entire feed.
 /// Missing optional display data must never take usable connections offline.
 async fn remark_cdn_meter(
@@ -978,6 +1031,61 @@ fn subscription_remark_address<'a>(outbound: &'a Value, host: &'a Value) -> &'a 
         .unwrap_or("")
 }
 
+/// Immutable inputs for rendering a single published Host label.
+struct HostRemark<'a> {
+    user: &'a Value,
+    inbound: &'a Value,
+    profile: &'a Value,
+    inbound_tag: &'a str,
+    nodes: &'a [Value],
+    settings: &'a Value,
+    now_ms: i64,
+    cdn_used_bytes: Option<i64>,
+    node_usage: Option<&'a std::collections::HashMap<i64, crate::node_user_quotas::NodeUsage>>,
+}
+
+fn rendered_host_remark(
+    template: &str,
+    host: &Value,
+    address: &str,
+    ctx: &HostRemark<'_>,
+) -> String {
+    if !template.contains("{TRAFFIC_LEFT}")
+        && !template.contains("{CDN_DATA_LEFT}")
+        && !template.contains("{NODE_DATA_LEFT}")
+    {
+        return crate::subscription_remark::render(
+            template,
+            ctx.user,
+            ctx.inbound,
+            host,
+            ctx.settings,
+            ctx.now_ms,
+            address,
+        );
+    }
+    let (scope, owner_node_id) =
+        host_traffic_scope(host, ctx.profile, ctx.inbound_tag, ctx.nodes, ctx.settings);
+    let node_ids = host_candidate_node_ids(host, ctx.profile, ctx.nodes);
+    let node_remaining =
+        crate::node_user_quotas::remaining_for(ctx.user, owner_node_id, &node_ids, ctx.node_usage);
+    crate::subscription_remark::render_with_context(
+        template,
+        ctx.user,
+        ctx.inbound,
+        host,
+        ctx.settings,
+        ctx.now_ms,
+        address,
+        crate::subscription_remark::TrafficContext {
+            scope,
+            cdn_used_bytes: ctx.cdn_used_bytes,
+            owner_node_id,
+            node_remaining,
+        },
+    )
+}
+
 async fn collect_user_outbounds(
     state: &AppState,
     user: &Value,
@@ -997,6 +1105,7 @@ async fn collect_user_outbounds(
     let nodes = crate::load_records(&state.pool, "nodes").await?;
     let (ids, tags) = permitted_inbound_tags(user, &squads);
     let cdn_used_bytes = remark_cdn_meter(state, user, &hosts, settings).await;
+    let node_usage = remark_node_meter(state, user, &hosts).await;
     let mut outbounds = Vec::<Value>::new();
     for profile in &profiles {
         let cfg = match profile.get("config") {
@@ -1037,31 +1146,22 @@ async fn collect_user_outbounds(
                         && template.contains('{')
                     {
                         let address = subscription_remark_address(&outbound, host);
-                        let label = if template.contains("{TRAFFIC_LEFT}")
-                            || template.contains("{CDN_DATA_LEFT}")
-                        {
-                            let (scope, owner_node_id) =
-                                host_traffic_scope(host, profile, tag, &nodes, settings);
-                            crate::subscription_remark::render_with_context(
-                                template,
+                        outbound["tag"] = json!(rendered_host_remark(
+                            template,
+                            host,
+                            address,
+                            &HostRemark {
                                 user,
                                 inbound,
-                                host,
+                                profile,
+                                inbound_tag: tag,
+                                nodes: &nodes,
                                 settings,
                                 now_ms,
-                                address,
-                                crate::subscription_remark::TrafficContext {
-                                    scope,
-                                    cdn_used_bytes,
-                                    owner_node_id,
-                                },
-                            )
-                        } else {
-                            crate::subscription_remark::render(
-                                template, user, inbound, host, settings, now_ms, address,
-                            )
-                        };
-                        outbound["tag"] = json!(label);
+                                cdn_used_bytes,
+                                node_usage: node_usage.as_ref(),
+                            },
+                        ));
                     }
                     outbounds.push(outbound);
                 } else {

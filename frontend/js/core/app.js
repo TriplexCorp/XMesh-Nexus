@@ -2535,6 +2535,7 @@ function userDrawer(id,tab){
       </section>
       <section class="user-pane user-pane-insights" data-user-editor-pane="traffic" data-active="false" role="tabpanel" id="user-panel-traffic" aria-labelledby="user-tab-traffic" tabindex="0" inert aria-hidden="true">
         <div class="user-pane-heading"><div class="user-heading-with-icon">${ic("server")}<div><h3>По серверам</h3><p>Персональный трафик Xray</p></div></div><button type="button" class="ia user-stats-refresh" data-user-traffic-refresh="${u.id}" title="Обновить статистику" aria-label="Обновить статистику">${ic('redo')}</button></div>
+        <div data-user-node-quotas></div>
         <div class="user-traffic-stats" data-user-traffic-id="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем данные…</span></div>
       </section>
       <section class="user-pane user-pane-devices" data-user-editor-pane="dev" data-active="false" role="tabpanel" id="user-panel-dev" aria-labelledby="user-tab-dev" tabindex="0" inert aria-hidden="true">
@@ -2547,6 +2548,12 @@ function userDrawer(id,tab){
   </div>`,'user-modal');
   window.XMeshUserDevices.mount(dlg.querySelector('[data-user-inline-devices]'),u.id);
   window.XMeshUserClientRouting?.mount(dlg.querySelector('.user-canvas'),u,DB);
+  if(window.XMeshNodeQuotas?.mount){
+    void window.XMeshNodeQuotas.mount(dlg.querySelector('[data-user-node-quotas]'),{
+      user:u,request:backendRequest,readOnly:viewerMode(),
+      save:patch=>api.update('users',u.id,patch),notify:toast
+    });
+  }
   window.XMeshUserTabs.select(dlg.querySelector('.user-canvas'),tab==='sub'?'acc':tab||'ov');
   // Native dialog/select focus must not leave a reused workspace scrolled.
   const workspace=dlg.querySelector('.user-canvas-grid');
