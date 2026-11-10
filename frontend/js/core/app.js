@@ -2506,11 +2506,11 @@ function userDrawer(id,tab){
               ${field(FE.find(f=>f.k==='limit'),u.limit)}
               ${field(FE.find(f=>f.k==='cdnLimitGb'),u.cdnLimitGb)}
               ${field(FE.find(f=>f.k==='strategy'),u.strategy)}
-              ${field(FE.find(f=>f.k==='tag'),u.tag)}
               ${FE.filter(f=>!['username','limit','cdnLimitGb','expireAt','strategy','desc','tg','email','tag'].includes(f.k)).map(f=>field(f,u[f.k])).join('')}
             </section>
-            <section class="user-detail-card user-note-card"><header class="user-card-title">${ic('file')}<div><h3>Заметка</h3><p>Внутренняя заметка администратора</p></div></header>
-              <label class="f user-notes-field"><span class="sr-only">Заметка</span><textarea name="desc" rows="3" spellcheck="true" placeholder="Дополнительная информация о пользователе…" data-user-note>${esc(u.desc||'')}</textarea><small class="user-note-meta"><span data-user-note-count>${Array.from(u.desc||'').length} символов</span></small></label>
+            <section class="user-detail-card user-note-card"><header class="user-card-title">${ic('file')}<div><h3>Дополнительно</h3><p>Тег и внутренняя заметка</p></div></header>
+              ${field(FE.find(f=>f.k==='tag'),u.tag)}
+              <label class="f user-notes-field"><span>Заметка</span><textarea name="desc" rows="3" spellcheck="true" placeholder="Дополнительная информация о пользователе…" data-user-note>${esc(u.desc||'')}</textarea><small class="user-note-meta"><span data-user-note-count>${Array.from(u.desc||'').length} символов</span></small></label>
             </section>
           </div>
         </form>
