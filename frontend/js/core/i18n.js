@@ -15,6 +15,20 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Переменные для анонсов":"Announcement variables",
+    "Вставить в текст":"Insert into announcement",
+    "Подстановка выполняется персонально при обновлении подписки. Для отдельной ноды используйте Remark: у анонса нет привязки к одной ноде.":"Variables are personalized when each subscription refreshes. Use Remark for per-node values: announcements are not bound to any single node.",
+    "Предпросмотр · демо-пользователь":"Preview · demo user",
+    "Израсходованный трафик":"Used traffic",
+    "Остаток общего трафика":"Remaining global traffic",
+    "Остаток LTE / CDN":"Remaining LTE / CDN",
+    "Статус подписки":"Subscription status",
+    "Пользователь: {USERNAME}":"User: {USERNAME}",
+    "Осталось LTE: {CDN_DATA_LEFT}":"LTE remaining: {CDN_DATA_LEFT}",
+    "1.75 ГБ":"1.75 GB",
+    "3.25 ГБ":"3.25 GB",
+    "24 д. 3 ч. 0 мин.":"24 d. 3 h. 0 min.",
+
     "Не удалось загрузить квоты:":"Could not load quotas:",
     "3.25 ГБ|3.25 ГБ":"3.25 GB|3.25 GB",
     "0.00 ГБ|0.00 ГБ":"0.00 GB|0.00 GB",
