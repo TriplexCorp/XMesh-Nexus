@@ -223,7 +223,7 @@ contract is enforced by `scripts/check-ui-system.js`.
 
 `workspace-dialog-contract.css` owns final dialog geometry; `user-details.css`
 owns feature content. The desktop frame adapts to available viewport width and height (38.5–49rem
-height target; ordinary desktop uses 74dvh and short zoomed-out layouts 70dvh), instead of remaining a tiny 64 × 38.5rem
+height target; 1100–2199px desktop uses 74dvh, tablets retain their compact 38.5rem bound and short zoomed-out layouts use 70dvh), instead of remaining a tiny 64 × 38.5rem
 island at reduced browser zoom. On effective widths above 2200px the entire
 surface, including text and controls, receives a modest bounded scale; short,
 very wide effective viewports use a 78rem reading width with a 1.28 scale so
