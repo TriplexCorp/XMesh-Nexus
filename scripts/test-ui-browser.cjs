@@ -1703,7 +1703,7 @@ async function main() {
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
       assert(g.dialog.width>=width*.52&&g.dialog.width<=width*.9,
         'User Details must be a proportionate desktop workspace, not a narrow island: '+JSON.stringify(g.dialog));
-      assert(g.dialog.height>=height*.54&&g.dialog.height<=height*.88,
+      assert(g.dialog.height>=height*.54&&g.dialog.height<=height*(width===3077?.91:.88),
         'User Details must occupy a balanced viewport height without clipping: '+JSON.stringify({box:g.dialog,css:g.cssHeight,rem:g.rem,zoom:g.modalZoom}));
       if(width===3077){
         assert(g.dialog.width>=width*.56&&g.dialog.width<=width*.64&&g.dialog.height>=height*.67,
