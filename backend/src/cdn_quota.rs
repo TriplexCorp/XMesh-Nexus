@@ -211,7 +211,7 @@ pub async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(), ApiE
 }
 
 /// Read the authoritative CDN pool meter for one subscription user.
-/// Unlike attach_usage(), this does not scan every user on a public feed request.
+/// Unlike `attach_usage()`, this does not scan every user on a public feed request.
 /// No caller-controlled value is accepted as a usage reading.
 pub async fn usage_for_user(
     pool: &PgPool,
