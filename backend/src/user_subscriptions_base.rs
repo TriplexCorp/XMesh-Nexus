@@ -533,7 +533,14 @@ pub async fn create(
     let settings = crate::read_settings(&state.pool).await?;
     // A link can exist before nodes are fully configured. Report that distinction
     // explicitly instead of presenting an unusable subscription as ready.
-    let readiness = match collect_user_outbounds(&state, &subscription_user, "generic", false, &settings).await
+    let readiness = match collect_user_outbounds(
+        &state,
+        &subscription_user,
+        "generic",
+        false,
+        &settings,
+    )
+    .await
     {
         Ok(outbounds) => json!({"ready":true,"connections":outbounds.len()}),
         Err(error) => {
@@ -931,7 +938,8 @@ async fn collect_user_outbounds(
                     if let Some(template) = outbound.get("tag").and_then(Value::as_str)
                         && template.contains('{')
                     {
-                        let address = outbound.pointer("/settings/vnext/0/address")
+                        let address = outbound
+                            .pointer("/settings/vnext/0/address")
                             .and_then(Value::as_str)
                             .or_else(|| endpoint(host))
                             .unwrap_or("");
@@ -1094,7 +1102,8 @@ pub async fn serve(
     // actual User-Agent. Explicit query parameters remain optional overrides.
     let client = crate::subscription_user_agent::negotiate(&headers, &options).map_err(bad)?;
     let settings = crate::read_settings(&state.pool).await?;
-    let outbounds = collect_user_outbounds(&state, &user, client.device.as_str(), true, &settings).await?;
+    let outbounds =
+        collect_user_outbounds(&state, &user, client.device.as_str(), true, &settings).await?;
     // Native Xray JSON is the only supported subscription format.
     // A disabled SMART selector changes routing, never the wire representation.
     let json = crate::subscription_json::build_feed(
