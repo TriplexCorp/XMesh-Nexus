@@ -879,7 +879,14 @@ async fn collect_user_outbounds(
     user: &Value,
     device: &str,
     rotate: bool,
+    settings: &Value,
 ) -> Result<Vec<Value>, ApiError> {
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     let squads = crate::load_records(&state.pool, "squads").await?;
     let profiles = crate::load_records(&state.pool, "profiles").await?;
     let hosts = crate::load_records(&state.pool, "hosts").await?;
@@ -919,6 +926,20 @@ async fn collect_user_outbounds(
                     if let Some(node) = direct_host_node(host, profile, &nodes) {
                         apply_ip_rotation(state, user, node, &mut outbound, rotate).await?;
                     }
+                    // Render only the user-visible remark. Keep routing tags and
+                    // Host addressing independent from personalized labels.
+                    if let Some(template) = outbound.get("tag").and_then(Value::as_str)
+                        && template.contains('{')
+                    {
+                        let address = outbound.pointer("/settings/vnext/0/address")
+                            .and_then(Value::as_str)
+                            .or_else(|| endpoint(host))
+                            .unwrap_or("");
+                        let label = crate::subscription_remark::render(
+                            template, user, inbound, host, settings, now_ms, address,
+                        );
+                        outbound["tag"] = json!(label);
+                    }
                     outbounds.push(outbound);
                 } else {
                     log_unavailable_subscription_host(user, inbound, host, tag);
@@ -957,8 +978,8 @@ pub async fn admin_client_json(
         .map_err(bad)?
         .device
         .as_str();
-    let proxies = collect_user_outbounds(&state, &user, device, false).await?;
     let setting = crate::read_settings(&state.pool).await?;
+    let proxies = collect_user_outbounds(&state, &user, device, false, &setting).await?;
     let profile = crate::subscription_json::build_feed(
         proxies,
         &crate::client_routing::scoped_settings(&setting, &user),
@@ -1072,8 +1093,8 @@ pub async fn serve(
     // Resolve content and XHTTP transport profile from the VPN client's
     // actual User-Agent. Explicit query parameters remain optional overrides.
     let client = crate::subscription_user_agent::negotiate(&headers, &options).map_err(bad)?;
-    let outbounds = collect_user_outbounds(&state, &user, client.device.as_str(), true).await?;
     let settings = crate::read_settings(&state.pool).await?;
+    let outbounds = collect_user_outbounds(&state, &user, client.device.as_str(), true, &settings).await?;
     // Native Xray JSON is the only supported subscription format.
     // A disabled SMART selector changes routing, never the wire representation.
     let json = crate::subscription_json::build_feed(
