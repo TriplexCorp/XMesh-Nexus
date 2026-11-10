@@ -118,8 +118,8 @@ dialog#dlg.user-modal{
   max-inline-size:calc(100vw - 2rem);
   min-height:0;
   min-block-size:0;
-  height:min(clamp(38.5rem,64dvh,49rem),calc(100dvh - 2rem));
-  block-size:min(clamp(38.5rem,64dvh,49rem),calc(100dvh - 2rem));
+  height:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));
+  block-size:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));
   max-height:calc(100dvh - 2rem);
   max-block-size:calc(100dvh - 2rem);
   overflow:hidden;
@@ -340,5 +340,7 @@ html[data-motion=off] #dlg.user-modal::backdrop{
   dialog#dlg.user-modal{
     --dialog-width:78rem;
     zoom:1.28;
+    height:min(clamp(38.5rem,70dvh,49rem),82dvh);
+    block-size:min(clamp(38.5rem,70dvh,49rem),82dvh);
   }
 }
