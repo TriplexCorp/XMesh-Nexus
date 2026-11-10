@@ -1551,7 +1551,8 @@ fn build_offline_policy(
         // Waiting subscriptions require confirmed online telemetry to start
         // their clock. Never issue a disconnected spending lease before then,
         // including when the user has an otherwise unlimited traffic plan.
-        let global_budget = remaining.map(|bytes| (bytes / active_nodes.max(1)).min(64 * 1024 * 1024));
+        let global_budget =
+            remaining.map(|bytes| (bytes / active_nodes.max(1)).min(64 * 1024 * 1024));
         // A node-specific quota is not split across other nodes. Constrain
         // offline allowance using the tighter of global and local balances.
         let node_budget = crate::node_user_quotas::offline_remaining(user, node_id)
@@ -2567,13 +2568,30 @@ mod provision_tests {
         let squads = vec![json!({"id":1,"inb":["MAIN"]})];
         let cdn_tags = std::collections::HashSet::new();
         let mut exhausted = base.clone();
-        provision_proxy_users(&mut exhausted,42,&users,&squads,1_800_000_000_000,&cdn_tags)
-            .unwrap();
-        assert_eq!(exhausted["inbounds"][0]["settings"]["clients"],json!([]));
+        provision_proxy_users(
+            &mut exhausted,
+            42,
+            &users,
+            &squads,
+            1_800_000_000_000,
+            &cdn_tags,
+        )
+        .unwrap();
+        assert_eq!(exhausted["inbounds"][0]["settings"]["clients"], json!([]));
         let mut other_node = base;
-        provision_proxy_users(&mut other_node,43,&users,&squads,1_800_000_000_000,&cdn_tags)
-            .unwrap();
-        assert_eq!(other_node["inbounds"][0]["settings"]["clients"][0]["id"],uuid);
+        provision_proxy_users(
+            &mut other_node,
+            43,
+            &users,
+            &squads,
+            1_800_000_000_000,
+            &cdn_tags,
+        )
+        .unwrap();
+        assert_eq!(
+            other_node["inbounds"][0]["settings"]["clients"][0]["id"],
+            uuid
+        );
     }
 
     #[test]
@@ -2585,9 +2603,9 @@ mod provision_tests {
             "nodeTrafficLimits":{"42":{"limitGb":5,"period":"monthly"}},
             "nodeQuotaUsedBytes":4_999_000_000_i64
         })];
-        let policy = build_offline_policy(&config,&users,42,1_800_000_000_000,"abc",10);
-        assert_eq!(policy["users"][0]["offlineBudgetBytes"],1_000_000);
-        let other = build_offline_policy(&config,&users,43,1_800_000_000_000,"abc",10);
+        let policy = build_offline_policy(&config, &users, 42, 1_800_000_000_000, "abc", 10);
+        assert_eq!(policy["users"][0]["offlineBudgetBytes"], 1_000_000);
+        let other = build_offline_policy(&config, &users, 43, 1_800_000_000_000, "abc", 10);
         assert!(other["users"][0]["offlineBudgetBytes"].is_null());
     }
 
@@ -2630,7 +2648,10 @@ mod provision_tests {
             json!({"id":4,"xrayId":"550e8400-e29b-41d4-a716-446655440003","squads":[4],"expireAt":now-1}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["SE"]})];
-        provision_proxy_users(&mut config, 42, &users,
+        provision_proxy_users(
+            &mut config,
+            42,
+            &users,
             &squads,
             now,
             &std::collections::HashSet::default(),
@@ -2670,7 +2691,10 @@ mod provision_tests {
                 "squads":[4],"hold":true,"holdDays":0}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]})];
-        provision_proxy_users(&mut config, 42, &users,
+        provision_proxy_users(
+            &mut config,
+            42,
+            &users,
             &squads,
             now,
             &std::collections::HashSet::default(),
@@ -2696,7 +2720,10 @@ mod provision_tests {
         let users =
             vec![json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]})];
         let squads = vec![json!({"id":4,"inb":["CDN NL"]})];
-        provision_proxy_users(&mut config, 42, &users,
+        provision_proxy_users(
+            &mut config,
+            42,
+            &users,
             &squads,
             1_800_000_000_000,
             &std::collections::HashSet::default(),
@@ -2743,7 +2770,10 @@ mod provision_tests {
         let blocked = json!({"id":8,"xrayId":"550e8400-e29b-41d4-a716-446655440001",
             "squads":[4],"disabled":true});
         let squads = vec![json!({"id":4,"inb":["VM","TR","SS","SS22","HY","MQ"]})];
-        provision_proxy_users(&mut config, 42, &[active, blocked],
+        provision_proxy_users(
+            &mut config,
+            42,
+            &[active, blocked],
             &squads,
             1_800_000_000_000,
             &std::collections::HashSet::default(),
@@ -2778,7 +2808,10 @@ mod provision_tests {
         let users =
             vec![json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4,5]})];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["NL"]})];
-        provision_proxy_users(&mut config, 42, &users,
+        provision_proxy_users(
+            &mut config,
+            42,
+            &users,
             &squads,
             1_800_000_000_000,
             &std::collections::HashSet::default(),
