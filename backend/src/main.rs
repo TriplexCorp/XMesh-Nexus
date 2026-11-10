@@ -1,6 +1,7 @@
 mod admin_accounts;
 mod auth;
 mod cdn_quota;
+mod node_user_quotas;
 mod client_routing;
 mod core;
 mod mfa;
@@ -355,6 +356,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         )
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
+        .route("/users/{id}/node-quotas", get(node_user_quotas::get_for_user))
         .route("/users/{id}/traffic/history", get(get_user_traffic_history))
         .route(
             "/users/{id}/traffic/observations",
@@ -1098,6 +1100,9 @@ async fn create_record(
     if collection == "nodes" {
         node_address_unique::reject_duplicate(&mut tx, &data, 0).await?;
     }
+    if collection == "users" && data.get("nodeTrafficLimits").is_some() {
+        node_user_quotas::require_existing_nodes(&mut tx, &data).await?;
+    }
     let row = sqlx::query(
         "INSERT INTO panel_records (collection, data) VALUES ($1, $2) RETURNING id, data",
     )
@@ -1274,6 +1279,9 @@ async fn update_record(
         object.insert(key, value);
     }
     validate_record(&collection, &data)?;
+    if collection == "users" && patch_object.contains_key("nodeTrafficLimits") {
+        node_user_quotas::require_existing_nodes(&mut tx, &data).await?;
+    }
     if collection == "nodes" && old_node_address != node_address_unique::address_key(&data) {
         node_address_unique::reject_duplicate(&mut tx, &data, id).await?;
     }
@@ -4618,6 +4626,7 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     }
     if collection == "users" {
         cdn_quota::validate_user(data)?;
+        node_user_quotas::validate_user(data)?;
         if let Some(personal) = object.get("clientRouting") {
             client_routing::validate_user_override(personal)
                 .map_err(|detail| ApiError::new(StatusCode::BAD_REQUEST, detail))?;
