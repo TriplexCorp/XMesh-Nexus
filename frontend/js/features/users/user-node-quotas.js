@@ -10,7 +10,7 @@ window.XMeshNodeQuotas=(()=>{
     const number=Number(bytes);
     if(!Number.isFinite(number))return '—';
     if(number>0&&number<5_000_000)return '<0.01 ГБ';
-    return (Math.max(0,number)/1e9).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' ГБ';
+    return (Math.max(0,number)/1e9).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' ГБ';
   };
   const txt=(ru,en)=>window.XMeshI18n?.getLanguage?.()==='en'?en:ru;
   const periodLabel=p=>p==='lifetime'?txt('За всё время','Lifetime'):txt('Ежемесячно','Monthly');
