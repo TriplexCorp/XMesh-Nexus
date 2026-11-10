@@ -1846,14 +1846,16 @@ dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
   min-height:2.65rem;
   padding:.36rem 0;
 }
+/* Save is the trailing primary action. Unsaved draft status belongs at the
+ * leading edge, and stays hidden until a field actually changes. */
 #dlg.user-modal .user-editor-actions .user-save-button{
-  order:-1;
-  margin-inline-start:0;
-}
-#dlg.user-modal .user-editor-actions .user-edit-dirty{
   order:1;
   margin-inline-start:auto;
-  text-align:end;
+}
+#dlg.user-modal .user-editor-actions .user-edit-dirty{
+  order:0;
+  margin-inline-start:0;
+  text-align:start;
 }
 @media(max-width:760px){
   #dlg.user-modal .user-detail-card{
