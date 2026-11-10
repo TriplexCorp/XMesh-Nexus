@@ -1707,7 +1707,7 @@ async function main() {
         'User Details must occupy a balanced viewport height without clipping: '+JSON.stringify({box:g.dialog,css:g.cssHeight,rem:g.rem,zoom:g.modalZoom}));
       if(width===3077){
         assert(g.dialog.width>=width*.56&&g.dialog.width<=width*.64&&g.dialog.height>=height*.67,
-          'Zoomed-out 2000×768 equivalent must be a proportionate, readable workspace');
+          'Zoomed-out 2000×768 equivalent must be a proportionate, readable workspace: '+JSON.stringify({dialog:g.dialog,rem:g.rem,zoom:g.modalZoom}));
       }
       const layout=await page.locator('#dlg').evaluate(d=>{
         const b=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}};
