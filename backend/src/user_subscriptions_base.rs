@@ -810,7 +810,10 @@ fn host_traffic_scope(
     for node in nodes.iter().filter(|node| {
         node.get("disabled") != Some(&Value::Bool(true))
             && same_record_id(node.get("profileId"), profile.get("id"))
-            && pins.is_none_or(|ids| ids.iter().any(|id| same_record_id(Some(id), node.get("id"))))
+            && pins.is_none_or(|ids| {
+                ids.iter()
+                    .any(|id| same_record_id(Some(id), node.get("id")))
+            })
     }) {
         let tag = [inbound_tag.to_owned()];
         let Ok(cdn_tags) = crate::cdn_quota::tags_for_node(settings, node, &tag) else {
@@ -948,12 +951,16 @@ async fn collect_user_outbounds(
     // Fetch one authoritative CDN meter for this user, only when a published
     // Remark actually asks for it. Never trust a client-provided usage value.
     let needs_cdn_meter = hosts.iter().any(|host| {
-        host.get("remark").and_then(Value::as_str).is_some_and(|name| {
-            name.contains("{CDN_DATA_LEFT}") || name.contains("{TRAFFIC_LEFT}")
-        })
+        host.get("remark")
+            .and_then(Value::as_str)
+            .is_some_and(|name| name.contains("{CDN_DATA_LEFT}") || name.contains("{TRAFFIC_LEFT}"))
     });
     let cdn_used_bytes = if needs_cdn_meter
-        && user.get("cdnLimitGb").and_then(Value::as_f64).unwrap_or(0.0) > 0.0
+        && user
+            .get("cdnLimitGb")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            > 0.0
     {
         if let Some(user_id) = user.get("id").and_then(record_id) {
             match crate::cdn_quota::usage_for_user(&state.pool, settings, user_id).await {
@@ -1018,7 +1025,13 @@ async fn collect_user_outbounds(
                         let (scope, owner_node_id) =
                             host_traffic_scope(host, profile, tag, &nodes, settings);
                         let label = crate::subscription_remark::render_with_context(
-                            template, user, inbound, host, settings, now_ms, address,
+                            template,
+                            user,
+                            inbound,
+                            host,
+                            settings,
+                            now_ms,
+                            address,
                             crate::subscription_remark::TrafficContext {
                                 scope,
                                 cdn_used_bytes,
@@ -2172,15 +2185,57 @@ mod tests {
         let standard = json!({"address":"cdn-named.example","nodes":[10]});
         let cdn = json!({"address":"vpn.example","nodes":[11]});
         let selective = json!({"address":"vpn.example","nodes":[12]});
-        assert_eq!(host_traffic_scope(&standard,&profile,"PL_LTE",&nodes,&settings), (TrafficScope::Account,Some(10)));
-        assert_eq!(host_traffic_scope(&cdn,&profile,"PL_LTE",&nodes,&settings), (TrafficScope::Cdn,Some(11)));
-        assert_eq!(host_traffic_scope(&selective,&profile,"PL_LTE",&nodes,&settings), (TrafficScope::Cdn,Some(12)));
-        assert_eq!(host_traffic_scope(&selective,&profile,"VLESS",&nodes,&settings), (TrafficScope::Account,Some(12)));
-        assert_eq!(host_traffic_scope(&json!({"nodes":[10,11]}),&profile,"PL_LTE",&nodes,&settings), (TrafficScope::Unknown,None));
-        assert_eq!(host_traffic_scope(&json!({"nodes":[11,12]}),&profile,"PL_LTE",&nodes,&settings), (TrafficScope::Cdn,None));
-        assert_eq!(host_traffic_scope(&json!({"nodes":[999]}),&profile,"PL_LTE",&nodes,&settings), (TrafficScope::Unknown,None));
+        assert_eq!(
+            host_traffic_scope(&standard, &profile, "PL_LTE", &nodes, &settings),
+            (TrafficScope::Account, Some(10))
+        );
+        assert_eq!(
+            host_traffic_scope(&cdn, &profile, "PL_LTE", &nodes, &settings),
+            (TrafficScope::Cdn, Some(11))
+        );
+        assert_eq!(
+            host_traffic_scope(&selective, &profile, "PL_LTE", &nodes, &settings),
+            (TrafficScope::Cdn, Some(12))
+        );
+        assert_eq!(
+            host_traffic_scope(&selective, &profile, "VLESS", &nodes, &settings),
+            (TrafficScope::Account, Some(12))
+        );
+        assert_eq!(
+            host_traffic_scope(
+                &json!({"nodes":[10,11]}),
+                &profile,
+                "PL_LTE",
+                &nodes,
+                &settings
+            ),
+            (TrafficScope::Unknown, None)
+        );
+        assert_eq!(
+            host_traffic_scope(
+                &json!({"nodes":[11,12]}),
+                &profile,
+                "PL_LTE",
+                &nodes,
+                &settings
+            ),
+            (TrafficScope::Cdn, None)
+        );
+        assert_eq!(
+            host_traffic_scope(
+                &json!({"nodes":[999]}),
+                &profile,
+                "PL_LTE",
+                &nodes,
+                &settings
+            ),
+            (TrafficScope::Unknown, None)
+        );
         let legacy_settings = json!({"cdnInboundTags":["PL_LTE"]});
-        assert_eq!(host_traffic_scope(&standard,&profile,"PL_LTE",&nodes,&legacy_settings), (TrafficScope::Cdn,Some(10)));
+        assert_eq!(
+            host_traffic_scope(&standard, &profile, "PL_LTE", &nodes, &legacy_settings),
+            (TrafficScope::Cdn, Some(10))
+        );
     }
     #[test]
     fn host_rotation_requires_unambiguous_direct_ip_not_cdn() {
