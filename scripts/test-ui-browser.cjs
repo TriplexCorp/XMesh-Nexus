@@ -1761,8 +1761,8 @@ async function main() {
         assert(composition.noteField.bottom<=composition.body.bottom+2,
           'The note input should be visible without scrolling at a 2000×768 zoomed-out desktop');
       }
-      assert(composition.save.x<=composition.actions.x+composition.actions.width*.5,
-        'Save action should be left-aligned consistently with Nexus dialogs');
+      assert(Math.abs(composition.save.right-(composition.actions.x+composition.actions.width))<=4,
+        'Save action must be right-aligned in the fixed User Details footer');
       if(width>=2200){
         const expectedZoom=width===3077?1.28:1.12;
         assert(Math.abs(Number(g.modalZoom)-expectedZoom)<.01,
