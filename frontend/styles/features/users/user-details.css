@@ -1727,10 +1727,9 @@ dialog.user-modal .user-pane {
 }
 
 /* User workstation / Settings composition.
- * Content-first grid: Basic + Note in the left column and Connection in the
- * right. Never stretch the shorter Basic card to the taller Connection card;
- * that created an enormous blank block and hid Note under the scroll fold.
- * Use established Nexus tokens and the existing shared modal frame. */
+ * Two content-sized form cards and a compact full-width note row. The prior
+ * left-only note left a large unused rectangle below Connection on desktop.
+ * Keep the shared dialog and Nexus materials; never force equal card heights. */
 @media(min-width:1100px){
   dialog#dlg.user-modal .user-pane-settings .user-settings-cards{
     display:grid;
@@ -1750,7 +1749,7 @@ dialog.user-modal .user-pane {
     gap:var(--nx-space-2) var(--nx-space-3);
   }
   dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-connection-card{
-    grid-column:2;grid-row:1 / span 2;
+    grid-column:2;grid-row:1;
     align-self:start;
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -1766,13 +1765,26 @@ dialog.user-modal .user-pane {
     margin:0;
   }
   dialog#dlg.user-modal .user-pane-settings .user-settings-cards>.user-note-card{
-    grid-column:1;
+    grid-column:1/-1;
     grid-row:2;
     align-self:start;
     min-width:0;
+    display:grid;
+    grid-template-columns:minmax(11rem, .24fr) minmax(0,1fr);
+    align-items:center;
+    column-gap:var(--nx-space-3);
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-note-card>.user-card-title{
+    margin:0;
+    padding:0;
+    border-bottom:0;
+  }
+  dialog#dlg.user-modal .user-pane-settings .user-note-card>.user-notes-field{
+    grid-column:2;
+    margin:0;
   }
   dialog#dlg.user-modal .user-pane-settings .user-note-card textarea{
-    min-height:3.6rem;
+    min-height:3.1rem;
     max-height:10rem;
   }
 }

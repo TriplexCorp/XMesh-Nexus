@@ -1236,9 +1236,12 @@ dialog.user-modal .user-stats-refresh:hover {
 }
 }
 .stats-user-pane .stats-bucket-table-wrap {
+  /* The active pane owns BOTH scroll axes. A horizontal-only nested wrapper
+   * computes overflow-y:auto in Chromium, and overscroll containment then
+   * consumes mouse-wheel events without ever scrolling the history pane. */
   max-height:none;
-  overflow-y:visible;
-  overflow-x:auto;
+  overflow:visible;
+  overscroll-behavior:auto;
 }
 .stats-history-filters {
   display:grid;

@@ -1751,10 +1751,10 @@ async function main() {
       assert(composition.connectionControls.every(Boolean),'Connection card must preserve limit, CDN limit, reset strategy and tag fields');
       assert(composition.fields.every(Boolean)&&Math.abs(composition.fields[0].x-composition.fields[1].x)>8&&Math.abs(composition.fields[0].y-composition.fields[1].y)<=4,
         'Connection controls must use two columns rather than a long vertical rail');
-      assert(Math.abs(composition.note.x-composition.basic.x)<=2&&composition.note.right<=composition.connection.x+2,
-        'Note must stay in the left reading column beneath Basic');
-      assert(composition.note.y>=composition.basic.bottom-2,
-        'Note must follow Basic, not be pushed below the taller Connection card');
+      assert(Math.abs(composition.note.x-composition.basic.x)<=2&&Math.abs(composition.note.right-composition.connection.right)<=2,
+        'Compact Note must occupy both columns instead of leaving a large empty right-side gap');
+      assert(composition.note.y>=Math.max(composition.basic.bottom,composition.connection.bottom)-2,
+        'Note must begin immediately below both form cards without overlapping');
       assert(composition.labelFont>=.85*composition.rem && composition.controlFont>=.875*composition.rem,
         'User details must not silently shrink labels and controls below Nexus reading sizes');
       if(width===3077){
@@ -2049,6 +2049,31 @@ async function main() {
       }
       await page.setViewportSize({width:1920,height:1080});
       await screenshot(page,'dialog-user-intelligence-history');
+      // A nested horizontal table wrapper used to compute overflow-y:auto,
+      // trap wheel events and prevent the outer history pane from scrolling.
+      // Scroll by an actual mouse wheel event OVER a dense table, not by
+      // assigning scrollTop in script (which would miss the regression).
+      const wheelFixture=await page.locator('#stats-user-modal [data-stats-user-pane="history"]').evaluate(pane=>{
+        const wrap=document.createElement('div');
+        wrap.className='stats-bucket-table-wrap stats-wheel-fixture';
+        wrap.innerHTML='<table><tbody>'+Array.from({length:64},(_,i)=>'<tr><td>Scroll fixture '+i+'</td><td>1 KB</td></tr>').join('')+'</tbody></table>';
+        pane.prepend(wrap);
+        pane.scrollTop=0;
+        return {parentHeight:pane.clientHeight,parentScrollHeight:pane.scrollHeight,wrapperOverflowY:getComputedStyle(wrap).overflowY};
+      });
+      assert(wheelFixture.parentScrollHeight>wheelFixture.parentHeight+200,
+        'User Intelligence wheel fixture must overflow the history pane');
+      assert.equal(wheelFixture.wrapperOverflowY,'visible',
+        'Table wrapper must not claim vertical scroll ownership or trap the mouse wheel');
+      const wheelBox=await page.locator('#stats-user-modal .stats-wheel-fixture').boundingBox();
+      assert(wheelBox&&wheelBox.height>30,'Wheel fixture must have a hit-testable table surface');
+      await page.mouse.move(wheelBox.x+Math.min(wheelBox.width/2,90),wheelBox.y+28);
+      await page.mouse.wheel(0,350);
+      await page.waitForFunction(()=>document.querySelector('#stats-user-modal [data-stats-user-pane="history"]').scrollTop>10);
+      await page.locator('#stats-user-modal [data-stats-user-pane="history"]').evaluate(pane=>{
+        pane.querySelector('.stats-wheel-fixture')?.remove();
+        pane.scrollTop=0;
+      });
       await page.locator('#stats-user-close').click();
       await page.waitForFunction(()=>!document.querySelector('#stats-user-modal')?.open);
       if(await page.locator('dialog#dlg[open]').count()){await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('#dlg')?.open)}
