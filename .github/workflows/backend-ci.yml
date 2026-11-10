@@ -233,6 +233,7 @@ jobs:
         run: |
           node scripts/check-host-editor-zones.js
           node scripts/test-host-client-overrides.cjs
+          node scripts/check-remark-picker-append.cjs
       - name: Check wide horizontal Node editor field alignment
         run: node scripts/check-node-editor-layout.js
       - name: Check responsive Nodes grid and density buttons
