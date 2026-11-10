@@ -298,8 +298,8 @@
    warning+=' '+trans('Доступ пользователей, связанных со сквадами, может измениться.','Users linked to these squads may lose access.');
   }
   if(action==='agent-update'){
-   warning+=' '+trans('Обновления выполняются не более чем на двух нодах одновременно. Доступность и поддержку самообновления проверит сервер.',
-     'Updates run on at most two nodes at a time. The server checks connectivity and update eligibility.');
+   warning+=' '+trans('Обновления запускаются одновременно на всех выбранных узлах. Доступность и поддержку самообновления проверит сервер.',
+     'Updates start on all selected nodes at once. The server checks connectivity and update eligibility.');
   }
   st.busy=true;update(area,spec);
   let xrayVersion='';

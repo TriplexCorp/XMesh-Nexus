@@ -188,7 +188,7 @@ window.XMeshI18n=(()=>{
     "Agent обновлён": "Agent updated",
     "Обновление Agent завершено:": "Agent update finished:",
     "ошибок:": "failed:",
-    "Обновления выполняются не более чем на двух нодах одновременно. Доступность и поддержку самообновления проверит сервер.": "Updates run on at most two nodes at a time. The server checks connectivity and update eligibility.",
+    "Обновления запускаются одновременно на всех выбранных узлах. Доступность и поддержку самообновления проверит сервер.": "Updates start on all selected nodes at once. The server checks connectivity and update eligibility.",
     "Ошибка подтверждения:": "Confirmation failed:",
     "Завершить выбор": "Finish selection",
     "Выбрано:": "Selected:",

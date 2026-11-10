@@ -59,7 +59,29 @@ async function exercise(english,failOne){
  assert.match(toasts[0],failOne?/6\/7.*(?:failed|ошибок): 1/:/7\/7/);
 }
 
+async function confirmation(english){
+ const state={ids:new Set(['1','2','3']),mode:true,busy:false};
+ let message='';
+ const context={
+  selection:()=>state,DB:{nodes:[{id:1},{id:2},{id:3}]},update:()=>{},
+  trans:(ru,en)=>english?en:ru,
+  actionText:()=>english?'Update Agent':'Обновить Agent',
+  panelConfirm:async text=>{message=text;return false;},
+  updateNodeAgents:()=>{throw Error('A cancelled confirmation must not update nodes');}
+ };
+ vm.createContext(context);
+ const execute=source.slice(source.indexOf(' async function execute('),source.indexOf(' window.XMeshBulk='));
+ vm.runInContext(execute+'\nglobalThis.run=execute;',context);
+ await context.run({}, {kind:'nodes'}, 'agent-update');
+ assert.match(message,english?/all selected nodes at once/:/одновременно на всех выбранных узлах/);
+ assert.doesNotMatch(message,/at most two|двух нодах/);
+ assert.equal(state.busy,false);
+}
+
 (async()=>{
- for(const english of [false,true])for(const failOne of [false,true])await exercise(english,failOne);
+ for(const english of [false,true]){
+  for(const failOne of [false,true])await exercise(english,failOne);
+  await confirmation(english);
+ }
  console.log('Agent fleet: all seven start together, independent results, slow nodes, retry selection and RU/EN stages passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});
