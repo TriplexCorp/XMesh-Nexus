@@ -1728,6 +1728,7 @@ window.XMeshI18n=(()=>{
   "Домен:": "Domain:",
   "Дополнительная защита учётной записи. После включения понадобится код приложения-аутентификатора; сохраните резервные коды для восстановления доступа.": "Additional account protection. Once enabled, sign-in requires a code from your authenticator app. Keep your recovery codes to restore access if needed.",
   "Дополнительно": "Advanced",
+  "Тег и внутренняя заметка": "Tag and internal note",
   "Дополнительные .dat": "Additional .dat files",
   "Дополнительные файлы должны скачиваться по HTTPS.": "Additional files must be downloaded over HTTPS.",
   "Дополнительные фильтры пользователей": "Additional user filters",
