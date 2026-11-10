@@ -186,8 +186,8 @@ dialog#dlg.user-modal>.user-canvas{
  * phone frame bounds. The historical 38.5rem mobile/tablet cap stays intact. */
 @media(min-width:1100px) and (max-width:2199px){
   dialog#dlg.user-modal{
-    height:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));
-    block-size:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));
+    height:min(clamp(36rem,70dvh,47rem),calc(100dvh - 2rem));
+    block-size:min(clamp(36rem,70dvh,47rem),calc(100dvh - 2rem));
   }
 }
 

@@ -221,6 +221,17 @@ contract is enforced by `scripts/check-ui-system.js`.
 
 ### User Details
 
+**User creation and editing use one visual form contract:** both consume
+`--nx-user-form-*` tokens in `features/users/user-editor.css` for control height,
+headings, labels, helper text, borders and card padding. Both present balanced
+two-column cards at desktop sizes and a compact full-width metadata row.
+Creation has additional necessary fields (Squads, Xray profile, duration,
+on-hold), so the functional content differs, but not the styling language.
+Avoid creating a second appearance system for either dialog. At narrower
+viewports stack the sections and preserve visible primary actions and one
+scroll owner.
+
+
 User Intelligence history and observations must scroll through **one vertical
 owner**, the active `.stats-user-pane`. Inner `.stats-bucket-table-wrap`
 elements must remain overflow-visible and never claim a dead-end vertical
@@ -230,7 +241,7 @@ single containing workspace scroll owner.
 
 `workspace-dialog-contract.css` owns final dialog geometry; `user-details.css`
 owns feature content. The desktop frame adapts to available viewport width and height (38.5–49rem
-height target; 1100–2199px desktop uses 74dvh, tablets retain their compact 38.5rem bound and short zoomed-out layouts use 70dvh), instead of remaining a tiny 64 × 38.5rem
+height target; 1100–2199px desktop uses a shorter 70dvh content-dense target, tablets retain their compact 38.5rem bound and short zoomed-out layouts use 70dvh), instead of remaining a tiny 64 × 38.5rem
 island at reduced browser zoom. On effective widths above 2200px the entire
 surface, including text and controls, receives a modest bounded scale; short,
 very wide effective viewports use a 78rem reading width with a 1.28 scale so
@@ -244,10 +255,12 @@ between tabs. Validation reveals the affected panel; errors stay outside panels.
 with a stable scrollbar gutter. `userDrawer()` resets that owner's scroll
 position after mounting, including when another user replaces an open dialog.
 On desktop Settings, Basic Data and Connection Parameters occupy two
-content-sized first-row columns, with a compact full-width Note row directly
-below them. A left-only Note caused a large unused lower-right rectangle. Do
-not force equal card heights. Keep Note visible without initial scrolling at
-the zoomed-out 2000×768 reference. Controls, labels and headings reuse Nexus size tokens with
+content-sized first-row columns. The uTLS selector is injected after Reset;
+the Tag belongs in a compact full-width "Дополнительно" row alongside Note
+instead of creating a third field row under Connection. This removes the
+otherwise unavoidable gap under Basic without stretching cards or inserting
+empty placeholders. Keep Note visible without initial scrolling at the
+zoomed-out 2000×768 reference. Controls, labels and headings reuse Nexus size tokens with
 a minimum readable text size; desktop viewport scaling affects the entire
 surface, not just its borders.
 
