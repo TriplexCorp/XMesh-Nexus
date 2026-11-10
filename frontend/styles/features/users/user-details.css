@@ -1772,7 +1772,7 @@ dialog.user-modal .user-pane {
     min-width:0;
   }
   dialog#dlg.user-modal .user-pane-settings .user-note-card textarea{
-    min-height:4.35rem;
+    min-height:3.6rem;
     max-height:10rem;
   }
 }
