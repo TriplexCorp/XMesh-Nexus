@@ -221,6 +221,13 @@ contract is enforced by `scripts/check-ui-system.js`.
 
 ### User Details
 
+User Intelligence history and observations must scroll through **one vertical
+owner**, the active `.stats-user-pane`. Inner `.stats-bucket-table-wrap`
+elements must remain overflow-visible and never claim a dead-end vertical
+scrollbar or stop wheel propagation. Narrow workspaces can instead use their
+single containing workspace scroll owner.
+
+
 `workspace-dialog-contract.css` owns final dialog geometry; `user-details.css`
 owns feature content. The desktop frame adapts to available viewport width and height (38.5–49rem
 height target; 1100–2199px desktop uses 74dvh, tablets retain their compact 38.5rem bound and short zoomed-out layouts use 70dvh), instead of remaining a tiny 64 × 38.5rem
@@ -236,11 +243,11 @@ shared settings/access draft and dialog geometry. Arrow keys, Home and End move
 between tabs. Validation reveals the affected panel; errors stay outside panels. `.user-canvas-grid` is the single scroll owner
 with a stable scrollbar gutter. `userDrawer()` resets that owner's scroll
 position after mounting, including when another user replaces an open dialog.
-On desktop Settings, Basic Data and Note share the left reading column, while
-Connection Parameters use the right. The cards are content-sized, not stretched
-to the height of their neighbors. The Note begins immediately after Basic Data
-and should remain visible without initial scrolling at the zoomed-out
-2000×768 reference. Controls, labels and headings reuse Nexus size tokens with
+On desktop Settings, Basic Data and Connection Parameters occupy two
+content-sized first-row columns, with a compact full-width Note row directly
+below them. A left-only Note caused a large unused lower-right rectangle. Do
+not force equal card heights. Keep Note visible without initial scrolling at
+the zoomed-out 2000×768 reference. Controls, labels and headings reuse Nexus size tokens with
 a minimum readable text size; desktop viewport scaling affects the entire
 surface, not just its borders.
 
