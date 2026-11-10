@@ -118,8 +118,8 @@ dialog#dlg.user-modal{
   max-inline-size:calc(100vw - 2rem);
   min-height:0;
   min-block-size:0;
-  height:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));
-  block-size:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));
+  height:min(clamp(38.5rem,64dvh,49rem),calc(100dvh - 2rem));
+  block-size:min(clamp(38.5rem,64dvh,49rem),calc(100dvh - 2rem));
   max-height:calc(100dvh - 2rem);
   max-block-size:calc(100dvh - 2rem);
   overflow:hidden;
@@ -180,6 +180,15 @@ dialog#dlg.user-modal>.user-canvas{
   scrollbar-gutter:stable;
   overscroll-behavior:contain;
   align-content:start;
+}
+
+/* Taller regular desktops gain useful form space without changing tablet and
+ * phone frame bounds. The historical 38.5rem mobile/tablet cap stays intact. */
+@media(min-width:1100px) and (max-width:2199px){
+  dialog#dlg.user-modal{
+    height:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));
+    block-size:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));
+  }
 }
 
 /* Desktop User Details spends width to save height without reducing readable
