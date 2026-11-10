@@ -61,6 +61,7 @@ pub enum TrafficScope {
 pub struct TrafficContext {
     pub scope: TrafficScope,
     pub cdn_used_bytes: Option<i64>,
+    #[expect(dead_code, reason = "Reserved for future per-node quota lookup; current CDN quota is pooled")]
     pub owner_node_id: Option<i64>,
 }
 
@@ -80,11 +81,11 @@ fn cdn_left(user: &Value, used_bytes: Option<i64>) -> String {
     if limit <= 0.0 {
         return "∞".to_owned();
     }
-    let Some(used) = used_bytes else {
+    let Some(consumed_bytes) = used_bytes else {
         return "—".to_owned();
     };
     let remaining = crate::gb_to_bytes_i64(limit)
-        .saturating_sub(used.max(0))
+        .saturating_sub(consumed_bytes.max(0))
         .max(0);
     let hundredths = remaining.saturating_add(5_000_000) / 10_000_000;
     format!("{}.{:02} ГБ", hundredths / 100, hundredths % 100)
@@ -196,6 +197,11 @@ fn public_ip(value: &str, ipv6: bool) -> Option<String> {
         _ => None,
     }
 }
+#[expect(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    reason = "A single auditable template variable switch requires the explicit user, endpoint and quota context"
+)]
 fn resolve(
     variable: &str,
     user: &Value,
