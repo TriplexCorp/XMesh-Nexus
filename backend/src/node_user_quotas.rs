@@ -361,12 +361,12 @@ fn display_row(
     let rule = rule_for(user, node_id).ok().flatten();
     let sampled = usage.get(&node_id).copied().unwrap_or_default();
     let period = rule.map_or("monthly", |r| r.period);
-    let used = if period == "monthly" {
+    let consumed_bytes = if period == "monthly" {
         sampled.monthly
     } else {
         sampled.lifetime
     };
-    let remaining = rule.map(|r| r.limit_bytes.saturating_sub(used).max(0));
+    let remaining = rule.map(|r| r.limit_bytes.saturating_sub(consumed_bytes).max(0));
     json!({
         "nodeId":node_id,
         "name":node.get("name").and_then(Value::as_str).unwrap_or(""),
@@ -377,7 +377,7 @@ fn display_row(
         "period":period,
         "monthlyBytes":sampled.monthly,
         "lifetimeBytes":sampled.lifetime,
-        "usedBytes":used,
+        "usedBytes":consumed_bytes,
         "remainingBytes":remaining,
         "exhausted":remaining.is_some_and(|value| value==0),
     })
