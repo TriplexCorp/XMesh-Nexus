@@ -61,7 +61,10 @@ pub enum TrafficScope {
 pub struct TrafficContext {
     pub scope: TrafficScope,
     pub cdn_used_bytes: Option<i64>,
-    #[expect(dead_code, reason = "Reserved for future per-node quota lookup; current CDN quota is pooled")]
+    #[expect(
+        dead_code,
+        reason = "Reserved for future per-node quota lookup; current CDN quota is pooled"
+    )]
     pub owner_node_id: Option<i64>,
 }
 
