@@ -1,7 +1,6 @@
 mod admin_accounts;
 mod auth;
 mod cdn_quota;
-mod node_user_quotas;
 mod client_routing;
 mod core;
 mod mfa;
@@ -13,6 +12,7 @@ mod node_policy;
 mod node_rotation;
 mod node_routing;
 mod node_runtime;
+mod node_user_quotas;
 mod node_xray_update;
 mod panel_version;
 
@@ -356,7 +356,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         )
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
-        .route("/users/{id}/node-quotas", get(node_user_quotas::get_for_user))
+        .route(
+            "/users/{id}/node-quotas",
+            get(node_user_quotas::get_for_user),
+        )
         .route("/users/{id}/traffic/history", get(get_user_traffic_history))
         .route(
             "/users/{id}/traffic/observations",
