@@ -160,10 +160,10 @@ assert.ok(userDetailsCss.includes('.user-settings-cards>.user-connection-card'),
  'Connection card must have explicit two-column desktop ownership');
 assert.match(userDetailsCss,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,
  'Connection fields must form compact readable columns');
-assert.match(userDetailsCss,/\.user-settings-cards>\.user-note-card\{[\s\S]*?grid-column:1;[\s\S]*?grid-row:2;[\s\S]*?align-self:start;/,
- 'Notes must sit below Basic in the left reading column');
-assert.match(userDetailsCss,/\.user-settings-cards>\.user-connection-card\{[\s\S]*?grid-column:2;grid-row:1 \/ span 2;/,
- 'Connection must occupy the right column without stretching Basic');
+assert.match(userDetailsCss,/\.user-settings-cards>\.user-note-card\{[\s\S]*?grid-column:1\/-1;[\s\S]*?grid-row:2;[\s\S]*?align-self:start;/,
+ 'Compact Note must span both columns below the form cards');
+assert.match(userDetailsCss,/\.user-settings-cards>\.user-connection-card\{[\s\S]*?grid-column:2;grid-row:1;/,
+ 'Connection must occupy the first row without stretching Basic');
 assert.match(userDetailsCss,/grid-template-rows:max-content max-content;[\s\S]*?align-items:start;/,
  'Settings cards must size to their content rather than creating empty equal-height slabs');
 assert.match(userDetailsCss,/\.user-editor-actions \.user-save-button\{\s*order:1;\s*margin-inline-start:auto;/,
