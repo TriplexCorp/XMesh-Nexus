@@ -105,7 +105,9 @@ fn expire_date(expiry_ms: i64, persian: bool) -> String {
 fn public_ip(value: &str, ipv6: bool) -> Option<String> {
     let addr: IpAddr = value.trim_matches(['[', ']']).parse().ok()?;
     match addr {
-        IpAddr::V4(ip) if !ipv6 && ip.is_global() => Some(ip.to_string()),
+        IpAddr::V4(ip) if !ipv6 && !ip.is_private() && !ip.is_loopback()
+            && !ip.is_link_local() && !ip.is_broadcast() && !ip.is_unspecified()
+            && !ip.is_multicast() => Some(ip.to_string()),
         IpAddr::V6(ip) if ipv6 && !ip.is_loopback() && !ip.is_unique_local()
             && !ip.is_unspecified() && !ip.is_multicast() => Some(ip.to_string()),
         _ => None,
@@ -115,7 +117,7 @@ fn resolve(
     variable: &str,
     user: &Value,
     inbound: &Value,
-    host: &Value,
+    _host: &Value,
     settings: &Value,
     now_ms: i64,
     server_address: &str,
@@ -187,7 +189,9 @@ pub fn render(
             break;
         };
         let variable = &after[..end];
-        if let Some(value) = resolve(variable, user, inbound, host, settings, now_ms, server_address) {
+        if VARIABLES.contains(&variable) {
+            let value = resolve(variable, user, inbound, host, settings, now_ms, server_address)
+                .expect("declared variable must resolve");
             result.push_str(&value);
         } else {
             result.push_str(&remainder[start..start + end + 2]);
