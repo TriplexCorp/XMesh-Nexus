@@ -13,19 +13,19 @@ for cmd in curl openssl python3 systemctl docker git; do command -v "$cmd" >/dev
 RAW_BASE="https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy"
 AGENT_TMP="$(mktemp)"; COLLECTOR_TMP="$(mktemp)"; UPGRADER_TMP="$(mktemp)"; STAGER_TMP="$(mktemp)"; STAGER_UNIT_TMP="$(mktemp)"; CONTROL_TMP="$(mktemp)"
 trap 'rm -f "$AGENT_TMP" "$COLLECTOR_TMP" "$UPGRADER_TMP" "$STAGER_TMP" "$STAGER_UNIT_TMP" "$CONTROL_TMP"' EXIT
-curl --fail --silent --show-error --location "$RAW_BASE/node-metrics-agent.sh" -o "$AGENT_TMP"
+/usr/bin/curl --fail --silent --show-error --location "$RAW_BASE/node-metrics-agent.sh" -o "$AGENT_TMP"
 bash -n "$AGENT_TMP"; install -o root -g root -m 0755 "$AGENT_TMP" /usr/local/sbin/xmesh-node-metrics
-curl --fail --silent --show-error --location "$RAW_BASE/xray-stats-collector.py" -o "$COLLECTOR_TMP"
+/usr/bin/curl --fail --silent --show-error --location "$RAW_BASE/xray-stats-collector.py" -o "$COLLECTOR_TMP"
 python3 -m py_compile "$COLLECTOR_TMP"; install -d -o root -g root -m 0755 /usr/local/libexec; install -o root -g root -m 0755 "$COLLECTOR_TMP" /usr/local/libexec/xmesh-xray-stats-collector.py
 
 # Fixed updater is installed before the managed sync worker; it is not executed here.
-curl -4 --retry 2 --retry-delay 2 --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/update-node-control-agent.sh" -o "$UPGRADER_TMP"
+/usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/update-node-control-agent.sh" -o "$UPGRADER_TMP"
 bash -n "$UPGRADER_TMP"; grep -q 'xmesh-node-agent-upgrade.service' "$UPGRADER_TMP" || { echo "Invalid remote agent updater" >&2; exit 1; }
 install -o root -g root -m 0700 "$UPGRADER_TMP" /usr/local/sbin/.xmesh-update-agent.new; mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
 
-curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xsp-v2-agent-staged-apply.sh" -o "$STAGER_TMP"
+/usr/bin/curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xsp-v2-agent-staged-apply.sh" -o "$STAGER_TMP"
 bash -n "$STAGER_TMP"; grep -Fq '/var/lib/xmesh-agent' "$STAGER_TMP" && grep -Fq 'artifactVersion' "$STAGER_TMP" || { echo "Invalid staged Agent helper" >&2; exit 1; }
-curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xmesh-xsp-v2-agent-stage.service" -o "$STAGER_UNIT_TMP"
+/usr/bin/curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xmesh-xsp-v2-agent-stage.service" -o "$STAGER_UNIT_TMP"
 grep -Fxq 'ExecStart=/usr/local/libexec/xmesh-xsp-v2-agent-staged-apply' "$STAGER_UNIT_TMP" && grep -Fxq 'ReadWritePaths=/run /var/lib/xmesh-agent' "$STAGER_UNIT_TMP" || { echo "Invalid staged Agent service" >&2; exit 1; }
 install -o root -g root -m 0700 "$STAGER_TMP" /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new; mv -f /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new /usr/local/libexec/xmesh-xsp-v2-agent-staged-apply
 install -o root -g root -m 0644 "$STAGER_UNIT_TMP" /etc/systemd/system/.xmesh-xsp-v2-agent-stage.service.new; mv -f /etc/systemd/system/.xmesh-xsp-v2-agent-stage.service.new /etc/systemd/system/xmesh-xsp-v2-agent-stage.service
@@ -95,13 +95,13 @@ WantedBy=timers.target
 EOF
 
 XRAY_UPDATE_TMP="$(mktemp)"
-curl -4 --retry 2 --retry-delay 2 --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xmesh-xray-update.py" -o "$XRAY_UPDATE_TMP"
-python3 -m py_compile "$XRAY_UPDATE_TMP";grep -Fxq 'AGENT_VERSION = "control-v6.0.10"' "$XRAY_UPDATE_TMP"
+/usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xmesh-xray-update.py" -o "$XRAY_UPDATE_TMP"
+python3 -m py_compile "$XRAY_UPDATE_TMP";grep -Fxq 'AGENT_VERSION = "control-v6.0.11"' "$XRAY_UPDATE_TMP"
 install -d -m 0755 /usr/local/libexec
 install -o root -g root -m 0700 "$XRAY_UPDATE_TMP" /usr/local/libexec/xmesh-xray-update.py
 rm -f "$XRAY_UPDATE_TMP"
-curl -4 --retry 2 --retry-delay 2 --fail --silent --show-error --location "$RAW_BASE/node-control-agent.sh" -o "$CONTROL_TMP"
-bash -n "$CONTROL_TMP"; grep -Fxq 'AGENT_VERSION="control-v6.0.10"' "$CONTROL_TMP" || { echo "Nexus main does not expose Agent v6.0.9" >&2; exit 1; }
+/usr/bin/curl -4 --retry 2 --retry-delay 2 --fail --silent --show-error --location "$RAW_BASE/node-control-agent.sh" -o "$CONTROL_TMP"
+bash -n "$CONTROL_TMP"; grep -Fxq 'AGENT_VERSION="control-v6.0.11"' "$CONTROL_TMP" || { echo "Nexus main does not expose the required Agent version" >&2; exit 1; }
 install -o root -g root -m 0700 "$CONTROL_TMP" /usr/local/sbin/xmesh-node-control
 cat > /etc/systemd/system/xmesh-node-control.service <<'EOF'
 [Unit]
@@ -211,14 +211,14 @@ install_v6_pq_runtime(){
   [[ -f "$mounted" ]] || { echo "Cannot resolve XMesh-Node checkout for PQ runtime" >&2; return 1; }
   dir="$(dirname "$mounted")"
   [[ -d "$dir/.git" && -f "$dir/VERSION" && "$(tr -d '\r\n' < "$dir/VERSION")" == "6.0.0" ]] || { echo "Fresh enrollment source is not XMesh-Node v6.0.0" >&2; return 1; }
-  [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.10" ]] || { echo "Fresh enrollment source does not expose Agent control-v6.0.10" >&2; return 1; }
+  [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.11" ]] || { echo "Fresh enrollment source does not expose Agent control-v6.0.11" >&2; return 1; }
   [[ -f "$dir/deploy/install-xsp-v2-production-agent.sh" && ! -L "$dir/deploy/install-xsp-v2-production-agent.sh" ]] || { echo "v6 PQ runtime installer missing" >&2; return 1; }
   revision="$(git -C "$dir" rev-parse HEAD)"; [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || return 1
   bash "$dir/deploy/install-xsp-v2-production-agent.sh" "$revision" || return 1
   identity="$(/usr/local/bin/xmesh-agent-xspv2-activate --identity)" || return 1
   python3 - "$identity" "$revision" <<'PY'
 import json,sys
-v=json.loads(sys.argv[1]); assert v.get('version')=='control-v6.0.10',v; assert v.get('sourceRevision')==sys.argv[2],v; assert len(v.get('artifactSha256',''))==64,v
+v=json.loads(sys.argv[1]); assert v.get('version')=='control-v6.0.11',v; assert v.get('sourceRevision')==sys.argv[2],v; assert len(v.get('artifactSha256',''))==64,v
 PY
 }
 install_v6_pq_runtime || { echo "POSTQUANTUM v6 runtime installation failed; refusing incomplete node enrollment" >&2; exit 1; }
@@ -228,7 +228,7 @@ systemctl enable xmesh-node-control.timer; systemctl restart xmesh-node-control.
 systemctl enable xmesh-node-metrics.timer; systemctl restart xmesh-node-metrics.timer
 if [[ -r /usr/local/libexec/xmesh-policy-guard.py ]]; then systemctl enable xmesh-node-user-meter.timer; systemctl restart xmesh-node-user-meter.timer; fi
 
-echo "XMesh Agent v6.0.5 POSTQUANTUM installed."
+echo "XMesh Agent POSTQUANTUM installed."
 echo "Node ID: $NODE_ID"
 echo "Network interface: $INTERFACE (auto detects the default-route interface)"
 echo "Control Agent and strict-PQ production binary are both installed and identity-verified."

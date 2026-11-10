@@ -39,4 +39,4 @@ The normal signed update path follows the same rule: it must execute a **fresh t
 
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.
 
-Current target: **`control-v6.0.10`**.
+Current target: **`control-v6.0.11`**.
