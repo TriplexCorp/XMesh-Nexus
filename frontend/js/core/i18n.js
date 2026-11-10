@@ -15,6 +15,11 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Не удалось загрузить квоты:":"Could not load quotas:",
+    "3.25 ГБ|3.25 ГБ":"3.25 GB|3.25 GB",
+    "0.00 ГБ|0.00 ГБ":"0.00 GB|0.00 GB",
+    "∞|5.00 ГБ":"∞|5.00 GB",
+
     "Расход квот нод рассчитывается сервером и не может быть изменён вручную.":"Node quota usage is server-calculated and cannot be edited manually.",
     "Квоты нод должны быть объектом.":"Node quotas must be an object.",
     "Для одного пользователя допускается не более 256 квот нод.":"At most 256 node quotas are allowed per user.",
