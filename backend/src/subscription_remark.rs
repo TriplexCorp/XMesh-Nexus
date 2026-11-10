@@ -74,7 +74,7 @@ fn epoch_ms(value: &Value) -> i64 {
 }
 
 // Gregorian UTC conversion with no extra dependencies (civil_from_days).
-fn gregorian(days_since_epoch: i64) -> (i64, i64, i64) {
+const fn gregorian(days_since_epoch: i64) -> (i64, i64, i64) {
     let z = days_since_epoch + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = z - era * 146_097;
@@ -97,7 +97,7 @@ fn jalali(gy: i64, gm: i64, gd: i64) -> (i64, i64, i64) {
     let mut days = 355_666 + 365 * gy + (gy2 + 3) / 4 - (gy2 + 99) / 100
         + (gy2 + 399) / 400
         + gd
-        + months[(gm - 1) as usize];
+        + months[usize::try_from(gm - 1).expect("valid Gregorian month")];
     let mut jy = -1_595 + 33 * (days / 12_053);
     days %= 12_053;
     jy += 4 * (days / 1_461);
@@ -162,7 +162,7 @@ fn resolve(
     server_address: &str,
 ) -> Option<String> {
     let status = crate::user_status(user, now_ms);
-    let used = bytes_gb(user, "used");
+    let consumed = bytes_gb(user, "used");
     let limit = bytes_gb(user, "limit");
     let hold = status == "ON_HOLD";
     let expiry_ms = epoch_ms(user);
@@ -174,12 +174,12 @@ fn resolve(
             .or_else(|| field(user, "name"))
             .unwrap_or("—")
             .to_owned(),
-        "DATA_USAGE" => gb(used),
+        "DATA_USAGE" => gb(consumed),
         "DATA_LEFT" => {
             if limit <= 0.0 {
                 "∞".into()
             } else {
-                gb((limit - used).max(0.0))
+                gb((limit - consumed).max(0.0))
             }
         }
         "DATA_LIMIT" => {
