@@ -103,7 +103,9 @@ fn node_left(state: crate::node_user_quotas::Remaining) -> String {
         crate::node_user_quotas::Remaining::Unlimited => "∞".to_owned(),
         crate::node_user_quotas::Remaining::Unavailable => "—".to_owned(),
         crate::node_user_quotas::Remaining::Bytes(0) => "0.00 ГБ".to_owned(),
-        crate::node_user_quotas::Remaining::Bytes(bytes) if bytes < 5_000_000 => "<0.01 ГБ".to_owned(),
+        crate::node_user_quotas::Remaining::Bytes(bytes) if bytes < 5_000_000 => {
+            "<0.01 ГБ".to_owned()
+        }
         crate::node_user_quotas::Remaining::Bytes(bytes) => {
             let rounded = bytes.saturating_add(5_000_000) / 10_000_000;
             format!("{}.{:02} ГБ", rounded / 100, rounded % 100)
@@ -267,7 +269,11 @@ fn resolve(
             crate::node_user_quotas::Remaining::Unavailable => "—".into(),
             crate::node_user_quotas::Remaining::Unlimited => match traffic.scope {
                 TrafficScope::Account => {
-                    if limit <= 0.0 { "∞".into() } else { gb((limit - consumed).max(0.0)) }
+                    if limit <= 0.0 {
+                        "∞".into()
+                    } else {
+                        gb((limit - consumed).max(0.0))
+                    }
                 }
                 TrafficScope::Cdn => cdn_left(user, traffic.cdn_used_bytes),
                 TrafficScope::Unknown => "—".into(),
@@ -553,22 +559,39 @@ mod tests {
         let inbound = json!({"protocol":"vless"});
         let host = json!({"remark":"server C"});
         let settings = json!({});
-        let display = |remaining| render_with_context(
-            "{NODE_DATA_LEFT}|{TRAFFIC_LEFT}", &user, &inbound, &host,
-            &settings, 0, "example.com",
-            TrafficContext {
-                scope: TrafficScope::Cdn,
-                cdn_used_bytes: Some(0),
-                owner_node_id: Some(42),
-                node_remaining: remaining,
-            },
+        let display = |remaining| {
+            render_with_context(
+                "{NODE_DATA_LEFT}|{TRAFFIC_LEFT}",
+                &user,
+                &inbound,
+                &host,
+                &settings,
+                0,
+                "example.com",
+                TrafficContext {
+                    scope: TrafficScope::Cdn,
+                    cdn_used_bytes: Some(0),
+                    owner_node_id: Some(42),
+                    node_remaining: remaining,
+                },
+            )
+        };
+        assert_eq!(
+            display(crate::node_user_quotas::Remaining::Bytes(3_250_000_000)),
+            "3.25 ГБ|3.25 ГБ"
         );
-        assert_eq!(display(crate::node_user_quotas::Remaining::Bytes(3_250_000_000)),
-            "3.25 ГБ|3.25 ГБ");
-        assert_eq!(display(crate::node_user_quotas::Remaining::Bytes(0)),
-            "0.00 ГБ|0.00 ГБ");
-        assert_eq!(display(crate::node_user_quotas::Remaining::Unavailable), "—|—");
-        assert_eq!(display(crate::node_user_quotas::Remaining::Unlimited), "∞|5.00 ГБ");
+        assert_eq!(
+            display(crate::node_user_quotas::Remaining::Bytes(0)),
+            "0.00 ГБ|0.00 ГБ"
+        );
+        assert_eq!(
+            display(crate::node_user_quotas::Remaining::Unavailable),
+            "—|—"
+        );
+        assert_eq!(
+            display(crate::node_user_quotas::Remaining::Unlimited),
+            "∞|5.00 ГБ"
+        );
     }
 
     #[test]
