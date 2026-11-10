@@ -1213,8 +1213,11 @@ pub async fn admin_client_json(
 /// Select the same global UTC rotation slot for every user, without
 /// retaining a rendered (user-specific) announcement in global settings.
 fn selected_subscription_announcement(settings: &Value, now_ms: i64) -> Option<&str> {
-    let raw = settings.get("subscriptionAnnouncement").and_then(Value::as_str)?;
-    let messages = raw.split("\n---\n")
+    let raw = settings
+        .get("subscriptionAnnouncement")
+        .and_then(Value::as_str)?;
+    let messages = raw
+        .split("\n---\n")
         .map(str::trim)
         .filter(|message| !message.is_empty())
         .collect::<Vec<_>>();
@@ -1244,7 +1247,11 @@ async fn personalized_subscription_announcement(
 ) -> Option<String> {
     let template = selected_subscription_announcement(settings, now_ms)?;
     let cdn_meter = if template.contains("{CDN_DATA_LEFT}")
-        && user.get("cdnLimitGb").and_then(Value::as_f64).unwrap_or(0.0) > 0.0
+        && user
+            .get("cdnLimitGb")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            > 0.0
     {
         let user_id = user.get("id").and_then(record_id)?;
         match crate::cdn_quota::usage_for_user(&state.pool, settings, user_id).await {
@@ -1376,8 +1383,7 @@ pub async fn serve(
     response
         .headers_mut()
         .insert(header::VARY, "User-Agent, Accept".parse().unwrap());
-    let announcement =
-        personalized_subscription_announcement(&state, &user, &settings, now).await;
+    let announcement = personalized_subscription_announcement(&state, &user, &settings, now).await;
     add_subscription_profile_headers(&mut response, &settings, announcement.as_deref());
     // User limits are expressed in decimal GB in panel records; the conventional subscription-userinfo
     // header expects bytes and Unix seconds.
@@ -2269,11 +2275,26 @@ mod tests {
             "subscriptionAnnouncement":"Привет {USERNAME}\n---\nLTE: {CDN_DATA_LEFT}\n---\n {STATUS_EMOJI} ",
             "subscriptionAnnouncementRotationHours":1
         });
-        assert_eq!(selected_subscription_announcement(&settings, 0), Some("Привет {USERNAME}"));
-        assert_eq!(selected_subscription_announcement(&settings, 3_600_000), Some("LTE: {CDN_DATA_LEFT}"));
-        assert_eq!(selected_subscription_announcement(&settings, 7_200_000), Some("{STATUS_EMOJI}"));
-        assert_eq!(selected_subscription_announcement(&settings, 10_800_000), Some("Привет {USERNAME}"));
-        assert_eq!(selected_subscription_announcement(&json!({"subscriptionAnnouncement":"   "}), 0), None);
+        assert_eq!(
+            selected_subscription_announcement(&settings, 0),
+            Some("Привет {USERNAME}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(&settings, 3_600_000),
+            Some("LTE: {CDN_DATA_LEFT}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(&settings, 7_200_000),
+            Some("{STATUS_EMOJI}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(&settings, 10_800_000),
+            Some("Привет {USERNAME}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(&json!({"subscriptionAnnouncement":"   "}), 0),
+            None
+        );
     }
 
     #[test]
@@ -2281,23 +2302,36 @@ mod tests {
         let settings = json!({"subscriptionAnnouncement":"{USERNAME}\nCDN: {CDN_DATA_LEFT}"});
         let first = crate::subscription_remark::render_announcement(
             selected_subscription_announcement(&settings, 0).unwrap(),
-            &json!({"username":"alice","cdnLimitGb":5.0}), &settings, 0,
+            &json!({"username":"alice","cdnLimitGb":5.0}),
+            &settings,
+            0,
             Some(1_750_000_000),
         );
         let second = crate::subscription_remark::render_announcement(
             selected_subscription_announcement(&settings, 0).unwrap(),
-            &json!({"username":"bob","cdnLimitGb":5.0}), &settings, 0,
+            &json!({"username":"bob","cdnLimitGb":5.0}),
+            &settings,
+            0,
             Some(4_000_000_000),
         );
         assert_eq!(first, "alice\nCDN: 3.25 ГБ");
         assert_eq!(second, "bob\nCDN: 1.00 ГБ");
-        assert_eq!(settings["subscriptionAnnouncement"], "{USERNAME}\nCDN: {CDN_DATA_LEFT}");
+        assert_eq!(
+            settings["subscriptionAnnouncement"],
+            "{USERNAME}\nCDN: {CDN_DATA_LEFT}"
+        );
         let mut response = Json(json!({})).into_response();
         add_subscription_profile_headers(&mut response, &settings, Some(&first));
-        let raw = response.headers().get("announce").unwrap().to_str().unwrap();
+        let raw = response
+            .headers()
+            .get("announce")
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert!(raw.starts_with("base64:"));
         let decoded = base64::engine::general_purpose::STANDARD
-            .decode(raw.strip_prefix("base64:").unwrap()).unwrap();
+            .decode(raw.strip_prefix("base64:").unwrap())
+            .unwrap();
         assert_eq!(String::from_utf8(decoded).unwrap(), first);
     }
 
