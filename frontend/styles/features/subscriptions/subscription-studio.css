@@ -303,3 +303,58 @@
 .subscription-status-emojis .subscription-field{min-width:0}
 .subscription-status-emojis .subscription-field input{font-size:1.02rem}
 
+
+/* Personal, multiline VPN client announcement templates. */
+.subscription-studio .subscription-announcement-tools{
+  display:grid;gap:.45rem;min-width:0;margin-top:-.7rem;
+}
+.subscription-studio .subscription-announcement-variables{
+  border:1px solid var(--st-border);
+  border-radius:var(--nx-control-radius,9px);
+  background:var(--nx-section-bg,transparent);
+  min-width:0;
+}
+.subscription-studio .subscription-announcement-variables>summary{
+  cursor:pointer;padding:.58rem .8rem;
+  font-weight:650;font-size:.79rem;color:var(--st-ink);
+}
+.subscription-studio .subscription-announcement-variables>summary small{
+  margin-left:.45rem;font-size:.72rem;color:var(--st-muted);font-weight:450;
+}
+.subscription-studio .subscription-announcement-token-grid{
+  padding:.1rem .6rem .55rem;display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));
+  gap:.37rem;min-width:0;
+}
+.subscription-studio .subscription-announcement-token{
+  min-width:0;display:flex;flex-direction:column;align-items:flex-start;
+  gap:.1rem;text-align:left;cursor:pointer;padding:.44rem .56rem;
+  border:1px solid var(--st-border);border-radius:var(--nx-control-radius,7px);
+  color:var(--st-ink);background:var(--nx-control-bg,transparent);
+}
+.subscription-studio .subscription-announcement-token:hover,
+.subscription-studio .subscription-announcement-token:focus-visible{
+  border-color:var(--a);outline-offset:2px;
+}
+.subscription-studio .subscription-announcement-token code{
+  color:var(--a);font-size:.75rem;overflow-wrap:anywhere;
+}
+.subscription-studio .subscription-announcement-token small{
+  font-size:.69rem;color:var(--st-muted);line-height:1.35;
+}
+.subscription-studio .subscription-announcement-variables>p{
+  margin:0;padding:0 .7rem .6rem;color:var(--st-muted);
+  font-size:.72rem;line-height:1.45;
+}
+.subscription-studio .subscription-announcement-demo{
+  display:grid;gap:.25rem;padding:.45rem .65rem;border-left:2px solid var(--a);
+  min-width:0;background:var(--nx-section-bg,transparent);
+  border-radius:0 var(--nx-control-radius,7px) var(--nx-control-radius,7px) 0;
+}
+.subscription-studio .subscription-announcement-demo small{
+  color:var(--st-muted);font-size:.69rem;
+}
+.subscription-studio .subscription-announcement-demo output{
+  color:var(--st-ink);font-size:.8rem;white-space:pre-wrap;overflow-wrap:anywhere;
+  max-height:8rem;overflow:auto;
+}
