@@ -2518,7 +2518,8 @@ async function main() {
         assert(g.title<=g.root*1.3+1,'Modal title must match shared typography');
         assert(g.section<=g.root*1.1+1,'Section title must match panel card typography');
         assert(g.label<=g.root*.83+1&&g.hint<=g.root*.75+1,'Field copy must use Nexus text tokens');
-        assert(g.input<=g.root*.84+1,'Input font must not scale separately from the panel');
+        assert(g.input>=g.label*.94&&g.input<=g.label*1.24+1,
+          'Input typography must stay proportionate to the shared form label, including browser zoom: '+JSON.stringify(g));
         assert(g.height<=Math.max(42,g.root*2.85)+1,'Input height must follow Nexus controls');
         assert(g.mainWidth>g.limitsWidth,'Keep the approved two-column hierarchy');
         return g;
