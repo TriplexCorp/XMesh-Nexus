@@ -15,6 +15,11 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "∞|3.25 ГБ|∞":"∞|3.25 GB|∞",
+    "∞|3.25 ГБ|3.25 ГБ":"∞|3.25 GB|3.25 GB",
+    "∞|0.00 ГБ|0.00 ГБ":"∞|0.00 GB|0.00 GB",
+    "∞|3.25 ГБ|—":"∞|3.25 GB|—",
+
     "Остаток отдельной CDN-квоты":"Remaining separate CDN quota",
     "Остаток по типу подключения: обычное или CDN":"Remaining traffic by connection type: standard or CDN",
     "Переменные заменяются при каждой выдаче подписки. Эмодзи статусов настраиваются в SUBSCRIPTION STUDIO. IPv4/IPv6 выводятся только при прямом подключении по публичному IP. TRAFFIC_LEFT выбирает CDN-квоту по привязкам Host к нодам, а при неоднозначном назначении выводит —.":"Variables are resolved whenever a subscription is issued. Configure status emojis in SUBSCRIPTION STUDIO. IPv4/IPv6 are shown only for direct public-IP connections. TRAFFIC_LEFT uses the Host-to-node assignment to select the CDN quota and displays a dash for ambiguous placements.",
