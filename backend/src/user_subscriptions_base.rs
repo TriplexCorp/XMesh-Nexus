@@ -1031,6 +1031,48 @@ fn subscription_remark_address<'a>(outbound: &'a Value, host: &'a Value) -> &'a 
         .unwrap_or("")
 }
 
+/// Immutable inputs for rendering a single published Host label.
+struct HostRemark<'a> {
+    user: &'a Value,
+    inbound: &'a Value,
+    profile: &'a Value,
+    inbound_tag: &'a str,
+    nodes: &'a [Value],
+    settings: &'a Value,
+    now_ms: i64,
+    cdn_used_bytes: Option<i64>,
+    node_usage: Option<&'a std::collections::HashMap<i64, crate::node_user_quotas::NodeUsage>>,
+}
+
+fn rendered_host_remark(
+    template: &str,
+    host: &Value,
+    address: &str,
+    ctx: &HostRemark<'_>,
+) -> String {
+    if !template.contains("{TRAFFIC_LEFT}")
+        && !template.contains("{CDN_DATA_LEFT}")
+        && !template.contains("{NODE_DATA_LEFT}")
+    {
+        return crate::subscription_remark::render(
+            template, ctx.user, ctx.inbound, host, ctx.settings, ctx.now_ms, address,
+        );
+    }
+    let (scope, owner_node_id) = host_traffic_scope(
+        host, ctx.profile, ctx.inbound_tag, ctx.nodes, ctx.settings,
+    );
+    let node_ids = host_candidate_node_ids(host, ctx.profile, ctx.nodes);
+    let node_remaining = crate::node_user_quotas::remaining_for(
+        ctx.user, owner_node_id, &node_ids, ctx.node_usage,
+    );
+    crate::subscription_remark::render_with_context(
+        template, ctx.user, ctx.inbound, host, ctx.settings, ctx.now_ms, address,
+        crate::subscription_remark::TrafficContext {
+            scope, cdn_used_bytes: ctx.cdn_used_bytes, owner_node_id, node_remaining,
+        },
+    )
+}
+
 async fn collect_user_outbounds(
     state: &AppState,
     user: &Value,
@@ -1091,40 +1133,15 @@ async fn collect_user_outbounds(
                         && template.contains('{')
                     {
                         let address = subscription_remark_address(&outbound, host);
-                        let label = if template.contains("{TRAFFIC_LEFT}")
-                            || template.contains("{CDN_DATA_LEFT}")
-                            || template.contains("{NODE_DATA_LEFT}")
-                        {
-                            let (scope, owner_node_id) =
-                                host_traffic_scope(host, profile, tag, &nodes, settings);
-                            let node_ids = host_candidate_node_ids(host, profile, &nodes);
-                            let node_remaining = crate::node_user_quotas::remaining_for(
-                                user,
-                                owner_node_id,
-                                &node_ids,
-                                node_usage.as_ref(),
-                            );
-                            crate::subscription_remark::render_with_context(
-                                template,
-                                user,
-                                inbound,
-                                host,
-                                settings,
-                                now_ms,
-                                address,
-                                crate::subscription_remark::TrafficContext {
-                                    scope,
-                                    cdn_used_bytes,
-                                    owner_node_id,
-                                    node_remaining,
-                                },
-                            )
-                        } else {
-                            crate::subscription_remark::render(
-                                template, user, inbound, host, settings, now_ms, address,
-                            )
-                        };
-                        outbound["tag"] = json!(label);
+                        outbound["tag"] = json!(rendered_host_remark(
+                            template,
+                            host,
+                            address,
+                            &HostRemark {
+                                user, inbound, profile, inbound_tag: tag, nodes: &nodes,
+                                settings, now_ms, cdn_used_bytes, node_usage: node_usage.as_ref(),
+                            },
+                        ));
                     }
                     outbounds.push(outbound);
                 } else {
