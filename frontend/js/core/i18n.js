@@ -15,6 +15,15 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Эмодзи статуса":"Status emoji",
+    "Пользователь: {USERNAME} Осталось LTE: {CDN_DATA_LEFT}":"User: {USERNAME} LTE remaining: {CDN_DATA_LEFT}",
+    "Пользователь: {USERNAME} Осталось LTE: {CDN_DATA_LEFT} Статус: {STATUS_EMOJI}":"User: {USERNAME} LTE remaining: {CDN_DATA_LEFT} Status: {STATUS_EMOJI}",
+    "Пользователь: alice Осталось LTE: 3.25 ГБ Статус: 💚":"User: alice LTE remaining: 3.25 GB Status: 💚",
+    "Сообщение":"Message",
+    "Привет {USERNAME} --- LTE: {CDN_DATA_LEFT} --- {STATUS_EMOJI}":"Hello {USERNAME} --- LTE: {CDN_DATA_LEFT} --- {STATUS_EMOJI}",
+    "Привет {USERNAME}":"Hello {USERNAME}",
+    "Пользователь: alice Осталось LTE: 3.25 ГБ":"User: alice LTE remaining: 3.25 GB",
+
     "Переменные для анонсов":"Announcement variables",
     "Вставить в текст":"Insert into announcement",
     "Подстановка выполняется персонально при обновлении подписки. Для отдельной ноды используйте Remark: у анонса нет привязки к одной ноде.":"Variables are personalized when each subscription refreshes. Use Remark for per-node values: announcements are not bound to any single node.",
