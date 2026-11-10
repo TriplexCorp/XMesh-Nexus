@@ -17,6 +17,7 @@ CREATE INDEX user_node_quota_lifetime_user_idx
 INSERT INTO user_node_quota_lifetime (node_id,user_id,uplink_bytes,downlink_bytes)
 SELECT node_id,user_id,uplink_bytes,downlink_bytes
 FROM user_node_traffic_totals
+WHERE TRUE
 ON CONFLICT (node_id,user_id) DO NOTHING;
 
 CREATE TABLE user_node_quota_monthly (
