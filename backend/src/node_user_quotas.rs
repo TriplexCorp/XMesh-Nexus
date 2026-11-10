@@ -70,30 +70,48 @@ fn parse_rule(entry: &Value) -> Result<QuotaRule, ()> {
         Some("lifetime") => "lifetime",
         _ => return Err(()),
     };
-    Ok(QuotaRule { limit_bytes, limit_gb, period })
+    Ok(QuotaRule {
+        limit_bytes,
+        limit_gb,
+        period,
+    })
 }
 
 /// None means no configured quota. Err means malformed stored policy and
 /// must never be treated as unlimited during authorization.
 pub fn rule_for(user: &Value, node_id: i64) -> Result<Option<QuotaRule>, ()> {
     let Some(map) = policy_map(user) else {
-        return if user.get("nodeTrafficLimits").is_some() { Err(()) } else { Ok(None) };
+        return if user.get("nodeTrafficLimits").is_some() {
+            Err(())
+        } else {
+            Ok(None)
+        };
     };
     map.get(&node_id.to_string()).map(parse_rule).transpose()
 }
 
 pub fn validate_user(user: &Value) -> Result<(), ApiError> {
     if user.get("nodeQuotaUsedBytes").is_some() || user.get("nodeQuotaRemainingBytes").is_some() {
-        return Err(bad("Расход квот нод рассчитывается сервером и не может быть изменён вручную."));
+        return Err(bad(
+            "Расход квот нод рассчитывается сервером и не может быть изменён вручную.",
+        ));
     }
-    let Some(value) = user.get("nodeTrafficLimits") else { return Ok(()); };
-    let policies = value.as_object().ok_or_else(|| bad("Квоты нод должны быть объектом."))?;
+    let Some(value) = user.get("nodeTrafficLimits") else {
+        return Ok(());
+    };
+    let policies = value
+        .as_object()
+        .ok_or_else(|| bad("Квоты нод должны быть объектом."))?;
     if policies.len() > MAX_NODE_POLICIES {
-        return Err(bad("Для одного пользователя допускается не более 256 квот нод."));
+        return Err(bad(
+            "Для одного пользователя допускается не более 256 квот нод.",
+        ));
     }
     for (key, entry) in policies {
         if valid_id(key).is_none() || parse_rule(entry).is_err() {
-            return Err(bad("Некорректная квота ноды: ID, положительный лимит ГБ и период monthly/lifetime обязательны."));
+            return Err(bad(
+                "Некорректная квота ноды: ID, положительный лимит ГБ и период monthly/lifetime обязательны.",
+            ));
         }
     }
     Ok(())
@@ -105,11 +123,15 @@ pub async fn require_existing_nodes(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user: &Value,
 ) -> Result<(), ApiError> {
-    let Some(map) = policy_map(user) else { return Ok(()); };
-    if map.is_empty() { return Ok(()); }
+    let Some(map) = policy_map(user) else {
+        return Ok(());
+    };
+    if map.is_empty() {
+        return Ok(());
+    }
     let ids = map.keys().filter_map(|id| valid_id(id)).collect::<Vec<_>>();
     let found = sqlx::query_scalar::<_, i64>(
-        "SELECT id FROM panel_records WHERE collection='nodes' AND id=ANY($1::BIGINT[])"
+        "SELECT id FROM panel_records WHERE collection='nodes' AND id=ANY($1::BIGINT[])",
     )
     .bind(&ids)
     .fetch_all(&mut **tx)
@@ -122,11 +144,14 @@ pub async fn require_existing_nodes(
 
 /// Authoritative per-user/node lifetime + UTC current-month readings in one
 /// bounded pair of queries. Physical counter baseline resets cannot erase them.
-pub async fn usage_for_user(pool: &PgPool, user_id: i64) -> Result<HashMap<i64, NodeUsage>, ApiError> {
+pub async fn usage_for_user(
+    pool: &PgPool,
+    user_id: i64,
+) -> Result<HashMap<i64, NodeUsage>, ApiError> {
     let mut usage = HashMap::<i64, NodeUsage>::new();
     let lifetime = sqlx::query(
         "SELECT node_id,(uplink_bytes+downlink_bytes)::BIGINT AS bytes
-         FROM user_node_quota_lifetime WHERE user_id=$1"
+         FROM user_node_quota_lifetime WHERE user_id=$1",
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -139,7 +164,7 @@ pub async fn usage_for_user(pool: &PgPool, user_id: i64) -> Result<HashMap<i64, 
     let monthly = sqlx::query(
         "SELECT node_id,(uplink_bytes+downlink_bytes)::BIGINT AS bytes
          FROM user_node_quota_monthly
-         WHERE user_id=$1 AND month_start=date_trunc('month',NOW() AT TIME ZONE 'UTC')::date"
+         WHERE user_id=$1 AND month_start=date_trunc('month',NOW() AT TIME ZONE 'UTC')::date",
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -159,12 +184,15 @@ pub async fn attach_for_node(
     node_id: i64,
     users: &mut [Value],
 ) -> Result<(), ApiError> {
-    if !users.iter().any(|user| rule_for(user, node_id).is_ok_and(|r| r.is_some())) {
+    if !users
+        .iter()
+        .any(|user| rule_for(user, node_id).is_ok_and(|r| r.is_some()))
+    {
         return Ok(());
     }
     let lifetime = sqlx::query(
         "SELECT user_id,(uplink_bytes+downlink_bytes)::BIGINT AS bytes
-         FROM user_node_quota_lifetime WHERE node_id=$1"
+         FROM user_node_quota_lifetime WHERE node_id=$1",
     )
     .bind(node_id)
     .fetch_all(pool)
@@ -172,7 +200,7 @@ pub async fn attach_for_node(
     let monthly = sqlx::query(
         "SELECT user_id,(uplink_bytes+downlink_bytes)::BIGINT AS bytes
          FROM user_node_quota_monthly
-         WHERE node_id=$1 AND month_start=date_trunc('month',NOW() AT TIME ZONE 'UTC')::date"
+         WHERE node_id=$1 AND month_start=date_trunc('month',NOW() AT TIME ZONE 'UTC')::date",
     )
     .bind(node_id)
     .fetch_all(pool)
@@ -193,10 +221,18 @@ pub async fn attach_for_node(
         if let Some(object) = user.as_object_mut() {
             object.remove("nodeQuotaUsedBytes");
         }
-        let Ok(Some(rule)) = rule_for(user, node_id) else { continue };
-        let Some(id) = user.get("id").and_then(Value::as_i64) else { continue };
+        let Ok(Some(rule)) = rule_for(user, node_id) else {
+            continue;
+        };
+        let Some(id) = user.get("id").and_then(Value::as_i64) else {
+            continue;
+        };
         let found = totals.get(&id).copied().unwrap_or_default();
-        let consumed = if rule.period == "monthly" { found.monthly } else { found.lifetime };
+        let consumed = if rule.period == "monthly" {
+            found.monthly
+        } else {
+            found.lifetime
+        };
         if let Some(object) = user.as_object_mut() {
             object.insert("nodeQuotaUsedBytes".into(), json!(consumed));
         }
@@ -222,7 +258,9 @@ pub fn offline_remaining(user: &Value, node_id: i64) -> Option<i64> {
         Ok(Some(rule)) => Some(
             user.get("nodeQuotaUsedBytes")
                 .and_then(Value::as_i64)
-                .map_or(0, |used| rule.limit_bytes.saturating_sub(used.max(0)).max(0)),
+                .map_or(0, |used| {
+                    rule.limit_bytes.saturating_sub(used.max(0)).max(0)
+                }),
         ),
     }
 }
@@ -235,20 +273,35 @@ pub fn remaining_for(
 ) -> Remaining {
     // A multi-node Host with any per-node quota is inherently ambiguous;
     // never claim one node's balance as the balance of the whole Host.
-    let configured = candidates.iter().filter(|id| {
-        !matches!(rule_for(user, **id), Ok(None))
-    }).count();
+    let configured = candidates
+        .iter()
+        .filter(|id| !matches!(rule_for(user, **id), Ok(None)))
+        .count();
     if configured == 0 {
-        return if candidates.is_empty() { Remaining::Unavailable } else { Remaining::Unlimited };
+        return if candidates.is_empty() {
+            Remaining::Unavailable
+        } else {
+            Remaining::Unlimited
+        };
     }
     if candidates.len() != 1 || Some(candidates[0]) != node_id {
         return Remaining::Unavailable;
     }
-    let Some(id) = node_id else { return Remaining::Unavailable };
-    let Ok(Some(rule)) = rule_for(user, id) else { return Remaining::Unavailable };
-    let Some(meters) = usage else { return Remaining::Unavailable };
+    let Some(id) = node_id else {
+        return Remaining::Unavailable;
+    };
+    let Ok(Some(rule)) = rule_for(user, id) else {
+        return Remaining::Unavailable;
+    };
+    let Some(meters) = usage else {
+        return Remaining::Unavailable;
+    };
     let found = meters.get(&id).copied().unwrap_or_default();
-    let spent = if rule.period == "monthly" { found.monthly } else { found.lifetime };
+    let spent = if rule.period == "monthly" {
+        found.monthly
+    } else {
+        found.lifetime
+    };
     Remaining::Bytes(rule.limit_bytes.saturating_sub(spent.max(0)).max(0))
 }
 
@@ -260,20 +313,21 @@ pub async fn get_for_user(
     Path(user_id): Path<i64>,
 ) -> Result<Json<Value>, ApiError> {
     crate::enforce_collection(&actor, "users", false)?;
-    if user_id <= 0 { return Err(bad("Некорректный ID пользователя.")); }
+    if user_id <= 0 {
+        return Err(bad("Некорректный ID пользователя."));
+    }
     let user = sqlx::query_scalar::<_, Value>(
-        "SELECT data FROM panel_records WHERE collection='users' AND id=$1"
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1",
     )
     .bind(user_id)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Пользователь не найден."))?;
     let usage = usage_for_user(&state.pool, user_id).await?;
-    let nodes = sqlx::query(
-        "SELECT id,data FROM panel_records WHERE collection='nodes' ORDER BY id"
-    )
-    .fetch_all(&state.pool)
-    .await?;
+    let nodes =
+        sqlx::query("SELECT id,data FROM panel_records WHERE collection='nodes' ORDER BY id")
+            .fetch_all(&state.pool)
+            .await?;
     let mut items = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for row in nodes {
@@ -284,13 +338,17 @@ pub async fn get_for_user(
     }
     if let Some(policies) = policy_map(&user) {
         for key in policies.keys() {
-            if let Some(id) = valid_id(key) && !seen.contains(&id) {
+            if let Some(id) = valid_id(key)
+                && !seen.contains(&id)
+            {
                 items.push(display_row(&user, id, &Value::Null, &usage, true));
             }
         }
     }
-    Ok(Json(json!({"userId":user_id,"items":items,"units":"decimal-gb",
-        "resetTimezone":"UTC","source":"signed_user_node_telemetry"})))
+    Ok(Json(
+        json!({"userId":user_id,"items":items,"units":"decimal-gb",
+        "resetTimezone":"UTC","source":"signed_user_node_telemetry"}),
+    ))
 }
 
 fn display_row(
@@ -303,7 +361,11 @@ fn display_row(
     let rule = rule_for(user, node_id).ok().flatten();
     let sampled = usage.get(&node_id).copied().unwrap_or_default();
     let period = rule.map_or("monthly", |r| r.period);
-    let used = if period == "monthly" { sampled.monthly } else { sampled.lifetime };
+    let used = if period == "monthly" {
+        sampled.monthly
+    } else {
+        sampled.lifetime
+    };
     let remaining = rule.map(|r| r.limit_bytes.saturating_sub(used).max(0));
     json!({
         "nodeId":node_id,
@@ -328,11 +390,14 @@ mod tests {
 
     #[test]
     fn strict_node_policy_validation() {
-        assert!(validate_user(&json!({"nodeTrafficLimits":{
-            "1":{"limitGb":1000,"period":"monthly"},
-            "2":{"limitGb":847,"period":"lifetime"},
-            "3":{"limitGb":5,"period":"monthly"}
-        }})).is_ok());
+        assert!(
+            validate_user(&json!({"nodeTrafficLimits":{
+                "1":{"limitGb":1000,"period":"monthly"},
+                "2":{"limitGb":847,"period":"lifetime"},
+                "3":{"limitGb":5,"period":"monthly"}
+            }}))
+            .is_ok()
+        );
         for invalid in [
             json!({"nodeTrafficLimits":[]}),
             json!({"nodeTrafficLimits":{"01":{"limitGb":5,"period":"monthly"}}}),
@@ -347,12 +412,18 @@ mod tests {
         ] {
             assert!(validate_user(&invalid).is_err(), "{invalid}");
         }
-        assert!(validate_user(&json!({"nodeTrafficLimits":{
-            "3":{"limitGb":0.000_000_03,"period":"monthly"}
-        }})).is_ok());
-        assert!(validate_user(&json!({"nodeTrafficLimits":{
-            "3":{"limitGb":0.000_000_000_01,"period":"monthly"}
-        }})).is_err());
+        assert!(
+            validate_user(&json!({"nodeTrafficLimits":{
+                "3":{"limitGb":0.000_000_03,"period":"monthly"}
+            }}))
+            .is_ok()
+        );
+        assert!(
+            validate_user(&json!({"nodeTrafficLimits":{
+                "3":{"limitGb":0.000_000_000_01,"period":"monthly"}
+            }}))
+            .is_err()
+        );
     }
 
     #[test]
@@ -378,13 +449,40 @@ mod tests {
             "20":{"limitGb":1000,"period":"lifetime"}
         }});
         let usage = HashMap::from([
-            (10, NodeUsage {monthly:1_750_000_000,lifetime:12_000_000_000}),
-            (20, NodeUsage {monthly:0,lifetime:1_000_000_000}),
+            (
+                10,
+                NodeUsage {
+                    monthly: 1_750_000_000,
+                    lifetime: 12_000_000_000,
+                },
+            ),
+            (
+                20,
+                NodeUsage {
+                    monthly: 0,
+                    lifetime: 1_000_000_000,
+                },
+            ),
         ]);
-        assert_eq!(remaining_for(&user,Some(10), &[10], Some(&usage)), Remaining::Bytes(3_250_000_000));
-        assert_eq!(remaining_for(&user,Some(20), &[20], Some(&usage)), Remaining::Bytes(999_000_000_000));
-        assert_eq!(remaining_for(&user,None,&[10,20],Some(&usage)), Remaining::Unavailable);
-        assert_eq!(remaining_for(&user,Some(10),&[10],None), Remaining::Unavailable);
-        assert_eq!(remaining_for(&user,Some(30),&[30],Some(&usage)), Remaining::Unlimited);
+        assert_eq!(
+            remaining_for(&user, Some(10), &[10], Some(&usage)),
+            Remaining::Bytes(3_250_000_000)
+        );
+        assert_eq!(
+            remaining_for(&user, Some(20), &[20], Some(&usage)),
+            Remaining::Bytes(999_000_000_000)
+        );
+        assert_eq!(
+            remaining_for(&user, None, &[10, 20], Some(&usage)),
+            Remaining::Unavailable
+        );
+        assert_eq!(
+            remaining_for(&user, Some(10), &[10], None),
+            Remaining::Unavailable
+        );
+        assert_eq!(
+            remaining_for(&user, Some(30), &[30], Some(&usage)),
+            Remaining::Unlimited
+        );
     }
 }
