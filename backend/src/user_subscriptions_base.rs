@@ -930,14 +930,64 @@ fn log_subscription_candidate(profile: &Value, inbound: &Value, nodes: &[Value],
      "Subscription endpoint candidate");
 }
 
-/// Read one CDN meter for the entire feed. A missing meter must not
-/// prevent a customer from importing otherwise valid server connections.
+/// Read a server-authoritative CDN meter once for the entire feed.
+/// Missing optional display data must never take usable connections offline.
 async fn remark_cdn_meter(
     state: &AppState,
     user: &Value,
     hosts: &[Value],
     settings: &Value,
 ) -> Option<i64> {
+    // Fetch one authoritative CDN meter for this user, only when a published
+    // Remark actually asks for it. Never trust a client-provided usage value.
+    let needs_cdn_meter = hosts.iter().any(|host| {
+        host.get("remark")
+            .and_then(Value::as_str)
+            .is_some_and(|name| name.contains("{CDN_DATA_LEFT}") || name.contains("{TRAFFIC_LEFT}"))
+    });
+    if needs_cdn_meter
+        && user
+            .get("cdnLimitGb")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            > 0.0
+    {
+        if let Some(user_id) = user.get("id").and_then(record_id) {
+            match crate::cdn_quota::usage_for_user(&state.pool, settings, user_id).await {
+                Ok(bytes) => Some(bytes),
+                Err(error) => {
+                    // Optional display data must never take a working feed offline.
+                    // The renderer displays a dash rather than an invented balance.
+                    tracing::warn!(user_id, error=%error.message, "CDN Remark meter unavailable");
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+async fn collect_user_outbounds(
+    state: &AppState,
+    user: &Value,
+    device: &str,
+    rotate: bool,
+    settings: &Value,
+) -> Result<Vec<Value>, ApiError> {
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
+    let squads = crate::load_records(&state.pool, "squads").await?;
+    let profiles = crate::load_records(&state.pool, "profiles").await?;
+    let hosts = crate::load_records(&state.pool, "hosts").await?;
+    let nodes = crate::load_records(&state.pool, "nodes").await?;
+    let (ids, tags) = permitted_inbound_tags(user, &squads);
     let cdn_used_bytes = remark_cdn_meter(state, user, &hosts, settings).await;
     let mut outbounds = Vec::<Value>::new();
     for profile in &profiles {
