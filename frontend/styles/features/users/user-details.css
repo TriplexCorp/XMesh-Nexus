@@ -1902,3 +1902,97 @@ dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
     min-width:0;
   }
 }
+
+
+/* Compact, unified individual per-node quota editor in User → Traffic. */
+#dlg.user-modal .user-node-quota-editor{
+  display:grid;gap:var(--nx-space-2,.65rem);min-width:0;
+  border:1px solid var(--bd);border-radius:var(--nx-section-radius,12px);
+  background:var(--nx-section-bg,transparent);padding:var(--nx-space-3,.85rem);
+}
+#dlg.user-modal .user-node-quota-heading{
+  display:flex;gap:.7rem;align-items:center;justify-content:space-between;min-width:0;
+}
+#dlg.user-modal .user-node-quota-heading h3{font-size:var(--nx-text-md,1rem);font-weight:720;line-height:1.25;margin:0}
+#dlg.user-modal .user-node-quota-heading p{
+  color:var(--mu);margin:.16rem 0 0;font-size:var(--nx-text-xs,.76rem);line-height:1.4;
+}
+#dlg.user-modal .user-node-quota-counter{
+  font-size:var(--nx-text-xs,.76rem);font-weight:730;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  border:1px solid var(--bd);border-radius:999px;padding:.3rem .65rem;color:var(--tx);
+}
+#dlg.user-modal .user-node-quota-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:.6rem;min-width:0;flex-wrap:wrap;
+}
+#dlg.user-modal .user-node-quota-search{
+  flex:1;min-width:150px;display:flex;align-items:center;gap:.4rem;
+  border:1px solid var(--bd);border-radius:var(--nx-control-radius,8px);
+  padding:0 .65rem;min-height:2.2rem;color:var(--mu);
+}
+#dlg.user-modal .user-node-quota-search input{
+  width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--tx);
+  font:inherit;font-size:var(--nx-text-sm,.88rem);
+}
+#dlg.user-modal .user-node-quota-filter{
+  display:flex;gap:.35rem;align-items:center;white-space:nowrap;
+  color:var(--mu);font-size:var(--nx-text-xs,.75rem);cursor:pointer;
+}
+#dlg.user-modal .user-node-quota-list{display:grid;gap:.35rem;min-width:0}
+#dlg.user-modal .user-node-quota-row{
+  display:grid;grid-template-columns:minmax(125px,1.25fr) minmax(120px,1.1fr) minmax(93px,.7fr) minmax(110px,.85fr);
+  gap:.6rem;align-items:center;min-width:0;border:1px solid var(--bd);
+  background:var(--nx-control-bg,transparent);border-radius:var(--nx-control-radius,9px);
+  padding:.46rem .58rem;
+}
+#dlg.user-modal .user-node-quota-row[hidden]{display:none!important}
+#dlg.user-modal .user-node-quota-identity{display:flex;align-items:center;gap:.48rem;min-width:0}
+#dlg.user-modal .user-node-quota-bullet{
+  flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:var(--a);
+}
+#dlg.user-modal .user-node-quota-bullet.is-exhausted{background:var(--c3,#da8a63)}
+#dlg.user-modal .user-node-quota-name{display:grid;gap:.1rem;min-width:0}
+#dlg.user-modal .user-node-quota-name strong{
+  color:var(--tx);font-size:var(--nx-text-sm,.83rem);font-weight:700;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+#dlg.user-modal .user-node-quota-name small,
+#dlg.user-modal .user-node-quota-usage small{color:var(--mu);font-size:var(--nx-text-xs,.69rem);line-height:1.3}
+#dlg.user-modal .user-node-quota-usage{min-width:0;display:grid;gap:.2rem}
+#dlg.user-modal .user-node-quota-usage span{font-size:var(--nx-text-xs,.75rem);color:var(--mu);white-space:nowrap}
+#dlg.user-modal .user-node-quota-usage b{font-variant-numeric:tabular-nums;color:var(--tx);font-weight:680}
+#dlg.user-modal .user-node-quota-track{
+  height:4px;background:var(--bd);border-radius:99px;overflow:hidden;
+}
+#dlg.user-modal .user-node-quota-track i{
+  display:block;height:100%;background:var(--a);border-radius:99px;
+}
+#dlg.user-modal :is(.user-node-quota-input,.user-node-quota-select){
+  display:grid;gap:.13rem;min-width:0;color:var(--mu);
+}
+#dlg.user-modal :is(.user-node-quota-input,.user-node-quota-select)>span{
+  font-size:var(--nx-text-xs,.71rem);font-weight:610;
+}
+#dlg.user-modal .user-node-quota-row :is(input[type=number],select){
+  box-sizing:border-box;display:block;width:100%;min-width:0;
+  min-height:2rem;height:2rem;border:1px solid var(--bd);
+  border-radius:var(--nx-control-radius,7px);padding:.25rem .38rem;
+  background:var(--nx-control-bg,transparent);color:var(--tx);
+  font:inherit;font-size:var(--nx-text-sm,.83rem);
+}
+#dlg.user-modal .user-node-quota-actions{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;min-height:2.2rem}
+#dlg.user-modal .user-node-quota-actions [data-node-quota-save]{order:0}
+#dlg.user-modal .user-node-quota-actions [data-node-quota-expand]{order:1}
+#dlg.user-modal .user-node-quota-message{order:2;color:var(--mu);font-size:var(--nx-text-xs,.75rem)}
+#dlg.user-modal .user-node-quota-note{color:var(--mu);font-size:var(--nx-text-xs,.73rem);line-height:1.42;margin:0}
+@media(max-width:900px){
+  #dlg.user-modal .user-node-quota-row{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:.55rem;
+  }
+}
+@media(max-width:450px){
+  #dlg.user-modal .user-node-quota-editor{padding:.6rem}
+  #dlg.user-modal .user-node-quota-row{grid-template-columns:minmax(0,1fr)}
+}
+
