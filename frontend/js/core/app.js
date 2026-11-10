@@ -1655,10 +1655,10 @@ function statisticsP(){
   };
   $('#stats-node-search')?.addEventListener('input',renderStatsNodes);
   $('#stats-node-filter')?.addEventListener('change',renderStatsNodes);
-  $('[data-stats-node-view]').forEach(button=>button.addEventListener('click',()=>{
+  document.querySelectorAll('[data-stats-node-view]').forEach(button=>button.addEventListener('click',()=>{
     const list=button.dataset.statsNodeView==='list';
     $('#stats-nodes')?.classList.toggle('is-list',list);
-    $('[data-stats-node-view]').forEach(choice=>choice.setAttribute('aria-pressed',String(choice===button)));
+    document.querySelectorAll('[data-stats-node-view]').forEach(choice=>choice.setAttribute('aria-pressed',String(choice===button)));
   }));
   const updateLiveStatus=()=>{
     const live=$('#stats-period')?.value==='live',badge=$('#stats-live-badge'),age=$('#stats-sample-age');
