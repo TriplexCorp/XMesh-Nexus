@@ -2597,13 +2597,16 @@ async function openUserSubscriptionQr(id){
   if(!Qr)throw Error(panelIsEnglish()?'QR generator is unavailable. Refresh the page.':'Генератор QR недоступен. Обновите страницу.');
   const qr=Qr.encodeText(url.href,Qr.Ecc.MEDIUM);
   const en=panelIsEnglish();
-  modal('<section class="box user-qr-card"><header class="user-qr-header"><div><h2 id="user-qr-title">'+(en?'Subscription QR code':'QR-код подписки')+'</h2>'+
+  const qrDialog=document.createElement('dialog');
+  qrDialog.className='user-qr-modal';
+  qrDialog.setAttribute('aria-labelledby','user-qr-title');
+  qrDialog.innerHTML='<section class="box user-qr-card"><header class="user-qr-header"><div><h2 id="user-qr-title">'+(en?'Subscription QR code':'QR-код подписки')+'</h2>'+
     '<p>'+esc(user.username)+'</p></div><button type="button" class="ia" data-x aria-label="'+(en?'Close':'Закрыть')+'">'+ic('x')+'</button></header>'+
     '<div class="user-qr-image" data-user-qr-image role="img" aria-label="'+(en?'Subscription QR code for ':'QR-код подписки пользователя ')+esc(user.username)+'"></div>'+
     '<p class="user-qr-hint">'+(en?'Scan with your VPN client to import the subscription. Keep this code private.':'Сканируйте QR в VPN-клиенте для импорта подписки. Не передавайте код посторонним.')+'</p>'+
     '<footer class="user-qr-actions"><button type="button" class="btn sm" data-row-sub-copy="'+id+'">'+ic('copy')+(en?'Copy link':'Копировать ссылку')+'</button>'+
-    '<button type="button" class="gh sm" data-row-edit="'+id+'">'+ic('pen')+(en?'User settings':'Настройки пользователя')+'</button></footer></section>','user-qr-modal');
-  const host=dlg.querySelector('[data-user-qr-image]');
+    '<button type="button" class="gh sm" data-row-edit="'+id+'">'+ic('pen')+(en?'User settings':'Настройки пользователя')+'</button></footer></section>';
+  const host=qrDialog.querySelector('[data-user-qr-image]');
   const ns='http://www.w3.org/2000/svg',quiet=4,side=qr.size+quiet*2;
   const svg=document.createElementNS(ns,'svg');
   svg.setAttribute('viewBox','0 0 '+side+' '+side);
@@ -2623,7 +2626,11 @@ async function openUserSubscriptionQr(id){
   path.setAttribute('d',pathData);
   svg.append(path);
   host.replaceChildren(svg);
-  dlg.querySelector('[data-row-sub-copy]')?.focus();
+  document.body.append(qrDialog);
+  qrDialog.addEventListener('click',event=>{if(event.target===qrDialog||event.target.closest('[data-x]'))qrDialog.close()});
+  qrDialog.addEventListener('close',()=>qrDialog.remove(),{once:true});
+  qrDialog.showModal();
+  qrDialog.querySelector('[data-row-sub-copy]')?.focus();
 }
 
 async function loadUserSubscription(id){
