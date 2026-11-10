@@ -31,7 +31,7 @@ window.XMeshHostEditor=(() => {
       const country=form.elements.namedItem('countryCode');
       if(remark && (force || !String(remark.value||'').trim())){
         remark.value=hostNodeCountryRemark(node);
-        remark.dispatchEvent(new Event('input',{bubbles:true}));
+        if(typeof remark.dispatchEvent==='function')remark.dispatchEvent(new Event('input',{bubbles:true}));
       }
       if(country && (force || !String(country.value||'').trim()))country.value=code;
     }
