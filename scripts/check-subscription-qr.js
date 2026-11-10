@@ -38,4 +38,29 @@ assert.match(template,/class="subscription-public-status-stack"/,'Public portal 
 assert.match(publicCss,/grid-template-columns:minmax\(0,\.88fr\) minmax\(0,1\.12fr\)/,'Subscription overview must balance its headline with status information');
 assert.match(publicCss,/grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,235px\),1fr\)\)/,'Client catalog must use readable responsive columns across the available width');
 assert.doesNotMatch(template,/portal-guide-copy/,'No duplicated copy instruction');
+
+const admin=fs.readFileSync('frontend/js/core/app.js','utf8');
+const usersCss=fs.readFileSync('frontend/styles/features/users/users.css','utf8');
+const adminHtml=fs.readFileSync('frontend/index.html','utf8');
+assert.match(admin,/function userRowQuickActions\(u\)/,'Users must provide a shared compact quick action group');
+for(const action of ['row-sub-qr','row-sub-copy','row-edit','row-toggle','row-delete']){
+  assert(admin.includes("'"+action+"'")||admin.includes('[data-'+action+']'),'Missing quick action: '+action);
+}
+assert.match(admin,/async function openUserSubscriptionQr\(id\)/,'QR action must have a dedicated implementation');
+assert.match(admin,/const subscription=await backendRequest\('\/api\/v1\/users\/'.*'\/subscription'\)/,
+ 'QR must fetch the currently issued user subscription');
+assert.match(admin,/if\(!subscription\.url\|\|!subscription\.token\)/,
+ 'Missing and legacy subscriptions must not produce a bogus QR');
+assert.match(admin,/const url=new URL\(subscription\.url,location\.origin\)/,
+ 'QR must encode the canonical absolute user link');
+assert.match(admin,/Qr\.encodeText\(url\.href,Qr\.Ecc\.MEDIUM\)/,
+ 'QR must use the local bundled QR encoder');
+assert.match(admin,/quiet=4,side=qr\.size\+quiet\*2/,'QR must have a scannable quiet zone');
+assert.match(admin,/qrDialog\.addEventListener\('close',\(\)=>qrDialog\.remove\(\)/,
+ 'QR dialog must be cleaned up on close without discarding the active user editor');
+assert.match(usersCss,/\.user-qr-image svg/,'QR image must have responsive styling');
+assert(adminHtml.indexOf('/js/core/qr-code.js')<adminHtml.indexOf('/js/core/app.js'),
+ 'Bundled QR engine must load before the user actions');
+console.log('User quick actions and private subscription QR: OK');
+
 console.log('Subscription absolute URL / QR / enterprise workspace contract: OK');

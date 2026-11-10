@@ -15,6 +15,21 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Быстрые действия пользователя": "Quick user actions",
+    "Просмотреть": "View",
+    "Включить доступ": "Enable access",
+    "Отключить доступ": "Disable access",
+    "Старую ссылку нельзя восстановить. Перевыпустите её в карточке пользователя.": "Legacy link cannot be recovered. Reissue it in the user card.",
+    "Сначала выпустите подписку в карточке пользователя.": "Issue a subscription in the user card first.",
+    "Ссылка подписки должна использовать HTTPS.": "Subscription URL must use HTTPS.",
+    "Генератор QR недоступен. Обновите страницу.": "QR generator is unavailable. Refresh the page.",
+    "QR-код подписки пользователя": "Subscription QR code for",
+    "Сканируйте QR в VPN-клиенте для импорта подписки. Не передавайте код посторонним.": "Scan with your VPN client to import the subscription. Keep this code private.",
+    "Не удалось показать QR-код:": "Unable to show QR code:",
+    "Пользователь отключён": "User disabled",
+    "Пользователь включён": "User enabled",
+    "Не удалось изменить доступ:": "Unable to change access:",
+
     "Эмодзи статуса":"Status emoji",
     "Пользователь: {USERNAME} Осталось LTE: {CDN_DATA_LEFT}":"User: {USERNAME} LTE remaining: {CDN_DATA_LEFT}",
     "Пользователь: {USERNAME} Осталось LTE: {CDN_DATA_LEFT} Статус: {STATUS_EMOJI}":"User: {USERNAME} LTE remaining: {CDN_DATA_LEFT} Status: {STATUS_EMOJI}",

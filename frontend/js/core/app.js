@@ -70,6 +70,7 @@ const P={
   globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/>',
   languages:'<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3H2"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
   terminal:'<rect x="2" y="3" width="20" height="18" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/>',
+  qr:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M5 5h3v3H5zM16 5h3v3h-3zM5 16h3v3H5zM14 14h3m3 0v3m-6 0v4m3-4h4m-4 4h4"/>',
   sparkles:'<path d="m12 3 1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6-5.6-1.9 5.6-1.9L12 3ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z"/>'
 };
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${P[n]||P.file}</svg>`;
@@ -2129,13 +2130,30 @@ const uf=u=>(UQ.st=='all'||(UQ.st=='ONLINE'?isOn(u):st(u)==UQ.st))&&(!UQ.sq||u.s
 &&(!UQ.inbound||DB.squads.some(s=>u.squads.includes(s.id)&&(s.inb||[]).includes(UQ.inbound)))
 &&(!UQ.node||DB.nodes.some(n=>String(n.id)===UQ.node&&DB.squads.some(s=>u.squads.includes(s.id)&&(s.inb||[]).some(tag=>DB.profiles.some(p=>String(p.id)===String(n.profileId)&&inbs(p).some(ib=>ib.tag===tag))))))
 &&(!UQ.q||[u.username,u.tag,u.email,u.desc,u.tg,u.short,...u.squads.map(id=>DB.squads.find(s=>s.id===id)?.name||'')].join(' ').toLowerCase().includes(UQ.q));
+
+function userRowQuickActions(u){
+  const name=esc(u.username||('#'+u.id));
+  const action=(data,icon,ru,en,extra='')=>{
+    const title=esc(panelIsEnglish()?en:ru)+' · '+name;
+    return '<button type="button" class="gh sm user-row-action'+(extra?' '+extra:'')+'" data-'+data+'="'+u.id+'" title="'+title+'" aria-label="'+title+'">'+ic(icon)+'</button>';
+  };
+  return '<div class="user-row-actions" role="group" aria-label="'+(panelIsEnglish()?'Quick user actions':'Быстрые действия пользователя')+'">'+
+    (viewerMode()
+      ?action('row-edit','file','Просмотреть','View user')
+      :action('row-sub-qr','qr','Показать QR-код','Show QR code')+
+        action('row-sub-copy','copy','Копировать ссылку','Copy subscription link')+
+        action('row-edit','pen','Редактировать','Edit user')+
+        action('row-toggle',u.disabled?'play':'pause',u.disabled?'Включить доступ':'Отключить доступ',u.disabled?'Enable access':'Disable access')+
+        action('row-delete','trash','Удалить пользователя','Delete user','user-row-delete'))+
+    '</div>';
+}
 async function drawUsers(){
   const [r,s]=await Promise.all([api.list('users',{f:uf,sort:UQ.sort,dir:UQ.dir,page:UQ.page,size:UQ.size}),api.stats()]);if(!$('#ut'))return;
   const pages=Math.max(1,Math.ceil(r.total/UQ.size));if(UQ.page>pages){UQ.page=pages;return drawUsers()}UIDS=r.ids;
   $('#uf').innerHTML=[['all','Все',s.total],['ONLINE','Онлайн',s.online],['ACTIVE','Активные',s.by.ACTIVE||0],['ON_HOLD','Ожидают',s.by.ON_HOLD||0],['LIMITED','Лимит',s.by.LIMITED||0],['EXPIRED','Истёк',s.by.EXPIRED||0],['DISABLED','Отключены',s.by.DISABLED||0]].map(([k,l,n])=>`<button type="button" data-uf="${k}" class="${UQ.st==k?'on':''}" aria-pressed="${UQ.st===k?'true':'false'}"><span class="users-filter-label">${l}</span><b class="users-filter-count">${n}</b></button>`).join('');
   const th=(k,l)=>`<th><button data-s="${k}">${l}${UQ.sort==k?(UQ.dir=='asc'?' ↑':' ↓'):''}</button></th>`;
   const all=r.items.length&&r.items.every(u=>UQ.sel.has(u.id));
-  $('#ut').innerHTML=r.total?`<div class="tw" data-ui-layout="table"><table class="tb"><thead><tr><th class="c1"><input type="checkbox" data-sela ${all?'checked':''} aria-label="Выбрать все на странице"></th>${th('username','Пользователь')}${th('status','Статус')}${th('used','Трафик')}${th('expireAt','Срок')}<th>Доступ</th>${th('onlineAt','Был в сети')}<th class="user-row-actions-head">Действия</th></tr></thead><tbody>${r.items.map(u=>{const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,on=isOn(u);return `<tr data-id="${u.id}" class="${UQ.sel.has(u.id)?'sel':''}"><td class="c1"><input type="checkbox" data-sel="${u.id}" ${UQ.sel.has(u.id)?'checked':''} aria-label="Выбрать ${esc(u.username)}"></td><td data-l=""><div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc(u.username[0].toUpperCase())}</span><div>${esc(u.username)} ${u.tag?chip(esc(u.tag),'--c3'):''}${u.desc?`<small class="mu">${esc(u.desc)}</small>`:''}</div></div></td><td data-l="Статус">${chip(sl,sc)}</td><td data-l="Трафик"><div class="tr">${u.limit?`<div class="pb${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<small>${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</small></div></td><td data-l="Срок"${u.expireAt&&u.expireAt<Date.now()+3*DAY?' class="er"':''}>${userExpiryCell(u)}</td><td data-l="Доступ">${u.squads.map(i=>chip(esc(DB.squads.find(x=>x.id==i)?.name||'?'),'--b')).join(' ')}</td><td data-l="Был в сети">${on?'<span class="dot"></span> онлайн':ago(u.onlineAt)}</td><td data-l="Действия"><div class="user-row-actions"><button type="button" class="gh sm" data-row-sub-copy="${u.id}" title="Скопировать ссылку подписки" aria-label="Скопировать подписку ${esc(u.username)}">${ic('copy')}Ссылка</button><button type="button" class="gh sm user-row-delete" data-row-delete="${u.id}" title="Удалить пользователя" aria-label="Удалить пользователя ${esc(u.username)}">${ic('trash')}</button></div></td></tr>`}).join('')}</tbody></table></div><div class="pg"><span>${(UQ.page-1)*UQ.size+1}–${Math.min(r.total,UQ.page*UQ.size)} из ${r.total}</span><select data-psz aria-label="Строк на странице">${[15,30,60].map(n=>`<option${n==UQ.size?' selected':''}>${n}</option>`).join('')}</select><button class="ia" data-pg="-1" ${UQ.page>1?'':'disabled'} aria-label="Назад">${ic('chevronLeft')}</button><button class="ia" data-pg="1" ${UQ.page<pages?'':'disabled'} aria-label="Вперёд">${ic('chevronRight')}</button></div>`:`<div class="empty"><b>Никого не найдено</b><span>Измените поиск или фильтр, либо создайте пользователя.</span><button class="btn sm" data-nu>${ic('plus')}Создать</button></div>`;
+  $('#ut').innerHTML=r.total?`<div class="tw" data-ui-layout="table"><table class="tb"><thead><tr><th class="c1"><input type="checkbox" data-sela ${all?'checked':''} aria-label="Выбрать все на странице"></th>${th('username','Пользователь')}${th('status','Статус')}${th('used','Трафик')}${th('expireAt','Срок')}<th>Доступ</th>${th('onlineAt','Был в сети')}<th class="user-row-actions-head">Действия</th></tr></thead><tbody>${r.items.map(u=>{const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,on=isOn(u);return `<tr data-id="${u.id}" class="${UQ.sel.has(u.id)?'sel':''}"><td class="c1"><input type="checkbox" data-sel="${u.id}" ${UQ.sel.has(u.id)?'checked':''} aria-label="Выбрать ${esc(u.username)}"></td><td data-l=""><div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc(u.username[0].toUpperCase())}</span><div>${esc(u.username)} ${u.tag?chip(esc(u.tag),'--c3'):''}${u.desc?`<small class="mu">${esc(u.desc)}</small>`:''}</div></div></td><td data-l="Статус">${chip(sl,sc)}</td><td data-l="Трафик"><div class="tr">${u.limit?`<div class="pb${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<small>${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</small></div></td><td data-l="Срок"${u.expireAt&&u.expireAt<Date.now()+3*DAY?' class="er"':''}>${userExpiryCell(u)}</td><td data-l="Доступ">${u.squads.map(i=>chip(esc(DB.squads.find(x=>x.id==i)?.name||'?'),'--b')).join(' ')}</td><td data-l="Был в сети">${on?'<span class="dot"></span> онлайн':ago(u.onlineAt)}</td><td data-l="Действия">${userRowQuickActions(u)}</td></tr>`}).join('')}</tbody></table></div><div class="pg"><span>${(UQ.page-1)*UQ.size+1}–${Math.min(r.total,UQ.page*UQ.size)} из ${r.total}</span><select data-psz aria-label="Строк на странице">${[15,30,60].map(n=>`<option${n==UQ.size?' selected':''}>${n}</option>`).join('')}</select><button class="ia" data-pg="-1" ${UQ.page>1?'':'disabled'} aria-label="Назад">${ic('chevronLeft')}</button><button class="ia" data-pg="1" ${UQ.page<pages?'':'disabled'} aria-label="Вперёд">${ic('chevronRight')}</button></div>`:`<div class="empty"><b>Никого не найдено</b><span>Измените поиск или фильтр, либо создайте пользователя.</span><button class="btn sm" data-nu>${ic('plus')}Создать</button></div>`;
   drawBulk();
 }
 function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">${ic('calendar')}Продлить…</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`;decorateButtonIcons(b)}
@@ -2563,6 +2581,58 @@ function userDrawer(id,tab){
   startUserTrafficAutoRefresh(u.id);
   if(!viewerMode())void loadUserSubscription(u.id);
 }
+
+async function openUserSubscriptionQr(id){
+  const user=DB.users.find(u=>u.id===id);
+  if(!user)throw Error(panelIsEnglish()?'User not found.':'Пользователь не найден.');
+  const subscription=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription');
+  if(!subscription.url||!subscription.token){
+    throw Error(subscription.legacy
+      ?(panelIsEnglish()?'Legacy link cannot be recovered. Reissue it in the user card.':'Старую ссылку нельзя восстановить. Перевыпустите её в карточке пользователя.')
+      :(panelIsEnglish()?'Issue a subscription in the user card first.':'Сначала выпустите подписку в карточке пользователя.'));
+  }
+  const url=new URL(subscription.url,location.origin);
+  if(url.protocol!=='https:'&&url.origin!==location.origin)throw Error(panelIsEnglish()?'Subscription URL must use HTTPS.':'Ссылка подписки должна использовать HTTPS.');
+  const Qr=window.qrcodegen?.QrCode;
+  if(!Qr)throw Error(panelIsEnglish()?'QR generator is unavailable. Refresh the page.':'Генератор QR недоступен. Обновите страницу.');
+  const qr=Qr.encodeText(url.href,Qr.Ecc.MEDIUM);
+  const en=panelIsEnglish();
+  const qrDialog=document.createElement('dialog');
+  qrDialog.className='user-qr-modal';
+  qrDialog.setAttribute('aria-labelledby','user-qr-title');
+  qrDialog.innerHTML='<section class="box user-qr-card"><header class="user-qr-header"><div><h2 id="user-qr-title">'+(en?'Subscription QR code':'QR-код подписки')+'</h2>'+
+    '<p>'+esc(user.username)+'</p></div><button type="button" class="ia" data-x aria-label="'+(en?'Close':'Закрыть')+'">'+ic('x')+'</button></header>'+
+    '<div class="user-qr-image" data-user-qr-image role="img" aria-label="'+(en?'Subscription QR code for ':'QR-код подписки пользователя ')+esc(user.username)+'"></div>'+
+    '<p class="user-qr-hint">'+(en?'Scan with your VPN client to import the subscription. Keep this code private.':'Сканируйте QR в VPN-клиенте для импорта подписки. Не передавайте код посторонним.')+'</p>'+
+    '<footer class="user-qr-actions"><button type="button" class="btn sm" data-row-sub-copy="'+id+'">'+ic('copy')+(en?'Copy link':'Копировать ссылку')+'</button>'+
+    '<button type="button" class="gh sm" data-row-edit="'+id+'">'+ic('pen')+(en?'User settings':'Настройки пользователя')+'</button></footer></section>';
+  const host=qrDialog.querySelector('[data-user-qr-image]');
+  const ns='http://www.w3.org/2000/svg',quiet=4,side=qr.size+quiet*2;
+  const svg=document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox','0 0 '+side+' '+side);
+  svg.setAttribute('shape-rendering','crispEdges');
+  svg.setAttribute('aria-hidden','true');
+  const background=document.createElementNS(ns,'rect');
+  background.setAttribute('width',String(side));
+  background.setAttribute('height',String(side));
+  background.setAttribute('fill','#fff');
+  svg.append(background);
+  let pathData='';
+  for(let y=0;y<qr.size;y++)for(let x=0;x<qr.size;x++){
+    if(qr.getModule(x,y))pathData+='M'+(x+quiet)+','+(y+quiet)+'h1v1h-1z';
+  }
+  const path=document.createElementNS(ns,'path');
+  path.setAttribute('fill','#101923');
+  path.setAttribute('d',pathData);
+  svg.append(path);
+  host.replaceChildren(svg);
+  document.body.append(qrDialog);
+  qrDialog.addEventListener('click',event=>{if(event.target===qrDialog||event.target.closest('[data-x]'))qrDialog.close()});
+  qrDialog.addEventListener('close',()=>qrDialog.remove(),{once:true});
+  qrDialog.showModal();
+  qrDialog.querySelector('[data-row-sub-copy]')?.focus();
+}
+
 async function loadUserSubscription(id){
   const target=$('[data-user-sub-state="'+id+'"]');
   if(!target)return;
@@ -2576,7 +2646,7 @@ async function loadUserSubscription(id){
       target.innerHTML='<div class="user-sub-link-card"><div class="user-sub-link-head"><span class="user-sub-link-label">'+label+'</span><span class="user-sub-link-status"><span class="user-sub-status-dot"></span>'+(panelIsEnglish()?'Issued':'Выпущена')+'</span></div>'+
         '<div class="user-sub-link-row"><input type="text" class="user-subscription-url" aria-label="'+label+'" value="'+esc(url)+'" readonly spellcheck="false" autocomplete="off" title="'+esc(url)+'">'+
         '<button type="button" class="btn sm user-sub-copy-main" data-user-sub-copy="'+id+'" title="'+(panelIsEnglish()?'Copy subscription link':'Скопировать ссылку')+'">'+ic('copy')+(panelIsEnglish()?'Copy':'Копировать')+'</button></div>'+
-        '<div class="user-sub-actions"><button type="button" class="gh sm" data-user-sub-open="'+id+'">'+ic('external-link')+(panelIsEnglish()?'Open subscription':'Открыть')+'</button>'+
+        '<div class="user-sub-actions"><button type="button" class="gh sm" data-row-sub-qr="'+id+'">'+ic('qr')+(panelIsEnglish()?'QR code':'QR-код')+'</button><button type="button" class="gh sm" data-user-sub-open="'+id+'">'+ic('external-link')+(panelIsEnglish()?'Open subscription':'Открыть')+'</button>'+
         '<button type="button" class="gh sm" data-user-sub-create="'+id+'">'+ic('refresh-cw')+(panelIsEnglish()?'Rotate':'Перевыпустить')+'</button>'+
         (sessionUser?.role==='owner'?'<button type="button" class="gh sm" data-user-credentials-rotate="'+id+'" title="'+(panelIsEnglish()?'Rotate URL and ALL VPN credentials':'Перевыпустить ссылку и ВСЕ VPN-реквизиты')+'">'+ic('shield-check')+(panelIsEnglish()?'Rotate VPN access':'Перевыпустить VPN-доступ')+'</button>':'')+
         '<button type="button" class="gh sm user-sub-revoke" data-user-sub-revoke="'+id+'">'+ic('shield-off')+(panelIsEnglish()?'Revoke':'Отозвать')+'</button></div></div>';
@@ -5158,6 +5228,37 @@ document.addEventListener('click',async e=>{
       notify:toast,
       afterSave:()=>{if(cur==='nodes')void render(1);}
     });
+    return;
+  }
+
+  if(b=g('[data-row-sub-qr]')){
+    e.preventDefault();
+    const id=Number(b.dataset.rowSubQr);
+    if(!Number.isSafeInteger(id)||id<=0||viewerMode())return;
+    b.disabled=true;
+    try{await openUserSubscriptionQr(id)}
+    catch(error){toast((panelIsEnglish()?'Unable to show QR code: ':'Не удалось показать QR-код: ')+(error.message||'API'))}
+    finally{if(b.isConnected)b.disabled=false}
+    return;
+  }
+  if(b=g('[data-row-edit]')){
+    e.preventDefault();
+    const id=Number(b.dataset.rowEdit);
+    if(DB.users.some(u=>u.id===id))userDrawer(id,'ov');
+    return;
+  }
+  if(b=g('[data-row-toggle]')){
+    e.preventDefault();
+    const id=Number(b.dataset.rowToggle),user=DB.users.find(u=>u.id===id);
+    if(!user||viewerMode())return;
+    b.disabled=true;
+    try{
+      const disabled=!user.disabled;
+      await api.update('users',id,{disabled});
+      toast(panelIsEnglish()?(disabled?'User disabled':'User enabled'):(disabled?'Пользователь отключён':'Пользователь включён'));
+      if(cur==='users')await drawUsers();
+    }catch(error){toast((panelIsEnglish()?'Unable to change access: ':'Не удалось изменить доступ: ')+(error.message||'API'))}
+    finally{if(b.isConnected)b.disabled=false}
     return;
   }
   if(b=g('[data-row-sub-copy]')){
