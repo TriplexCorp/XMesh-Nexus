@@ -239,7 +239,7 @@ pub fn remaining_for(
         !matches!(rule_for(user, **id), Ok(None))
     }).count();
     if configured == 0 {
-        return if node_id.is_some() { Remaining::Unlimited } else { Remaining::Unavailable };
+        return if candidates.is_empty() { Remaining::Unavailable } else { Remaining::Unlimited };
     }
     if candidates.len() != 1 || Some(candidates[0]) != node_id {
         return Remaining::Unavailable;
