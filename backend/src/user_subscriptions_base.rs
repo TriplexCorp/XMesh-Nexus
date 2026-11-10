@@ -933,13 +933,22 @@ fn log_subscription_candidate(profile: &Value, inbound: &Value, nodes: &[Value],
 /// Candidate node identities for this exact Host placement (not geographic
 /// guesses or the public CDN domain). Stable IDs are needed for per-node caps.
 fn host_candidate_node_ids(host: &Value, profile: &Value, nodes: &[Value]) -> Vec<i64> {
-    let pins = host.get("nodes").and_then(Value::as_array).filter(|v| !v.is_empty());
-    nodes.iter().filter(|node| {
-        node.get("disabled") != Some(&Value::Bool(true))
-            && same_record_id(node.get("profileId"), profile.get("id"))
-            && pins.is_none_or(|list| list.iter()
-                .any(|id| same_record_id(Some(id), node.get("id"))))
-    }).filter_map(|node| node.get("id").and_then(record_id)).collect()
+    let pins = host
+        .get("nodes")
+        .and_then(Value::as_array)
+        .filter(|v| !v.is_empty());
+    nodes
+        .iter()
+        .filter(|node| {
+            node.get("disabled") != Some(&Value::Bool(true))
+                && same_record_id(node.get("profileId"), profile.get("id"))
+                && pins.is_none_or(|list| {
+                    list.iter()
+                        .any(|id| same_record_id(Some(id), node.get("id")))
+                })
+        })
+        .filter_map(|node| node.get("id").and_then(record_id))
+        .collect()
 }
 
 /// Optional server-derived per-node meter used only for generated labels.
@@ -949,13 +958,19 @@ async fn remark_node_meter(
     user: &Value,
     hosts: &[Value],
 ) -> Option<std::collections::HashMap<i64, crate::node_user_quotas::NodeUsage>> {
-    let configured = user.get("nodeTrafficLimits")
-        .and_then(Value::as_object).is_some_and(|items| !items.is_empty());
-    if !configured || !hosts.iter().any(|host| {
-        host.get("remark").and_then(Value::as_str).is_some_and(|remark| {
-            remark.contains("{NODE_DATA_LEFT}") || remark.contains("{TRAFFIC_LEFT}")
+    let configured = user
+        .get("nodeTrafficLimits")
+        .and_then(Value::as_object)
+        .is_some_and(|items| !items.is_empty());
+    if !configured
+        || !hosts.iter().any(|host| {
+            host.get("remark")
+                .and_then(Value::as_str)
+                .is_some_and(|remark| {
+                    remark.contains("{NODE_DATA_LEFT}") || remark.contains("{TRAFFIC_LEFT}")
+                })
         })
-    }) {
+    {
         return None;
     }
     let id = user.get("id").and_then(record_id)?;
@@ -1084,7 +1099,10 @@ async fn collect_user_outbounds(
                                 host_traffic_scope(host, profile, tag, &nodes, settings);
                             let node_ids = host_candidate_node_ids(host, profile, &nodes);
                             let node_remaining = crate::node_user_quotas::remaining_for(
-                                user, owner_node_id, &node_ids, node_usage.as_ref(),
+                                user,
+                                owner_node_id,
+                                &node_ids,
+                                node_usage.as_ref(),
                             );
                             crate::subscription_remark::render_with_context(
                                 template,
