@@ -2747,6 +2747,69 @@ async fn activate_waiting_users_on_traffic(
     Ok(())
 }
 
+/// Charge authenticated positive user/node deltas before updating the
+/// cumulative physical baseline. Inbound traffic is intentionally excluded.
+async fn persist_user_node_quota_deltas(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    serialized: &Value,
+) -> Result<(), ApiError> {
+    // Independent per-user/node quota ledgers. The exact positive delta
+    // is taken from authenticated monotonic user counters before updating
+    // the physical baseline. Repeated/first/reset snapshots charge zero.
+    // Never sum separate inbound counters into this family.
+    sqlx::query(
+        "INSERT INTO user_node_quota_lifetime AS quota (
+            node_id,user_id,uplink_bytes,downlink_bytes,updated_at
+         )
+         SELECT $1, sample.user_id,
+                sample.uplink_bytes-previous.last_uplink_bytes,
+                sample.downlink_bytes-previous.last_downlink_bytes,
+                NOW()
+         FROM jsonb_to_recordset($2::jsonb)
+              AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+         JOIN panel_records AS u ON u.collection='users' AND u.id=sample.user_id
+         JOIN user_node_traffic_totals AS previous
+              ON previous.node_id=$1 AND previous.user_id=sample.user_id
+         WHERE sample.uplink_bytes>=previous.last_uplink_bytes
+           AND sample.downlink_bytes>=previous.last_downlink_bytes
+         ON CONFLICT (node_id,user_id) DO UPDATE SET
+             uplink_bytes=quota.uplink_bytes+EXCLUDED.uplink_bytes,
+             downlink_bytes=quota.downlink_bytes+EXCLUDED.downlink_bytes,
+             updated_at=NOW()",
+    )
+    .bind(node_id)
+    .bind(serialized)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "INSERT INTO user_node_quota_monthly AS monthly (
+            month_start,node_id,user_id,uplink_bytes,downlink_bytes,updated_at
+         )
+         SELECT date_trunc('month', NOW() AT TIME ZONE 'UTC')::date,
+                $1, sample.user_id,
+                sample.uplink_bytes-previous.last_uplink_bytes,
+                sample.downlink_bytes-previous.last_downlink_bytes,
+                NOW()
+         FROM jsonb_to_recordset($2::jsonb)
+              AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+         JOIN panel_records AS u ON u.collection='users' AND u.id=sample.user_id
+         JOIN user_node_traffic_totals AS previous
+              ON previous.node_id=$1 AND previous.user_id=sample.user_id
+         WHERE sample.uplink_bytes>=previous.last_uplink_bytes
+           AND sample.downlink_bytes>=previous.last_downlink_bytes
+         ON CONFLICT (month_start,node_id,user_id) DO UPDATE SET
+             uplink_bytes=monthly.uplink_bytes+EXCLUDED.uplink_bytes,
+             downlink_bytes=monthly.downlink_bytes+EXCLUDED.downlink_bytes,
+             updated_at=NOW()",
+    )
+    .bind(node_id)
+    .bind(serialized)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 async fn persist_user_traffic(
     conn: &mut sqlx::PgConnection,
     node_id: i64,
@@ -2792,59 +2855,7 @@ async fn persist_user_traffic(
         activate_waiting_users_on_traffic(conn, node_id, &serialized, sampled_at, source_ms)
             .await?;
         persist_verified_traffic_deltas(conn, node_id, &serialized, sampled_at, false).await?;
-        // Independent per-user/node quota ledgers. The exact positive delta
-        // is taken from authenticated monotonic user counters before updating
-        // the physical baseline. Repeated/first/reset snapshots charge zero.
-        // Never sum separate inbound counters into this family.
-        sqlx::query(
-            "INSERT INTO user_node_quota_lifetime AS quota (
-                node_id,user_id,uplink_bytes,downlink_bytes,updated_at
-             )
-             SELECT $1, sample.user_id,
-                    sample.uplink_bytes-previous.last_uplink_bytes,
-                    sample.downlink_bytes-previous.last_downlink_bytes,
-                    NOW()
-             FROM jsonb_to_recordset($2::jsonb)
-                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-             JOIN panel_records AS u ON u.collection='users' AND u.id=sample.user_id
-             JOIN user_node_traffic_totals AS previous
-                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
-             WHERE sample.uplink_bytes>=previous.last_uplink_bytes
-               AND sample.downlink_bytes>=previous.last_downlink_bytes
-             ON CONFLICT (node_id,user_id) DO UPDATE SET
-                 uplink_bytes=quota.uplink_bytes+EXCLUDED.uplink_bytes,
-                 downlink_bytes=quota.downlink_bytes+EXCLUDED.downlink_bytes,
-                 updated_at=NOW()",
-        )
-        .bind(node_id)
-        .bind(&serialized)
-        .execute(&mut *conn)
-        .await?;
-        sqlx::query(
-            "INSERT INTO user_node_quota_monthly AS monthly (
-                month_start,node_id,user_id,uplink_bytes,downlink_bytes,updated_at
-             )
-             SELECT date_trunc('month', NOW() AT TIME ZONE 'UTC')::date,
-                    $1, sample.user_id,
-                    sample.uplink_bytes-previous.last_uplink_bytes,
-                    sample.downlink_bytes-previous.last_downlink_bytes,
-                    NOW()
-             FROM jsonb_to_recordset($2::jsonb)
-                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-             JOIN panel_records AS u ON u.collection='users' AND u.id=sample.user_id
-             JOIN user_node_traffic_totals AS previous
-                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
-             WHERE sample.uplink_bytes>=previous.last_uplink_bytes
-               AND sample.downlink_bytes>=previous.last_downlink_bytes
-             ON CONFLICT (month_start,node_id,user_id) DO UPDATE SET
-                 uplink_bytes=monthly.uplink_bytes+EXCLUDED.uplink_bytes,
-                 downlink_bytes=monthly.downlink_bytes+EXCLUDED.downlink_bytes,
-                 updated_at=NOW()",
-        )
-        .bind(node_id)
-        .bind(&serialized)
-        .execute(&mut *conn)
-        .await?;
+        persist_user_node_quota_deltas(conn, node_id, &serialized).await?;
         sqlx::query(
             "INSERT INTO user_node_traffic_totals AS totals (
                 node_id, user_id, last_uplink_bytes, last_downlink_bytes,
