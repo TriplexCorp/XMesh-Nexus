@@ -83,7 +83,9 @@ fn cdn_left(user: &Value, used_bytes: Option<i64>) -> String {
     let Some(used) = used_bytes else {
         return "—".to_owned();
     };
-    let remaining = crate::gb_to_bytes_i64(limit).saturating_sub(used.max(0)).max(0);
+    let remaining = crate::gb_to_bytes_i64(limit)
+        .saturating_sub(used.max(0))
+        .max(0);
     let hundredths = remaining.saturating_add(5_000_000) / 10_000_000;
     format!("{}.{:02} ГБ", hundredths / 100, hundredths % 100)
 }
@@ -235,7 +237,11 @@ fn resolve(
         "CDN_DATA_LEFT" => cdn_left(user, traffic.cdn_used_bytes),
         "TRAFFIC_LEFT" => match traffic.scope {
             TrafficScope::Account => {
-                if limit <= 0.0 { "∞".into() } else { gb((limit - consumed).max(0.0)) }
+                if limit <= 0.0 {
+                    "∞".into()
+                } else {
+                    gb((limit - consumed).max(0.0))
+                }
             }
             TrafficScope::Cdn => cdn_left(user, traffic.cdn_used_bytes),
             TrafficScope::Unknown => "—".into(),
@@ -323,12 +329,21 @@ pub fn render(
     server_address: &str,
 ) -> String {
     render_with_context(
-        template, user, inbound, host, settings, now_ms, server_address,
+        template,
+        user,
+        inbound,
+        host,
+        settings,
+        now_ms,
+        server_address,
         TrafficContext::default(),
     )
 }
 
-#[expect(clippy::too_many_arguments, reason = "Explicit immutable inputs keep quota scope separate from user-controlled data")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Explicit immutable inputs keep quota scope separate from user-controlled data"
+)]
 pub fn render_with_context(
     template: &str,
     user: &Value,
@@ -468,15 +483,38 @@ mod tests {
         let inbound = json!({"protocol":"vless"});
         let host = json!({"remark":"Poland"});
         let settings = json!({});
-        let render_for = |scope, used_bytes| render_with_context(
-            "{DATA_LEFT}|{CDN_DATA_LEFT}|{TRAFFIC_LEFT}",
-            &account, &inbound, &host, &settings, 0, "vpn.example.org",
-            TrafficContext { scope, cdn_used_bytes: used_bytes, owner_node_id: Some(7) },
+        let render_for = |scope, used_bytes| {
+            render_with_context(
+                "{DATA_LEFT}|{CDN_DATA_LEFT}|{TRAFFIC_LEFT}",
+                &account,
+                &inbound,
+                &host,
+                &settings,
+                0,
+                "vpn.example.org",
+                TrafficContext {
+                    scope,
+                    cdn_used_bytes: used_bytes,
+                    owner_node_id: Some(7),
+                },
+            )
+        };
+        assert_eq!(
+            render_for(TrafficScope::Account, Some(1_750_000_000)),
+            "∞|3.25 ГБ|∞"
         );
-        assert_eq!(render_for(TrafficScope::Account, Some(1_750_000_000)), "∞|3.25 ГБ|∞");
-        assert_eq!(render_for(TrafficScope::Cdn, Some(1_750_000_000)), "∞|3.25 ГБ|3.25 ГБ");
-        assert_eq!(render_for(TrafficScope::Cdn, Some(5_900_000_000)), "∞|0.00 ГБ|0.00 ГБ");
-        assert_eq!(render_for(TrafficScope::Unknown, Some(1_750_000_000)), "∞|3.25 ГБ|—");
+        assert_eq!(
+            render_for(TrafficScope::Cdn, Some(1_750_000_000)),
+            "∞|3.25 ГБ|3.25 ГБ"
+        );
+        assert_eq!(
+            render_for(TrafficScope::Cdn, Some(5_900_000_000)),
+            "∞|0.00 ГБ|0.00 ГБ"
+        );
+        assert_eq!(
+            render_for(TrafficScope::Unknown, Some(1_750_000_000)),
+            "∞|3.25 ГБ|—"
+        );
         assert_eq!(render_for(TrafficScope::Cdn, None), "∞|—|—");
         assert_eq!(cdn_left(&json!({"cdnLimitGb":0}), None), "∞");
     }
