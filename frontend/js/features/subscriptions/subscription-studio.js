@@ -59,6 +59,19 @@ window.XMeshSubscriptionStudio = (() => {
     return selected.replace(/\{([A-Z_]+)\}/g,(full,key)=>
       Object.prototype.hasOwnProperty.call(announcementExamples,key)?announcementExamples[key]:full);
   };
+  // Preserve the position inside a multiline notice. This is intentionally
+  // different from the append-only Host/Remark server-name picker.
+  const insertAnnouncementToken=(field,key)=>{
+    if(!announcementFields.includes(key))return false;
+    const token='{'+key+'}';
+    const start=Number.isInteger(field.selectionStart)?field.selectionStart:field.value.length;
+    const end=Number.isInteger(field.selectionEnd)?field.selectionEnd:start;
+    if(field.maxLength>=0 && field.value.length-(end-start)+token.length>field.maxLength)return false;
+    field.setRangeText(token,start,end,'end');
+    field.focus();
+    field.dispatchEvent(new Event('input',{bubbles:true}));
+    return true;
+  };
   const announcementHelp=()=>'<div class="subscription-announcement-tools">'+
     '<details class="subscription-announcement-variables"><summary>Переменные для анонсов <small>Вставить в текст</small></summary>'+
     '<div class="subscription-announcement-token-grid">'+
@@ -499,17 +512,9 @@ window.XMeshSubscriptionStudio = (() => {
         const button=event.target.closest('[data-announcement-token]');
         if(!button||!form.contains(button))return;
         event.preventDefault();
-        const token='{'+button.dataset.announcementToken+'}';
-        const start=Number.isInteger(announcementInput.selectionStart)
-          ? announcementInput.selectionStart:announcementInput.value.length;
-        const end=Number.isInteger(announcementInput.selectionEnd)
-          ? announcementInput.selectionEnd:start;
-        // Unlike a server-name Remark, an announcement is multiline: insert
-        // precisely at the text caret to support composing several lines.
-        announcementInput.setRangeText(token,start,end,'end');
-        announcementInput.focus();
-        announcementInput.dispatchEvent(new Event('input',{bubbles:true}));
-        updateAnnouncementPreview();
+        if(insertAnnouncementToken(announcementInput,button.dataset.announcementToken)){
+          updateAnnouncementPreview();
+        }
       });
       announcementInput.addEventListener('input',updateAnnouncementPreview);
       updateAnnouncementPreview();
@@ -952,5 +957,5 @@ window.XMeshSubscriptionStudio = (() => {
     };
     return [markup,mount];
   }
-  return {create,defaults,hostnameOK,pathOK,clientCatalog,validHttps,renderCustomClient,nextCustomClientId,maxCustomClients,appsHeading};
+  return {create,defaults,hostnameOK,pathOK,clientCatalog,validHttps,renderCustomClient,nextCustomClientId,maxCustomClients,appsHeading,announcementPreview:demoAnnouncement,insertAnnouncementToken};
 })();
