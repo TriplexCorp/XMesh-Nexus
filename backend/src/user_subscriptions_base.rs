@@ -1039,7 +1039,13 @@ async fn collect_user_outbounds(
                             let (scope, owner_node_id) =
                                 host_traffic_scope(host, profile, tag, &nodes, settings);
                             crate::subscription_remark::render_with_context(
-                                template, user, inbound, host, settings, now_ms, address,
+                                template,
+                                user,
+                                inbound,
+                                host,
+                                settings,
+                                now_ms,
+                                address,
                                 crate::subscription_remark::TrafficContext {
                                     scope,
                                     cdn_used_bytes,
