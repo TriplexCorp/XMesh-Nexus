@@ -1703,15 +1703,15 @@ async function main() {
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
       assert(g.dialog.width>=width*.52&&g.dialog.width<=width*.9,
         'User Details must be a proportionate desktop workspace, not a narrow island: '+JSON.stringify(g.dialog));
-      assert(g.dialog.height>=height*.54&&g.dialog.height<=height*.88,
+      assert(g.dialog.height>=height*.54&&g.dialog.height<=height*(width===3077?.91:.88),
         'User Details must occupy a balanced viewport height without clipping: '+JSON.stringify({box:g.dialog,css:g.cssHeight,rem:g.rem,zoom:g.modalZoom}));
       if(width===3077){
-        assert(g.dialog.width>=width*.6&&g.dialog.height>=height*.67,
-          'Zoomed-out 2000×768 equivalent must remain a readable full workspace');
+        assert(g.dialog.width>=width*.56&&g.dialog.width<=width*.64&&g.dialog.height>=height*.67,
+          'Zoomed-out 2000×768 equivalent must be a proportionate, readable workspace: '+JSON.stringify({dialog:g.dialog,rem:g.rem,zoom:g.modalZoom}));
       }
       const layout=await page.locator('#dlg').evaluate(d=>{
         const b=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom}};
-        const fields=[...d.querySelectorAll('.user-basic-card>.f')].map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y}});
+        const fields=[...d.querySelectorAll('.user-basic-card>.f')].map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,bottom:r.bottom}});
         return {basic:b('.user-basic-card'),connection:b('.user-connection-card'),note:b('.user-note-card'),fields};
       });
       assert(layout.connection.x>=layout.basic.right-2,'Connection controls must form the right-hand column');
@@ -1719,6 +1719,11 @@ async function main() {
         'Administrator note must follow the basic data on the left');
       assert(layout.fields.length===4&&Math.abs(layout.fields[0].x-layout.fields[1].x)>8,
         'Basic user data must form two compact columns on desktop');
+      const finalBasicField=Math.max(...layout.fields.map(field=>field.bottom));
+      assert(layout.basic.bottom-finalBasicField<=2.4*g.rem*(Number(g.modalZoom)||1),
+        'Basic card must end after its actual fields without stretching to Connection card');
+      assert(layout.basic.bottom<layout.connection.bottom-8,
+        'Different-length settings cards must not be artificially equal-height');
       const composition=await page.locator('#dlg').evaluate(d=>{
         const rect=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
         const connectionNames=['limit','cdnLimitGb','strategy','tag'];
@@ -1737,20 +1742,30 @@ async function main() {
           actions:rect('.user-editor-actions'),
           fields,
           connectionControls:controls.map(Boolean),
+          noteField:rect('.user-note-card textarea'),
+          labelFont:parseFloat(getComputedStyle(d.querySelector('.user-basic-card>.f>span')).fontSize),
+          controlFont:parseFloat(getComputedStyle(d.querySelector('.user-basic-card input')).fontSize),
           rem:parseFloat(getComputedStyle(document.documentElement).fontSize)
         };
       });
       assert(composition.connectionControls.every(Boolean),'Connection card must preserve limit, CDN limit, reset strategy and tag fields');
       assert(composition.fields.every(Boolean)&&Math.abs(composition.fields[0].x-composition.fields[1].x)>8&&Math.abs(composition.fields[0].y-composition.fields[1].y)<=4,
         'Connection controls must use two columns rather than a long vertical rail');
-      assert(composition.note.x<=composition.basic.x+2&&composition.note.right>=composition.connection.right-2,
-        'Note must span the full workspace below both settings cards');
-      assert(composition.note.y>=Math.max(composition.basic.bottom,composition.connection.bottom)-2,
-        'Note must follow both upper cards without overlapping either');
+      assert(Math.abs(composition.note.x-composition.basic.x)<=2&&composition.note.right<=composition.connection.x+2,
+        'Note must stay in the left reading column beneath Basic');
+      assert(composition.note.y>=composition.basic.bottom-2,
+        'Note must follow Basic, not be pushed below the taller Connection card');
+      assert(composition.labelFont>=.85*composition.rem && composition.controlFont>=.875*composition.rem,
+        'User details must not silently shrink labels and controls below Nexus reading sizes');
+      if(width===3077){
+        assert(composition.noteField.bottom<=composition.body.bottom+2,
+          'The note input should be visible without scrolling at a 2000×768 zoomed-out desktop');
+      }
       assert(composition.save.x<=composition.actions.x+composition.actions.width*.5,
         'Save action should be left-aligned consistently with Nexus dialogs');
       if(width>=2200){
-        assert(Math.abs(Number(g.modalZoom)-1.12)<.01,
+        const expectedZoom=width===3077?1.28:1.12;
+        assert(Math.abs(Number(g.modalZoom)-expectedZoom)<.01,
           'Wide effective viewports must scale User Details text and controls with its shell');
         assert(Math.abs(composition.basic.width-composition.connection.width)<composition.connection.width*.25,
           'Settings cards must keep balanced proportions');

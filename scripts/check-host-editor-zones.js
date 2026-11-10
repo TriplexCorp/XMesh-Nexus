@@ -126,7 +126,7 @@ assert.match(css,/@media \(max-width:900px\)[\s\S]*?\.host-connection-workspace,
 assert.match(css,/@media \(max-width:560px\)[\s\S]*?\.host-connect-fields,\.host-public-fields,\.host-advanced-fields\{grid-template-columns:minmax\(0,1fr\)/,'Phone fields must keep usable widths');
 
 // User Details keeps a stable tab frame while adapting to viewport and zoom.
-assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:clamp\(64rem,58vw,108rem\)[\s\S]*?height:min\(clamp\(38\.5rem,64dvh,49rem\),calc\(100dvh - 2rem\)\)[\s\S]*?max-block-size:calc\(100dvh - 2rem\)/,
+assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:clamp\(64rem,54vw,100rem\)[\s\S]*?height:min\(clamp\(38\.5rem,64dvh,49rem\),calc\(100dvh - 2rem\)\)[\s\S]*?max-block-size:calc\(100dvh - 2rem\)/,
  'User Details must use the viewport-responsive width and bounded desktop height');
 assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?opacity \.34s[\s\S]*?transform \.50s[\s\S]*?overlay \.50s allow-discrete/,
  'User Details must retain its accessible premium open/close motion');
@@ -148,12 +148,24 @@ assert.ok(canonicalDialogsCss.includes('zoom:1.12;') &&
  canonicalDialogsCss.includes('height:min(clamp(38.5rem,64dvh,49rem),82dvh);') &&
  canonicalDialogsCss.includes('block-size:min(clamp(38.5rem,64dvh,49rem),82dvh);'),
  'Wide User Details must proportionally scale typography and keep a viewport-safe height');
+assert.ok(canonicalDialogsCss.includes('@media(min-width:1100px) and (max-width:2199px)') &&
+ canonicalDialogsCss.includes('height:min(clamp(38.5rem,74dvh,49rem),calc(100dvh - 2rem));'),
+ 'Normal desktop workspaces may use the taller form, without making 768px tablet dialogs oversized');
+assert.ok(canonicalDialogsCss.includes('@media(min-width:2800px) and (max-height:1300px)') &&
+ canonicalDialogsCss.includes('--dialog-width:78rem;') &&
+ canonicalDialogsCss.includes('zoom:1.28;') &&
+ canonicalDialogsCss.includes('height:min(clamp(38.5rem,70dvh,49rem),82dvh);'),
+ 'Short wide zoomed-out screens must get a bounded and legible workspace');
 assert.ok(userDetailsCss.includes('.user-settings-cards>.user-connection-card'),
  'Connection card must have explicit two-column desktop ownership');
 assert.match(userDetailsCss,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,
  'Connection fields must form compact readable columns');
-assert.ok(userDetailsCss.includes('.user-settings-cards>.user-note-card'),
- 'The note must have a full-width workspace row');
+assert.match(userDetailsCss,/\.user-settings-cards>\.user-note-card\{[\s\S]*?grid-column:1;[\s\S]*?grid-row:2;[\s\S]*?align-self:start;/,
+ 'Notes must sit below Basic in the left reading column');
+assert.match(userDetailsCss,/\.user-settings-cards>\.user-connection-card\{[\s\S]*?grid-column:2;grid-row:1 \/ span 2;/,
+ 'Connection must occupy the right column without stretching Basic');
+assert.match(userDetailsCss,/grid-template-rows:max-content max-content;[\s\S]*?align-items:start;/,
+ 'Settings cards must size to their content rather than creating empty equal-height slabs');
 assert.ok(userDetailsCss.includes('.user-editor-actions .user-save-button'),
  'The save action must be consistently aligned in the workspace footer');
 console.log('Workspace dialogs: accessible Host tasks, stable frame and User details OK');
