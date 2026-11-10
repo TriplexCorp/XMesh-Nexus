@@ -338,7 +338,7 @@ html[data-motion=off] #dlg.user-modal::backdrop{
  * without eating the full physical screen or changing other dialogs. */
 @media(min-width:2800px) and (max-height:1300px){
   dialog#dlg.user-modal{
-    --dialog-width:88rem;
+    --dialog-width:78rem;
     zoom:1.28;
   }
 }
