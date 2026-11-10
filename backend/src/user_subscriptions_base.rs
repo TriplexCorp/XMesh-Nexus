@@ -533,7 +533,14 @@ pub async fn create(
     let settings = crate::read_settings(&state.pool).await?;
     // A link can exist before nodes are fully configured. Report that distinction
     // explicitly instead of presenting an unusable subscription as ready.
-    let readiness = match collect_user_outbounds(&state, &subscription_user, "generic", false).await
+    let readiness = match collect_user_outbounds(
+        &state,
+        &subscription_user,
+        "generic",
+        false,
+        &settings,
+    )
+    .await
     {
         Ok(outbounds) => json!({"ready":true,"connections":outbounds.len()}),
         Err(error) => {
@@ -782,6 +789,55 @@ fn direct_host_node<'a>(host: &Value, profile: &Value, nodes: &'a [Value]) -> Op
     }
 }
 
+/// Determine the quota governing this public endpoint from its actual node
+/// binding and inbound policy. Country, host names and IP ranges are not quota
+/// signals. Mixed CDN/account placements are deliberately unresolved.
+fn host_traffic_scope(
+    host: &Value,
+    profile: &Value,
+    inbound_tag: &str,
+    nodes: &[Value],
+    settings: &Value,
+) -> (crate::subscription_remark::TrafficScope, Option<i64>) {
+    use crate::subscription_remark::TrafficScope;
+    let pins = host
+        .get("nodes")
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty());
+    let mut scope = None;
+    let mut owner = None;
+    let mut count = 0;
+    for node in nodes.iter().filter(|node| {
+        node.get("disabled") != Some(&Value::Bool(true))
+            && same_record_id(node.get("profileId"), profile.get("id"))
+            && pins.is_none_or(|ids| {
+                ids.iter()
+                    .any(|id| same_record_id(Some(id), node.get("id")))
+            })
+    }) {
+        let tag = [inbound_tag.to_owned()];
+        let Ok(cdn_tags) = crate::cdn_quota::tags_for_node(settings, node, &tag) else {
+            return (TrafficScope::Unknown, None);
+        };
+        let current = if cdn_tags.contains(inbound_tag) {
+            TrafficScope::Cdn
+        } else {
+            TrafficScope::Account
+        };
+        if scope.is_some_and(|previous| previous != current) {
+            return (TrafficScope::Unknown, None);
+        }
+        scope = Some(current);
+        count += 1;
+        if count == 1 {
+            owner = node.get("id").and_then(record_id);
+        } else {
+            owner = None;
+        }
+    }
+    (scope.unwrap_or(TrafficScope::Unknown), owner)
+}
+
 async fn apply_ip_rotation(
     state: &AppState,
     user: &Value,
@@ -874,17 +930,73 @@ fn log_subscription_candidate(profile: &Value, inbound: &Value, nodes: &[Value],
      "Subscription endpoint candidate");
 }
 
+/// Read a server-authoritative CDN meter once for the entire feed.
+/// Missing optional display data must never take usable connections offline.
+async fn remark_cdn_meter(
+    state: &AppState,
+    user: &Value,
+    hosts: &[Value],
+    settings: &Value,
+) -> Option<i64> {
+    // Fetch one authoritative CDN meter for this user, only when a published
+    // Remark actually asks for it. Never trust a client-provided usage value.
+    let needs_cdn_meter = hosts.iter().any(|host| {
+        host.get("remark")
+            .and_then(Value::as_str)
+            .is_some_and(|name| name.contains("{CDN_DATA_LEFT}") || name.contains("{TRAFFIC_LEFT}"))
+    });
+    if needs_cdn_meter
+        && user
+            .get("cdnLimitGb")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            > 0.0
+    {
+        if let Some(user_id) = user.get("id").and_then(record_id) {
+            match crate::cdn_quota::usage_for_user(&state.pool, settings, user_id).await {
+                Ok(bytes) => Some(bytes),
+                Err(error) => {
+                    // Optional display data must never take a working feed offline.
+                    // The renderer displays a dash rather than an invented balance.
+                    tracing::warn!(user_id, error=%error.message, "CDN Remark meter unavailable");
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn subscription_remark_address<'a>(outbound: &'a Value, host: &'a Value) -> &'a str {
+    outbound
+        .pointer("/settings/vnext/0/address")
+        .and_then(Value::as_str)
+        .or_else(|| endpoint(host))
+        .unwrap_or("")
+}
+
 async fn collect_user_outbounds(
     state: &AppState,
     user: &Value,
     device: &str,
     rotate: bool,
+    settings: &Value,
 ) -> Result<Vec<Value>, ApiError> {
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     let squads = crate::load_records(&state.pool, "squads").await?;
     let profiles = crate::load_records(&state.pool, "profiles").await?;
     let hosts = crate::load_records(&state.pool, "hosts").await?;
     let nodes = crate::load_records(&state.pool, "nodes").await?;
     let (ids, tags) = permitted_inbound_tags(user, &squads);
+    let cdn_used_bytes = remark_cdn_meter(state, user, &hosts, settings).await;
     let mut outbounds = Vec::<Value>::new();
     for profile in &profiles {
         let cfg = match profile.get("config") {
@@ -918,6 +1030,38 @@ async fn collect_user_outbounds(
                     }
                     if let Some(node) = direct_host_node(host, profile, &nodes) {
                         apply_ip_rotation(state, user, node, &mut outbound, rotate).await?;
+                    }
+                    // Render only the user-visible remark. Keep routing tags and
+                    // Host addressing independent from personalized labels.
+                    if let Some(template) = outbound.get("tag").and_then(Value::as_str)
+                        && template.contains('{')
+                    {
+                        let address = subscription_remark_address(&outbound, host);
+                        let label = if template.contains("{TRAFFIC_LEFT}")
+                            || template.contains("{CDN_DATA_LEFT}")
+                        {
+                            let (scope, owner_node_id) =
+                                host_traffic_scope(host, profile, tag, &nodes, settings);
+                            crate::subscription_remark::render_with_context(
+                                template,
+                                user,
+                                inbound,
+                                host,
+                                settings,
+                                now_ms,
+                                address,
+                                crate::subscription_remark::TrafficContext {
+                                    scope,
+                                    cdn_used_bytes,
+                                    owner_node_id,
+                                },
+                            )
+                        } else {
+                            crate::subscription_remark::render(
+                                template, user, inbound, host, settings, now_ms, address,
+                            )
+                        };
+                        outbound["tag"] = json!(label);
                     }
                     outbounds.push(outbound);
                 } else {
@@ -957,8 +1101,8 @@ pub async fn admin_client_json(
         .map_err(bad)?
         .device
         .as_str();
-    let proxies = collect_user_outbounds(&state, &user, device, false).await?;
     let setting = crate::read_settings(&state.pool).await?;
+    let proxies = collect_user_outbounds(&state, &user, device, false, &setting).await?;
     let profile = crate::subscription_json::build_feed(
         proxies,
         &crate::client_routing::scoped_settings(&setting, &user),
@@ -1072,8 +1216,9 @@ pub async fn serve(
     // Resolve content and XHTTP transport profile from the VPN client's
     // actual User-Agent. Explicit query parameters remain optional overrides.
     let client = crate::subscription_user_agent::negotiate(&headers, &options).map_err(bad)?;
-    let outbounds = collect_user_outbounds(&state, &user, client.device.as_str(), true).await?;
     let settings = crate::read_settings(&state.pool).await?;
+    let outbounds =
+        collect_user_outbounds(&state, &user, client.device.as_str(), true, &settings).await?;
     // Native Xray JSON is the only supported subscription format.
     // A disabled SMART selector changes routing, never the wire representation.
     let json = crate::subscription_json::build_feed(
@@ -2049,6 +2194,71 @@ mod tests {
         );
         assert_eq!(data["remarks"], "Sweden");
         assert_eq!(data["inbounds"][0]["protocol"], "socks");
+    }
+    #[test]
+    fn quota_scope_uses_real_node_assignments_not_host_names() {
+        use crate::subscription_remark::TrafficScope;
+        let profile = json!({"id":1});
+        let nodes = vec![
+            json!({"id":10,"profileId":1,"cdnMode":"standard"}),
+            json!({"id":11,"profileId":1,"cdnMode":"all"}),
+            json!({"id":12,"profileId":1,"cdnMode":"selected","cdnInboundTags":["PL_LTE"]}),
+        ];
+        let settings = json!({"cdnInboundTags":[]});
+        let standard = json!({"address":"cdn-named.example","nodes":[10]});
+        let cdn = json!({"address":"vpn.example","nodes":[11]});
+        let selective = json!({"address":"vpn.example","nodes":[12]});
+        assert_eq!(
+            host_traffic_scope(&standard, &profile, "PL_LTE", &nodes, &settings),
+            (TrafficScope::Account, Some(10))
+        );
+        assert_eq!(
+            host_traffic_scope(&cdn, &profile, "PL_LTE", &nodes, &settings),
+            (TrafficScope::Cdn, Some(11))
+        );
+        assert_eq!(
+            host_traffic_scope(&selective, &profile, "PL_LTE", &nodes, &settings),
+            (TrafficScope::Cdn, Some(12))
+        );
+        assert_eq!(
+            host_traffic_scope(&selective, &profile, "VLESS", &nodes, &settings),
+            (TrafficScope::Account, Some(12))
+        );
+        assert_eq!(
+            host_traffic_scope(
+                &json!({"nodes":[10,11]}),
+                &profile,
+                "PL_LTE",
+                &nodes,
+                &settings
+            ),
+            (TrafficScope::Unknown, None)
+        );
+        assert_eq!(
+            host_traffic_scope(
+                &json!({"nodes":[11,12]}),
+                &profile,
+                "PL_LTE",
+                &nodes,
+                &settings
+            ),
+            (TrafficScope::Cdn, None)
+        );
+        assert_eq!(
+            host_traffic_scope(
+                &json!({"nodes":[999]}),
+                &profile,
+                "PL_LTE",
+                &nodes,
+                &settings
+            ),
+            (TrafficScope::Unknown, None)
+        );
+        let legacy_settings = json!({"cdnInboundTags":["PL_LTE"]});
+        assert_eq!(
+            host_traffic_scope(&standard, &profile, "PL_LTE", &nodes, &legacy_settings),
+            (TrafficScope::Cdn, Some(10))
+        );
     }
     #[test]
     fn host_rotation_requires_unambiguous_direct_ip_not_cdn() {

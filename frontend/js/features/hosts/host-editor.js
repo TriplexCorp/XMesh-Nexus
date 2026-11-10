@@ -29,7 +29,10 @@ window.XMeshHostEditor=(() => {
       const code=hostNodeCountryCode(node);
       const remark=form.elements.namedItem('remark');
       const country=form.elements.namedItem('countryCode');
-      if(remark && (force || !String(remark.value||'').trim()))remark.value=hostNodeCountryRemark(node);
+      if(remark && (force || !String(remark.value||'').trim())){
+        remark.value=hostNodeCountryRemark(node);
+        if(typeof remark.dispatchEvent==='function')remark.dispatchEvent(new Event('input',{bubbles:true}));
+      }
       if(country && (force || !String(country.value||'').trim()))country.value=code;
     }
 
@@ -63,7 +66,7 @@ window.XMeshHostEditor=(() => {
         panel('connection','<div class="host-connection-workspace"><section class="host-editor-main host-primary-panel" aria-label="Подключение и назначение">'+
           '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
           '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
-          '<div class="node-form-section-title">Публичная точка</div><div class="host-public-fields">'+basic+'</div></section>'+
+          '<div class="node-form-section-title">Публичная точка</div><div class="host-public-fields">'+basic+'</div>'+ (window.XMeshRemarkPicker?.markup()||'')+'</section>'+
           '<section class="host-assignment-panel"><div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
           '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small></section></div>')+
         panel('client','<section class="host-advanced host-advanced-panel" aria-label="Параметры клиента">'+
@@ -88,6 +91,7 @@ window.XMeshHostEditor=(() => {
     function bindHostEditor(form){
       if(!form||form.dataset.hostTabsBound)return;
       form.dataset.hostTabsBound='true';
+      window.XMeshRemarkPicker?.bind(form,'[name="remark"]');
       // Prepare themed selects before measuring the shared intrinsic task frame.
       // Inactive tasks stay visually hidden throughout this synchronous setup.
       for(const pane of form.querySelectorAll('[data-host-editor-pane]'))pane.inert=false;

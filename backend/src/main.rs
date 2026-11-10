@@ -19,6 +19,7 @@ mod protocol_credentials;
 mod security;
 mod subscription_finalmask;
 mod subscription_json;
+mod subscription_remark;
 mod subscription_settings;
 mod subscription_transport;
 mod subscription_user_agent;
@@ -1515,6 +1516,7 @@ fn validate_settings_keys(object: &serde_json::Map<String, Value>) -> Result<(),
                 | "subscriptionAppsTitle"
                 | "subscriptionAppsTitleEn"
                 | "subscriptionCustomClients"
+                | "subscriptionStatusEmojis"
         ) {
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
@@ -1605,6 +1607,10 @@ fn validate_settings_identifiers(object: &serde_json::Map<String, Value>) -> Res
 }
 
 fn validate_settings_presentation(object: &serde_json::Map<String, Value>) -> Result<(), ApiError> {
+    if let Some(emojis) = object.get("subscriptionStatusEmojis") {
+        subscription_remark::validate_emoji_settings(emojis)
+            .map_err(|message| ApiError::new(StatusCode::BAD_REQUEST, message))?;
+    }
     for (key, max_len) in [
         ("subscriptionBrand", 80),
         ("subscriptionDescription", 240),

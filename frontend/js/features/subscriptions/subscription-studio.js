@@ -14,6 +14,7 @@ window.XMeshSubscriptionStudio = (() => {
     subscriptionBrand:'', subscriptionAnnouncement:'', subscriptionAnnouncementRotationHours:24, subscriptionUpdateInterval:24, subscriptionDescription:'Настройки подключения и информация о подписке.',
     subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78',subscriptionSecondaryAccent:'#c6e985', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
+    subscriptionStatusEmojis:{ACTIVE:'✅',ON_HOLD:'⌛️',LIMITED:'🪫',EXPIRED:'❌',DISABLED:'🔌'},
     subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:'',
     subscriptionBackground:'#0c131b',subscriptionCardColor:'#15212b',subscriptionTextColor:'#ecf3f6',
     subscriptionLayout:'standard',subscriptionCardStyle:'soft',subscriptionFont:'system',subscriptionRadius:16,
@@ -25,6 +26,10 @@ window.XMeshSubscriptionStudio = (() => {
     subscriptionShowStatus:true,subscriptionShowApps:true,subscriptionShowQr:true,
     subscriptionShowCopy:true,subscriptionShowSupport:false,subscriptionShowDevices:false
   };
+  const remarkStatuses=Object.freeze([
+    ['ACTIVE','Активная'],['ON_HOLD','Ожидает подключения'],
+    ['LIMITED','Трафик исчерпан'],['EXPIRED','Срок истёк'],['DISABLED','Отключена']
+  ]);
   const clientCatalog = Object.freeze([
     ['happ','Happ','iOS · Android · Windows · macOS','Универсальные'],
     ['incy','Incy','iOS · Android','Универсальные'],
@@ -111,6 +116,7 @@ window.XMeshSubscriptionStudio = (() => {
     for(const key of Object.keys(currentPalette))if(settings?.[key]===undefined&&data.subscriptionSyncPanelTheme===false)data[key]=currentPalette[key];
     data.subscriptionRadius=Math.max(1,Math.min(36,Math.round(Number(data.subscriptionRadius)||16)));
     data.subscriptionClients={...defaultClients,...(settings?.subscriptionClients||{})};
+    data.subscriptionStatusEmojis={...defaults.subscriptionStatusEmojis,...(settings?.subscriptionStatusEmojis||{})};
     data.subscriptionClientLinks={...(settings?.subscriptionClientLinks||{})};
     data.subscriptionCustomClients=Array.isArray(settings?.subscriptionCustomClients)?settings.subscriptionCustomClients.slice(0,maxCustomClients):[];
 
@@ -154,6 +160,11 @@ window.XMeshSubscriptionStudio = (() => {
       field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Сообщения чередуются с заданной ниже периодичностью.',{area:true,max:4000}),
       field('subscriptionAnnouncementRotationHours','Ротация анонсов (ч)',data.subscriptionAnnouncementRotationHours,'От 1 до 720 часов. По умолчанию 24 часа. Период отсчитывается по UTC.',{type:'number',min:1,max:720}),
       field('subscriptionUpdateInterval','Интервал обновления подписки (ч)',data.subscriptionUpdateInterval,'Подсказка для поддерживающих клиентов: от 1 до 168 часов.',{type:'number',min:1,max:168}),
+      '<details class="subscription-status-emojis"><summary>Эмодзи статусов в Remark <small>Настраиваемые</small></summary>',
+      '<p class="subscription-emoji-hint">Используйте <code>{STATUS_EMOJI}</code> в названии публичного подключения. Значок автоматически зависит от статуса пользователя при обновлении подписки.</p>',
+      '<div class="subscription-studio-pair">',
+      ...remarkStatuses.map(([status,label])=>field('remarkEmoji_'+status,label,data.subscriptionStatusEmojis[status],null,{max:32})),
+      '</div></details>',
       field('subscriptionDescription','Описание (RU)',data.subscriptionDescription,'Текст на русском.',{area:true,max:240}),
       field('subscriptionDescriptionEn','Описание (EN)',data.subscriptionDescriptionEn,'Английский текст; пустое поле — стандартное описание на английском.',{area:true,max:240}),
       '<label class="subscription-theme-sync"><input type="checkbox" name="subscriptionSyncPanelTheme"'+(data.subscriptionSyncPanelTheme!==false?' checked':'')+'> <span><b>Синхронизировать с темой панели</b><small>Акцент, светлый/тёмный режим, фон, карточки и цвет текста. Выключите для своего оформления.</small></span></label>',
@@ -488,6 +499,7 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionLanguage:input(form,'subscriptionLanguage').value,
         subscriptionTheme:input(form,'subscriptionTheme').value,
         subscriptionShowTraffic:input(form,'subscriptionShowTraffic').checked,
+        subscriptionStatusEmojis:Object.fromEntries(remarkStatuses.map(([status])=>[status,input(form,'remarkEmoji_'+status).value.trim()])),
         subscriptionShowExpiry:input(form,'subscriptionShowExpiry').checked,
         subscriptionPlacement:input(form,'subscriptionPlacement').value,
         nodePlacement:input(form,'nodePlacement').value,
@@ -827,6 +839,9 @@ window.XMeshSubscriptionStudio = (() => {
         applyPanelTheme();
         const draft=read();
         if(!hostnameOK(draft.subscriptionDomain)){notify('Некорректный домен подписки');return;}
+        if(Object.values(draft.subscriptionStatusEmojis).some(emoji=>!emoji||[...emoji].length>16||/[\u0000-\u001f\u007f]/.test(emoji))){
+          notify('Эмодзи статуса должен содержать от 1 до 16 символов.');return;
+        }
         if(!pathOK(draft.subscriptionPath)){notify('Некорректный путь подписки');return;}
         if(![draft.subscriptionJson.socksPort,draft.subscriptionJson.httpPort].every(p=>Number.isInteger(p)&&p>=1024&&p<=65535)||draft.subscriptionJson.socksPort===draft.subscriptionJson.httpPort){notify('Укажите разные локальные порты в диапазоне 1024–65535');return;}
         for(const key of ['deploymentServerB','deploymentServerC'])

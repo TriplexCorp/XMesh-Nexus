@@ -230,3 +230,19 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:2.6
 .host-card-grid[data-grid-mode=compact]{grid-template-columns:repeat(auto-fill,minmax(min(100%,21rem),1fr));gap:var(--nx-space-3)}
 .host-card-grid[data-grid-mode=compact]>.host-card{padding:var(--nx-space-4);gap:var(--nx-space-3)}
 .host-card-grid[data-grid-mode=spacious]{grid-template-columns:repeat(auto-fill,minmax(min(100%,40rem),1fr))}
+
+/* Shared Remark template picker in Hosts and XRAY STUDIO. */
+.remark-template-tools{display:grid;gap:.45rem;min-width:0;width:100%;grid-column:1/-1;font-size:.82rem}
+.remark-template-details{min-width:0;border:1px solid var(--nx-border,var(--bd));border-radius:var(--nx-section-radius,10px);background:var(--nx-section-bg,transparent)}
+.remark-template-details>summary{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem;cursor:pointer;padding:.65rem .8rem;font-weight:650;color:var(--tx)}
+.remark-template-details>summary span{font-size:.75rem;color:var(--mu);font-weight:450}
+.remark-template-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13.5rem),1fr));gap:.4rem;padding:.15rem .65rem .65rem}
+.remark-template-token{display:flex;flex-direction:column;align-items:flex-start;min-width:0;gap:.12rem;border:1px solid var(--nx-border,var(--bd));background:var(--nx-control-bg,transparent);color:var(--tx);border-radius:var(--nx-control-radius,8px);padding:.55rem .65rem;text-align:left;cursor:pointer}
+.remark-template-token:hover,.remark-template-token:focus-visible{border-color:var(--a);outline-offset:2px}
+.remark-template-token code{white-space:normal;overflow-wrap:anywhere;font-size:.79rem;color:var(--a)}
+.remark-template-token small,.remark-template-note{font-size:.72rem;line-height:1.45;color:var(--mu)}
+.remark-template-note{margin:0;padding:0 .7rem .65rem}
+.remark-template-preview{display:flex;gap:.4rem .65rem;flex-wrap:wrap;align-items:baseline;min-width:0;color:var(--mu)}
+.remark-template-preview small{font-size:.72rem}
+.remark-template-preview output{font-size:.84rem;color:var(--tx);overflow-wrap:anywhere}
+

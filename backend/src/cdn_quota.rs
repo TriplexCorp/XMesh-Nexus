@@ -210,6 +210,45 @@ pub async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(), ApiE
     Ok(())
 }
 
+/// Read the authoritative CDN pool meter for one subscription user.
+/// Unlike `attach_usage()`, this does not scan every user on a public feed request.
+/// No caller-controlled value is accepted as a usage reading.
+pub async fn usage_for_user(
+    pool: &PgPool,
+    settings: &Value,
+    user_id: i64,
+) -> Result<i64, ApiError> {
+    let row = if reset_period(settings)? == "monthly" {
+        sqlx::query(
+            "SELECT COALESCE(SUM(quota_uplink_bytes + quota_downlink_bytes),0)::BIGINT AS bytes
+             FROM user_inbound_traffic_monthly
+             WHERE user_id=$1
+               AND month_start = date_trunc('month', NOW() AT TIME ZONE 'UTC')::date",
+        )
+        .bind(user_id)
+        .fetch_one(pool)
+        .await?
+    } else {
+        let mut names = tags(settings)?.into_iter().collect::<Vec<_>>();
+        names.sort_unstable();
+        sqlx::query(
+            "SELECT COALESCE(SUM(totals.uplink_bytes + totals.downlink_bytes),0)::BIGINT AS bytes
+             FROM user_inbound_traffic_totals AS totals
+             LEFT JOIN panel_records AS node ON node.collection='nodes' AND node.id=totals.node_id
+             WHERE totals.user_id=$1
+               AND (totals.inbound_tag = ANY($2::TEXT[])
+                 OR node.data->>'cdnMode'='all'
+                 OR (node.data->>'cdnMode'='selected' AND
+                     node.data->'cdnInboundTags' ? totals.inbound_tag))",
+        )
+        .bind(user_id)
+        .bind(names)
+        .fetch_one(pool)
+        .await?
+    };
+    Ok(row.try_get::<i64, _>("bytes")?.max(0))
+}
+
 /// A missing server-derived meter fails closed for a quota-enabled user.
 /// Zero means unlimited CDN access; unrelated inbound tags stay unaffected.
 pub fn exhausted(user: &Value, inbound_tag: &str, cdn_tags: &HashSet<String>) -> bool {
