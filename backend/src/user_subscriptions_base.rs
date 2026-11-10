@@ -533,7 +533,7 @@ pub async fn create(
     let settings = crate::read_settings(&state.pool).await?;
     // A link can exist before nodes are fully configured. Report that distinction
     // explicitly instead of presenting an unusable subscription as ready.
-    let readiness = match collect_user_outbounds(&state, &subscription_user, "generic", false).await
+    let readiness = match collect_user_outbounds(&state, &subscription_user, "generic", false, &settings).await
     {
         Ok(outbounds) => json!({"ready":true,"connections":outbounds.len()}),
         Err(error) => {
