@@ -1210,7 +1210,70 @@ pub async fn admin_client_json(
     .map_err(|detail| ApiError::new(StatusCode::BAD_REQUEST, detail))?;
     Ok(Json(profile))
 }
-fn add_subscription_profile_headers(response: &mut Response, settings: &Value) {
+/// Select the same global UTC rotation slot for every user, without
+/// retaining a rendered (user-specific) announcement in global settings.
+fn selected_subscription_announcement(settings: &Value, now_ms: i64) -> Option<&str> {
+    let raw = settings
+        .get("subscriptionAnnouncement")
+        .and_then(Value::as_str)?;
+    let messages = raw
+        .split("\n---\n")
+        .map(str::trim)
+        .filter(|message| !message.is_empty())
+        .collect::<Vec<_>>();
+    if messages.is_empty() {
+        return None;
+    }
+    let rotation_hours = settings
+        .get("subscriptionAnnouncementRotationHours")
+        .and_then(Value::as_u64)
+        .unwrap_or(24)
+        .clamp(1, 720);
+    let epoch_seconds = u64::try_from(now_ms.max(0)).unwrap_or(0) / 1000;
+    let slot = epoch_seconds / (rotation_hours * 3600);
+    let message_count = u64::try_from(messages.len()).unwrap_or(u64::MAX);
+    let index = usize::try_from(slot % message_count).expect("message index fits in usize");
+    Some(messages[index])
+}
+
+/// Only the authenticated subscription user is used for substitution. CDN
+/// usage comes from verified, server-side accounting, never query parameters
+/// or cached global settings; an unavailable meter renders a dash.
+async fn personalized_subscription_announcement(
+    state: &AppState,
+    user: &Value,
+    settings: &Value,
+    now_ms: i64,
+) -> Option<String> {
+    let template = selected_subscription_announcement(settings, now_ms)?;
+    let cdn_meter = if template.contains("{CDN_DATA_LEFT}")
+        && user
+            .get("cdnLimitGb")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            > 0.0
+    {
+        let user_id = user.get("id").and_then(record_id)?;
+        match crate::cdn_quota::usage_for_user(&state.pool, settings, user_id).await {
+            Ok(bytes) => Some(bytes),
+            Err(error) => {
+                tracing::warn!(user_id, error=%error.message, "CDN announcement meter unavailable");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    Some(crate::subscription_remark::render_announcement(
+        template, user, settings, now_ms, cdn_meter,
+    ))
+}
+
+fn add_subscription_profile_headers(
+    response: &mut Response,
+    settings: &Value,
+    announcement: Option<&str>,
+) {
     // Client metadata: these are advisory headers and never change the native Xray JSON body.
     // Never reflect untrusted settings into HTTP headers without HeaderValue validation.
     let title = studio_string(
@@ -1233,36 +1296,13 @@ fn add_subscription_profile_headers(response: &mut Response, settings: &Value) {
     {
         response.headers_mut().insert("support-url", value);
     }
-    // Rotate announcements at a configurable UTC epoch-aligned interval.
-    // A line containing only "---" separates announcements. Plain text stays compatible.
-    if let Some(announcement) = settings
-        .get("subscriptionAnnouncement")
-        .and_then(Value::as_str)
-    {
-        let messages: Vec<&str> = announcement
-            .split("\n---\n")
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .collect();
-        if !messages.is_empty() {
-            let rotation_hours = settings
-                .get("subscriptionAnnouncementRotationHours")
-                .and_then(Value::as_u64)
-                .unwrap_or(24)
-                .clamp(1, 720);
-            let slot = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs()
-                / (rotation_hours * 3_600);
-            let selected_index =
-                usize::try_from(slot % u64::try_from(messages.len()).unwrap_or(u64::MAX))
-                    .expect("message index fits in usize");
-            let selected = messages[selected_index];
-            let encoded = base64::engine::general_purpose::STANDARD.encode(selected.as_bytes());
-            if let Ok(value) = header::HeaderValue::from_str(&format!("base64:{encoded}")) {
-                response.headers_mut().insert("announce", value);
-            }
+    // Selected and rendered after subscription-user authentication.
+    // The header is base64 so multiline Unicode content stays compatible
+    // with VPN clients without allowing raw CR/LF header injection.
+    if let Some(message) = announcement {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(message.as_bytes());
+        if let Ok(value) = header::HeaderValue::from_str(&format!("base64:{encoded}")) {
+            response.headers_mut().insert("announce", value);
         }
     }
     let interval = settings
@@ -1343,7 +1383,8 @@ pub async fn serve(
     response
         .headers_mut()
         .insert(header::VARY, "User-Agent, Accept".parse().unwrap());
-    add_subscription_profile_headers(&mut response, &settings);
+    let announcement = personalized_subscription_announcement(&state, &user, &settings, now).await;
+    add_subscription_profile_headers(&mut response, &settings, announcement.as_deref());
     // User limits are expressed in decimal GB in panel records; the conventional subscription-userinfo
     // header expects bytes and Unix seconds.
     let consumed_gb = user
@@ -2228,6 +2269,72 @@ async fn portal_browser(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn announcement_rotation_selects_message_before_personalization() {
+        let settings = json!({
+            "subscriptionAnnouncement":"Привет {USERNAME}\n---\nLTE: {CDN_DATA_LEFT}\n---\n {STATUS_EMOJI} ",
+            "subscriptionAnnouncementRotationHours":1
+        });
+        assert_eq!(
+            selected_subscription_announcement(&settings, 0),
+            Some("Привет {USERNAME}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(&settings, 3_600_000),
+            Some("LTE: {CDN_DATA_LEFT}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(&settings, 7_200_000),
+            Some("{STATUS_EMOJI}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(&settings, 10_800_000),
+            Some("Привет {USERNAME}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(&json!({"subscriptionAnnouncement":"   "}), 0),
+            None
+        );
+    }
+
+    #[test]
+    fn personalized_announce_is_multiline_base64_and_not_cached_globally() {
+        let settings = json!({"subscriptionAnnouncement":"{USERNAME}\nCDN: {CDN_DATA_LEFT}"});
+        let first = crate::subscription_remark::render_announcement(
+            selected_subscription_announcement(&settings, 0).unwrap(),
+            &json!({"username":"alice","cdnLimitGb":5.0}),
+            &settings,
+            0,
+            Some(1_750_000_000),
+        );
+        let second = crate::subscription_remark::render_announcement(
+            selected_subscription_announcement(&settings, 0).unwrap(),
+            &json!({"username":"bob","cdnLimitGb":5.0}),
+            &settings,
+            0,
+            Some(4_000_000_000),
+        );
+        assert_eq!(first, "alice\nCDN: 3.25 ГБ");
+        assert_eq!(second, "bob\nCDN: 1.00 ГБ");
+        assert_eq!(
+            settings["subscriptionAnnouncement"],
+            "{USERNAME}\nCDN: {CDN_DATA_LEFT}"
+        );
+        let mut response = Json(json!({})).into_response();
+        add_subscription_profile_headers(&mut response, &settings, Some(&first));
+        let raw = response
+            .headers()
+            .get("announce")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(raw.starts_with("base64:"));
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(raw.strip_prefix("base64:").unwrap())
+            .unwrap();
+        assert_eq!(String::from_utf8(decoded).unwrap(), first);
+    }
+
     #[test]
     fn portal_expiry_distinguishes_missing_unlimited_and_waiting() {
         assert!(portal_expiry(&json!({}), true).contains("Not specified"));

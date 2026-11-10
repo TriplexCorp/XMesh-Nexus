@@ -387,6 +387,87 @@ pub fn render_with_context(
     server_address: &str,
     traffic: TrafficContext,
 ) -> String {
+    // Remark's established limit is 100 Unicode characters, not bytes.
+    // Announcement headers have a separate byte-based cap.
+    expand_template(
+        template,
+        user,
+        inbound,
+        host,
+        settings,
+        now_ms,
+        server_address,
+        traffic,
+    )
+    .chars()
+    .filter(|c| !c.is_control())
+    .take(100)
+    .collect()
+}
+
+/// VPN client announcement headers are user-specific, but have no endpoint or
+/// node context. Per-node variables therefore return a visible dash instead of
+/// fabricating a balance. The selected message is expanded after UTC rotation.
+pub fn render_announcement(
+    template: &str,
+    user: &Value,
+    settings: &Value,
+    now_ms: i64,
+    cdn_used_bytes: Option<i64>,
+) -> String {
+    let inbound = serde_json::json!({"protocol":"—","streamSettings":{"network":"—"}});
+    let scope = TrafficContext {
+        cdn_used_bytes,
+        ..TrafficContext::default()
+    };
+    sanitize_text(
+        &expand_template(
+            template,
+            user,
+            &inbound,
+            &Value::Null,
+            settings,
+            now_ms,
+            "",
+            scope,
+        ),
+        3072,
+        true,
+    )
+}
+
+/// Preserve newlines in announcements (they are base64-encoded as a header);
+/// never keep CR/control characters or produce an oversized HTTP header.
+/// The byte limit is applied only after variable expansion and at UTF-8
+/// boundaries so a long username cannot break header serialization.
+fn sanitize_text(value: &str, max_bytes: usize, allow_newlines: bool) -> String {
+    let mut result = String::with_capacity(value.len().min(max_bytes));
+    for ch in value.chars() {
+        if ch.is_control() && !(allow_newlines && ch == '\n') {
+            continue;
+        }
+        if result.len().saturating_add(ch.len_utf8()) > max_bytes {
+            break;
+        }
+        result.push(ch);
+    }
+    result
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Shared non-recursive placeholder expansion keeps personalized labels and announcements consistent"
+)]
+fn expand_template(
+    template: &str,
+    user: &Value,
+    inbound: &Value,
+    host: &Value,
+    settings: &Value,
+    now_ms: i64,
+    server_address: &str,
+    traffic: TrafficContext,
+) -> String {
     let mut remainder = template;
     let mut result = String::with_capacity(template.len().min(256));
     while let Some(start) = remainder.find('{') {
@@ -417,10 +498,6 @@ pub fn render_with_context(
     }
     result.push_str(remainder);
     result
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(100)
-        .collect()
 }
 
 #[cfg(test)]
@@ -592,6 +669,73 @@ mod tests {
             display(crate::node_user_quotas::Remaining::Unlimited),
             "∞|5.00 ГБ"
         );
+    }
+
+    #[test]
+    fn announcement_substitutes_user_and_real_cdn_balance_across_lines() {
+        let user = json!({"username":"alice","limit":0,"used":3.0,
+            "cdnLimitGb":5.0,"expireAt":0});
+        let settings = json!({"subscriptionStatusEmojis":{"ACTIVE":"💚"}});
+        let rendered = render_announcement(
+            "Пользователь: {USERNAME}\nОсталось LTE: {CDN_DATA_LEFT}\nСтатус: {STATUS_EMOJI}",
+            &user,
+            &settings,
+            1_800_000_000_000,
+            Some(1_750_000_000),
+        );
+        assert_eq!(
+            rendered,
+            "Пользователь: alice\nОсталось LTE: 3.25 ГБ\nСтатус: 💚"
+        );
+    }
+
+    #[test]
+    fn announcement_never_guesses_node_or_transport_and_never_recurses() {
+        let user = json!({"username":"{STATUS_EMOJI}","cdnLimitGb":5.0});
+        let rendered = render_announcement(
+            "{USERNAME}|{NODE_DATA_LEFT}|{TRAFFIC_LEFT}|{SERVER_IP}|{TRANSPORT}|{CDN_DATA_LEFT}",
+            &user,
+            &json!({}),
+            0,
+            None,
+        );
+        assert_eq!(rendered, "{STATUS_EMOJI}|—|—|—|—|—");
+        assert_eq!(
+            render_announcement("{UNKNOWN}", &user, &json!({}), 0, None),
+            "{UNKNOWN}"
+        );
+    }
+
+    #[test]
+    fn remarks_keep_the_existing_unicode_character_limit() {
+        let name = "🇵🇱".repeat(70);
+        let result = render(&name, &json!({}), &json!({}), &json!({}), &json!({}), 0, "");
+        assert_eq!(result.chars().count(), 100);
+        assert!(
+            result.len() > 100,
+            "UTF-8 remarks must not be cut to 100 bytes"
+        );
+    }
+
+    #[test]
+    fn announcement_preserves_newlines_but_strips_controls_and_limits_encoded_size() {
+        let user = json!({"username":"a".repeat(9000)});
+        let result = render_announcement(
+            "Сообщение\r\n{USERNAME}\0\nГотово",
+            &user,
+            &json!({}),
+            0,
+            None,
+        );
+        assert!(result.starts_with("Сообщение\n"));
+        assert!(!result.contains('\r'));
+        assert!(!result.contains('\0'));
+        assert!(result.len() <= 3072);
+        assert!(std::str::from_utf8(result.as_bytes()).is_ok());
+        let emoji = json!({"username":"💚".repeat(1100)});
+        let result = render_announcement("{USERNAME}", &emoji, &json!({}), 0, None);
+        assert!(result.len() <= 3072);
+        assert!(result.chars().all(|c| c == '💚'));
     }
 
     #[test]

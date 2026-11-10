@@ -30,6 +30,57 @@ window.XMeshSubscriptionStudio = (() => {
     ['ACTIVE','Активная'],['ON_HOLD','Ожидает подключения'],
     ['LIMITED','Трафик исчерпан'],['EXPIRED','Срок истёк'],['DISABLED','Отключена']
   ]);
+  // Announcements have user and global CDN context but no single Host/node.
+  // Keep this list sourced from the same Remark variable catalog and intentionally
+  // exclude SERVER_IP, PROTOCOL, NODE_DATA_LEFT and TRAFFIC_LEFT.
+  const announcementFields=Object.freeze([
+    'USERNAME','DATA_USAGE','DATA_LEFT','DATA_LIMIT','CDN_DATA_LEFT',
+    'DAYS_LEFT','TIME_LEFT','EXPIRE_DATE','JALALI_EXPIRE_DATE',
+    'STATUS_TEXT','STATUS_EMOJI'
+  ]);
+  const announcementFallback=Object.freeze([
+    ['USERNAME','Имя пользователя'],['DATA_USAGE','Израсходованный трафик'],
+    ['DATA_LEFT','Остаток общего трафика'],['DATA_LIMIT','Лимит трафика'],
+    ['CDN_DATA_LEFT','Остаток LTE / CDN'],['DAYS_LEFT','Осталось дней'],
+    ['TIME_LEFT','Осталось времени'],['EXPIRE_DATE','Дата окончания'],
+    ['JALALI_EXPIRE_DATE','Дата по календарю Джалали'],
+    ['STATUS_TEXT','Статус подписки'],['STATUS_EMOJI','Эмодзи статуса']
+  ]);
+  const announcementTokens=()=>((window.XMeshRemarkPicker?.variables)||announcementFallback)
+    .filter(([key])=>announcementFields.includes(key));
+  const announcementExamples=Object.freeze({
+    USERNAME:'alice',DATA_USAGE:'1.75 ГБ',DATA_LEFT:'∞',
+    DATA_LIMIT:'∞',CDN_DATA_LEFT:'3.25 ГБ',DAYS_LEFT:'24',
+    TIME_LEFT:'24 д. 3 ч. 0 мин.',EXPIRE_DATE:'2026-12-05',
+    JALALI_EXPIRE_DATE:'1405-09-14',STATUS_TEXT:'Активна',STATUS_EMOJI:'✅'
+  });
+  const demoAnnouncement=text=>{
+    const selected=String(text||'').split('\n---\n').map(x=>x.trim()).find(Boolean)||'';
+    return selected.replace(/\{([A-Z_]+)\}/g,(full,key)=>
+      Object.prototype.hasOwnProperty.call(announcementExamples,key)?announcementExamples[key]:full);
+  };
+  // Preserve the position inside a multiline notice. This is intentionally
+  // different from the append-only Host/Remark server-name picker.
+  const insertAnnouncementToken=(field,key)=>{
+    if(!announcementFields.includes(key))return false;
+    const token='{'+key+'}';
+    const start=Number.isInteger(field.selectionStart)?field.selectionStart:field.value.length;
+    const end=Number.isInteger(field.selectionEnd)?field.selectionEnd:start;
+    if(field.maxLength>=0 && field.value.length-(end-start)+token.length>field.maxLength)return false;
+    field.setRangeText(token,start,end,'end');
+    field.focus();
+    field.dispatchEvent(new Event('input',{bubbles:true}));
+    return true;
+  };
+  const announcementHelp=()=>'<div class="subscription-announcement-tools">'+
+    '<details class="subscription-announcement-variables"><summary>Переменные для анонсов <small>Вставить в текст</small></summary>'+
+    '<div class="subscription-announcement-token-grid">'+
+    announcementTokens().map(([key,description])=>
+      '<button type="button" class="subscription-announcement-token" data-announcement-token="'+key+
+      '" title="'+esc(description)+'"><code>{'+key+'}</code><small>'+esc(description)+'</small></button>').join('')+
+    '</div><p>Подстановка выполняется персонально при обновлении подписки. Для отдельной ноды используйте Remark: у анонса нет привязки к одной ноде.</p></details>'+
+    '<div class="subscription-announcement-demo"><small>Предпросмотр · демо-пользователь</small>'+
+    '<output data-announcement-demo>—</output></div></div>';
   const clientCatalog = Object.freeze([
     ['happ','Happ','iOS · Android · Windows · macOS','Универсальные'],
     ['incy','Incy','iOS · Android','Универсальные'],
@@ -91,7 +142,7 @@ window.XMeshSubscriptionStudio = (() => {
   const hostnameOK = v => !v || (v.length <= 253 && /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?)*$/i.test(v));
   const pathOK = v => v.length <= 64 && v.split('/').length <= 9 && /^\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/i.test(v) && !/^\/(?:api|login|dashboard)(?:\/|$)/i.test(v);
   const field = (name,label,value,help,opts) => '<label class="f subscription-field"><span>'+label+'</span>'+
-    (opts && opts.area ? '<textarea name="'+name+'" rows="2" maxlength="'+(opts.max||240)+'">'+esc(value)+'</textarea>' :
+    (opts && opts.area ? '<textarea name="'+name+'" rows="'+(opts.rows||2)+'" maxlength="'+(opts.max||240)+'"'+(opts.placeholder?' placeholder="'+esc(opts.placeholder)+'"':'')+'>'+esc(value)+'</textarea>' :
      '<input name="'+name+'" type="'+(opts && opts.color?'color':opts && opts.type==='number'?'number':'text')+'" '+(opts&&opts.max?'maxlength="'+opts.max+'"':'')+
       ' value="'+esc(value)+'" placeholder="'+esc((opts&&opts.placeholder)||'')+'" autocomplete="off" spellcheck="false">')+
     (help?'<small>'+help+'</small>':'')+'</label>';
@@ -157,7 +208,8 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
-      field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Сообщения чередуются с заданной ниже периодичностью.',{area:true,max:4000}),
+      field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Сообщения чередуются с заданной ниже периодичностью.',{area:true,rows:3,max:4000,placeholder:'Пользователь: {USERNAME}\nОсталось LTE: {CDN_DATA_LEFT}'}),
+      announcementHelp(),
       field('subscriptionAnnouncementRotationHours','Ротация анонсов (ч)',data.subscriptionAnnouncementRotationHours,'От 1 до 720 часов. По умолчанию 24 часа. Период отсчитывается по UTC.',{type:'number',min:1,max:720}),
       field('subscriptionUpdateInterval','Интервал обновления подписки (ч)',data.subscriptionUpdateInterval,'Подсказка для поддерживающих клиентов: от 1 до 168 часов.',{type:'number',min:1,max:168}),
       '<details class="subscription-status-emojis"><summary>Эмодзи статусов в Remark <small>Настраиваемые</small></summary>',
@@ -451,6 +503,22 @@ window.XMeshSubscriptionStudio = (() => {
       }
       previewShadow.appendChild(previewBody);
       const $=s=>form.querySelector(s)||previewShadow.querySelector(s);
+      const announcementInput=input(form,'subscriptionAnnouncement');
+      const updateAnnouncementPreview=()=>{
+        const output=form.querySelector('[data-announcement-demo]');
+        if(output)output.textContent=demoAnnouncement(announcementInput.value)||'—';
+      };
+      form.addEventListener('click',event=>{
+        const button=event.target.closest('[data-announcement-token]');
+        if(!button||!form.contains(button))return;
+        event.preventDefault();
+        if(insertAnnouncementToken(announcementInput,button.dataset.announcementToken)){
+          updateAnnouncementPreview();
+        }
+      });
+      announcementInput.addEventListener('input',updateAnnouncementPreview);
+      updateAnnouncementPreview();
+
       const customRows=()=>[...form.querySelectorAll('[data-custom-client-row]')];
       const readCustomClients=()=>customRows().map(row=>({
         id:row.dataset.customClientId,
@@ -889,5 +957,5 @@ window.XMeshSubscriptionStudio = (() => {
     };
     return [markup,mount];
   }
-  return {create,defaults,hostnameOK,pathOK,clientCatalog,validHttps,renderCustomClient,nextCustomClientId,maxCustomClients,appsHeading};
+  return {create,defaults,hostnameOK,pathOK,clientCatalog,validHttps,renderCustomClient,nextCustomClientId,maxCustomClients,appsHeading,announcementPreview:demoAnnouncement,insertAnnouncementToken};
 })();

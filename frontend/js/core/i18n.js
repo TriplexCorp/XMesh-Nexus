@@ -15,6 +15,29 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Эмодзи статуса":"Status emoji",
+    "Пользователь: {USERNAME} Осталось LTE: {CDN_DATA_LEFT}":"User: {USERNAME} LTE remaining: {CDN_DATA_LEFT}",
+    "Пользователь: {USERNAME} Осталось LTE: {CDN_DATA_LEFT} Статус: {STATUS_EMOJI}":"User: {USERNAME} LTE remaining: {CDN_DATA_LEFT} Status: {STATUS_EMOJI}",
+    "Пользователь: alice Осталось LTE: 3.25 ГБ Статус: 💚":"User: alice LTE remaining: 3.25 GB Status: 💚",
+    "Сообщение":"Message",
+    "Привет {USERNAME} --- LTE: {CDN_DATA_LEFT} --- {STATUS_EMOJI}":"Hello {USERNAME} --- LTE: {CDN_DATA_LEFT} --- {STATUS_EMOJI}",
+    "Привет {USERNAME}":"Hello {USERNAME}",
+    "Пользователь: alice Осталось LTE: 3.25 ГБ":"User: alice LTE remaining: 3.25 GB",
+
+    "Переменные для анонсов":"Announcement variables",
+    "Вставить в текст":"Insert into announcement",
+    "Подстановка выполняется персонально при обновлении подписки. Для отдельной ноды используйте Remark: у анонса нет привязки к одной ноде.":"Variables are personalized when each subscription refreshes. Use Remark for per-node values: announcements are not bound to any single node.",
+    "Предпросмотр · демо-пользователь":"Preview · demo user",
+    "Израсходованный трафик":"Used traffic",
+    "Остаток общего трафика":"Remaining global traffic",
+    "Остаток LTE / CDN":"Remaining LTE / CDN",
+    "Статус подписки":"Subscription status",
+    "Пользователь: {USERNAME}":"User: {USERNAME}",
+    "Осталось LTE: {CDN_DATA_LEFT}":"LTE remaining: {CDN_DATA_LEFT}",
+    "1.75 ГБ":"1.75 GB",
+    "3.25 ГБ":"3.25 GB",
+    "24 д. 3 ч. 0 мин.":"24 d. 3 h. 0 min.",
+
     "Не удалось загрузить квоты:":"Could not load quotas:",
     "3.25 ГБ|3.25 ГБ":"3.25 GB|3.25 GB",
     "0.00 ГБ|0.00 ГБ":"0.00 GB|0.00 GB",
