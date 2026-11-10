@@ -1055,20 +1055,33 @@ fn rendered_host_remark(
         && !template.contains("{NODE_DATA_LEFT}")
     {
         return crate::subscription_remark::render(
-            template, ctx.user, ctx.inbound, host, ctx.settings, ctx.now_ms, address,
+            template,
+            ctx.user,
+            ctx.inbound,
+            host,
+            ctx.settings,
+            ctx.now_ms,
+            address,
         );
     }
-    let (scope, owner_node_id) = host_traffic_scope(
-        host, ctx.profile, ctx.inbound_tag, ctx.nodes, ctx.settings,
-    );
+    let (scope, owner_node_id) =
+        host_traffic_scope(host, ctx.profile, ctx.inbound_tag, ctx.nodes, ctx.settings);
     let node_ids = host_candidate_node_ids(host, ctx.profile, ctx.nodes);
-    let node_remaining = crate::node_user_quotas::remaining_for(
-        ctx.user, owner_node_id, &node_ids, ctx.node_usage,
-    );
+    let node_remaining =
+        crate::node_user_quotas::remaining_for(ctx.user, owner_node_id, &node_ids, ctx.node_usage);
     crate::subscription_remark::render_with_context(
-        template, ctx.user, ctx.inbound, host, ctx.settings, ctx.now_ms, address,
+        template,
+        ctx.user,
+        ctx.inbound,
+        host,
+        ctx.settings,
+        ctx.now_ms,
+        address,
         crate::subscription_remark::TrafficContext {
-            scope, cdn_used_bytes: ctx.cdn_used_bytes, owner_node_id, node_remaining,
+            scope,
+            cdn_used_bytes: ctx.cdn_used_bytes,
+            owner_node_id,
+            node_remaining,
         },
     )
 }
@@ -1138,8 +1151,15 @@ async fn collect_user_outbounds(
                             host,
                             address,
                             &HostRemark {
-                                user, inbound, profile, inbound_tag: tag, nodes: &nodes,
-                                settings, now_ms, cdn_used_bytes, node_usage: node_usage.as_ref(),
+                                user,
+                                inbound,
+                                profile,
+                                inbound_tag: tag,
+                                nodes: &nodes,
+                                settings,
+                                now_ms,
+                                cdn_used_bytes,
+                                node_usage: node_usage.as_ref(),
                             },
                         ));
                     }
