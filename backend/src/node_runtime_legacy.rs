@@ -1358,6 +1358,7 @@ fn quota_gb_to_bytes(gb: f64) -> i64 {
 
 fn provision_proxy_users(
     config: &mut Value,
+    node_id: i64,
     users: &[Value],
     squads: &[Value],
     now_ms: i64,
@@ -1417,7 +1418,10 @@ fn provision_proxy_users(
                     ids.iter()
                         .any(|id| id.as_i64().is_some_and(|id| allowed.contains(&id)))
                 });
-            if !authorized || crate::cdn_quota::exhausted(user, tag, cdn_tags) {
+            if !authorized
+                || crate::cdn_quota::exhausted(user, tag, cdn_tags)
+                || crate::node_user_quotas::exhausted(user, node_id)
+            {
                 // Only CDN-tagged inbounds are excluded: main servers remain
                 // independently usable with the same user UUID.
                 continue;
@@ -1547,10 +1551,20 @@ fn build_offline_policy(
         // Waiting subscriptions require confirmed online telemetry to start
         // their clock. Never issue a disconnected spending lease before then,
         // including when the user has an otherwise unlimited traffic plan.
+        let global_budget = remaining.map(|bytes| (bytes / active_nodes.max(1)).min(64 * 1024 * 1024));
+        // A node-specific quota is not split across other nodes. Constrain
+        // offline allowance using the tighter of global and local balances.
+        let node_budget = crate::node_user_quotas::offline_remaining(user, node_id)
+            .map(|bytes| bytes.min(64 * 1024 * 1024));
         let offline_budget = if user.get("hold").and_then(Value::as_bool) == Some(true) {
             Some(0)
         } else {
-            remaining.map(|bytes| (bytes / active_nodes.max(1)).min(64 * 1024 * 1024))
+            match (global_budget, node_budget) {
+                (Some(global), Some(local)) => Some(global.min(local)),
+                (Some(global), None) => Some(global),
+                (None, Some(local)) => Some(local),
+                (None, None) => None,
+            }
         };
         user_policies.push(json!({
             "userId":user_id,"xrayId":uuid.to_string(),
@@ -1679,7 +1693,8 @@ pub async fn preview_routing(
     ensure_masque_address(&mut config)?;
     configure_node_managed_tls(&node, &mut config)?;
     // Identical stats-first ordering to live signed policy provisioning.
-    let users = crate::load_records(&state.pool, "users").await?;
+    let mut users = crate::load_records(&state.pool, "users").await?;
+    crate::node_user_quotas::attach_for_node(&state.pool, node_id, &mut users).await?;
     let squads = crate::load_records(&state.pool, "squads").await?;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1697,7 +1712,7 @@ pub async fn preview_routing(
         .map(str::to_owned)
         .collect::<Vec<_>>();
     let cdn_tags = crate::cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?;
-    provision_proxy_users(&mut config, &users, &squads, now, &cdn_tags)?;
+    provision_proxy_users(&mut config, node_id, &users, &squads, now, &cdn_tags)?;
     let geo = crate::node_geodata::apply(&node, &mut config)?;
     let nodes = crate::load_records(&state.pool, "nodes").await?;
     let hosts = crate::load_records(&state.pool, "hosts").await?;
@@ -2131,7 +2146,8 @@ async fn compile_node_profile(
     configure_local_xray_inbound(&mut config, port)?;
     ensure_masque_address(&mut config)?;
     let tls_provision = configure_node_managed_tls(&node, &mut config)?;
-    let users = crate::load_records(&state.pool, "users").await?;
+    let mut users = crate::load_records(&state.pool, "users").await?;
+    crate::node_user_quotas::attach_for_node(&state.pool, node_id, &mut users).await?;
     let squads = crate::load_records(&state.pool, "squads").await?;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -2149,7 +2165,7 @@ async fn compile_node_profile(
         .map(str::to_owned)
         .collect::<Vec<_>>();
     let cdn_tags = crate::cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?;
-    provision_proxy_users(&mut config, &users, &squads, now, &cdn_tags)?;
+    provision_proxy_users(&mut config, node_id, &users, &squads, now, &cdn_tags)?;
     // Keep the source XRAY STUDIO profile immutable: every source node gets
     // its own GeoData assets and its own validated routing/exit graph.
     let nodes = crate::load_records(&state.pool, "nodes").await?;
@@ -2552,7 +2568,7 @@ mod provision_tests {
         })];
         let squads = vec![json!({"id":4,"inb":["MAIN_DE","CDN_DE","CDN_UK"]})];
         let tags = std::collections::HashSet::from(["CDN_DE".to_owned(), "CDN_UK".to_owned()]);
-        provision_proxy_users(&mut config, &users, &squads, 1_800_000_000_000, &tags).unwrap();
+        provision_proxy_users(&mut config, 42, &users, &squads, 1_800_000_000_000, &tags).unwrap();
         let inbounds = config["inbounds"].as_array().unwrap();
         assert_eq!(
             inbounds[0]["settings"]["clients"].as_array().unwrap().len(),
@@ -2577,9 +2593,7 @@ mod provision_tests {
             json!({"id":4,"xrayId":"550e8400-e29b-41d4-a716-446655440003","squads":[4],"expireAt":now-1}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["SE"]})];
-        provision_proxy_users(
-            &mut config,
-            &users,
+        provision_proxy_users(&mut config, 42, &users,
             &squads,
             now,
             &std::collections::HashSet::default(),
@@ -2619,9 +2633,7 @@ mod provision_tests {
                 "squads":[4],"hold":true,"holdDays":0}),
         ];
         let squads = vec![json!({"id":4,"inb":["NL"]})];
-        provision_proxy_users(
-            &mut config,
-            &users,
+        provision_proxy_users(&mut config, 42, &users,
             &squads,
             now,
             &std::collections::HashSet::default(),
@@ -2647,9 +2659,7 @@ mod provision_tests {
         let users =
             vec![json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]})];
         let squads = vec![json!({"id":4,"inb":["CDN NL"]})];
-        provision_proxy_users(
-            &mut config,
-            &users,
+        provision_proxy_users(&mut config, 42, &users,
             &squads,
             1_800_000_000_000,
             &std::collections::HashSet::default(),
@@ -2696,9 +2706,7 @@ mod provision_tests {
         let blocked = json!({"id":8,"xrayId":"550e8400-e29b-41d4-a716-446655440001",
             "squads":[4],"disabled":true});
         let squads = vec![json!({"id":4,"inb":["VM","TR","SS","SS22","HY","MQ"]})];
-        provision_proxy_users(
-            &mut config,
-            &[active, blocked],
+        provision_proxy_users(&mut config, 42, &[active, blocked],
             &squads,
             1_800_000_000_000,
             &std::collections::HashSet::default(),
@@ -2733,9 +2741,7 @@ mod provision_tests {
         let users =
             vec![json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4,5]})];
         let squads = vec![json!({"id":4,"inb":["NL"]}), json!({"id":5,"inb":["NL"]})];
-        provision_proxy_users(
-            &mut config,
-            &users,
+        provision_proxy_users(&mut config, 42, &users,
             &squads,
             1_800_000_000_000,
             &std::collections::HashSet::default(),
