@@ -1627,3 +1627,14 @@
     grid-template-columns:minmax(0,1fr);
   }
 }
+
+
+/* Match the edit workspace's whole-surface scale at effective desktop widths
+ * created by browser zoom-out. Scale typography and controls together, not
+ * just the dialog's border or width. The form body remains scrollable. */
+@media(min-width:2200px){
+  #dlg.user-create-modal{zoom:1.12;}
+}
+@media(min-width:2800px) and (max-height:1300px){
+  #dlg.user-create-modal{zoom:1.28;}
+}
