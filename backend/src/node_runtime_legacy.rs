@@ -2555,6 +2555,43 @@ mod provision_tests {
     }
 
     #[test]
+    fn node_user_limit_excludes_only_that_node_from_signed_xray_config() {
+        let uuid = "550e8400-e29b-41d4-a716-446655440000";
+        let base = json!({"inbounds":[{"protocol":"vless","tag":"MAIN",
+            "settings":{"clients":[]}}]});
+        let users = vec![json!({
+            "id":1,"xrayId":uuid,"squads":[1],"limit":0,
+            "nodeTrafficLimits":{"42":{"limitGb":5,"period":"monthly"}},
+            "nodeQuotaUsedBytes":5_000_000_000_i64
+        })];
+        let squads = vec![json!({"id":1,"inb":["MAIN"]})];
+        let cdn_tags = std::collections::HashSet::new();
+        let mut exhausted = base.clone();
+        provision_proxy_users(&mut exhausted,42,&users,&squads,1_800_000_000_000,&cdn_tags)
+            .unwrap();
+        assert_eq!(exhausted["inbounds"][0]["settings"]["clients"],json!([]));
+        let mut other_node = base;
+        provision_proxy_users(&mut other_node,43,&users,&squads,1_800_000_000_000,&cdn_tags)
+            .unwrap();
+        assert_eq!(other_node["inbounds"][0]["settings"]["clients"][0]["id"],uuid);
+    }
+
+    #[test]
+    fn node_quota_limits_signed_offline_allowance_not_other_node_budget() {
+        let uuid = "550e8400-e29b-41d4-a716-446655440000";
+        let config = json!({"inbounds":[{"settings":{"clients":[{"id":uuid}]}}]});
+        let users = vec![json!({
+            "id":1,"xrayId":uuid,"limit":0,
+            "nodeTrafficLimits":{"42":{"limitGb":5,"period":"monthly"}},
+            "nodeQuotaUsedBytes":4_999_000_000_i64
+        })];
+        let policy = build_offline_policy(&config,&users,42,1_800_000_000_000,"abc",10);
+        assert_eq!(policy["users"][0]["offlineBudgetBytes"],1_000_000);
+        let other = build_offline_policy(&config,&users,43,1_800_000_000_000,"abc",10);
+        assert!(other["users"][0]["offlineBudgetBytes"].is_null());
+    }
+
+    #[test]
     fn cdn_quota_drops_only_cdn_accounts_without_revoking_main_access() {
         let uuid = "550e8400-e29b-41d4-a716-446655440000";
         let mut config = json!({"inbounds":[
