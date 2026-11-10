@@ -104,9 +104,10 @@ dialog#dlg.node-wide>form.box{
 /* User Details: one stable task workspace, with a viewport-responsive desktop
  * footprint. A hard 38.5rem ceiling made the drawer physically tiny whenever
  * browser zoom enlarged the effective CSS viewport. Every task keeps the same
- * shell geometry; only the shared central content area scrolls. */
+ * shell geometry; only the shared central content area scrolls.
+ * Keep the workspace bounded to useful reading width, not a stretched page. */
 dialog#dlg.user-modal{
-  --dialog-width:clamp(64rem,58vw,108rem);
+  --dialog-width:clamp(64rem,54vw,100rem);
   --modal-off:translateY(22px) scale(.972);
   box-sizing:border-box;
   width:min(var(--dialog-width),calc(100vw - 2rem));
@@ -322,14 +323,22 @@ html[data-motion=off] #dlg.user-modal::backdrop{
   z-index:auto;
 }
 
-/* Browser zoom-out increases CSS viewport width while shrinking every rem in
- * physical pixels. Grow the complete surface moderately, including its text,
- * instead of only widening microscopic controls. 82dvh is a zoom-safe cap:
- * even short wide screens retain a visible header and action footer. */
+/* At effective wide viewports (including browser zoom-out), modestly scale
+ * the whole surface rather than elongating tiny fields. Preserve the same
+ * viewport-bounded frame for every tab, with one shared scroll owner. */
 @media(min-width:2200px){
   dialog#dlg.user-modal{
     zoom:1.12;
     height:min(clamp(38.5rem,64dvh,49rem),82dvh);
     block-size:min(clamp(38.5rem,64dvh,49rem),82dvh);
+  }
+}
+/* Short, very wide effective viewports typically come from desktop zoom-out.
+ * A narrower working width plus a slightly larger scale improves legibility
+ * without eating the full physical screen or changing other dialogs. */
+@media(min-width:2800px) and (max-height:1300px){
+  dialog#dlg.user-modal{
+    --dialog-width:88rem;
+    zoom:1.28;
   }
 }
