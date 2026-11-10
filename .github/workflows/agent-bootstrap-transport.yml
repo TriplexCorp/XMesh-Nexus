@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 5a3f484bd2ddf705cd35c31ffdfd8cd5996b427d
+          ref: d53bbd6f88e5c9cc012bddb808ac66cca3716fef
           path: .node-transport-fixture
       - name: Exercise bootstrap and signed requests with the production strict PATH
         run: python3 scripts/test-agent-bootstrap-transport.py --node-root .node-transport-fixture
