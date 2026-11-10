@@ -1722,11 +1722,13 @@ async function main() {
       const finalBasicField=Math.max(...layout.fields.map(field=>field.bottom));
       assert(layout.basic.bottom-finalBasicField<=2.4*g.rem*(Number(g.modalZoom)||1),
         'Basic card must end after its actual fields without stretching to Connection card');
-      assert(layout.basic.bottom<layout.connection.bottom-8,
-        'Different-length settings cards must not be artificially equal-height');
+      assert(layout.note.y-layout.basic.bottom<=3.6*g.rem*(Number(g.modalZoom)||1),
+        'Tag relocation must eliminate the oversized empty gap beneath Basic Data');
+      assert(layout.connection.bottom-layout.basic.bottom<=3.4*g.rem*(Number(g.modalZoom)||1),
+        'Connection card must not have a whole extra field row compared with Basic Data');
       const composition=await page.locator('#dlg').evaluate(d=>{
         const rect=s=>{const r=d.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
-        const connectionNames=['limit','cdnLimitGb','strategy','tag'];
+        const connectionNames=['limit','cdnLimitGb','strategy'];
         const controls=connectionNames.map(name=>d.querySelector('.user-connection-card [name="'+name+'"]'));
         const fields=controls.slice(0,2).map(control=>{
           const el=control?.closest('.f');
@@ -1742,13 +1744,15 @@ async function main() {
           actions:rect('.user-editor-actions'),
           fields,
           connectionControls:controls.map(Boolean),
+          noteTag:!!d.querySelector('.user-note-card [name="tag"]'),
           noteField:rect('.user-note-card textarea'),
           labelFont:parseFloat(getComputedStyle(d.querySelector('.user-basic-card>.f>span')).fontSize),
           controlFont:parseFloat(getComputedStyle(d.querySelector('.user-basic-card input')).fontSize),
           rem:parseFloat(getComputedStyle(document.documentElement).fontSize)
         };
       });
-      assert(composition.connectionControls.every(Boolean),'Connection card must preserve limit, CDN limit, reset strategy and tag fields');
+      assert(composition.connectionControls.every(Boolean)&&composition.noteTag,
+        'Connection must preserve limits and reset; Tag belongs beside Note in the compact metadata row');
       assert(composition.fields.every(Boolean)&&Math.abs(composition.fields[0].x-composition.fields[1].x)>8&&Math.abs(composition.fields[0].y-composition.fields[1].y)<=4,
         'Connection controls must use two columns rather than a long vertical rail');
       assert(Math.abs(composition.note.x-composition.basic.x)<=2&&Math.abs(composition.note.right-composition.connection.right)<=2,
@@ -2401,11 +2405,19 @@ async function main() {
             metadata:bounds('.user-create-section-extra'),
             footer:bounds('.user-create-footer'),
             zoomScale:Number.parseFloat(getComputedStyle(dialog).getPropertyValue('--uc'))||16,
-            inputFont:font('input[name="limit"]')
+            inputFont:font('input[name="limit"]'),
+            sectionHeadingFont:font('.user-create-section-head h3'),
+            sectionHelpFont:font('.user-create-section-head p'),
+            rootFont:parseFloat(getComputedStyle(document.documentElement).fontSize),
+            formToken:getComputedStyle(dialog).getPropertyValue('--nx-user-form-label-size').trim(),
+            metadataLayout:getComputedStyle(dialog.querySelector('.user-create-extra-grid')).gridTemplateAreas
           };
         });
         assert(design.titleFont>=22,'Create-user modal title must be clearly readable');
-        assert(design.labelFont>=12,'Form labels must not shrink to micro text');
+        assert(design.labelFont>=.85*design.rootFont,'Create-user labels must match the User Details label scale');
+        assert(design.formToken.length>0,'Create and edit must share the same Nexus user-form tokens');
+        assert(design.sectionHeadingFont>=.95*design.rootFont&&design.sectionHelpFont>=.75*design.rootFont,
+          'Create-user section headings and descriptions must match User Details reading sizes');
         assert(design.fieldHeight>=42,'Form controls must be comfortable to click');
         if(width>=2200){
           assert(design.zoomScale<=20.1,'Wide user creation dialog must have a bounded design scale');
@@ -2417,6 +2429,8 @@ async function main() {
           assert(design.identity.right<design.limits.left+2,'Identity and limits must be side by side');
           assert(Math.abs(design.identity.top-design.limits.top)<2,'Top cards must share a baseline');
           assert(Math.abs(design.identity.bottom-design.limits.bottom)<3,'Top cards must have matching heights');
+          if(width>=1200)assert(design.metadataLayout.includes('squads tag hold desc'),
+            'Desktop metadata must form one compact row like the User Details Tag / Note strip');
           assert(design.metadata.top>=design.identity.bottom-2,'Metadata card must be below the top cards');
         }else{
           assert(design.identity.bottom<=design.limits.top+2,'Narrow layout must stack sections without overlap');
