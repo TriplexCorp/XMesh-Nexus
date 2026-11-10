@@ -970,6 +970,14 @@ async fn remark_cdn_meter(
     }
 }
 
+fn subscription_remark_address<'a>(outbound: &'a Value, host: &'a Value) -> &'a str {
+    outbound
+        .pointer("/settings/vnext/0/address")
+        .and_then(Value::as_str)
+        .or_else(|| endpoint(host))
+        .unwrap_or("")
+}
+
 async fn collect_user_outbounds(
     state: &AppState,
     user: &Value,
@@ -1028,11 +1036,7 @@ async fn collect_user_outbounds(
                     if let Some(template) = outbound.get("tag").and_then(Value::as_str)
                         && template.contains('{')
                     {
-                        let address = outbound
-                            .pointer("/settings/vnext/0/address")
-                            .and_then(Value::as_str)
-                            .or_else(|| endpoint(host))
-                            .unwrap_or("");
+                        let address = subscription_remark_address(&outbound, host);
                         let label = if template.contains("{TRAFFIC_LEFT}")
                             || template.contains("{CDN_DATA_LEFT}")
                         {
