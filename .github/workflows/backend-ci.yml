@@ -213,6 +213,8 @@ jobs:
         run: node scripts/check-cdn-inbound-quotas.js
       - name: Verify node-scoped LTE policy and UTC monthly signed meters
         run: node scripts/check-lte-node-monthly-quotas.js
+      - name: Verify independent per-user node quota accounting and signed cutoff
+        run: node scripts/check-user-node-quotas.js
       - name: Verify manual node traffic reset and safety guards
         run: node scripts/check-node-traffic-reset.js
       - name: Verify automatic node quota cutoff and signed shutdown
