@@ -44,7 +44,7 @@ window.XMeshHostEditor=(() => {
       const p=field(f('profileId'),selectedProfile?.id||'');
       const inboundOptions=selectedProfile?inbs(selectedProfile).map(i=>[i.tag,i.tag+' · '+i.protocol]):[];
       const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
-      const basic=['remark','address','port','countryCode'].map(k=>field(f(k),o[k])).join('');
+      const basic=['remark','serverDescription','address','port','countryCode'].filter(k=>f(k)).map(k=>field(f(k),o[k])).join('');
       const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
       // Keep all overrides in the same form; tabs must never split a draft.
       const advancedField=k=>{
@@ -66,7 +66,7 @@ window.XMeshHostEditor=(() => {
         panel('connection','<div class="host-connection-workspace"><section class="host-editor-main host-primary-panel" aria-label="Подключение и назначение">'+
           '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
           '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
-          '<div class="node-form-section-title">Публичная точка</div><div class="host-public-fields">'+basic+'</div>'+ (window.XMeshRemarkPicker?.markup()||'')+'</section>'+
+          '<div class="node-form-section-title">Публичная точка</div><div class="host-public-fields">'+basic+'</div><small class="host-description-hint">Описание сервера показывается под названием в Happ. Поле необязательное, максимум 30 символов.</small>'+ (window.XMeshRemarkPicker?.markup()||'')+'</section>'+
           '<section class="host-assignment-panel"><div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
           '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small></section></div>')+
         panel('client','<section class="host-advanced host-advanced-panel" aria-label="Параметры клиента">'+
