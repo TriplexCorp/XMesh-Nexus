@@ -720,7 +720,7 @@ pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String
             &all_proxies,
             &standalone_settings,
         )?;
-        // Happ reads the optional subtitle from the top-level JSON metadata,
+        // Compatible subscription clients can read the optional subtitle from JSON metadata,
         // not the transport settings or the Xray routing tag.
         if let Some(subtitle) = subtitle {
             config["meta"]["serverDescription"] = json!(subtitle);
@@ -815,7 +815,7 @@ mod tests {
    "xhttpSettings":{"path":"/test","mode":"stream-up"}}})
     }
     #[test]
-    fn happ_server_descriptions_are_local_to_standalone_hosts() {
+    fn server_descriptions_are_local_to_standalone_hosts() {
         let mut pl = outbound("PL");
         pl["tag"] = json!("🇵🇱 Польша");
         pl["xmeshSourceKey"] = json!("host:101");
@@ -836,7 +836,7 @@ mod tests {
     }
 
     #[test]
-    fn happ_description_does_not_leak_into_balancer_or_other_host() {
+    fn server_description_does_not_leak_into_balancer_or_other_host() {
         let mut pl = outbound("PL");
         pl["xmeshSourceKey"] = json!("host:101");
         pl["xmeshServerDescription"] = json!("LTE 5 GB");
