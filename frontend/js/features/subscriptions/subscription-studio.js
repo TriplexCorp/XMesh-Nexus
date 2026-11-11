@@ -696,10 +696,13 @@ window.XMeshSubscriptionStudio = (() => {
           enrolled?'Связь не установлена. Последняя активность: '+last:
           'Для управления создайте одноразовую команду привязки и выполните её на VPS.';
         const stage=status?.update?.stage;
-        const labels={queued:'обновление в очереди',running:'обновление выполняется',
+        const elapsed=Math.max(0,Date.now()/1000-Number(status?.update?.updatedAt||0));
+        const activeJob=(stage==='queued'&&elapsed<1800)||(stage==='running'&&elapsed<3600);
+        const labels={queued:activeJob?'обновление в очереди':'ожидание обновления истекло',
+          running:activeJob?'обновление выполняется':'обновление прервалось',
           completed:'обновление завершено',failed:'ошибка обновления'};
         agentDetail.textContent=info+(labels[stage]?' · '+labels[stage]:'');
-        const busy=Boolean(updateBusy||statusBusy||stage==='queued'||stage==='running');
+        const busy=Boolean(updateBusy||statusBusy||activeJob);
         updateButton.disabled=!subApi?.update||!online||busy;
         statusButton.disabled=!subApi?.status||statusBusy;
       };
