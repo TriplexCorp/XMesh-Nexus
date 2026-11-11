@@ -40,6 +40,11 @@ assert.match(subscription,/node_user_quotas::remaining_for/);
 assert.match(ui,/data-node-quota-limit/);
 assert.match(ui,/data-node-quota-period/);
 assert.match(ui,/function createMarkup\(nodes\)/);
+assert.match(ui,/<section class="user-create-section user-create-node-quotas"/,
+  'Quota controls must be a visible section, not a collapsed details element');
+assert.doesNotMatch(ui,/<details class="user-create-node-quotas"/,
+  'Node limits must not require expanding a hidden accordion');
+assert.match(ui,/data-user-create-quota-status/,'Each node must show its configured/unlimited state');
 assert.match(ui,/function readCreate\(form\)/);
 assert.match(ui,/function bindCreate\(form\)/);
 const dialog=fs.readFileSync('frontend/js/features/nodes/node-dialogs.js','utf8');
@@ -57,6 +62,13 @@ assert.equal(helper.createMarkup([]),'');
 const created=helper.createMarkup([{id:12,name:'Польша'},{id:19,name:'Норвегия'}]);
 assert.match(created,/data-user-create-quota-row="12"/);
 assert.match(created,/data-user-create-quota-row="19"/);
+assert.match(created,/data-user-create-quota-count/);
+assert.match(created,/Безлимит/);
+assert.equal(created.includes('<details'),false,'The per-node panel must appear immediately');
+assert.match(helper.createMarkup([{id:3,name:'A & <B>'}]),/A &amp; &lt;B&gt;/,
+  'Node names must be escaped before rendering');
+assert.match(helper.createMarkup(Array.from({length:7},(_,i)=>({id:i+1,name:'Node '+i}))),/data-user-create-node-search/,
+  'Large node catalogs need a search field');
 const nodeRow=(id,value,period)=>({
   dataset:{userCreateQuotaRow:String(id)},
   querySelector:selector=>selector==='[data-user-create-quota-limit]'?{value:String(value)}:

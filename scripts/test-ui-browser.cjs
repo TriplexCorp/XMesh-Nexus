@@ -204,13 +204,17 @@ async function main() {
       await form.waitFor({state:'visible'});
       const details=form.locator('[data-user-create-node-quotas]');
       assert.equal(await details.count(),1,'A new user must allow node quota policies before saving');
-      await details.locator('summary').click();
+      assert.equal(await details.isVisible(),true,'Node quotas must be visible immediately, with no accordion click');
+      assert.equal(await details.locator('.user-create-node-quotas-head').isVisible(),true,
+        'A visible quota heading and summary must appear on creation');
       const row=form.locator('[data-user-create-quota-row="'+node.id+'"]');
       await row.locator('[data-user-create-quota-limit]').fill('5');
       await row.locator('[data-user-create-quota-period]').evaluate(select=>{
         select.value='lifetime';select.dispatchEvent(new Event('change',{bubbles:true}));
       });
       assert.match(await details.locator('[data-user-create-quota-count]').innerText(),/1\s*\/\s*\d+/);
+      assert.equal(await row.getAttribute('data-limited'),'true','Configured node has an active state');
+      assert.match(await row.locator('[data-user-create-quota-status]').innerText(),/5/);
       const sampled=await form.evaluate(f=>window.XMeshNodeQuotas.readCreate(f));
       assert.deepEqual(sampled[String(node.id)],{limitGb:5,period:'lifetime'});
       await form.locator('input[name="username"]').fill(prefix+'-node-quota-create');
@@ -1206,13 +1210,19 @@ async function main() {
       assert.equal(metrics.range,'24h');
       assert.equal(metrics.membership,'current');
       assert(Array.isArray(metrics.items),'Squad traffic must be backed by verified counter data');
+      // The create-user quota test creates another member of this squad.
+      // Count from persisted assignments rather than a stale hard-coded 2.
+      const roster=(await api('GET','/bootstrap')).collections.users;
+      const expectedSquadMembers=roster.filter(u=>Array.isArray(u.squads)&&
+        u.squads.some(id=>String(id)===String(squad.id))).length;
+      assert(expectedSquadMembers>=2,'Base fixtures must remain assigned to the squad');
       for(const [width,height] of [[1920,1080],[1366,768],[390,844]]){
         await page.setViewportSize({width,height});
         await navigate('squads');
         const card=page.locator(`[data-squad-card="${squad.id}"]`);
         assert(await card.isVisible(),'Squad must render as a card');
         assert.equal(await page.locator('.squad-card-grid [data-e]').count(),0,'Legacy table rows must not appear');
-        assert.equal(await card.locator('.squad-card-metrics strong').first().innerText(),'2','Members from current user assignments');
+        assert.equal(await card.locator('.squad-card-metrics strong').first().innerText(),String(expectedSquadMembers),'Members from current user assignments');
         assert.equal(await card.locator('.squad-card-metrics strong').nth(1).innerText(),'1','Inbound count from saved squad');
         assert.equal(await card.locator('.squad-card-relations b').first().innerText(),'1','Hosts from enabled host mapping');
         await page.waitForFunction(id=>!!document.querySelector(`[data-squad-traffic="${id}"] .squad-card-traffic-value`),squad.id);
@@ -2531,6 +2541,19 @@ async function main() {
           assert(design.identity.bottom<=design.limits.top+2,'Narrow layout must stack sections without overlap');
         }
         assert(design.footer.height>=44,'Create/cancel footer must remain accessible');
+        const quotas=page.locator('#dlg.user-create-modal [data-user-create-node-quotas]');
+        assert.equal(await quotas.isVisible(),true,'Quota panel must be visible with no additional click');
+        const quotaGrid=await quotas.evaluate(section=>{
+          const list=section.querySelector('.user-create-node-quota-list');
+          return {items:list.querySelectorAll('[data-user-create-quota-row]').length,
+            columns:getComputedStyle(list).gridTemplateColumns.split(' ').length,
+            width:section.getBoundingClientRect().width,
+            overflow:list.scrollWidth-list.clientWidth};
+        });
+        assert(quotaGrid.items>0,'Quota cards must show existing nodes');
+        assert(quotaGrid.overflow<=2,'Quota cards must not scroll horizontally');
+        if(quotaGrid.width>=760)assert.equal(quotaGrid.columns,2,'Wide dialog uses two quota columns');
+        else assert.equal(quotaGrid.columns,1,'Narrow dialog uses one quota column');
         const bypassLimit=page.locator('#dlg.user-create-modal input[name="cdnLimitGb"]');
         assert(await bypassLimit.isVisible(),'Bypass traffic limit must be present when creating a user');
         await bypassLimit.fill('5');
