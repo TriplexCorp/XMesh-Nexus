@@ -4834,7 +4834,7 @@ mod node_tls_auto_mode_validation_tests {
             "remark":"Польша","serverDescription":12
         })).is_err());
         assert!(validate_record("hosts", &json!({
-            "remark":"Польша","serverDescription":"one\\nsecond"
+            "remark":"Польша","serverDescription":"one\nsecond"
         })).is_err());
     }
 
