@@ -32,6 +32,10 @@ assert.match(js,/Math\.max\(1,Math\.round\(serial\(target\)-serial\(today\(\)\)\
 // user-create-policy-v6.css / user-create-extra-v7.css compatibility layers.
 assert.match(css,/#dlg\.user-create-modal\{/,
  'User editor styles must be wired into the canonical panel CSS graph');
+assert.match(css,/#dlg\.user-create-modal>form\.user-create-dialog\{[^}]*height:100%;[^}]*grid-template-rows:auto minmax\(0,1fr\) auto;/,
+ 'Create-user form must have a definite height and a shrinkable scroll track');
+assert.match(css,/#dlg\.user-create-modal \.user-create-body\{[^}]*min-height:0;[^}]*overflow-y:auto;/,
+ 'Create-user center body must own scrolling without clipping the dialog header/footer');
 assert.match(css,/\.user-create-limits-grid\{[\s\S]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,
  'Policy controls must retain a balanced two-column desktop grid');
 assert.match(css,/\.user-create-limits-grid>\.user-create-field\{[\s\S]*grid-template-rows:auto 3rem minmax\(1\.1rem,auto\)/,
