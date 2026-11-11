@@ -1128,7 +1128,7 @@ async fn collect_user_outbounds(
             let matched = published_hosts_for_profile(&hosts, tag, profile, &nodes);
             for host in matched {
                 if let Some(mut outbound) = proxy_outbound(user, inbound, host, device) {
-                    // Happ-specific display subtitle is host-owned metadata.
+                    // Client-facing display subtitle is host-owned metadata.
                     // It is attached only to this selectable subscription entry,
                     // never to a server-side inbound or client transport.
                     if let Some(description) =
