@@ -303,6 +303,30 @@ matches(css,/\.stats-node-facts\s*\{[\s\S]*?grid-template-columns:/);
 matches(css,/@media\(max-width:390px\)[\s\S]*?\.stats-node-facts\s*\{grid-template-columns:1fr/);
 rejects(app,/\['CPU',statsValue\(ok\?v\.cpuPercent:null,'%'/,'Do not repeat CPU underneath the compact gauges');
 
+// Node controls share ONE toolbar (including the count), with enhanced-select geometry.
+matches(app,/class="stats-nodes-toolbar" role="toolbar"/);
+matches(app,/id="stats-node-count" class="stats-node-count" role="status"/);
+assert(app.indexOf('id="stats-node-count"')<app.indexOf('id="stats-nodes"'), 'Count must precede the node grid');
+rejects(app,/class="stats-nodes-summary"/, 'Count must not create a second row');
+matches(css,/\.stats-nodes-section \.stats-nodes-toolbar\s*\{[\s\S]*?flex-wrap:nowrap/);
+matches(css,/\.stats-nodes-section \.stats-nodes-toolbar :is\(\.xm-select-shell,#stats-node-filter\)/);
+matches(css,/\.stats-nodes-section \.stats-nodes-toolbar \.xm-select-trigger\s*\{/);
+matches(css,/\.stats-nodes-section \.stats-nodes-toolbar \.stats-node-search input\[type="search"\]/);
+matches(css,/@media\(max-width:720px\)[\s\S]*?\.stats-nodes-section \.stats-nodes-toolbar\{flex-wrap:wrap/);
+matches(app,/fact\('TCP соединения',statsInteger\(ok\?v\.activeConnections:null\),'layers'\)/);
+matches(app,/fact\('Онлайн клиенты',statsInteger\(ok\?v\.onlineClients:null\),'users'\)/);
+rejects(app,/fact\('(TCP соединения|Онлайн клиенты)',statsValue\(/,
+  'People and TCP connection counts must never display fractional values');
+const integerSource=app.match(/const statsInteger=v=>[\s\S]*?;/)?.[0];
+assert(integerSource,'Discrete telemetry formatter must exist');
+const statsInteger=new Function('fmt',integerSource+'return statsInteger;')(
+  (n,decimals=0)=>Number(n).toLocaleString('ru-RU',{minimumFractionDigits:decimals,maximumFractionDigits:decimals})
+);
+for(const [value,expected] of [[0,'0'],[1,'1'],[3,'3'],[1.5,'1'],[null,'Нет данных'],[undefined,'Нет данных'],[NaN,'Нет данных'],[-1,'Нет данных'],[Infinity,'Нет данных']]){
+  assert.equal(statsInteger(value),expected,'TCP/client counts must be whole numbers and preserve missing telemetry');
+}
+assert.equal(statsInteger(1334).replace(/\s/g,''),'1334');
+
 // Node breakdown colors are stable and separate from upload\/download semantics.
 matches(app,/function userServerColor\(id\)/);
 matches(app,/registerUserNodeColors\(servers\)/);
