@@ -15,6 +15,9 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Описание сервера Happ должно быть строкой.": "Happ server description must be a string.",
+    "Описание сервера Happ: максимум 30 символов, без управляющих знаков.": "Happ server description: up to 30 characters, without control characters.",
+
     "10 гбит/с🔥": "10 Gbps🔥",
     "Описание сервера в Happ": "Server description in Happ",
     "Необязательная подпись под названием сервера в Happ (до 30 символов).": "Optional subtitle below the server name in Happ (up to 30 characters).",
