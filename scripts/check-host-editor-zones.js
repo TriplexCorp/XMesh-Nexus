@@ -93,7 +93,7 @@ assert.match(html,/class="host-advanced-groups"/,'Both groups must remain inside
 assert(html.includes('host-client-settings'),'Expert client metadata must have its own disclosure');
 assert.match(feature, /\['remark','serverDescription','address','port','countryCode'\]/, 'Server description belongs next to public host name');
 assert.match(html,/name="serverDescription"/,'The Host editor must expose the optional description field');
-assert(!html.includes('Отображается в Happ')&&!html.includes('Описание сервера показывается'),'Host form must not show app-specific or redundant help text');
+assert(!html.includes('host-description-hint')&&!html.includes('Описание сервера показывается'),'Host form must not show redundant description hints');
 
 // Bootstrap refreshes replace arrays. An existing feature instance must see
 // the new collections and must leave their objects untouched during rendering.
