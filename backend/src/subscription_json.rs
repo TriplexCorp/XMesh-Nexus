@@ -612,6 +612,17 @@ fn configure_feed_balancer(config: &mut Value, row: &Value) {
     }
 }
 
+// A display-only Host attribute; never copy it into Xray transport settings.
+fn host_server_description(proxy: &Value) -> Option<String> {
+    proxy
+        .get("xmeshServerDescription")
+        .and_then(Value::as_str)
+        .filter(|text| {
+            !text.is_empty() && text.chars().count() <= 30 && !text.chars().any(char::is_control)
+        })
+        .map(str::to_owned)
+}
+
 pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         // A valid active subscription can have zero published Hosts. Return a
@@ -709,15 +720,7 @@ pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String
         {
             continue;
         }
-        let subtitle = proxy
-            .get("xmeshServerDescription")
-            .and_then(Value::as_str)
-            .filter(|text| {
-                !text.is_empty()
-                    && text.chars().count() <= 30
-                    && !text.chars().any(char::is_control)
-            })
-            .map(str::to_owned);
+        let subtitle = host_server_description(&proxy);
         let mut config =
             crate::client_routing::build_server(proxy, &all_proxies, &standalone_settings)?;
         // Compatible subscription clients can read the optional subtitle from JSON metadata,
