@@ -126,8 +126,9 @@
             <div class="user-create-limits-grid">${limit}${cdnLimit}${days}${strategy}${hwid}
               <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>Автоматический контроль при лимите больше 0.</small></p><label class="user-create-smart-switch" title="Включить или отключить лимит устройств"><input type="checkbox" data-user-create-hwid-switch aria-label="Ограничивать число устройств"><span></span></label></div>
             </div>
-            ${nodeQuotas}
           </section>
+
+          ${nodeQuotas}
 
           <section class="user-create-section user-create-section-extra">
             <div class="user-create-section-head">

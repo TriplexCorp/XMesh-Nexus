@@ -159,31 +159,41 @@ window.XMeshNodeQuotas=(()=>{
     }
   }
 
-  // The same authoritative node policy is accepted by POST /collections/users.
-  // Create mode never reads or writes traffic meters: only {limitGb,period}.
+  // The initial create POST accepts exactly these policies. Signed counters
+  // are server-owned and must never be submitted from the creation UI.
   function createMarkup(nodes){
     const items=(Array.isArray(nodes)?nodes:[]).filter(node=>Number.isSafeInteger(Number(node.id))&&Number(node.id)>0);
     if(!items.length)return '';
+    const symbol='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3.5" width="18" height="7" rx="2"/><rect x="3" y="13.5" width="18" height="7" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/></svg>';
     const rows=items.map(node=>{
       const id=String(node.id),name=String(node.name||txt('Нода','Node')+' #'+id);
-      return '<div class="user-create-quota-row" data-user-create-quota-row="'+esc(id)+'" data-quota-name="'+esc(name.toLocaleLowerCase())+'">'+
-        '<div class="user-create-quota-name" title="'+esc(name)+'"><strong>'+esc(name)+'</strong><small>#'+esc(id)+'</small></div>'+
+      const country=String(node.countryCode||'').toUpperCase();
+      const flag=String(node.flag||'');
+      const mark=/^[\u{1F1E6}-\u{1F1FF}]{2}$/u.test(flag)?flag:
+        /^[A-Z]{2}$/.test(country)?String.fromCodePoint(...[...country].map(char=>127397+char.charCodeAt(0))):'';
+      return '<article class="user-create-quota-row" data-user-create-quota-row="'+esc(id)+'" data-quota-name="'+esc(name.toLocaleLowerCase())+'" data-limited="false">'+
+        '<div class="user-create-quota-identity"><span class="user-create-quota-avatar" aria-hidden="true">'+(mark?esc(mark):symbol)+'</span>'+
+        '<div class="user-create-quota-name" title="'+esc(name)+'"><strong>'+esc(name)+'</strong><small>#'+esc(id)+(country?' · '+esc(country):'')+'</small></div>'+
+        '<span class="user-create-quota-status" data-user-create-quota-status>'+txt('Безлимит','Unlimited')+'</span></div>'+
+        '<div class="user-create-quota-controls">'+
         '<label class="user-create-quota-field"><span>'+txt('Лимит, ГБ','Limit, GB')+'</span>'+
         '<input type="number" data-user-create-quota-limit inputmode="decimal" min="0" max="1000000" step="any" placeholder="∞" aria-label="'+txt('Лимит для','Limit for')+' '+esc(name)+'"></label>'+
         '<label class="user-create-quota-field"><span>'+txt('Период','Period')+'</span>'+
         '<select data-user-create-quota-period aria-label="'+txt('Период для','Period for')+' '+esc(name)+'">'+
         '<option value="monthly">'+txt('Ежемесячно','Monthly')+'</option>'+
-        '<option value="lifetime">'+txt('За всё время','Lifetime')+'</option></select></label></div>';
+        '<option value="lifetime">'+txt('За всё время','Lifetime')+'</option></select></label></div></article>';
     }).join('');
-    return '<details class="user-create-node-quotas" data-user-create-node-quotas>'+
-      '<summary><span class="user-create-node-quotas-title">'+txt('Квоты по нодам','Per-node quotas')+'</span>'+
-      '<span class="user-create-node-quotas-count" data-user-create-quota-count>0 / '+items.length+'</span>'+
-      '<span class="user-create-node-quotas-chevron" aria-hidden="true">⌄</span></summary>'+
-      '<div class="user-create-node-quotas-body">'+
-      (items.length>5?'<label class="user-create-node-quota-search"><input type="search" data-user-create-node-search autocomplete="off" placeholder="'+txt('Поиск нод…','Search nodes…')+'" aria-label="'+txt('Поиск нод','Search nodes')+'"></label>':'')+
+    return '<section class="user-create-section user-create-node-quotas" data-user-create-node-quotas aria-label="'+txt('Квоты по нодам','Per-node quotas')+'" data-has-limits="false" data-many="'+(items.length>6)+'">'+
+      '<header class="user-create-node-quotas-head">'+
+      '<div class="user-create-node-quotas-heading"><span class="user-create-node-quotas-symbol" aria-hidden="true">'+symbol+'</span>'+
+      '<div><h3 class="user-create-node-quotas-title">'+txt('Квоты по нодам','Per-node quotas')+'</h3>'+
+      '<p>'+txt('Настройте лимит каждой ноды до создания пользователя.','Set per-node limits before creating the user.')+'</p></div></div>'+
+      '<div class="user-create-node-quotas-total"><strong data-user-create-quota-count>0 / '+items.length+'</strong><span>'+txt('с лимитом','with limits')+'</span></div></header>'+
+      (items.length>6?'<label class="user-create-node-quota-search"><span aria-hidden="true">⌕</span><input type="search" data-user-create-node-search autocomplete="off" placeholder="'+txt('Поиск нод…','Search nodes…')+'" aria-label="'+txt('Поиск нод','Search nodes')+'"></label>':'')+
       '<div class="user-create-node-quota-list">'+rows+'</div>'+
-      '<p class="user-create-node-quota-note">'+txt('Пусто или 0 — безлимит. Квоты сохраняются при создании пользователя.',
-      'Blank or zero means unlimited. Quotas are saved when the user is created.')+'</p></div></details>';
+      '<p class="user-create-node-quota-note"><span aria-hidden="true">ⓘ</span> '+
+      txt('Пусто или 0 — безлимит. Квоты сохраняются при создании пользователя.',
+      'Blank or zero means unlimited. Quotas are saved when the user is created.')+'</p></section>';
   }
   function bindCreate(form){
     const root=form?.querySelector('[data-user-create-node-quotas]');
@@ -191,7 +201,19 @@ window.XMeshNodeQuotas=(()=>{
     root.dataset.bound='true';
     const update=()=>{
       const rows=[...root.querySelectorAll('[data-user-create-quota-row]')];
-      const count=rows.filter(row=>Number(row.querySelector('[data-user-create-quota-limit]')?.value||0)>0).length;
+      let count=0;
+      for(const row of rows){
+        const input=row.querySelector('[data-user-create-quota-limit]');
+        const raw=String(input?.value||'').trim(),amount=Number(raw);
+        const limited=raw!==''&&Number.isFinite(amount)&&amount>0;
+        const invalid=Boolean(input?.validity?.badInput)||(raw!==''&&(!Number.isFinite(amount)||amount<0||amount>1000000||(amount>0&&amount*1e9<1)));
+        row.dataset.limited=limited?'true':'false';
+        row.dataset.invalid=invalid?'true':'false';
+        if(limited)count++;
+        const badge=row.querySelector('[data-user-create-quota-status]');
+        if(badge)badge.textContent=limited?amount.toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU')+' '+txt('ГБ','GB'):txt('Безлимит','Unlimited');
+      }
+      root.dataset.hasLimits=count>0?'true':'false';
       const badge=root.querySelector('[data-user-create-quota-count]');
       if(badge)badge.textContent=count+' / '+rows.length;
       const search=String(root.querySelector('[data-user-create-node-search]')?.value||'').trim().toLocaleLowerCase();
@@ -207,6 +229,10 @@ window.XMeshNodeQuotas=(()=>{
     for(const row of rows){
       const input=row.querySelector('[data-user-create-quota-limit]');
       const raw=String(input?.value||'').trim();
+      if(input?.validity?.badInput){
+        const error=Error(txt('Некорректные квоты нод.','Invalid node quotas.'));
+        error.field=input;throw error;
+      }
       if(raw===''||Number(raw)===0)continue;
       const id=row.dataset.userCreateQuotaRow,amount=Number(raw);
       const period=row.querySelector('[data-user-create-quota-period]')?.value;

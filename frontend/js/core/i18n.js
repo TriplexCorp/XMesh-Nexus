@@ -15,6 +15,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Настройте лимит каждой ноды до создания пользователя.": "Set per-node limits before creating the user.",
+    "с лимитом": "with limits",
     "Период для": "Period for",
     "Квоты по нодам": "Per-node quotas",
     "Пусто или 0 — безлимит. Квоты сохраняются при создании пользователя.": "Blank or zero means unlimited. Quotas are saved when the user is created.",
