@@ -195,6 +195,38 @@ async function main() {
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
+
+    await checked('Create user: per-node quotas persist in the initial POST',async()=>{
+      await page.setViewportSize({width:1366,height:768});
+      await navigate('users');
+      await page.locator('[data-nu]').first().click();
+      const form=page.locator('#dlg.user-create-modal form[data-k="user"]');
+      await form.waitFor({state:'visible'});
+      const details=form.locator('[data-user-create-node-quotas]');
+      assert.equal(await details.count(),1,'A new user must allow node quota policies before saving');
+      await details.locator('summary').click();
+      const row=form.locator('[data-user-create-quota-row="'+node.id+'"]');
+      await row.locator('[data-user-create-quota-limit]').fill('5');
+      await row.locator('[data-user-create-quota-period]').evaluate(select=>{
+        select.value='lifetime';select.dispatchEvent(new Event('change',{bubbles:true}));
+      });
+      assert.match(await details.locator('[data-user-create-quota-count]').innerText(),/1\s*\/\s*\d+/);
+      const sampled=await form.evaluate(f=>window.XMeshNodeQuotas.readCreate(f));
+      assert.deepEqual(sampled[String(node.id)],{limitGb:5,period:'lifetime'});
+      await form.locator('input[name="username"]').fill(prefix+'-node-quota-create');
+      await form.locator('[name="squads"][value="'+squad.id+'"]').check();
+      const response=page.waitForResponse(res=>res.url().includes('/api/v1/collections/users')&&res.request().method()==='POST');
+      await form.locator('.user-create-submit').click();
+      const created=await response;
+      assert.equal(created.status(),201,'User and node policy must be accepted in one create request');
+      const payload=JSON.parse(created.request().postData()||'{}');
+      assert.deepEqual(payload.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'lifetime'});
+      assert.equal(payload.nodeQuotaUsedBytes,undefined,'Browser must never submit quota meter state');
+      const saved=await created.json();
+      fixtures.push({collection:'users',id:saved.id});
+      assert.deepEqual(saved.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'lifetime'});
+    });
+
     await checked('Version popover: available, completed, unavailable and accessible actions',async()=>{
       await navigate('home');
       await page.locator('[data-panel-version-trigger]').waitFor({state:'visible'});

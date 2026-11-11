@@ -174,6 +174,38 @@
 .user-create-generate:focus-visible{outline:none;border-color:color-mix(in srgb,var(--a) 66%,var(--nx-border));box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 11%,transparent)}
 
 .user-create-limits-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.68rem;align-items:start}
+
+/* Inline node limits are optional. Keep the default create dialog short;
+ * opening the policy shows a bounded editor without a second save action. */
+.user-create-section-limits{container:uc-create-limits / inline-size}
+.user-create-node-quotas{margin-top:.76rem;min-width:0;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg)}
+.user-create-node-quotas>summary{display:flex;align-items:center;gap:.5rem;min-height:var(--nx-control-h-sm);padding:.45rem .65rem;cursor:pointer;list-style:none}
+.user-create-node-quotas>summary::-webkit-details-marker{display:none}
+.user-create-node-quotas>summary:focus-visible{outline:2px solid var(--nx-focus);outline-offset:-2px}
+.user-create-node-quotas-title{font-size:var(--nx-user-form-input-size,.76rem);font-weight:750;color:var(--tx)}
+.user-create-node-quotas-count{margin-left:auto;font-size:.72rem;color:var(--mu);font-variant-numeric:tabular-nums}
+.user-create-node-quotas-chevron{font-size:1rem;color:var(--mu);transition:transform var(--nx-duration) ease}
+.user-create-node-quotas[open] .user-create-node-quotas-chevron{transform:rotate(180deg)}
+.user-create-node-quotas-body{padding:.1rem .55rem .58rem;border-top:1px solid var(--nx-separator);min-width:0}
+.user-create-node-quota-search{display:block;margin:.42rem 0}
+.user-create-node-quota-search input{width:100%;min-width:0;min-height:var(--nx-control-h-sm);padding:.35rem .55rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
+.user-create-node-quota-list{display:grid;gap:.22rem;max-height:13rem;overflow:auto;overflow-x:hidden;min-width:0}
+.user-create-quota-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(4.8rem,.65fr) minmax(7.3rem,.92fr);align-items:center;gap:.45rem;min-width:0;padding:.35rem .2rem;border-bottom:1px solid var(--nx-separator)}
+.user-create-quota-row:last-child{border-bottom:0}
+.user-create-quota-row[hidden]{display:none}
+.user-create-quota-name{display:grid;gap:.1rem;min-width:0}
+.user-create-quota-name strong{font-size:.72rem;font-weight:690;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-create-quota-name small{font-size:.63rem;color:var(--mu)}
+.user-create-quota-field{display:grid;gap:.2rem;min-width:0}
+.user-create-quota-field>span{font-size:.64rem;color:var(--mu);white-space:nowrap}
+#dlg.user-create-modal .user-create-quota-field :is(input,select,.xm-select-shell,.xm-select-trigger){box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:2.1rem;font-size:.72rem}
+#dlg.user-create-modal .user-create-quota-field :is(input,select){padding:.35rem .42rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg);color:var(--tx)}
+.user-create-node-quota-note{margin:.48rem 0 0;color:var(--mu);font-size:.65rem;line-height:1.4}
+@container uc-create-limits (max-width:24rem){
+ .user-create-quota-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .user-create-quota-name{grid-column:1/-1}
+}
+
 .user-create-policy-note{
   margin-top:.7rem;padding:.62rem .66rem;
   display:grid;grid-template-columns:1.5rem minmax(0,1fr);gap:.52rem;align-items:start;

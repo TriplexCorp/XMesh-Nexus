@@ -82,6 +82,7 @@
     const tag=decorate('tag','', 'user-create-tag');
     const squads=decorate('squads',[], 'user-create-squads');
     const hold=decorate('hold',false,'user-create-hold');
+    const nodeQuotas=window.XMeshNodeQuotas.createMarkup(DB.nodes);
 
     modal(`<form class="box user-create-dialog" data-k="user" method="dialog">
       <header class="user-create-head">
@@ -125,6 +126,7 @@
             <div class="user-create-limits-grid">${limit}${cdnLimit}${days}${strategy}${hwid}
               <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>Автоматический контроль при лимите больше 0.</small></p><label class="user-create-smart-switch" title="Включить или отключить лимит устройств"><input type="checkbox" data-user-create-hwid-switch aria-label="Ограничивать число устройств"><span></span></label></div>
             </div>
+            ${nodeQuotas}
           </section>
 
           <section class="user-create-section user-create-section-extra">
@@ -159,6 +161,7 @@
     // Dynamic selects are enhanced synchronously after the complete valid form
     // exists, avoiding a one-frame native/fallback flash inside the modal.
     window.XMeshSelects?.refresh?.(dlg);
+    window.XMeshNodeQuotas.bindCreate(dlg.querySelector('form[data-k="user"]'));
     // The switch controls the existing server-enforced hwid limit:
     // off = 0; on = the previous positive value or 1.
     const deviceLimitInput=dlg.querySelector('input[name="hwid"]');

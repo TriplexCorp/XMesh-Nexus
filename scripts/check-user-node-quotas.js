@@ -39,6 +39,39 @@ assert.match(subscription,/node_user_quotas::usage_for_user/);
 assert.match(subscription,/node_user_quotas::remaining_for/);
 assert.match(ui,/data-node-quota-limit/);
 assert.match(ui,/data-node-quota-period/);
+assert.match(ui,/function createMarkup\(nodes\)/);
+assert.match(ui,/function readCreate\(form\)/);
+assert.match(ui,/function bindCreate\(form\)/);
+const dialog=fs.readFileSync('frontend/js/features/nodes/node-dialogs.js','utf8');
+assert.match(dialog,/XMeshNodeQuotas\.createMarkup\(DB\.nodes\)/);
+assert.match(dialog,/XMeshNodeQuotas\.bindCreate\(dlg\.querySelector/);
+assert.match(dialog,/\$\{nodeQuotas\}/);
+assert.match(app,/XMeshNodeQuotas\.readCreate\(f\)/);
+assert.match(app,/nodeTrafficLimits:nodePolicies/);
+// Check create-only payload semantics without a browser: empty/zero is unlimited,
+// periods and decimal GB survive, invalid values fail before POST.
+const stubWindow={XMeshI18n:{getLanguage:()=> 'ru'}};
+new Function('window',ui)(stubWindow);
+const helper=stubWindow.XMeshNodeQuotas;
+assert.equal(helper.createMarkup([]),'');
+const created=helper.createMarkup([{id:12,name:'Польша'},{id:19,name:'Норвегия'}]);
+assert.match(created,/data-user-create-quota-row="12"/);
+assert.match(created,/data-user-create-quota-row="19"/);
+const nodeRow=(id,value,period)=>({
+  dataset:{userCreateQuotaRow:String(id)},
+  querySelector:selector=>selector==='[data-user-create-quota-limit]'?{value:String(value)}:
+    selector==='[data-user-create-quota-period]'?{value:period}:null
+});
+const form=rows=>({querySelectorAll:()=>rows});
+assert.deepEqual(helper.readCreate(form([nodeRow(12,'5','monthly'),nodeRow(19,'847','lifetime')])),{
+  '12':{limitGb:5,period:'monthly'},'19':{limitGb:847,period:'lifetime'}
+});
+assert.deepEqual(helper.readCreate(form([nodeRow(12,'','monthly'),nodeRow(19,'0','monthly')])),{});
+for(const value of ['-1','1000001','abc','0.0000000001']){
+  assert.throws(()=>helper.readCreate(form([nodeRow(12,value,'monthly')])));
+}
+assert.throws(()=>helper.readCreate(form([nodeRow(12,'5','weekly')])));
+
 assert.match(ui,/save\(\{nodeTrafficLimits:policies\}\)/);
 assert.match(app,/XMeshNodeQuotas\.mount/);
 assert.doesNotMatch(ui,/nodeQuotaUsedBytes\s*:/,'UI may not write server-owned counter');

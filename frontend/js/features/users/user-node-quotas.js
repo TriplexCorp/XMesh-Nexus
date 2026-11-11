@@ -158,5 +158,69 @@ window.XMeshNodeQuotas=(()=>{
       if(root.isConnected)root.textContent=txt('Не удалось загрузить квоты: ','Could not load quotas: ')+(e.message||'API');
     }
   }
-  return Object.freeze({mount});
+
+  // The same authoritative node policy is accepted by POST /collections/users.
+  // Create mode never reads or writes traffic meters: only {limitGb,period}.
+  function createMarkup(nodes){
+    const items=(Array.isArray(nodes)?nodes:[]).filter(node=>Number.isSafeInteger(Number(node.id))&&Number(node.id)>0);
+    if(!items.length)return '';
+    const rows=items.map(node=>{
+      const id=String(node.id),name=String(node.name||txt('Нода','Node')+' #'+id);
+      return '<div class="user-create-quota-row" data-user-create-quota-row="'+esc(id)+'" data-quota-name="'+esc(name.toLocaleLowerCase())+'">'+
+        '<div class="user-create-quota-name" title="'+esc(name)+'"><strong>'+esc(name)+'</strong><small>#'+esc(id)+'</small></div>'+
+        '<label class="user-create-quota-field"><span>'+txt('Лимит, ГБ','Limit, GB')+'</span>'+
+        '<input type="number" data-user-create-quota-limit inputmode="decimal" min="0" max="1000000" step="any" placeholder="∞" aria-label="'+txt('Лимит для','Limit for')+' '+esc(name)+'"></label>'+
+        '<label class="user-create-quota-field"><span>'+txt('Период','Period')+'</span>'+
+        '<select data-user-create-quota-period aria-label="'+txt('Период для','Period for')+' '+esc(name)+'">'+
+        '<option value="monthly">'+txt('Ежемесячно','Monthly')+'</option>'+
+        '<option value="lifetime">'+txt('За всё время','Lifetime')+'</option></select></label></div>';
+    }).join('');
+    return '<details class="user-create-node-quotas" data-user-create-node-quotas>'+
+      '<summary><span class="user-create-node-quotas-title">'+txt('Квоты по нодам','Per-node quotas')+'</span>'+
+      '<span class="user-create-node-quotas-count" data-user-create-quota-count>0 / '+items.length+'</span>'+
+      '<span class="user-create-node-quotas-chevron" aria-hidden="true">⌄</span></summary>'+
+      '<div class="user-create-node-quotas-body">'+
+      (items.length>5?'<label class="user-create-node-quota-search"><input type="search" data-user-create-node-search autocomplete="off" placeholder="'+txt('Поиск нод…','Search nodes…')+'" aria-label="'+txt('Поиск нод','Search nodes')+'"></label>':'')+
+      '<div class="user-create-node-quota-list">'+rows+'</div>'+
+      '<p class="user-create-node-quota-note">'+txt('Пусто или 0 — безлимит. Квоты сохраняются при создании пользователя.',
+      'Blank or zero means unlimited. Quotas are saved when the user is created.')+'</p></div></details>';
+  }
+  function bindCreate(form){
+    const root=form?.querySelector('[data-user-create-node-quotas]');
+    if(!root||root.dataset.bound==='true')return;
+    root.dataset.bound='true';
+    const update=()=>{
+      const rows=[...root.querySelectorAll('[data-user-create-quota-row]')];
+      const count=rows.filter(row=>Number(row.querySelector('[data-user-create-quota-limit]')?.value||0)>0).length;
+      const badge=root.querySelector('[data-user-create-quota-count]');
+      if(badge)badge.textContent=count+' / '+rows.length;
+      const search=String(root.querySelector('[data-user-create-node-search]')?.value||'').trim().toLocaleLowerCase();
+      for(const row of rows)row.hidden=!!search&&!row.dataset.quotaName.includes(search)&&!row.dataset.userCreateQuotaRow.includes(search);
+    };
+    root.addEventListener('input',update);
+    root.addEventListener('change',update);
+    update();
+  }
+  function readCreate(form){
+    const policies={};
+    const rows=form.querySelectorAll('[data-user-create-quota-row]');
+    for(const row of rows){
+      const input=row.querySelector('[data-user-create-quota-limit]');
+      const raw=String(input?.value||'').trim();
+      if(raw===''||Number(raw)===0)continue;
+      const id=row.dataset.userCreateQuotaRow,amount=Number(raw);
+      const period=row.querySelector('[data-user-create-quota-period]')?.value;
+      if(!/^[1-9][0-9]*$/.test(id)||!Number.isSafeInteger(Number(id))||
+         !Number.isFinite(amount)||amount<=0||amount>1000000||amount*1e9<1||
+         !['monthly','lifetime'].includes(period)){
+        const error=new Error(txt('Проверьте лимит и период ноды: положительное число до 1 000 000 ГБ и ежемесячно/за всё время.',
+          'Check the node limit and period: a positive number up to 1,000,000 GB and monthly/lifetime.'));
+        error.field=input;throw error;
+      }
+      policies[id]={limitGb:amount,period};
+      if(Object.keys(policies).length>256)throw Error(txt('Можно задать не более 256 квот нод.','A maximum of 256 node quotas is allowed.'));
+    }
+    return policies;
+  }
+  return Object.freeze({mount,createMarkup,bindCreate,readCreate});
 })();
