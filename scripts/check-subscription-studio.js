@@ -211,7 +211,7 @@ assert.doesNotMatch(src,/input\(form,'subscriptionPlacement'\)|input\(form,'node
 assert.match(view,/data-sub-health-url/,'VPS workflow needs explicit health endpoint guidance');
 assert.match(view,/data-sub-health-link/,'VPS workflow must expose a real health link');
 assert.match(view,/не регистр|пока не реализованы/,'Do not pretend phase-one edge automatically pairs or reports uptime');
-assert.match(src,/data\.subscriptionView=next/,'Tabs must switch actual content, not just visual selection');
+assert.match(src,/root\.dataset\.subscriptionView=next/,'Tabs must switch actual content, not just visual selection');
 assert.match(src,/ArrowRight/,'Server tabs must support arrow-key navigation');
 
 assert(!view.includes('<script>alert(1)</script>'),'User-provided studio content must be escaped');
