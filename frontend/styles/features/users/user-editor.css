@@ -1831,3 +1831,18 @@
     max-height:calc(100dvh - .65rem);
   }
 }
+
+
+/* Short desktop windows: use available width to save vertical space without
+ * reducing labels or hit targets. Node inputs align beside the identity. */
+@media(min-width:1100px) and (max-height:820px){
+  #dlg.user-create-modal .user-create-node-quotas-head{margin-bottom:.5rem}
+  #dlg.user-create-modal .user-create-quota-row{
+    grid-template-columns:minmax(0,.9fr) minmax(0,1.4fr);
+    align-items:center;
+    gap:.45rem;
+    padding:.46rem .6rem;
+  }
+  #dlg.user-create-modal .user-create-quota-controls{gap:.38rem}
+  #dlg.user-create-modal .user-create-node-quota-note{margin-top:.43rem}
+}

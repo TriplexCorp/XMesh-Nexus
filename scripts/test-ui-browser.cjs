@@ -2512,6 +2512,19 @@ async function main() {
           assert(g.head.bottom<=g.body.top+2,'Header must not be pushed behind the body');
           assert(g.body.bottom<=g.footer.top+2,'Scrollable body must not cover the footer');
           assert.equal(g.overflow,'auto','Only the creation body may scroll vertically');
+          if(width>=1100&&height<=820){
+            const rows=await dialog.locator('[data-user-create-quota-row]').first().evaluate(card=>{
+              const a=card.querySelector('.user-create-quota-identity').getBoundingClientRect();
+              const b=card.querySelector('.user-create-quota-controls').getBoundingClientRect();
+              return{identityRight:a.right,controlsLeft:b.left,
+                inputWidth:card.querySelector('[data-user-create-quota-limit]').getBoundingClientRect().width,
+                selectWidth:card.querySelector('[data-user-create-quota-period]').getBoundingClientRect().width};
+            });
+            assert(rows.identityRight<=rows.controlsLeft+1,
+              'Quota identity and inputs must fit side by side without overlap: '+JSON.stringify(rows));
+            assert(rows.inputWidth>=55&&rows.selectWidth>=85,'Quota controls must remain readable');
+          }
+
           assert(g.bodyClient>0,'Scrollable creation body must retain useful height');
           // The creation form contains a quota workspace even before entering a value.
           assert.equal(await dialog.locator('[data-user-create-node-quotas]').count(),1);
