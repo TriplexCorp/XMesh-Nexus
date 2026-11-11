@@ -2478,6 +2478,59 @@ async function main() {
       });
     }
 
+    // A large node catalog must not expand the native dialog beyond the viewport.
+    // Only the center content scrolls; title, close and submit stay actionable.
+    for(const [width,height] of [[390,680],[768,768],[1366,640],[1366,768],[1920,768],[2560,900],[3440,900],[3440,1440]]){
+      await checked('Create-user viewport clipping and fixed actions: '+width+'×'+height,async()=>{
+        await page.setViewportSize({width,height});
+        await navigate('users');
+        await page.locator('[data-nu]').first().click();
+        const dialog=page.locator('#dlg.user-create-modal[open]');
+        await dialog.waitFor({state:'visible'});
+        try{
+          const g=await dialog.evaluate(root=>{
+            const bounds=selector=>{
+              const node=selector==='self'?root:root.querySelector(selector);
+              if(!node)return null;
+              const r=node.getBoundingClientRect();
+              return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height};
+            };
+            const body=root.querySelector('.user-create-body');
+            return{
+              viewport:{width:innerWidth,height:innerHeight},
+              dialog:bounds('self'),head:bounds('.user-create-head'),
+              body:bounds('.user-create-body'),footer:bounds('.user-create-footer'),
+              close:bounds('.user-create-close'),submit:bounds('.user-create-submit'),
+              bodyClient:body.clientHeight,bodyScroll:body.scrollHeight,
+              overflow:getComputedStyle(body).overflowY
+            };
+          });
+          const fits=b=>b&&b.top>=-1&&b.bottom<=g.viewport.height+1&&b.left>=-1&&b.right<=g.viewport.width+1;
+          for(const part of ['dialog','head','body','footer','close','submit']){
+            assert(fits(g[part]),part+' is outside the create-user viewport: '+JSON.stringify(g));
+          }
+          assert(g.head.bottom<=g.body.top+2,'Header must not be pushed behind the body');
+          assert(g.body.bottom<=g.footer.top+2,'Scrollable body must not cover the footer');
+          assert.equal(g.overflow,'auto','Only the creation body may scroll vertically');
+          assert(g.bodyClient>0,'Scrollable creation body must retain useful height');
+          // The creation form contains a quota workspace even before entering a value.
+          assert.equal(await dialog.locator('[data-user-create-node-quotas]').count(),1);
+          await dialog.locator('.user-create-body').evaluate(body=>{body.scrollTop=body.scrollHeight});
+          const controls=await dialog.evaluate(root=>{
+            const rect=el=>el.getBoundingClientRect();
+            const rootBounds=rect(root);
+            const head=rect(root.querySelector('.user-create-head'));
+            const footer=rect(root.querySelector('.user-create-footer'));
+            return {headerVisible:head.top>=rootBounds.top-1,footerVisible:footer.bottom<=rootBounds.bottom+1};
+          });
+          assert(controls.headerVisible&&controls.footerVisible,'Header and footer must remain fixed while contents scroll');
+        }finally{
+          await page.keyboard.press('Escape');
+          await page.waitForSelector('dialog[open]',{state:'detached'});
+        }
+      });
+    }
+
     // The create-user metadata section must adapt to the *section* width,
     // including browser zoom and a long list of squad names. It may scroll
     // vertically within the chips box, never horizontally across other fields.
