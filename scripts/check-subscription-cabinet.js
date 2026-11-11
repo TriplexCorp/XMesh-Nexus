@@ -14,7 +14,14 @@ new Function(portal);
 const context={};
 new Function('window',studioSource+';return window.XMeshSubscriptionStudio;')(context);
 const [preview]=context.XMeshSubscriptionStudio.create({},async()=>{},()=>{},{users:2,nodes:1});
-for(const markup of [template,preview]){
+// The admin Studio may have workspace tabs, but the *public customer portal*
+// still has one-page onboarding without tabs or duplicate navigation.
+const previewStart=preview.indexOf('<div class="subscription-studio-preview subscription-public"');
+const previewEnd=preview.indexOf('<div class="subscription-studio-stats"',previewStart);
+assert(previewStart>=0&&previewEnd>previewStart,'Find the customer-facing preview inside admin Studio');
+assert.match(preview,/data-substudio-tab="servers"/,'Admin Studio may have a separate server workspace');
+const customerPreview=preview.slice(previewStart,previewEnd);
+for(const markup of [template,customerPreview]){
  assert.doesNotMatch(markup,/role="tab(?:list|panel)?"|data-cabinet-tab|data-cabinet-panel/,'Customer setup must be one page');
  assert.doesNotMatch(markup,/cabinet-feature-actions|subscription-cabinet-checklist|portal-app-next/,'No duplicated overview or navigation actions');
  for(const key of ['apps','connect','devices','support'])assert(markup.includes('data-setup-section="'+key+'"'),'Missing setup section '+key);
