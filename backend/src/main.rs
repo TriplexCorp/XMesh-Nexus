@@ -4694,7 +4694,10 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     if collection == "hosts" {
         if let Some(description) = object.get("serverDescription") {
             let description = description.as_str().ok_or_else(|| {
-                ApiError::new(StatusCode::BAD_REQUEST, "Описание сервера должно быть строкой.")
+                ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Описание сервера должно быть строкой.",
+                )
             })?;
             if description.chars().count() > 30 || description.chars().any(char::is_control) {
                 return Err(ApiError::new(
@@ -4821,21 +4824,51 @@ mod node_tls_auto_mode_validation_tests {
     #[test]
     fn validates_server_description_without_blocking_legacy_hosts() {
         assert!(validate_record("hosts", &json!({"remark":"Польша"})).is_ok());
-        assert!(validate_record("hosts", &json!({
-            "remark":"Польша","serverDescription":"10 гбит/с🔥"
-        })).is_ok());
-        assert!(validate_record("hosts", &json!({
-            "remark":"Польша","serverDescription":""
-        })).is_ok());
-        assert!(validate_record("hosts", &json!({
-            "remark":"Польша","serverDescription":"a".repeat(31)
-        })).is_err());
-        assert!(validate_record("hosts", &json!({
-            "remark":"Польша","serverDescription":12
-        })).is_err());
-        assert!(validate_record("hosts", &json!({
-            "remark":"Польша","serverDescription":"one\nsecond"
-        })).is_err());
+        assert!(
+            validate_record(
+                "hosts",
+                &json!({
+                    "remark":"Польша","serverDescription":"10 гбит/с🔥"
+                })
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_record(
+                "hosts",
+                &json!({
+                    "remark":"Польша","serverDescription":""
+                })
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_record(
+                "hosts",
+                &json!({
+                    "remark":"Польша","serverDescription":"a".repeat(31)
+                })
+            )
+            .is_err()
+        );
+        assert!(
+            validate_record(
+                "hosts",
+                &json!({
+                    "remark":"Польша","serverDescription":12
+                })
+            )
+            .is_err()
+        );
+        assert!(
+            validate_record(
+                "hosts",
+                &json!({
+                    "remark":"Польша","serverDescription":"one\nsecond"
+                })
+            )
+            .is_err()
+        );
     }
 
     #[test]
