@@ -101,8 +101,8 @@ assert.match(app,/\{k:'serverDescription',l:'Описание сервера'/,
  'Host must expose an optional, editable server description');
 assert.match(app,/host\.serverDescription\?'<span class="host-card-description"/,
  'Host cards must visibly show the optional subtitle');
-assert.match(hostEditor,/\['remark','serverDescription','address','port','countryCode'\]/,
- 'Host form must place description directly after the server name');
+assert.match(hostEditor,/\['remark','address','port','countryCode','serverDescription'\]/,
+ 'Host description must follow the original name, address, port and country controls');
 assert.match(apiBackend,/if collection == "hosts"\s*&& let Some\(description\) = object\.get\("serverDescription"\)/,
  'Server must validate server descriptions on host creation and update');
 assert.match(server,/outbound\["xmeshServerDescription"\] = json!\(description\)/,

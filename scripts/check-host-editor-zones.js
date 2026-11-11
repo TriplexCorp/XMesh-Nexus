@@ -91,7 +91,7 @@ assert(!html.includes('<details class="host-advanced'),'Existing transport and s
 assert.equal((html.match(/class="host-client-group"/g)||[]).length,2,'Client fields must have Transport and Security groupings');
 assert.match(html,/class="host-advanced-groups"/,'Both groups must remain inside the same Host form');
 assert(html.includes('host-client-settings'),'Expert client metadata must have its own disclosure');
-assert.match(feature, /\['remark','serverDescription','address','port','countryCode'\]/, 'Server description belongs next to public host name');
+assert.match(feature, /\['remark','address','port','countryCode','serverDescription'\]/, 'Optional description follows the public endpoint without breaking field pairs');
 assert.match(html,/name="serverDescription"/,'The Host editor must expose the optional description field');
 assert(!html.includes('host-description-hint')&&!html.includes('Описание сервера показывается'),'Host form must not show redundant description hints');
 

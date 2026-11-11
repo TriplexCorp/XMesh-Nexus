@@ -6,7 +6,7 @@
 /* Scoped panel features. The public subscription portal has its own document entrypoint. */
 @import url("../features/access/access.css?v=c9b134b8a0bd");
 @import url("../features/balancers/balancers.css?v=78e756c1e123");
-@import url("../features/hosts/hosts.css?v=f56a13d958a2");
+@import url("../features/hosts/hosts.css?v=aa7354cdd818");
 @import url("../features/nodes/diagnostics.css?v=88108462f070");
 @import url("../features/nodes/node-dialogs.css?v=56d227cd5200");
 @import url("../features/nodes/node-editor.css?v=0379a0715298");

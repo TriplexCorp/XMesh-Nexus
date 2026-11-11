@@ -30,6 +30,8 @@ dialog.host-wide .node-form-section-title{display:flex;align-items:center;gap:.5
 .host-connect-fields,.host-public-fields{padding:var(--nx-section-pad);border:1px solid var(--nx-border);border-radius:var(--nx-section-radius);background:var(--nx-section-bg)}
 .host-connect-fields>.f:first-child{grid-column:1/-1}
 .host-public-fields>.f>span:first-child{min-block-size:0}
+/* Preserve the name/address and port/country pairs; the optional subtitle follows on its own row. */
+.host-public-fields>.f:has([name="serverDescription"]){grid-column:1/-1}
 .host-assignment-fields{display:grid;gap:.85rem;min-width:0}
 .host-assignment-fields>.f:last-child{padding-top:.75rem;border-top:1px solid var(--nx-border)}
 .host-editor-layout .ms{display:grid;align-items:stretch;grid-template-columns:repeat(2,minmax(0,1fr));gap:.48rem;min-width:0}

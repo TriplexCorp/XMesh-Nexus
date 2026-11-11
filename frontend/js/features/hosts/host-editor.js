@@ -44,7 +44,7 @@ window.XMeshHostEditor=(() => {
       const p=field(f('profileId'),selectedProfile?.id||'');
       const inboundOptions=selectedProfile?inbs(selectedProfile).map(i=>[i.tag,i.tag+' · '+i.protocol]):[];
       const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
-      const basic=['remark','serverDescription','address','port','countryCode'].filter(k=>f(k)).map(k=>field(f(k),o[k])).join('');
+      const basic=['remark','address','port','countryCode','serverDescription'].filter(k=>f(k)).map(k=>field(f(k),o[k])).join('');
       const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
       // Keep all overrides in the same form; tabs must never split a draft.
       const advancedField=k=>{

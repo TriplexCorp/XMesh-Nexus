@@ -208,7 +208,7 @@ assert.match(app,/class="nx-directory-toolbar host-directory-toolbar">'\+search\
 assert.match(app,/function applyHostSearch\(root\)/,
  'Hosts need an isolated client-side filter');
 assert.match(app,/const searchText=\[host\.remark,host\.serverDescription,host\.address,hostPublicEndpoint\(host\),host\.countryCode,/,
- 'Host search must index name, Happ description and real endpoint fields');
+ 'Host search must index name, optional description and real endpoint fields');
 assert.match(app,/host\.tag,profile\?\.name,\.\.\.resolved\.map\(node=>node\.name\)/,
  'Host search must include inbound, profile and assigned nodes');
 assert.match(app,/data-host-search-empty/,
