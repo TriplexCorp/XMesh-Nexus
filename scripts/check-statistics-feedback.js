@@ -312,7 +312,7 @@ matches(css,/\.stats-nodes-section \.stats-nodes-toolbar\s*\{[\s\S]*?flex-wrap:n
 matches(css,/\.stats-nodes-section \.stats-nodes-toolbar :is\(\.xm-select-shell,#stats-node-filter\)/);
 matches(css,/\.stats-nodes-section \.stats-nodes-toolbar \.xm-select-trigger\s*\{/);
 matches(css,/\.stats-nodes-section \.stats-nodes-toolbar \.stats-node-search input\[type="search"\]/);
-matches(css,/@media\(max-width:720px\)[\s\S]*?\.stats-nodes-section \.stats-nodes-toolbar\{flex-wrap:wrap/);
+matches(css,/@media\(max-width:960px\)[\s\S]*?\.stats-nodes-section \.stats-nodes-toolbar\{flex-wrap:wrap/);
 matches(app,/fact\('TCP соединения',statsInteger\(ok\?v\.activeConnections:null\),'layers'\)/);
 matches(app,/fact\('Онлайн клиенты',statsInteger\(ok\?v\.onlineClients:null\),'users'\)/);
 rejects(app,/fact\('(TCP соединения|Онлайн клиенты)',statsValue\(/,
