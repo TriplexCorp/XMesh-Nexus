@@ -274,6 +274,17 @@ pub async fn request_update(
     if recent == 0 || now().saturating_sub(recent) > 90 {
         return Err(ApiError::new(StatusCode::CONFLICT, "Sub-сервер не в сети."));
     }
+    let current: Option<String> = redis::cmd("GET")
+        .arg(CURRENT_UPDATE)
+        .query_async(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    if current.is_some() {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Обновление сервера уже выполняется.",
+        ));
+    }
     let job = random_hex()[..32].to_owned();
     let stored: Option<String> = redis::cmd("SET")
         .arg(PENDING_UPDATE)
