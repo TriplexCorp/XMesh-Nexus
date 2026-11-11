@@ -198,15 +198,25 @@ assert.match(css,/\.subscription-client-editor/);
 assert.match(css,/\.subscription-preview-apps/);
 assert.match(css,/\.subscription-custom-toolbar/);
 assert.match(css,/\.subscription-custom-header/);
-assert.match(view,/name="subscriptionPlacement"/);
-assert.match(view,/name="nodePlacement"/);
-assert.match(view,/name="deploymentServerB"/);
-assert.match(view,/name="deploymentServerC"/);
-assert.match(view,/value="c" selected/);
-assert.match(view,/value="b" selected/);
+assert.match(view,/data-substudio-tab="settings"/,'Studio must have dedicated settings tab');
+assert.match(view,/data-substudio-tab="servers"/,'Studio must have separate Sub servers tab');
+assert.match(view,/role="tabpanel" aria-labelledby="substudio-tab-servers" hidden/,
+ 'Sub server setup must start hidden, with settings as the default');
+assert.doesNotMatch(view,/Архитектура LEGO|Экспорт схемы JSON|Сервер B · адрес|Сервер C · адрес/,
+ 'Remove misleading topology-only blueprint from user interface');
+assert.doesNotMatch(view,/name="subscriptionPlacement"|name="nodePlacement"|name="deploymentServerB"|name="deploymentServerC"/,
+ 'Obsolete planning-only fields should not be editable');
+assert.doesNotMatch(src,/input\(form,'subscriptionPlacement'\)|input\(form,'nodePlacement'\)/,
+ 'Legacy planning keys must not be included in future saves');
+assert.match(view,/data-sub-health-url/,'VPS workflow needs explicit health endpoint guidance');
+assert.match(view,/data-sub-health-link/,'VPS workflow must expose a real health link');
+assert.match(view,/не регистр|пока не реализованы/,'Do not pretend phase-one edge automatically pairs or reports uptime');
+assert.match(src,/data\.subscriptionView=next/,'Tabs must switch actual content, not just visual selection');
+assert.match(src,/ArrowRight/,'Server tabs must support arrow-key navigation');
+
 assert(!view.includes('<script>alert(1)</script>'),'User-provided studio content must be escaped');
 assert.match(view,/&lt;script&gt;/);
-assert.match(view,/Экспорт схемы JSON/);
+assert.doesNotMatch(view,/Экспорт схемы JSON/);
 assert.match(view,/Оформление действующей страницы подписки/);
 assert.match(fs.readFileSync("backend/src/user_subscriptions.rs","utf8"),/subscriptionClientLinks/);
 assert.match(fs.readFileSync("backend/src/user_subscriptions.rs","utf8"),/subscriptionPath/);
@@ -281,6 +291,10 @@ assert.match(fs.readFileSync('backend/src/user_subscriptions.rs','utf8'),/includ
 assert.match(css,/\.subscription-studio-layout/);
 assert.match(css,/@media\(max-width:780px\)/);
 assert.match(css,/\.subscription-sub-install-command/);
+assert.match(css,/\.subscription-servers-page/,'Server setup must have its own bounded layout');
+assert.match(css,/\.subscription-studio-tabs button\.on/,'Tab state must be visible');
+assert.match(css,/\[hidden\]\{display:none!important\}/,'Hidden workspace must not leak into the grid');
+
 assert.match(src,/navigator\.clipboard\?\.writeText/);
 assert.match(src,/savedInstall\.domain=draft\.subscriptionDomain/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);

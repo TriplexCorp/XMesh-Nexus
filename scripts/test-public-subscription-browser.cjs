@@ -134,7 +134,7 @@ async function dismissDialog(page,dialog,opener){
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-traffic.js').toString()});
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-studio.js').toString()});
   await page.evaluate(()=>{
-    const [markup,mount]=window.XMeshSubscriptionStudio.create({subscriptionLanguage:'en',subscriptionSyncPanelTheme:false,subscriptionShowDevices:true,subscriptionShowSupport:true},async()=>{},()=>{},{users:2,nodes:1});
+    const [markup,mount]=window.XMeshSubscriptionStudio.create({domain:'panel.example.org',subscriptionLanguage:'en',subscriptionSyncPanelTheme:false,subscriptionShowDevices:true,subscriptionShowSupport:true},async()=>{},()=>{},{users:2,nodes:1});
     document.body.innerHTML=markup;mount();
   });
   const studio=page.locator('[data-subscription-preview-frame]');
@@ -154,6 +154,34 @@ async function dismissDialog(page,dialog,opener){
   assert(await studio.locator('.subscription-public-info-panel').isHidden());
   await page.locator('[name="subscriptionShowQr"]').uncheck();
   assert(await studio.locator('[data-subscription-qr]').isHidden());checks++;
+  // Sub server installation must be a discoverable, functional and isolated tab.
+  const settingsTab=page.locator('[data-substudio-tab="settings"]');
+  const serversTab=page.locator('[data-substudio-tab="servers"]');
+  await serversTab.click();
+  assert.equal(await serversTab.getAttribute('aria-selected'),'true');
+  assert(await studio.isHidden(),'Preview stays separate from server provisioning');
+  assert(await page.locator('.subscription-servers-page').isVisible());
+  assert(await page.locator('.subscription-studio-main').isHidden());
+  const commandCopy=page.locator('[data-sub-install-copy]');
+  assert(await commandCopy.isDisabled(),'Installation cannot be copied before domain settings are saved');
+  assert(await page.locator('[data-sub-health-link]').isHidden(),'Health link needs validated saved DNS');
+  await page.locator('[name="subscriptionDomain"]').fill('sub.example.org');
+  assert(await commandCopy.isDisabled(),'Editing the domain is not equivalent to saving it');
+  await page.locator('button[form="subscription-studio-form"]').click();
+  assert(await commandCopy.isEnabled(),'Saving the domain allows copying the installer command');
+  assert.match(await page.locator('[data-sub-install-command]').innerText(),/--domain sub\.example\.org --path \/s/);
+  assert.equal(await page.locator('[data-sub-health-link]').getAttribute('href'),'https://sub.example.org/healthz');
+  assert.match(await page.locator('[data-sub-install-state]').innerText(),/Команда готова/);
+  assert(!/подключён|онлайн/i.test(await page.locator('[data-sub-install-state]').innerText()),
+    'A generated command is not proof of a paired or online server');
+  await settingsTab.click();
+  assert(await studio.isVisible(),'Portal preview must remain mounted after tab switches');
+  assert.equal(await page.locator('[name="subscriptionDomain"]').inputValue(),'sub.example.org');
+  assert(await page.locator('.subscription-servers-page').isHidden());
+  await serversTab.focus();
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await settingsTab.getAttribute('aria-selected'),'true','Keyboard navigation must select the settings workspace');
+  checks++;
   assert.deepEqual(errors,[]);console.log('Public portal: '+checks+' viewport/locale/state cases, onboarding, copy, QR, filters, keyboard, English, real usage and reduced motion passed');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1});
