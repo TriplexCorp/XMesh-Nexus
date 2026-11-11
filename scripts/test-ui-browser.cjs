@@ -1188,6 +1188,33 @@ async function main() {
       for (const route of routes) await checked(`${route}: ${width}×${height}`, async () => {
         await navigate(route);
         const g = await geometry(page);
+        if(route==='statistics'){
+          const toolbar=await page.locator('.stats-nodes-toolbar').evaluate(root=>{
+            const rect=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,centerY:r.y+r.height/2}};
+            const search=root.querySelector('.stats-node-search'),input=root.querySelector('#stats-node-search');
+            const filter=root.querySelector('.xm-select-shell')||root.querySelector('#stats-node-filter');
+            const toggle=root.querySelector('.stats-node-view-toggle'),count=root.querySelector('#stats-node-count');
+            return {outer:rect(root),search:rect(search),filter:rect(filter),toggle:rect(toggle),count:rect(count),
+              wrap:getComputedStyle(root).flexWrap,inputBorder:getComputedStyle(input).borderTopWidth,
+              inputShadow:getComputedStyle(input).boxShadow};
+          });
+          assert.equal(toolbar.inputBorder,'0px','Statistics search must not draw a second pill border');
+          assert.equal(toolbar.inputShadow,'none','Statistics search must not have a second shadow');
+          for(const part of ['search','filter','toggle','count']){
+            const r=toolbar[part],outer=toolbar.outer;
+            assert(r.x>=outer.x-2&&r.right<=outer.right+2,
+              'Statistics toolbar '+part+' escapes horizontal bounds at '+width+'px');
+          }
+          if(width>=1366){
+            assert.equal(toolbar.wrap,'nowrap','Desktop Statistics toolbar must be a single row');
+            assert(toolbar.outer.height<=66,'Statistics toolbar has grown into stacked rows');
+            const boxes=[toolbar.search,toolbar.filter,toolbar.toggle,toolbar.count];
+            assert(boxes.every(b=>Math.abs(b.centerY-boxes[0].centerY)<=8),
+              'Statistics controls and count must share one horizontal baseline');
+            assert(boxes.every((b,i)=>i===0||boxes[i-1].right<=b.x+3),
+              'Statistics toolbar controls overlap instead of forming one line');
+          }
+        }
         if (['set','nodes'].includes(route) || width === 390 || width === 768 || width === 1440 || width === 1920 || width === 3440) await screenshot(page,`${route}-${width}`);
         if(width<1000){
           assert(!g.renderFailed,'Mobile route must render');
