@@ -1618,7 +1618,7 @@ html[data-motion=off] :is(.stats-bucket-detail,.stats-bucket-content,.stats-deta
 @media(max-width:1080px){
   .stats-nodes-section .stats-node-grid{grid-template-columns:minmax(0,1fr)}
 }
-@media(max-width:720px){
+@media(max-width:960px){
   .stats-nodes-section .stats-nodes-toolbar{flex-wrap:wrap;gap:.4rem}
   .stats-nodes-section .stats-node-search{
     flex:1 1 100%;min-width:0;width:100%;max-width:100%;margin-right:0;
