@@ -3797,6 +3797,7 @@ function hostEditorRefresh(form,changedProfile=false){
   if(preview){
     preview.innerHTML=
       show('Название в Happ',val('remark')||'Введите название слева')+
+      (val('serverDescription')?show('Подпись в Happ',val('serverDescription')):'')+
       show('XRAY STUDIO',profile?.name||'Не выбран')+
       show('Inbound',inbound?.tag||'Не выбран')+
       show('Протокол / транспорт',inbound?(inbound.protocol+' / '+(stream.network||'tcp')):'—')+
