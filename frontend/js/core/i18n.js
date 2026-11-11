@@ -21,6 +21,7 @@ window.XMeshI18n=(()=>{
     "Описание сервера — не более 30 символов, без управляющих знаков.": "Server description must be at most 30 characters without control characters.",
 
 
+    "Краткое описание (необязательно)": "Short description (optional)",
     "10 гбит/с🔥": "10 Gbps🔥",
 
 
