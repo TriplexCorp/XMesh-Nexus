@@ -1128,6 +1128,20 @@ async fn collect_user_outbounds(
             let matched = published_hosts_for_profile(&hosts, tag, profile, &nodes);
             for host in matched {
                 if let Some(mut outbound) = proxy_outbound(user, inbound, host, device) {
+                    // Happ-specific display subtitle is host-owned metadata.
+                    // It is attached only to this selectable subscription entry,
+                    // never to a server-side inbound or client transport.
+                    if let Some(description) =
+                        host.get("serverDescription").and_then(Value::as_str)
+                    {
+                        let description = description.trim();
+                        if !description.is_empty()
+                            && description.chars().count() <= 30
+                            && !description.chars().any(char::is_control)
+                        {
+                            outbound["xmeshServerDescription"] = json!(description);
+                        }
+                    }
                     // Stable explicit-host identity is independent of display name.
                     if let Some(id) = host.get("id").and_then(Value::as_i64) {
                         outbound["xmeshSourceKey"] = json!(format!("host:{id}"));
