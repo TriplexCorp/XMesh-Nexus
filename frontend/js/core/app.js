@@ -6166,7 +6166,19 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     const d=read(FU,f);
     if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()))return er('Такое имя уже есть. Выберите другое.');
     if(!d.squads.length)return er('Выберите хотя бы один сквад.');
-    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,cdnLimitGb:d.cdnLimitGb,used:0,strategy:d.strategy,tag:d.tag,tg:d.tg,email:d.email,desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[]};
+    let nodePolicies={};
+    try{
+      if(f.querySelector('[data-user-create-node-quotas]')){
+        if(!window.XMeshNodeQuotas?.readCreate)throw Error('Редактор квот нод недоступен. Обновите страницу.');
+        nodePolicies=window.XMeshNodeQuotas.readCreate(f);
+      }
+    }catch(error){
+      const details=f.querySelector('[data-user-create-node-quotas]');
+      if(details)details.open=true;
+      error.field?.focus?.();
+      return er(error.message||'Некорректные квоты нод.');
+    }
+    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,cdnLimitGb:d.cdnLimitGb,used:0,strategy:d.strategy,tag:d.tag,tg:d.tg,email:d.email,desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[],...(Object.keys(nodePolicies).length?{nodeTrafficLimits:nodePolicies}:{})};
     const submitButton=f.querySelector('.user-create-submit, .act .btn');
     f.dataset.creating='1';
     if(submitButton)submitButton.disabled=true;
