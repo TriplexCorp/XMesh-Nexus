@@ -256,6 +256,7 @@ const ENT={
     {k:'nodes',l:'Назначенные ноды',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.name])},
     {k:'disabled',l:'Отключить выдачу хоста в подписках',t:'bool'},
     {k:'remark',l:'Название в приложении',req:1,h:'Отображается в Happ.'},
+    {k:'serverDescription',l:'Описание сервера в Happ',ph:'10 гбит/с🔥',h:'Необязательная подпись под названием сервера в Happ (до 30 символов).'},
     {k:'address',l:'Публичный адрес',req:1},
     {k:'countryCode',l:'Код страны',ph:'NL, DE, SE…',h:'Две буквы: NL, DE, SE. Необязательно.'},
     {k:'port',l:'Публичный порт',t:'num'},
@@ -281,6 +282,8 @@ const ENT={
     def:()=>({port:443,fp:'chrome',order:DB.hosts.length+1,nodes:[],profileId:DB.profiles[0]?.id||0}),
     chk:d=>{
       d.securityLayer=String(d.securityLayer||'');d.alpn=String(d.alpn||'');
+      d.serverDescription=String(d.serverDescription||'').trim();
+      if([...d.serverDescription].length>30||/[\\u0000-\\u001f\\u007f]/.test(d.serverDescription))return panelIsEnglish()?'Happ server description must be 30 characters or fewer.':'Описание сервера Happ — не более 30 символов, без управляющих знаков.';
       for(const key of ['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings']){
         const raw=d[key];
         if(!raw){d[key]=null;continue}
@@ -3382,7 +3385,7 @@ function hostCard(host,index,total){
   ).join('');
   const more=resolved.length>4?'<span class="host-card-node-extra">+'+(resolved.length-4)+'</span>':'';
   const endpoint=esc(hostPublicEndpoint(host));
-  const searchText=[host.remark,host.address,hostPublicEndpoint(host),host.countryCode,
+  const searchText=[host.remark,host.serverDescription,host.address,hostPublicEndpoint(host),host.countryCode,
     host.tag,profile?.name,...resolved.map(node=>node.name)].join(' ');
   const readiness=ENT.hosts.cols[4][1](host);
   const state=host.disabled?'Выключен':'Включён';
@@ -3391,7 +3394,8 @@ function hostCard(host,index,total){
   return '<article class="host-card" data-host-card-id="'+id+'" data-host-search-text="'+esc(searchText)+'">'+
     '<header class="host-card-header"><div class="host-card-identity">'+
     '<span class="host-card-emblem">'+ic('server')+'</span>'+
-    '<div class="host-card-heading"><button type="button" class="host-card-name" data-ne="hosts:'+id+'" data-no-translate>'+name+'</button>'+
+    '<div class="host-card-heading"><button type="button" class="host-card-name" data-ne="hosts:'+id+'" data-no-translate>'+name+'</button>'+ 
+    (host.serverDescription?'<span class="host-card-description" data-no-translate title="'+esc(String(host.serverDescription))+'">'+esc(String(host.serverDescription))+'</span>':'')+
     '<span class="host-card-state '+stateClass+'">'+ic(host.disabled?'pause':'check')+state+'</span></div></div>'+
     '<div class="host-card-head-actions">'+toggle+
     '<details class="host-card-actions"><summary aria-label="Действия с хостом" title="Действия с хостом">'+ic('more')+'</summary>'+
