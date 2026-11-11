@@ -27,6 +27,9 @@
 .sidebar-logout{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;min-height:var(--nx-control-h-sm);border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);color:var(--mu)}
 .sidebar-logout:hover{color:var(--er);background:color-mix(in srgb,var(--er) 7%,var(--nx-control-bg))}
 .top{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:.75rem;width:100%;min-height:4rem;margin-bottom:1.1rem;padding-bottom:1rem;border-bottom:1px solid var(--nx-separator);z-index:1}
+/* A child popover cannot escape the header's stacking context. Raise the whole
+ * header only while the version menu is open, above node/card action controls. */
+.top:has(.top-panel-version-menu:not([hidden])){z-index:var(--nx-z-dialog)}
 .top-identity{display:grid;gap:.15rem;min-width:0;margin-right:auto}
 .top h1{font-size:var(--nx-title);line-height:1.2;letter-spacing:-.035em}
 .search{display:flex;align-items:center;gap:.6rem;flex:0 1 21rem;min-width:12rem;min-height:var(--nx-control-h);padding:.55rem .8rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);color:var(--nx-muted);text-align:left}
