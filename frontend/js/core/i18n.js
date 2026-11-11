@@ -15,6 +15,21 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "· последняя связь": "· last seen",
+    "Для управления создайте одноразовую команду привязки и выполните её на VPS.": "To manage this server, generate a one-time pairing command and run it on the VPS.",
+    "Подключение к Sub-серверу временно недоступно.": "Sub server connection is temporarily unavailable.",
+    "Сначала сохраните корректный домен подписок в Subscription Studio.": "Save a valid subscription domain in Subscription Studio first.",
+    "Недействительный ключ XMesh Sub.": "Invalid XMesh Sub key.",
+    "Код подключения недействителен.": "Invalid pairing code.",
+    "Домен сервера не совпадает с доменом подписок.": "Server domain does not match the subscription domain.",
+    "Код подключения истёк или уже использован.": "Pairing code expired or has already been used.",
+    "Сначала подключите Sub-сервер.": "Connect the Sub server first.",
+    "Домен подписок изменился. Подключите сервер повторно.": "Subscription domain changed. Pair the server again.",
+    "Sub-сервер не в сети.": "Sub server is offline.",
+    "На сервере уже ожидает выполнения обновление.": "An update is already queued for this server.",
+    "Недопустимая версия агента.": "Invalid agent version.",
+    "Недопустимый отчёт Sub-сервера.": "Invalid Sub server report.",
+    "Неизвестное обновление.": "Unknown update.",
     "Управление Sub-сервером": "Manage Sub server",
     "Привяжите VPS один раз для статуса и обновления из панели": "Pair the VPS once to view status and update it from Nexus",
     "Не подключён": "Not connected",
