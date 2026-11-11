@@ -821,7 +821,7 @@ mod tests {
         pl["xmeshSourceKey"] = json!("host:101");
         pl["xmeshServerDescription"] = json!("10 гбит/с🔥");
         let mut de = outbound("DE");
-        de["tag"] = json!("🇩🇪 Германия");
+        de["tag"] = json!("🇩🇪 Germany");
         de["xmeshSourceKey"] = json!("host:102");
         let feed = build_feed(vec![pl.clone(), de.clone()], &json!({})).unwrap();
         assert_eq!(feed[0]["remarks"], "🇵🇱 Польша");
@@ -839,20 +839,20 @@ mod tests {
     fn happ_description_does_not_leak_into_balancer_or_other_host() {
         let mut pl = outbound("PL");
         pl["xmeshSourceKey"] = json!("host:101");
-        pl["xmeshServerDescription"] = json!("LTE 5 ГБ");
+        pl["xmeshServerDescription"] = json!("LTE 5 GB");
         let mut de = outbound("DE");
         de["xmeshSourceKey"] = json!("host:102");
         de["xmeshServerDescription"] = json!("10 гбит/с🔥");
         let setting = json!({"clientBalancers":[{
             "tag":"AUTO_1", "remark":"🇪🇺 AUTO",
-            "serverDescription":"Маршрут EU", "selector":["host:101","host:102"],
+            "serverDescription":"EU route", "selector":["host:101","host:102"],
             "strategy":"roundRobin","enabled":true
         }]});
         let feed = build_feed(vec![pl,de], &setting).unwrap();
         assert_eq!(feed.as_array().unwrap().len(),3);
         assert!(feed[0].get("meta").is_none());
-        assert_eq!(feed[0]["serverDescription"],"Маршрут EU");
-        assert_eq!(feed[1]["meta"]["serverDescription"],"LTE 5 ГБ");
+        assert_eq!(feed[0]["serverDescription"],"EU route");
+        assert_eq!(feed[1]["meta"]["serverDescription"],"LTE 5 GB");
         assert_eq!(feed[2]["meta"]["serverDescription"],"10 гбит/с🔥");
         assert!(!feed.to_string().contains("xmeshServerDescription"));
     }
