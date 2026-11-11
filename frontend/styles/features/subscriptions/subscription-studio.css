@@ -450,3 +450,33 @@
 @media(prefers-reduced-motion:reduce){
  .subscription-studio-tabs button{transition:none}
 }
+
+
+/* Managed XMesh Sub: inline, compact and separate from installation wizard. */
+.subscription-sub-management{
+ display:grid;gap:.7rem;min-width:0;
+ padding:.82rem .9rem;border:1px solid var(--st-border);
+ border-radius:var(--nx-control-radius);background:var(--nx-section-bg);
+}
+.subscription-sub-management-title{
+ display:flex;align-items:center;justify-content:space-between;
+ gap:.8rem;flex-wrap:wrap;min-width:0;
+}
+.subscription-sub-management-title>div{display:grid;gap:.15rem;min-width:0}
+.subscription-sub-management-title b{font-size:.85rem;color:var(--st-ink)}
+.subscription-sub-management-title small,.subscription-sub-management>small{
+ font-size:.69rem;line-height:1.45;color:var(--st-muted);
+}
+.subscription-sub-management-actions{
+ display:flex;align-items:center;justify-content:flex-start;
+ flex-wrap:wrap;gap:.45rem;min-width:0;
+}
+.subscription-sub-management-actions button{min-height:2.25rem}
+.subscription-sub-management-actions button:disabled{opacity:.5;cursor:not-allowed}
+.subscription-sub-management-actions [data-sub-update]{
+ margin-left:auto;
+}
+@media(max-width:780px){
+ .subscription-sub-management-actions [data-sub-update]{margin-left:0}
+ .subscription-sub-management-actions button{flex:1 1 auto}
+}
