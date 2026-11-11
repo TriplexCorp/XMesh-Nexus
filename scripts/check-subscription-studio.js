@@ -232,7 +232,9 @@ assert.doesNotMatch(src,/input\(form,'subscriptionPlacement'\)|input\(form,'node
  'Legacy planning keys must not be included in future saves');
 assert.match(view,/data-sub-health-url/,'VPS workflow needs explicit health endpoint guidance');
 assert.match(view,/data-sub-health-link/,'VPS workflow must expose a real health link');
-assert.match(view,/не регистр|пока не реализованы/,'Do not pretend phase-one edge automatically pairs or reports uptime');
+assert.match(view,/data-sub-agent-state/,'Managed status must be backed by the agent API');
+assert.match(view,/агент на VPS сам обращается к Nexus по HTTPS/,'Explain outbound-only management');
+assert.match(src,/status\?\.online&&status\?\.domainMatches/,'Online state must require an authenticated and domain-matched heartbeat');
 assert.match(src,/root\.dataset\.subscriptionView=next/,'Tabs must switch actual content, not just visual selection');
 assert.match(src,/ArrowRight/,'Server tabs must support arrow-key navigation');
 
