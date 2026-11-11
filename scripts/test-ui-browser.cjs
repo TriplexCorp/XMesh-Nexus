@@ -1915,12 +1915,33 @@ async function main() {
       await page.locator('[data-user-editor-tab=dev]').press('Home');
       assert.equal(await first.inputValue(),'User tab draft','Tab switches must preserve the original form DOM');
       await page.locator('[data-user-editor-tab=traffic]').click();
+      const quotaEditor=page.locator('[data-user-node-quotas]');
+      const quotaRow=quotaEditor.locator('[data-node-quota-row="'+node.id+'"]');
+      await quotaRow.waitFor({state:'visible'});
+      assert.equal(await quotaEditor.locator('[data-node-quota-save]').count(),0,
+        'No separate save action is allowed for per-node quotas');
+      await quotaRow.locator('[data-node-quota-limit]').fill('-1');
+      await page.locator('.user-save-button').click();
+      assert.equal(await page.locator('[data-user-editor-tab=traffic]').getAttribute('aria-selected'),'true',
+        'Invalid quota must keep the Traffic tab selected');
+      assert(await page.locator('#dlg #fe').isVisible(),'Quota validation must show an error');
+      await quotaRow.locator('[data-node-quota-limit]').fill('5');
+      await quotaRow.locator('[data-node-quota-period]').selectOption('lifetime');
+      assert.match(await page.locator('[data-user-edit-dirty]').innerText(),/несохранённые|Unsaved/i,
+        'Editing quotas must flag unsaved user changes');
       const saved=page.waitForResponse(r=>r.url().endsWith(`/collections/users/${otherUser.id}`)&&r.request().method()==='PATCH');
-      await page.locator('.user-save-button').click();assert((await saved).ok());
+      await page.locator('.user-save-button').click();
+      const response=await saved;
+      assert(response.ok());
+      const patch=JSON.parse(response.request().postData()||'{}');
+      assert.deepEqual(patch.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'lifetime'},
+        'The one user Save must submit the changed quota alongside other settings');
+      assert.equal(patch.nodeQuotaUsedBytes,undefined,'Never send server-owned counters');
       await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
       const result=(await api('GET','/bootstrap')).collections.users.find(u=>u.id===otherUser.id);
       assert.equal(result.desc,'User tab draft');assert.equal(result.hwid,4);assert.deepEqual(result.squads,[]);
-      await api('PATCH',`/collections/users/${otherUser.id}`,{desc:'',hwid:2,squads:[squad.id]});
+      assert.deepEqual(result.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'lifetime'});
+      await api('PATCH',`/collections/users/${otherUser.id}`,{desc:'',hwid:2,squads:[squad.id],nodeTrafficLimits:{}});
     });
 
     await checked('User Details: viewer can navigate every read-only tab',async()=>{
