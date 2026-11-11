@@ -1,6 +1,6 @@
 'use strict';
 // Compact per-user node quota editor. Reads only server-calculated, signed usage;
-// saves policy changes via normal user PATCH and never submits usage counters.
+// includes policy edits in the unified user PATCH; never submits usage counters.
 window.XMeshNodeQuotas=(()=>{
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -54,7 +54,6 @@ window.XMeshNodeQuotas=(()=>{
       '<label class="user-node-quota-filter"><input type="checkbox" data-node-quota-limited-only> '+txt('Только с лимитами','Limited only')+'</label></div>'+
       '<div class="user-node-quota-list" data-node-quota-list>'+rows+'</div>'+
       '<div class="user-node-quota-actions">'+(data.length>8?'<button type="button" class="gh sm" data-node-quota-expand>'+txt('Показать все','Show all')+'</button>':'')+
-      (isEditable(editor)?'<button type="button" class="btn sm" data-node-quota-save disabled>'+txt('Сохранить квоты','Save quotas')+'</button>':'')+
       '<span class="user-node-quota-message" data-node-quota-message role="status" aria-live="polite"></span></div>'+
       '<p class="user-node-quota-note">'+txt('0 или пусто — без ограничения на этой ноде. Лимит действует только для данного пользователя. Доступ изменится после синхронизации ноды.',
       'Zero or blank means unlimited on that node. This limit applies to this user only. Access updates after node synchronization.')+'</p>'+
@@ -84,20 +83,45 @@ window.XMeshNodeQuotas=(()=>{
   function readPolicies(editor){
     const policies={};
     for(const row of editor.root.querySelectorAll('[data-node-quota-row]')){
-      const raw=row.querySelector('[data-node-quota-limit]').value.trim();
+      const input=row.querySelector('[data-node-quota-limit]');
+      const raw=String(input?.value||'').trim();
       const id=row.dataset.nodeQuotaRow;
+      if(input?.validity?.badInput){
+        const error=Error(txt('Лимит должен быть положительным числом до 1 000 000 ГБ.','The limit must be a positive number up to 1,000,000 GB.'));
+        error.field=input;throw error;
+      }
       if(!raw||Number(raw)===0)continue;
       const amount=Number(raw);
       if(!Number.isFinite(amount)||amount<=0||amount>1000000||amount*1e9<1){
-        throw Error(txt('Лимит должен быть положительным числом до 1 000 000 ГБ.','The limit must be a positive number up to 1,000,000 GB.'));
+        const error=Error(txt('Лимит должен быть положительным числом до 1 000 000 ГБ.','The limit must be a positive number up to 1,000,000 GB.'));
+        error.field=input;throw error;
       }
-      const period=row.querySelector('[data-node-quota-period]').value;
-      if(!['monthly','lifetime'].includes(period))throw Error(txt('Некорректный период.','Invalid period.'));
+      const periodSelect=row.querySelector('[data-node-quota-period]');
+      const period=periodSelect?.value;
+      if(!['monthly','lifetime'].includes(period)){
+        const error=Error(txt('Некорректный период.','Invalid period.'));
+        error.field=periodSelect;throw error;
+      }
       policies[id]={limitGb:amount,period};
     }
     return policies;
   }
-  async function mount(root,{user,request,save,readOnly=false,notify}){
+  // Never send unchanged quotas: failed or pending loads must not erase
+  // existing policies when other user fields are saved.
+  function readDraft(root){
+    if(!root||root.dataset.nodeQuotaDirty!=='true')return null;
+    try{
+      const policies=readPolicies({root});
+      const status=root.querySelector('[data-node-quota-message]');
+      if(status)status.textContent='';
+      return policies;
+    }catch(error){
+      const status=root.querySelector('[data-node-quota-message]');
+      if(status)status.textContent=error.message;
+      throw error;
+    }
+  }
+  async function mount(root,{user,request,readOnly=false}){
     if(!root)return;
     const editor={root,user,readOnly,expanded:false,items:[]};
     root.textContent=txt('Загружаем индивидуальные квоты…','Loading per-node quotas…');
@@ -105,57 +129,41 @@ window.XMeshNodeQuotas=(()=>{
       const result=await request('/api/v1/users/'+encodeURIComponent(user.id)+'/node-quotas');
       if(!root.isConnected||!Array.isArray(result.items))return;
       editor.items=result.items;
+      root.dataset.nodeQuotaDirty='false';
       root.innerHTML=markup(editor);
+      const markDirty=()=>{
+        if(readOnly)return;
+        root.dataset.nodeQuotaDirty='true';
+        const status=root.querySelector('[data-node-quota-message]');
+        if(status)status.textContent=txt('Есть несохранённые изменения','Unsaved changes');
+        const badge=root.closest('.user-canvas')?.querySelector('[data-user-edit-dirty]');
+        if(badge)badge.textContent=txt('Есть несохранённые изменения','Unsaved changes');
+      };
       root.addEventListener('input',event=>{
         if(event.target.matches('[data-node-quota-search]')){
           updateVisibility(editor);
-        }else if(event.target.closest('[data-node-quota-row]')){
-          const button=root.querySelector('[data-node-quota-save]');
-          if(button)button.disabled=false;
+        }else if(event.target.matches('[data-node-quota-limit]')){
+          markDirty();
           updateVisibility(editor);
         }
       });
       root.addEventListener('change',event=>{
         if(event.target.matches('[data-node-quota-limited-only]')){
           updateVisibility(editor);
-        }else if(event.target.closest('[data-node-quota-row]')){
-          const button=root.querySelector('[data-node-quota-save]');
-          if(button)button.disabled=false;
+        }else if(event.target.matches('[data-node-quota-limit],[data-node-quota-period]')){
+          markDirty();
           updateVisibility(editor);
         }
       });
-      root.addEventListener('click',async event=>{
+      root.addEventListener('click',event=>{
         if(event.target.closest('[data-node-quota-expand]')){
-          editor.expanded=!editor.expanded;updateVisibility(editor);return;
-        }
-        const button=event.target.closest('[data-node-quota-save]');
-        if(!button||readOnly)return;
-        const status=root.querySelector('[data-node-quota-message]');
-        let policies;
-        try{policies=readPolicies(editor)}
-        catch(e){if(status)status.textContent=e.message;return}
-        button.disabled=true;
-        if(status)status.textContent=txt('Сохраняем…','Saving…');
-        try{
-          await save({nodeTrafficLimits:policies});
-          user.nodeTrafficLimits=policies;
-          const updated=await request('/api/v1/users/'+encodeURIComponent(user.id)+'/node-quotas');
-          if(!root.isConnected)return;
-          editor.items=updated.items;
-          editor.expanded=true;
-          root.innerHTML=markup(editor);
+          editor.expanded=!editor.expanded;
           updateVisibility(editor);
-          if(notify)notify(txt('Индивидуальные квоты сохранены','Per-node quotas saved'));
-          const fresh=root.querySelector('[data-node-quota-message]');
-          if(fresh)fresh.textContent=txt('Сохранено. Синхронизация нод применит ограничения.','Saved. Node synchronization will apply the limits.');
-        }catch(e){
-          if(status)status.textContent=txt('Ошибка: ','Error: ')+(e.message||'API');
-          button.disabled=false;
         }
       });
       updateVisibility(editor);
-    }catch(e){
-      if(root.isConnected)root.textContent=txt('Не удалось загрузить квоты: ','Could not load quotas: ')+(e.message||'API');
+    }catch(error){
+      if(root.isConnected)root.textContent=txt('Не удалось загрузить квоты: ','Could not load quotas: ')+(error.message||'API');
     }
   }
 
@@ -248,5 +256,5 @@ window.XMeshNodeQuotas=(()=>{
     }
     return policies;
   }
-  return Object.freeze({mount,createMarkup,bindCreate,readCreate});
+  return Object.freeze({mount,readDraft,createMarkup,bindCreate,readCreate});
 })();

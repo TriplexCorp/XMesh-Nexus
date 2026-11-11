@@ -2613,8 +2613,7 @@ function userDrawer(id,tab){
   window.XMeshUserClientRouting?.mount(dlg.querySelector('.user-canvas'),u,DB);
   if(window.XMeshNodeQuotas?.mount){
     void window.XMeshNodeQuotas.mount(dlg.querySelector('[data-user-node-quotas]'),{
-      user:u,request:backendRequest,readOnly:viewerMode(),
-      save:patch=>api.update('users',u.id,patch),notify:toast
+      user:u,request:backendRequest,readOnly:viewerMode()
     });
   }
   window.XMeshUserTabs.select(dlg.querySelector('.user-canvas'),tab==='sub'?'acc':tab||'ov');

@@ -83,8 +83,41 @@ for(const value of ['-1','1000001','abc','0.0000000001']){
   assert.throws(()=>helper.readCreate(form([nodeRow(12,value,'monthly')])));
 }
 assert.throws(()=>helper.readCreate(form([nodeRow(12,'5','weekly')])));
+const quotaRow=(id,value,period)=>({
+  dataset:{nodeQuotaRow:String(id)},
+  querySelector:selector=>selector==='[data-node-quota-limit]'?
+    {value:String(value),validity:{badInput:false}}:{value:period}
+});
+const draftRoot=(dirty,rows)=>({
+  dataset:{nodeQuotaDirty:dirty?'true':'false'},
+  querySelectorAll:()=>rows,
+  querySelector:()=>null
+});
+assert.equal(helper.readDraft(draftRoot(false,[quotaRow(12,'5','monthly')])),null,
+  'Unedited quotas must not overwrite server policies');
+assert.deepEqual(helper.readDraft(draftRoot(true,[quotaRow(12,'5','monthly')])),{
+  '12':{limitGb:5,period:'monthly'}
+});
+assert.deepEqual(helper.readDraft(draftRoot(true,[quotaRow(12,'','monthly')])),{},
+  'Clearing a quota must transmit an empty policy map');
+assert.throws(()=>helper.readDraft(draftRoot(true,[quotaRow(12,'-1','monthly')])),
+  /Лимит должен быть положительным/);
+assert.throws(()=>helper.readDraft(draftRoot(true,[quotaRow(12,'5','weekly')])),
+  /Некорректный период/);
 
-assert.match(ui,/save\(\{nodeTrafficLimits:policies\}\)/);
+assert.doesNotMatch(ui,/data-node-quota-save/,
+  'Quota editor must not show a separate Save button');
+assert.match(ui,/function readDraft\(root\)/,
+  'Quota editor must export its unsaved draft to the common Save handler');
+assert.match(ui,/root\.dataset\.nodeQuotaDirty='true'/,
+  'Quota input changes must mark the unified form dirty');
+const unified=fs.readFileSync('frontend/js/features/users/user-editor-draft.js','utf8');
+assert.ok(unified.includes("XMeshNodeQuotas?.readDraft?.(canvas.querySelector('[data-user-node-quotas]'))"),
+  'One Save must read per-node quota changes');
+assert.match(unified,/data\.nodeTrafficLimits=policies/,
+  'Unified user PATCH must contain edited node quotas');
+assert.doesNotMatch(app,/save:patch=>api\.update\('users',u\.id,patch\)/,
+  'Node quota editor must no longer get a separate PATCH function');
 assert.match(app,/XMeshNodeQuotas\.mount/);
 assert.doesNotMatch(ui,/nodeQuotaUsedBytes\s*:/,'UI may not write server-owned counter');
 assert.doesNotMatch(backend,/UPDATE user_node_quota_monthly SET uplink_bytes=0/,'general traffic reset must not erase per-node quotas');
