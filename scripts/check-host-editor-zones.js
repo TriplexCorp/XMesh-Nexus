@@ -18,7 +18,7 @@ const DB={
   nodes:[{id:5,name:'Netherlands',addr:'example.net',port:443,profileId:1}],
 };
 const field=(f,value)=>'<label class="f"><span>'+f.l+'</span><input name="'+f.k+'" value="'+String(value??'')+'"></label>';
-const names=['profileId','tag','nodes','disabled','remark','address','port','countryCode',
+const names=['profileId','tag','nodes','disabled','remark','serverDescription','address','port','countryCode',
  'securityLayer','tlsVerification','xhttpMode','useSniAsHost','sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'];
 const fspec=names.map(k=>({k,l:k}));
 const countries=[{code:'NL',flag:'🇳🇱'},{code:'PL',flag:'🇵🇱'},{code:'DE',flag:'🇩🇪'}];
@@ -46,7 +46,7 @@ assert.equal(helpers.hostNodeCountryCode({flag:'🇳🇱'}),'NL','Flag emoji mus
 assert.equal(helpers.hostNodeCountryCode({flag:'pl'}),'PL','Legacy ISO flag must be accepted');
 assert.equal(helpers.hostNodeCountryCode({countryCode:'DE',flag:'🇳🇱'}),'DE','Explicit node ISO must be authoritative');
 assert.equal(helpers.hostNodeCountryCode({flag:'❓'}),'','Unknown flags must not generate fake ISO codes');
-assert.equal(helpers.hostNodeCountryRemark({flag:'🇵🇱',name:'Польша'}),'🇵🇱 Польша','Happ Remark must include both flag and exact node name');
+assert.equal(helpers.hostNodeCountryRemark({flag:'🇵🇱',name:'Польша'}),'🇵🇱 Польша','Subscription remark must include both flag and exact node name');
 assert.equal(helpers.hostNodeCountryRemark({flag:'NL',name:'Нидерланды'}),'🇳🇱 Нидерланды','ISO node flags must produce a client-visible emoji and name');
 assert.equal(helpers.hostNodeCountryRemark({countryCode:'DE',flag:'🇵🇱',name:'Custom Berlin'}),'🇩🇪 Custom Berlin','Explicit ISO override determines the emoji while preserving node name');
 assert.equal(helpers.hostNodeCountryRemark({flag:'PL',name:'Warsaw Premium #2'}),'🇵🇱 Warsaw Premium #2','Custom names must be transferred verbatim');
@@ -58,7 +58,7 @@ assert.equal(helpers.hostNodeCountryRemark({name:'Custom node',flag:'❓'}),'Cus
 const fields={remark:{value:''},countryCode:{value:''}};
 const form={elements:{namedItem:key=>fields[key]}};
 helpers.hostAutofillNodeFields(form,{flag:'🇳🇱',name:'Нидерланды'});
-assert.equal(fields.remark.value,'🇳🇱 Нидерланды','Implicit autofill must include flag and node name in Happ');
+assert.equal(fields.remark.value,'🇳🇱 Нидерланды','Implicit autofill must include flag and node name in client remark');
 assert.equal(fields.countryCode.value,'NL');
 fields.remark.value='Manual custom name';
 helpers.hostAutofillNodeFields(form,{flag:'🇵🇱',name:'Польша'});
@@ -91,6 +91,10 @@ assert(!html.includes('<details class="host-advanced'),'Existing transport and s
 assert.equal((html.match(/class="host-client-group"/g)||[]).length,2,'Client fields must have Transport and Security groupings');
 assert.match(html,/class="host-advanced-groups"/,'Both groups must remain inside the same Host form');
 assert(html.includes('host-client-settings'),'Expert client metadata must have its own disclosure');
+assert.match(feature, /\['remark','address','port','countryCode','serverDescription'\]/, 'Optional description follows the public endpoint without breaking field pairs');
+assert.match(html,/name="serverDescription"/,'The Host editor must expose the optional description field');
+assert(!html.includes('host-description-hint')&&!html.includes('Описание сервера показывается'),'Host form must not show redundant description hints');
+
 // Bootstrap refreshes replace arrays. An existing feature instance must see
 // the new collections and must leave their objects untouched during rendering.
 DB.profiles=[{id:2,name:'Replacement profile'}];

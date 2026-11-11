@@ -191,6 +191,11 @@ fn prepare_proxy_outbounds(proxies: &mut [Value]) -> Result<PreparedProxyOutboun
             .ok_or("Неверная структура outbound")?
             .remove("xmeshCountry");
         outbound.as_object_mut().unwrap().remove("xmeshSourceKey");
+        // Feed-only metadata must never become an Xray outbound field.
+        outbound
+            .as_object_mut()
+            .unwrap()
+            .remove("xmeshServerDescription");
         outbound
             .as_object_mut()
             .unwrap()
@@ -607,6 +612,17 @@ fn configure_feed_balancer(config: &mut Value, row: &Value) {
     }
 }
 
+// A display-only Host attribute; never copy it into Xray transport settings.
+fn host_server_description(proxy: &Value) -> Option<String> {
+    proxy
+        .get("xmeshServerDescription")
+        .and_then(Value::as_str)
+        .filter(|text| {
+            !text.is_empty() && text.chars().count() <= 30 && !text.chars().any(char::is_control)
+        })
+        .map(str::to_owned)
+}
+
 pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         // A valid active subscription can have zero published Hosts. Return a
@@ -704,11 +720,15 @@ pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String
         {
             continue;
         }
-        entries.push(crate::client_routing::build_server(
-            proxy,
-            &all_proxies,
-            &standalone_settings,
-        )?);
+        let subtitle = host_server_description(&proxy);
+        let mut config =
+            crate::client_routing::build_server(proxy, &all_proxies, &standalone_settings)?;
+        // Compatible subscription clients can read the optional subtitle from JSON metadata,
+        // not the transport settings or the Xray routing tag.
+        if let Some(subtitle) = subtitle {
+            config["meta"]["serverDescription"] = json!(subtitle);
+        }
+        entries.push(config);
     }
     Ok(Value::Array(entries))
 }
@@ -797,6 +817,57 @@ mod tests {
    "realitySettings":{"serverName":"example.com","publicKey":"public","shortId":"aa"},
    "xhttpSettings":{"path":"/test","mode":"stream-up"}}})
     }
+    #[test]
+    fn server_descriptions_are_local_to_standalone_hosts() {
+        let mut pl = outbound("PL");
+        pl["tag"] = json!("🇵🇱 Польша");
+        pl["xmeshSourceKey"] = json!("host:101");
+        pl["xmeshServerDescription"] = json!("10 гбит/с🔥");
+        let mut de = outbound("DE");
+        de["tag"] = json!("🇩🇪 Germany");
+        de["xmeshSourceKey"] = json!("host:102");
+        let feed = build_feed(vec![pl.clone(), de.clone()], &json!({})).unwrap();
+        assert_eq!(feed[0]["remarks"], "🇵🇱 Польша");
+        assert_eq!(feed[0]["meta"]["serverDescription"], "10 гбит/с🔥");
+        assert!(feed[1].get("meta").is_none());
+        assert!(
+            !feed[0]["outbounds"]
+                .to_string()
+                .contains("xmeshServerDescription")
+        );
+        assert!(
+            !feed[1]["outbounds"]
+                .to_string()
+                .contains("serverDescription")
+        );
+        // A standalone Xray builder cannot leak the intermediate transport field.
+        let raw = build(vec![pl], &json!({})).unwrap();
+        assert!(raw.get("meta").is_none());
+        assert!(!raw.to_string().contains("xmeshServerDescription"));
+    }
+
+    #[test]
+    fn server_description_does_not_leak_into_balancer_or_other_host() {
+        let mut pl = outbound("PL");
+        pl["xmeshSourceKey"] = json!("host:101");
+        pl["xmeshServerDescription"] = json!("LTE 5 GB");
+        let mut de = outbound("DE");
+        de["xmeshSourceKey"] = json!("host:102");
+        de["xmeshServerDescription"] = json!("10 гбит/с🔥");
+        let setting = json!({"clientBalancers":[{
+            "tag":"AUTO_1", "remark":"🇪🇺 AUTO",
+            "serverDescription":"EU route", "selector":["host:101","host:102"],
+            "strategy":"roundRobin","enabled":true
+        }]});
+        let feed = build_feed(vec![pl, de], &setting).unwrap();
+        assert_eq!(feed.as_array().unwrap().len(), 3);
+        assert!(feed[0].get("meta").is_none());
+        assert_eq!(feed[0]["serverDescription"], "EU route");
+        assert_eq!(feed[1]["meta"]["serverDescription"], "LTE 5 GB");
+        assert_eq!(feed[2]["meta"]["serverDescription"], "10 гбит/с🔥");
+        assert!(!feed.to_string().contains("xmeshServerDescription"));
+    }
+
     #[test]
     fn round_robin_and_random_never_require_missing_observatory() {
         for strategy in ["roundRobin", "random"] {

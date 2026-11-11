@@ -15,6 +15,15 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Описание сервера": "Server description",
+    "Описание сервера должно быть строкой.": "Server description must be a string.",
+    "Описание сервера: максимум 30 символов, без управляющих знаков.": "Server description: up to 30 characters, without control characters.",
+    "Описание сервера — не более 30 символов, без управляющих знаков.": "Server description must be at most 30 characters without control characters.",
+
+
+    "10 гбит/с🔥": "10 Gbps🔥",
+
+
     "Поиск и отображение узлов": "Search and display nodes",
     "Поиск по узлам…": "Search nodes…",
     "Поиск по узлам": "Search nodes",
@@ -2063,7 +2072,6 @@ window.XMeshI18n=(()=>{
   "на XHTTP? Настройки предыдущего транспорта сохранятся в JSON, но перестанут применяться.": "to XHTTP? The previous transport settings will remain in JSON but will no longer apply.",
   "Выберите интервал на графике для подробностей. Пропуски не интерполируются.": "Select an interval on the chart for details. Missing samples are not interpolated.",
   "Наведите на точку для времени и скорости. Пропуски не интерполируются.": "Hover over a point for its timestamp and rate. Missing samples are not interpolated.",
-  "Название в Happ": "Name in Happ",
   "Название профиля редактируется над JSON и сохраняется вместе с конфигурацией.": "Edit the profile name above the JSON. It is saved together with the configuration.",
   "Название своего протокола в Xray-core": "Custom protocol name in Xray-core",
   "Название своего транспорта в Xray-core": "Custom transport name in Xray-core",
@@ -3989,7 +3997,6 @@ window.XMeshI18n=(()=>{
   dict.set("Конфигурации Xray и подключения.","Xray configurations and connections.");
   dict.set("Учётные записи и права доступа.","Accounts and access permissions.");
   dict.set("Название в приложении","Name in app");
-  dict.set("Отображается в Happ.","Shown in Happ.");
   dict.set("Код страны","Country code");
   dict.set("Две буквы: NL, DE, SE. Необязательно.","Two letters: NL, DE, SE. Optional.");
   dict.set("Группы серверов для JSON-подписок.","Server groups for JSON subscriptions.");
