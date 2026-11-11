@@ -1,6 +1,6 @@
 'use strict';
 // Studio settings are used by the live subscription portal and URL issuer.
-// Separate-server placement remains an architecture plan until a reverse proxy is configured.
+// XMesh Sub v0.1 is a separate HTTPS edge. Nexus still owns the subscription business logic.
 window.XMeshSubscriptionStudio = (() => {
   function actionInk(color){
     const rgb=String(color).trim().match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
@@ -141,6 +141,13 @@ window.XMeshSubscriptionStudio = (() => {
   const esc = x => String(x ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const hostnameOK = v => !v || (v.length <= 253 && /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?)*$/i.test(v));
   const pathOK = v => v.length <= 64 && v.split('/').length <= 9 && /^\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/i.test(v) && !/^\/(?:api|login|dashboard)(?:\/|$)/i.test(v);
+  const installCommand=(panel,sub,path)=>{
+    const valid=host=>typeof host==='string'&&host.includes('.')&&hostnameOK(host)&&
+      /^[a-z0-9.-]+$/i.test(host)&&/\.[a-z]{2,}$/i.test(host);
+    if(!valid(panel)||!valid(sub)||panel===sub||!pathOK(path))return '';
+    return 'curl -fsSL https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/main/install.sh | sudo bash -s -- --panel https://'+panel+
+      ' --domain '+sub+' --path '+path;
+  };
   const field = (name,label,value,help,opts) => '<label class="f subscription-field"><span>'+label+'</span>'+
     (opts && opts.area ? '<textarea name="'+name+'" rows="'+(opts.rows||2)+'" maxlength="'+(opts.max||240)+'"'+(opts.placeholder?' placeholder="'+esc(opts.placeholder)+'"':'')+'>'+esc(value)+'</textarea>' :
      '<input name="'+name+'" type="'+(opts && opts.color?'color':opts && opts.type==='number'?'number':'text')+'" '+(opts&&opts.max?'maxlength="'+opts.max+'"':'')+
@@ -193,7 +200,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-heading"><span>02</span><div><h3>Архитектура LEGO</h3><p>Три роли, три условных сервера. Можно разместить всё вместе или разнести.</p></div></div>',
       '<div class="subscription-roles">',
       '<div class="subscription-role"><span class="subscription-role-icon">▦</span><div><b>Панель управления</b><small>Control plane • XMesh Nexus</small></div><strong>Сервер A</strong></div>',
-      '<div class="subscription-role"><span class="subscription-role-icon">↗</span><div><b>Сервис подписок</b><small>Публичная выдача через XMesh Nexus</small></div>',
+      '<div class="subscription-role"><span class="subscription-role-icon">↗</span><div><b>Сервис подписок</b><small>Отдельный HTTPS-сервер XMesh Sub · выдачу авторизует Nexus</small></div>',
       choice('subscriptionPlacement',data.subscriptionPlacement,slot),'</div>',
       '<div class="subscription-role"><span class="subscription-role-icon">⌘</span><div><b>VPN-ноды</b><small>Пример топологии; реальные ноды задаются в «Узлах»</small></div>',
       choice('nodePlacement',data.nodePlacement,slot),'</div>',
@@ -204,6 +211,11 @@ window.XMeshSubscriptionStudio = (() => {
       '</div>',
       '<div class="subscription-topology" data-subscription-topology aria-live="polite"></div>',
       '<div class="subscription-studio-toolbar"><button type="button" class="gh sm" data-subscription-export>Экспорт схемы JSON</button><small>Сохранить схему размещения в формате JSON.</small></div>',
+      '<div class="subscription-sub-install"><div class="subscription-sub-install-title"><b>XMesh Sub · отдельный VPS</b>',
+      '<p>Сохраните адрес подписок. На чистом VPS выполните эту команду; HTTPS настроится автоматически.</p></div>',
+      '<div class="subscription-sub-install-command"><code data-sub-install-command>Укажите адреса панели и подписок</code>',
+      '<button type="button" class="btn sm" data-sub-install-copy disabled>Скопировать команду</button></div>',
+      '<small data-sub-install-note role="status" aria-live="polite">Настройте DNS A/AAAA нового VPS и откройте 80/443.</small></div>',
       '</section>',
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
@@ -626,9 +638,25 @@ window.XMeshSubscriptionStudio = (() => {
       };
       const previewQr=previewShadow.querySelector('[data-subscription-qr]');
       previewShadow.querySelector('.subscription-public-primary-action')?.append(previewQr);
+      const savedInstall={domain:String(data.subscriptionDomain||'').toLowerCase(),path:String(data.subscriptionPath||'')};
+      const updateInstall=(d)=>{
+        const panel=String(settings?.domain||window.location?.hostname||'').trim().toLowerCase();
+        const command=installCommand(panel,d.subscriptionDomain,d.subscriptionPath);
+        const dirty=savedInstall.domain!==d.subscriptionDomain||savedInstall.path!==d.subscriptionPath;
+        const code=form.querySelector('[data-sub-install-command]');
+        const copy=form.querySelector('[data-sub-install-copy]');
+        const note=form.querySelector('[data-sub-install-note]');
+        if(code)code.textContent=command||'Укажите разные домены панели и подписок и корректный путь.';
+        if(copy)copy.disabled=!command||dirty;
+        if(note)note.textContent=dirty?'Сначала сохраните изменённые настройки адреса выдачи.':
+          command?'Перед установкой направьте DNS на новый VPS и откройте порты 80/443. Команда не содержит секретов.':
+          'Укажите корректные отдельные домены панели и подписок.';
+        return !dirty?command:'';
+      };
       const draw = () => {
         applyPanelTheme();
         const d=read();
+        updateInstall(d);
         if(!['ru','en'].includes(previewLanguage))previewLanguage='ru';
         const lang=previewLanguage,english=lang==='en',copy=locale[lang];
         const previewRoot=$('[data-subscription-preview]');
@@ -939,9 +967,26 @@ window.XMeshSubscriptionStudio = (() => {
         }
         const button=form.closest('.subscription-studio').querySelector('.subscription-studio-intro button');
         button.disabled=true;
-        try {await save(draft);notify('Настройки SUBSCRIPTION STUDIO сохранены');}
+        try {await save(draft);savedInstall.domain=draft.subscriptionDomain;savedInstall.path=draft.subscriptionPath;draw();notify('Настройки SUBSCRIPTION STUDIO сохранены');}
         catch(err){notify('Не удалось сохранить: '+(err.message||'ошибка API'));}
         finally{button.disabled=false;}
+      });
+      form.querySelector('[data-sub-install-copy]').addEventListener('click',async()=>{
+        const command=updateInstall(read());
+        if(!command){notify('Сначала сохраните настройки адреса выдачи.');return;}
+        try{
+          if(!navigator.clipboard?.writeText)throw Error('Clipboard unavailable');
+          await navigator.clipboard.writeText(command);
+          notify('Команда XMesh Sub скопирована');
+        }catch(_){
+          const textarea=document.createElement('textarea');
+          textarea.value=command;textarea.readOnly=true;textarea.style.position='fixed';
+          textarea.style.opacity='0';document.body.appendChild(textarea);textarea.select();
+          let copied=false;
+          try{copied=document.execCommand('copy');}catch(_){}
+          textarea.remove();
+          notify(copied?'Команда XMesh Sub скопирована':'Скопируйте команду вручную из поля.');
+        }
       });
       $('[data-subscription-export]').addEventListener('click',()=>{
         const json=JSON.stringify({schema:'xmesh-subscription-blueprint/v1',panel:{domain:settings.domain||'',role:'control-plane'},
@@ -957,5 +1002,5 @@ window.XMeshSubscriptionStudio = (() => {
     };
     return [markup,mount];
   }
-  return {create,defaults,hostnameOK,pathOK,clientCatalog,validHttps,renderCustomClient,nextCustomClientId,maxCustomClients,appsHeading,announcementPreview:demoAnnouncement,insertAnnouncementToken};
+  return {create,defaults,hostnameOK,pathOK,installCommand,clientCatalog,validHttps,renderCustomClient,nextCustomClientId,maxCustomClients,appsHeading,announcementPreview:demoAnnouncement,insertAnnouncementToken};
 })();

@@ -15,6 +15,18 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Отдельный HTTPS-сервер XMesh Sub · выдачу авторизует Nexus": "Separate HTTPS XMesh Sub server · Nexus authorizes delivery",
+    "XMesh Sub · отдельный VPS": "XMesh Sub · separate VPS",
+    "Сохраните адрес подписок. На чистом VPS выполните эту команду; HTTPS настроится автоматически.": "Save the subscription address. Run this command on a clean VPS; HTTPS will configure automatically.",
+    "Укажите адреса панели и подписок": "Enter the panel and subscription addresses",
+    "Настройте DNS A/AAAA нового VPS и откройте 80/443.": "Configure DNS A/AAAA for the new VPS and open ports 80/443.",
+    "Укажите разные домены панели и подписок и корректный путь.": "Enter different panel and subscription domains and a valid path.",
+    "Сначала сохраните изменённые настройки адреса выдачи.": "Save the changed subscription address settings first.",
+    "Перед установкой направьте DNS на новый VPS и откройте порты 80/443. Команда не содержит секретов.": "Before installing, point DNS to the new VPS and open ports 80/443. The command contains no secrets.",
+    "Укажите корректные отдельные домены панели и подписок.": "Enter valid separate panel and subscription domains.",
+    "Сначала сохраните настройки адреса выдачи.": "Save subscription address settings first.",
+    "Команда XMesh Sub скопирована": "XMesh Sub command copied",
+    "Скопируйте команду вручную из поля.": "Copy the command manually from the field.",
     "Настройте лимит каждой ноды до создания пользователя.": "Set per-node limits before creating the user.",
     "с лимитом": "with limits",
     "Период для": "Period for",
