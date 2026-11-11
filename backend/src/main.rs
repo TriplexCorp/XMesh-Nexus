@@ -22,6 +22,7 @@ mod subscription_finalmask;
 mod subscription_json;
 mod subscription_remark;
 mod subscription_settings;
+mod sub_server;
 mod subscription_transport;
 mod subscription_user_agent;
 mod user_subscriptions;
@@ -339,6 +340,9 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/bootstrap", get(bootstrap))
         .merge(protected_management_routes())
         .route("/settings", get(get_settings).patch(patch_settings))
+        .route("/sub-server/status", get(sub_server::status))
+        .route("/sub-server/enrollment", post(sub_server::issue_enrollment))
+        .route("/sub-server/update", post(sub_server::request_update))
         .route("/client-routing", patch(patch_client_routing))
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
@@ -497,6 +501,9 @@ fn application_router(state: AppState) -> Router {
     let public = Router::new()
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
+        .route("/sub-server/claim", post(sub_server::claim))
+        .route("/sub-server/agent/poll", post(sub_server::poll))
+        .route("/sub-server/agent/report", post(sub_server::report))
         .route("/metrics/ingest", post(ingest_node_metrics))
         .route("/node/heartbeat", post(node_runtime::heartbeat))
         .route("/node/restart/poll", post(node_runtime::poll_restart))
@@ -775,7 +782,12 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
             | "/api/v1/node/restart/poll"
             | "/api/v1/node/restart/progress"
             | "/api/v1/node/restart/ack" => request.headers().contains_key("x-xmesh-signature"),
-            "/api/v1/node/enroll" => request
+            "/api/v1/sub-server/agent/poll"
+            | "/api/v1/sub-server/agent/report" => request
+                .headers()
+                .get(header::AUTHORIZATION)
+                .is_some_and(|value| value.to_str().ok().is_some_and(|s| s.starts_with("Bearer "))),
+            "/api/v1/sub-server/claim" | "/api/v1/node/enroll" => request
                 .headers()
                 .get(header::CONTENT_TYPE)
                 .and_then(|value| value.to_str().ok())
