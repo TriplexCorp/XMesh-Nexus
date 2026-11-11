@@ -255,8 +255,8 @@ const ENT={
     {k:'tag',l:'Inbound',t:'sel',o:tags},
     {k:'nodes',l:'Назначенные ноды',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.name])},
     {k:'disabled',l:'Отключить выдачу хоста в подписках',t:'bool'},
-    {k:'remark',l:'Название в приложении',req:1,h:'Отображается в Happ.'},
-    {k:'serverDescription',l:'Описание сервера в Happ',ph:'10 гбит/с🔥',h:'Необязательная подпись под названием сервера в Happ (до 30 символов).'},
+    {k:'remark',l:'Название в приложении',req:1},
+    {k:'serverDescription',l:'Описание сервера',ph:'10 гбит/с🔥'},
     {k:'address',l:'Публичный адрес',req:1},
     {k:'countryCode',l:'Код страны',ph:'NL, DE, SE…',h:'Две буквы: NL, DE, SE. Необязательно.'},
     {k:'port',l:'Публичный порт',t:'num'},
@@ -283,7 +283,7 @@ const ENT={
     chk:d=>{
       d.securityLayer=String(d.securityLayer||'');d.alpn=String(d.alpn||'');
       d.serverDescription=String(d.serverDescription||'').trim();
-      if([...d.serverDescription].length>30||/[\u0000-\u001f\u007f]/.test(d.serverDescription))return panelIsEnglish()?'Happ server description must be 30 characters or fewer.':'Описание сервера Happ — не более 30 символов, без управляющих знаков.';
+      if([...d.serverDescription].length>30||/[\u0000-\u001f\u007f]/.test(d.serverDescription))return panelIsEnglish()?'Server description must be 30 characters or fewer.':'Описание сервера — не более 30 символов, без управляющих знаков.';
       for(const key of ['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings']){
         const raw=d[key];
         if(!raw){d[key]=null;continue}
@@ -3796,8 +3796,8 @@ function hostEditorRefresh(form,changedProfile=false){
   const preview=form.querySelector('[data-host-resolved]');
   if(preview){
     preview.innerHTML=
-      show('Название в Happ',val('remark')||'Введите название слева')+
-      (val('serverDescription')?show('Подпись в Happ',val('serverDescription')):'')+
+      show('Название в приложении',val('remark')||'Введите название слева')+
+      (val('serverDescription')?show('Описание сервера',val('serverDescription')):'')+
       show('XRAY STUDIO',profile?.name||'Не выбран')+
       show('Inbound',inbound?.tag||'Не выбран')+
       show('Протокол / транспорт',inbound?(inbound.protocol+' / '+(stream.network||'tcp')):'—')+
