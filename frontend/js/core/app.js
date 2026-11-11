@@ -1026,7 +1026,16 @@ const syncSubscriptionTheme=()=>{
  }).catch(error=>toast('Не удалось синхронизировать тему подписки: '+(error.message||'API')));
  return subscriptionThemeSync;
 };
-const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(DB.set,patch=>api.saveSettings(patch),toast,{users:DB.users.length,nodes:DB.nodes.length},panelSubscriptionTheme);
+const subServerApi={
+ enroll:()=>backendRequest('/api/v1/sub-server/enrollment',{method:'POST',body:'{}'}),
+ status:()=>backendRequest('/api/v1/sub-server/status'),
+ update:()=>backendRequest('/api/v1/sub-server/update',{method:'POST',body:'{}'})
+};
+const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(
+ DB.set,patch=>api.saveSettings(patch),toast,
+ {users:DB.users.length,nodes:DB.nodes.length},panelSubscriptionTheme,
+ sessionUser?.role==='owner'?subServerApi:null
+);
 // Balancers are an explicit subscription feature, never inferred from node count.
 // Keeping this as a separate workspace prevents accidental SMART activation.
 const balancersP=async()=>{
