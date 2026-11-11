@@ -15,6 +15,13 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Период для": "Period for",
+    "Квоты по нодам": "Per-node quotas",
+    "Пусто или 0 — безлимит. Квоты сохраняются при создании пользователя.": "Blank or zero means unlimited. Quotas are saved when the user is created.",
+    "Проверьте лимит и период ноды: положительное число до 1 000 000 ГБ и ежемесячно/за всё время.": "Check the node limit and period: a positive number up to 1,000,000 GB and monthly/lifetime.",
+    "Можно задать не более 256 квот нод.": "A maximum of 256 node quotas is allowed.",
+    "Редактор квот нод недоступен. Обновите страницу.": "The node quota editor is unavailable. Reload the page.",
+    "Некорректные квоты нод.": "Invalid node quotas.",
     "Описание сервера": "Server description",
     "Описание сервера должно быть строкой.": "Server description must be a string.",
     "Описание сервера: максимум 30 символов, без управляющих знаков.": "Server description: up to 30 characters, without control characters.",
