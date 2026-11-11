@@ -93,25 +93,25 @@ assert.match(app,/inbs\(profile\)\.find\(i=>SUBSCRIPTION_PROTOCOLS\.has\(i\.prot
 assert.equal((server.match(/if let Some\(mut outbound\) = proxy_outbound\(user, inbound, &?host, device\)/g)||[]).length,1,
  'Exactly one explicit-Host export path must exist for all supported protocols');
 
-// Happ serverDescription is host-owned metadata, not a routing/transport field.
+// Server description is host-owned metadata, not a routing/transport field.
 const jsonEngine=fs.readFileSync('backend/src/subscription_json.rs','utf8');
 const hostEditor=fs.readFileSync('frontend/js/features/hosts/host-editor.js','utf8');
 const apiBackend=fs.readFileSync('backend/src/main.rs','utf8');
-assert.match(app,/\{k:'serverDescription',l:'Описание сервера в Happ'/,
- 'Host must expose an optional, editable Happ subtitle');
+assert.match(app,/\{k:'serverDescription',l:'Описание сервера'/,
+ 'Host must expose an optional, editable server description');
 assert.match(app,/host\.serverDescription\?'<span class="host-card-description"/,
  'Host cards must visibly show the optional subtitle');
 assert.match(hostEditor,/\['remark','serverDescription','address','port','countryCode'\]/,
  'Host form must place description directly after the server name');
 assert.match(apiBackend,/if collection == "hosts" \{[\s\S]*?object\.get\("serverDescription"\)/,
- 'Server must validate Happ descriptions on host creation and update');
+ 'Server must validate server descriptions on host creation and update');
 assert.match(server,/outbound\["xmeshServerDescription"\] = json!\(description\)/,
  'Proxy must inherit the description of its exact Host');
 assert.match(jsonEngine,/config\["meta"\]\["serverDescription"\] = json!\(subtitle\)/,
  'Published JSON profiles must contain meta.serverDescription');
 assert.match(jsonEngine,/remove\("xmeshServerDescription"\)/,
  'Intermediate description must never leak into Xray outbounds');
-assert.match(jsonEngine,/fn happ_description_does_not_leak_into_balancer_or_other_host/,
+assert.match(jsonEngine,/fn server_description_does_not_leak_into_balancer_or_other_host/,
  'Feed must test isolation across Hosts and balancers');
 
 console.log('XRAY STUDIO endpoints integration, backwards-compatible storage and routing: PASS');
