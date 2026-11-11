@@ -1131,8 +1131,7 @@ async fn collect_user_outbounds(
                     // Client-facing display subtitle is host-owned metadata.
                     // It is attached only to this selectable subscription entry,
                     // never to a server-side inbound or client transport.
-                    if let Some(description) =
-                        host.get("serverDescription").and_then(Value::as_str)
+                    if let Some(description) = host.get("serverDescription").and_then(Value::as_str)
                     {
                         let description = description.trim();
                         if !description.is_empty()
