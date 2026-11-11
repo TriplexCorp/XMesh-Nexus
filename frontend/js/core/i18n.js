@@ -15,6 +15,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Обновление сервера уже выполняется.": "Server update is already running.",
     "· последняя связь": "· last seen",
     "Для управления создайте одноразовую команду привязки и выполните её на VPS.": "To manage this server, generate a one-time pairing command and run it on the VPS.",
     "Подключение к Sub-серверу временно недоступно.": "Sub server connection is temporarily unavailable.",
