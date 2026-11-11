@@ -239,7 +239,7 @@ pub async fn request_update(
         ApiError::new(StatusCode::CONFLICT, "Сначала подключите Sub-сервер.")
     })?;
     let domain = current_domain(&state).await?;
-    if settings.get("domain").and_then(Value::as_str) != Some(&domain) {
+    if settings.get("domain").and_then(Value::as_str) != Some(domain.as_str()) {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
             "Домен подписок изменился. Подключите сервер повторно.",
@@ -256,7 +256,7 @@ pub async fn request_update(
     if recent == 0 || now().saturating_sub(recent) > 90 {
         return Err(ApiError::new(StatusCode::CONFLICT, "Sub-сервер не в сети."));
     }
-    let job = hex::encode(&hex::decode(random_hex()).unwrap()[..16]);
+    let job = random_hex()[..32].to_owned();
     let stored: Option<String> = redis::cmd("SET")
         .arg(PENDING_UPDATE)
         .arg(&job)
