@@ -68,17 +68,19 @@ async fn current_domain(state: &AppState) -> Result<String, ApiError> {
         .unwrap_or("")
         .to_ascii_lowercase();
     if !valid_domain(&domain) {
-        return Err(api_error("Сначала сохраните корректный домен подписок в Subscription Studio."));
+        return Err(api_error(
+            "Сначала сохраните корректный домен подписок в Subscription Studio.",
+        ));
     }
     Ok(domain)
 }
 async fn credential(pool: &PgPool) -> Result<Option<Value>, ApiError> {
-    Ok(sqlx::query_scalar::<_, Value>(
-        "SELECT value FROM app_settings WHERE key = $1",
+    Ok(
+        sqlx::query_scalar::<_, Value>("SELECT value FROM app_settings WHERE key = $1")
+            .bind(CREDENTIAL_KEY)
+            .fetch_optional(pool)
+            .await?,
     )
-    .bind(CREDENTIAL_KEY)
-    .fetch_optional(pool)
-    .await?)
 }
 async fn authorize(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
     let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Недействительный ключ XMesh Sub.");
@@ -129,7 +131,9 @@ pub async fn issue_enrollment(
         json!({"domain":domain}),
     )
     .await;
-    Ok(Json(json!({"enrollmentToken":token,"expiresInSeconds":600})))
+    Ok(Json(
+        json!({"enrollmentToken":token,"expiresInSeconds":600}),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -145,9 +149,15 @@ pub async fn claim(
 ) -> Result<Json<Value>, ApiError> {
     if !is_hex(&body.enrollment_token, 64)
         || !valid_domain(&body.domain)
-        || body.enrollment_token.bytes().any(|b| b.is_ascii_uppercase())
+        || body
+            .enrollment_token
+            .bytes()
+            .any(|b| b.is_ascii_uppercase())
     {
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Код подключения недействителен."));
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Код подключения недействителен.",
+        ));
     }
     let domain = current_domain(&state).await?;
     if body.domain != domain {
@@ -158,7 +168,10 @@ pub async fn claim(
     }
     let mut conn = state.redis.clone();
     let matched: Option<String> = redis::cmd("GETDEL")
-        .arg(format!("{ENROLL_PREFIX}{}", sha256_hex(&body.enrollment_token)))
+        .arg(format!(
+            "{ENROLL_PREFIX}{}",
+            sha256_hex(&body.enrollment_token)
+        ))
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
@@ -208,7 +221,10 @@ pub async fn status(
     let heartbeat: Value = heartbeat
         .and_then(|h| serde_json::from_str(&h).ok())
         .unwrap_or(Value::Null);
-    let last_seen = heartbeat.get("lastSeen").and_then(Value::as_u64).unwrap_or(0);
+    let last_seen = heartbeat
+        .get("lastSeen")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
     let is_online = credential.is_some() && last_seen > 0 && now().saturating_sub(last_seen) <= 90;
     let update: Option<String> = redis::cmd("GET")
         .arg(UPDATE_STATUS)
@@ -235,9 +251,9 @@ pub async fn request_update(
     Extension(actor): Extension<auth::AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
     require_owner(&actor)?;
-    let settings = credential(&state.pool).await?.ok_or_else(|| {
-        ApiError::new(StatusCode::CONFLICT, "Сначала подключите Sub-сервер.")
-    })?;
+    let settings = credential(&state.pool)
+        .await?
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Сначала подключите Sub-сервер."))?;
     let domain = current_domain(&state).await?;
     if settings.get("domain").and_then(Value::as_str) != Some(domain.as_str()) {
         return Err(ApiError::new(
@@ -251,7 +267,9 @@ pub async fn request_update(
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
-    let hb: Value = hb.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);
+    let hb: Value = hb
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or(Value::Null);
     let recent = hb.get("lastSeen").and_then(Value::as_u64).unwrap_or(0);
     if recent == 0 || now().saturating_sub(recent) > 90 {
         return Err(ApiError::new(StatusCode::CONFLICT, "Sub-сервер не в сети."));
@@ -281,7 +299,15 @@ pub async fn request_update(
         .query_async::<String>(&mut conn)
         .await
         .map_err(|_| backend_error())?;
-    audit(&state.pool, &actor.username, "sub.update.request", None, None, json!({"domain":domain})).await;
+    audit(
+        &state.pool,
+        &actor.username,
+        "sub.update.request",
+        None,
+        None,
+        json!({"domain":domain}),
+    )
+    .await;
     Ok(Json(status))
 }
 
@@ -299,7 +325,10 @@ pub async fn poll(
     authorize(&state, &headers).await?;
     if body.version.is_empty()
         || body.version.len() > 40
-        || !body.version.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b,b'.'|b'_'|b'-'))
+        || !body
+            .version
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
     {
         return Err(api_error("Недопустимая версия агента."));
     }
@@ -361,7 +390,10 @@ pub async fn report(
         .await
         .map_err(|_| backend_error())?;
     if current.as_deref() != Some(&body.job_id) {
-        return Err(ApiError::new(StatusCode::CONFLICT, "Неизвестное обновление."));
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Неизвестное обновление.",
+        ));
     }
     let payload = json!({
         "jobId":body.job_id,
