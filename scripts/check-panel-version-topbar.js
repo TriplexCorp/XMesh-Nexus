@@ -10,6 +10,7 @@ const read=path=>fs.readFileSync(path,'utf8');
 const html=read('frontend/index.html');
 const script=read('frontend/js/features/settings/panel-version-topbar.js');
 const css=read('frontend/styles/features/settings/panel-version-topbar.css');
+const layout=read('frontend/styles/system/nexus-v3-layout.css');
 const entry=read('frontend/styles/system/nexus-ui-v3.css');
 const app=read('frontend/js/core/app.js');
 const backend=read('backend/src/main.rs');
@@ -67,6 +68,8 @@ assert.match(script,/status\.dataset\.state=displayState/);
 assert.doesNotMatch(script,/method\s*:\s*['"]POST['"]/,'Checking updates must remain read-only');
 assert.doesNotMatch(script,/\/api\/v1\/panel\/update/,'Version UI calls the existing owner-confirmed updater bridge, never a second unguarded endpoint');
 assert.match(css,/\.top-panel-version-menu\[hidden\]/);
+assert.match(layout,/\.top:has\(\.top-panel-version-menu:not\(\[hidden\]\)\)\{z-index:var\(--nx-z-dialog\)\}/,
+  'An open version menu must elevate the header stacking context above workspace actions');
 assert.match(css,/@media\(max-width:760px\)/);
 assert.match(backend,/\.route\("\/panel\/version", get\(panel_version::installed\)\)/);
 assert.match(backend,/\.route\("\/panel\/version\/check", get\(panel_version::check\)\)/);

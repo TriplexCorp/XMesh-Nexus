@@ -284,6 +284,35 @@ async function main() {
       }
     });
 
+    await checked('Version popover: node actions cannot cover its contents',async()=>{
+      await page.setViewportSize({width:1366,height:768});
+      await navigate('nodes');
+      const trigger=page.locator('[data-panel-version-trigger]');
+      const menu=page.locator('[data-panel-version-menu]');
+      await trigger.click();
+      await menu.waitFor({state:'visible'});
+      try{
+        // A card action menu in the workspace may use the ordinary popover layer.
+        // Reproduce that overlap at the version window's actual position.
+        const hit=await menu.evaluate(panel=>{
+          const r=panel.getBoundingClientRect();
+          const x=r.left+r.width/2,y=r.top+r.height/2;
+          const competing=document.createElement('button');
+          competing.textContent='⋯';
+          competing.setAttribute('aria-label','Node actions overlap probe');
+          competing.style.cssText='position:fixed;z-index:var(--nx-z-popover);width:36px;height:36px;pointer-events:auto;';
+          competing.style.left=(x-18)+'px';
+          competing.style.top=(y-18)+'px';
+          document.querySelector('#view').appendChild(competing);
+          try{return panel.contains(document.elementFromPoint(x,y))}
+          finally{competing.remove()}
+        });
+        assert.equal(hit,true,'Node actions must remain behind the open panel-version popover');
+      }finally{
+        await menu.locator('[data-panel-version-close]').click();
+      }
+    });
+
     await checked('Settings composition: full-width, left-aligned desktop workspace and compact navigation',async()=>{
       await page.setViewportSize({width:1920,height:1080});
       for(const section of ['general','appearance','system','data']){
