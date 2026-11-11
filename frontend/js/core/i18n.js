@@ -22,6 +22,7 @@ window.XMeshI18n=(()=>{
 
 
     "Краткое описание (необязательно)": "Short description (optional)",
+    "10 гбит/с🔥": "10 Gbps🔥",
 
 
     "Поиск и отображение узлов": "Search and display nodes",
