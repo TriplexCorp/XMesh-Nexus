@@ -192,7 +192,10 @@ fn prepare_proxy_outbounds(proxies: &mut [Value]) -> Result<PreparedProxyOutboun
             .remove("xmeshCountry");
         outbound.as_object_mut().unwrap().remove("xmeshSourceKey");
         // Feed-only metadata must never become an Xray outbound field.
-        outbound.as_object_mut().unwrap().remove("xmeshServerDescription");
+        outbound
+            .as_object_mut()
+            .unwrap()
+            .remove("xmeshServerDescription");
         outbound
             .as_object_mut()
             .unwrap()
@@ -715,11 +718,8 @@ pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String
                     && !text.chars().any(char::is_control)
             })
             .map(str::to_owned);
-        let mut config = crate::client_routing::build_server(
-            proxy,
-            &all_proxies,
-            &standalone_settings,
-        )?;
+        let mut config =
+            crate::client_routing::build_server(proxy, &all_proxies, &standalone_settings)?;
         // Compatible subscription clients can read the optional subtitle from JSON metadata,
         // not the transport settings or the Xray routing tag.
         if let Some(subtitle) = subtitle {
@@ -827,8 +827,16 @@ mod tests {
         assert_eq!(feed[0]["remarks"], "🇵🇱 Польша");
         assert_eq!(feed[0]["meta"]["serverDescription"], "10 гбит/с🔥");
         assert!(feed[1].get("meta").is_none());
-        assert!(!feed[0]["outbounds"].to_string().contains("xmeshServerDescription"));
-        assert!(!feed[1]["outbounds"].to_string().contains("serverDescription"));
+        assert!(
+            !feed[0]["outbounds"]
+                .to_string()
+                .contains("xmeshServerDescription")
+        );
+        assert!(
+            !feed[1]["outbounds"]
+                .to_string()
+                .contains("serverDescription")
+        );
         // A standalone Xray builder cannot leak the intermediate transport field.
         let raw = build(vec![pl], &json!({})).unwrap();
         assert!(raw.get("meta").is_none());
@@ -848,12 +856,12 @@ mod tests {
             "serverDescription":"EU route", "selector":["host:101","host:102"],
             "strategy":"roundRobin","enabled":true
         }]});
-        let feed = build_feed(vec![pl,de], &setting).unwrap();
-        assert_eq!(feed.as_array().unwrap().len(),3);
+        let feed = build_feed(vec![pl, de], &setting).unwrap();
+        assert_eq!(feed.as_array().unwrap().len(), 3);
         assert!(feed[0].get("meta").is_none());
-        assert_eq!(feed[0]["serverDescription"],"EU route");
-        assert_eq!(feed[1]["meta"]["serverDescription"],"LTE 5 GB");
-        assert_eq!(feed[2]["meta"]["serverDescription"],"10 гбит/с🔥");
+        assert_eq!(feed[0]["serverDescription"], "EU route");
+        assert_eq!(feed[1]["meta"]["serverDescription"], "LTE 5 GB");
+        assert_eq!(feed[2]["meta"]["serverDescription"], "10 гбит/с🔥");
         assert!(!feed.to_string().contains("xmeshServerDescription"));
     }
 
