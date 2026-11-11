@@ -46,10 +46,10 @@
     const status=canvas.querySelector('[data-user-edit-dirty]');
     if(status)status.textContent=panelIsEnglish()?'Unsaved changes':'Есть несохранённые изменения';
   };
-  const setError=(form,message)=>{
+  const setError=(form,message,tab='ov')=>{
     const target=canvasFor(form)?.querySelector('#fe');
     if(target)target.textContent=message||'';
-    if(message)select(canvasFor(form),'ov');
+    if(message)select(canvasFor(form),tab);
   };
 
   // Access controls belong to the same draft as the main settings form.
@@ -68,8 +68,8 @@
     setDirty(target);
   },true);
 
-  // One authoritative Save: settings + squads + device limit go through a single
-  // users update request. Explicit action buttons (reset traffic, revoke, etc.)
+  // One authoritative Save: settings, squads, device limit and edited node quotas
+  // go through one atomic user PATCH. Explicit actions (reset traffic, revoke, etc.)
   // remain separate intentional actions.
   document.addEventListener('submit',async event=>{
     const form=event.target?.matches?.(EDIT_FORM)?event.target:null;
@@ -105,6 +105,17 @@
     }catch(error){
       setError(form,error?.message||'Invalid personal routing');
       select(canvas,error?.tab||'routing');
+      return;
+    }
+
+    // An unedited (or still-loading) quota panel must never clear existing
+    // policies. Edited quota fields join the same user PATCH as all other tabs.
+    try{
+      const policies=window.XMeshNodeQuotas?.readDraft?.(canvas.querySelector('[data-user-node-quotas]'));
+      if(policies!==null&&policies!==undefined)data.nodeTrafficLimits=policies;
+    }catch(error){
+      setError(form,error?.message||'Invalid node quotas','traffic');
+      error?.field?.focus?.();
       return;
     }
 
