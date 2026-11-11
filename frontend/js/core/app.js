@@ -1332,6 +1332,10 @@ async function render(soft){
 // are distinct from zero. The control-plane container isn't the host VPS.
 const statsValue=(v,unit='')=>v===null||v===undefined||!Number.isFinite(Number(v))
   ?'Нет данных':fmt(Number(v),1)+unit;
+// Counts are discrete events/people, never percentages. Keep unavailable telemetry
+// distinct from zero, and never fabricate partial TCP connections or clients.
+const statsInteger=v=>v===null||v===undefined||v===''||!Number.isFinite(Number(v))||Number(v)<0||!Number.isSafeInteger(Math.trunc(Number(v)))
+  ?'Нет данных':fmt(Math.trunc(Number(v)),0);
 const statsBytes=v=>v===null||v===undefined||!Number.isFinite(Number(v))
  ?'Нет данных':sysBytes(Number(v));
 // Speeds are bits/s (not bytes/s); translate dynamic numeric values at source.
@@ -1595,7 +1599,7 @@ function statisticsP(){
    </section>
   </dialog>
   <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
-  <section class="card stats-nodes-section"><div class="hd stats-nodes-header"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div><div class="stats-nodes-toolbar"><label class="stats-node-search">${ic('search')}<input type="search" id="stats-node-search" placeholder="Поиск по узлам…" aria-label="Поиск по узлам" autocomplete="off"></label><select id="stats-node-filter" aria-label="Фильтр телеметрии"><option value="all">Все узлы</option><option value="fresh">Свежие данные</option><option value="attention">Требуют внимания</option><option value="missing">Без измерений</option></select><div class="stats-node-view-toggle" role="group" aria-label="Вид карточек узлов"><button type="button" data-stats-node-view="grid" aria-label="Карточки" title="Карточки" aria-pressed="true">${ic('grid')}</button><button type="button" data-stats-node-view="list" aria-label="Список" title="Список" aria-pressed="false">${ic('list')}</button></div></div></div><div class="stats-nodes-summary"><span id="stats-node-count" role="status" aria-live="polite"></span></div><div id="stats-nodes" class="stats-node-grid"></div></section>
+  <section class="card stats-nodes-section"><div class="hd stats-nodes-header"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div class="stats-nodes-toolbar" role="toolbar" aria-label="Поиск и отображение узлов"><label class="stats-node-search">${ic('search')}<input type="search" id="stats-node-search" placeholder="Поиск по узлам…" aria-label="Поиск по узлам" autocomplete="off"></label><select id="stats-node-filter" aria-label="Фильтр телеметрии"><option value="all">Все узлы</option><option value="fresh">Свежие данные</option><option value="attention">Требуют внимания</option><option value="missing">Без измерений</option></select><div class="stats-node-view-toggle" role="group" aria-label="Вид карточек узлов"><button type="button" data-stats-node-view="grid" aria-label="Карточки" title="Карточки" aria-pressed="true">${ic('grid')}</button><button type="button" data-stats-node-view="list" aria-label="Список" title="Список" aria-pressed="false">${ic('list')}</button></div><span id="stats-node-count" class="stats-node-count" role="status" aria-live="polite" aria-atomic="true"></span></div><div id="stats-nodes" class="stats-node-grid"></div></section>
   <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
  </div>`;
  const init=()=>{
@@ -1647,8 +1651,8 @@ function statisticsP(){
         '<div class="stats-node-facts"><div class="stats-node-facts-network">'+
         fact('RX',value('rxBytesPerSec'),'dl')+fact('TX',value('txBytesPerSec'),'upload')+
         '</div><div class="stats-node-facts-service">'+
-        fact('TCP соединения',statsValue(ok?v.activeConnections:null),'layers')+
-        fact('Онлайн клиенты',statsValue(ok?v.onlineClients:null),'users')+
+        fact('TCP соединения',statsInteger(ok?v.activeConnections:null),'layers')+
+        fact('Онлайн клиенты',statsInteger(ok?v.onlineClients:null),'users')+
         fact('Учёт Xray',status,verified?'check':'code',verified)+'</div></div>'+
         '</article>';
     }).join(''):'<p class="note stats-node-empty">'+(statsNodeRows.length?(panelIsEnglish()?'No nodes match the filters.':'По этим условиям узлы не найдены.'):(panelIsEnglish()?'No nodes added yet.':'Узлы пока не созданы.'))+'</p>';

@@ -15,6 +15,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Поиск и отображение узлов": "Search and display nodes",
     "Поиск по узлам…": "Search nodes…",
     "Поиск по узлам": "Search nodes",
     "Фильтр телеметрии": "Telemetry filter",
