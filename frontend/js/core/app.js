@@ -283,7 +283,7 @@ const ENT={
     chk:d=>{
       d.securityLayer=String(d.securityLayer||'');d.alpn=String(d.alpn||'');
       d.serverDescription=String(d.serverDescription||'').trim();
-      if([...d.serverDescription].length>30||/[\\u0000-\\u001f\\u007f]/.test(d.serverDescription))return panelIsEnglish()?'Happ server description must be 30 characters or fewer.':'Описание сервера Happ — не более 30 символов, без управляющих знаков.';
+      if([...d.serverDescription].length>30||/[\u0000-\u001f\u007f]/.test(d.serverDescription))return panelIsEnglish()?'Happ server description must be 30 characters or fewer.':'Описание сервера Happ — не более 30 символов, без управляющих знаков.';
       for(const key of ['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings']){
         const raw=d[key];
         if(!raw){d[key]=null;continue}
