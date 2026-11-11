@@ -358,3 +358,13 @@
   color:var(--st-ink);font-size:.8rem;white-space:pre-wrap;overflow-wrap:anywhere;
   max-height:8rem;overflow:auto;
 }
+
+/* Independent subscription-edge installation command. */
+.subscription-sub-install{display:grid;gap:.68rem;min-width:0;margin-top:1rem;padding:.95rem;border:1px solid var(--st-border);border-radius:var(--nx-control-radius);background:color-mix(in srgb,var(--a) 3%,var(--nx-control-bg))}
+.subscription-sub-install-title b{font-size:.89rem;color:var(--st-ink)}
+.subscription-sub-install-title p{margin:.28rem 0 0;color:var(--st-muted);font-size:.74rem;line-height:1.45}
+.subscription-sub-install-command{display:flex;align-items:center;gap:.7rem;min-width:0;padding:.5rem;border:1px solid var(--st-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
+.subscription-sub-install-command code{flex:1;min-width:0;overflow-wrap:anywhere;user-select:all;color:var(--st-ink);font-size:.73rem;line-height:1.5;padding:0 .35rem}
+.subscription-sub-install-command button{flex:none;min-height:2.15rem}
+.subscription-sub-install small{font-size:.72rem;color:var(--st-muted);line-height:1.4}
+@media(max-width:780px){.subscription-sub-install-command{flex-wrap:wrap}.subscription-sub-install-command button{width:100%}}

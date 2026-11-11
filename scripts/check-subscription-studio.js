@@ -22,6 +22,13 @@ assert(!studio.hostnameOK('https://sub.example.com/'));
 assert(studio.pathOK('/subscription'));
 assert(!studio.pathOK('/api/v1'));
 assert(!studio.pathOK('//s'));
+const install=studio.installCommand('panel.example.org','sub.example.org','/s');
+assert.equal(install,'curl -fsSL https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/main/install.sh | sudo bash -s -- --panel https://panel.example.org --domain sub.example.org --path /s');
+assert.equal(studio.installCommand('panel.example.org','panel.example.org','/s'),'');
+assert.equal(studio.installCommand('panel.example.org','sub.example.org','/api/v1'),'');
+assert.equal(studio.installCommand('panel.example.org','sub.example.org','/s;curl bad'),'');
+assert.equal(studio.installCommand('panel.example.org;bad','sub.example.org','/s'),'');
+
 
 const [view,init]=studio.create({
   brand:'My VPN',
@@ -32,6 +39,9 @@ const [view,init]=studio.create({
   nodePlacement:'b'
 },async()=>{},()=>{},{users:3,nodes:8});
 assert.equal(typeof init,'function');
+assert.match(view,/data-sub-install-command/);
+assert.match(view,/data-sub-install-copy/);
+assert.match(view,/XMesh Sub/);
 const linkedPalette={
  subscriptionAccent:'#4488cc',subscriptionSecondaryAccent:'#f0a560',subscriptionTheme:'light',
  subscriptionBackground:'#f7f9fc',subscriptionCardColor:'#ffffff',subscriptionTextColor:'#203040',
@@ -270,5 +280,8 @@ assert.match(portalCss,/\.subscription-studio-preview \.subscription-public-shel
 assert.match(fs.readFileSync('backend/src/user_subscriptions.rs','utf8'),/include_str!\("subscription_template\.html"\)/,'Backend must use shared portal template');
 assert.match(css,/\.subscription-studio-layout/);
 assert.match(css,/@media\(max-width:780px\)/);
+assert.match(css,/\.subscription-sub-install-command/);
+assert.match(src,/navigator\.clipboard\?\.writeText/);
+assert.match(src,/savedInstall\.domain=draft\.subscriptionDomain/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
 console.log('Subscription Studio, separate-domain management and deployment blueprint: OK');
