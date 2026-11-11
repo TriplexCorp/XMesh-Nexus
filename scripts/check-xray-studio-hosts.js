@@ -97,8 +97,10 @@ assert.equal((server.match(/if let Some\(mut outbound\) = proxy_outbound\(user, 
 const jsonEngine=fs.readFileSync('backend/src/subscription_json.rs','utf8');
 const hostEditor=fs.readFileSync('frontend/js/features/hosts/host-editor.js','utf8');
 const apiBackend=fs.readFileSync('backend/src/main.rs','utf8');
-assert.match(app,/\{k:'serverDescription',l:'Описание сервера'/,
- 'Host must expose an optional, editable server description');
+assert.match(app,/\{k:'serverDescription',l:'Описание сервера',ph:'Краткое описание \(необязательно\)'\}/,
+ 'Host must expose a neutral optional description placeholder');
+assert.doesNotMatch(app,/ph:'10 гбит\/с🔥'/,
+ 'Host editor placeholder must not imply a specific speed or emoji');
 assert.match(app,/host\.serverDescription\?'<span class="host-card-description"/,
  'Host cards must visibly show the optional subtitle');
 assert.match(hostEditor,/\['remark','address','port','countryCode','serverDescription'\]/,

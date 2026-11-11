@@ -256,7 +256,7 @@ const ENT={
     {k:'nodes',l:'Назначенные ноды',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.name])},
     {k:'disabled',l:'Отключить выдачу хоста в подписках',t:'bool'},
     {k:'remark',l:'Название в приложении',req:1},
-    {k:'serverDescription',l:'Описание сервера',ph:'10 гбит/с🔥'},
+    {k:'serverDescription',l:'Описание сервера',ph:'Краткое описание (необязательно)'},
     {k:'address',l:'Публичный адрес',req:1},
     {k:'countryCode',l:'Код страны',ph:'NL, DE, SE…',h:'Две буквы: NL, DE, SE. Необязательно.'},
     {k:'port',l:'Публичный порт',t:'num'},
