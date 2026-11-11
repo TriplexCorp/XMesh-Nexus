@@ -151,6 +151,9 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:2.6
 .host-card-heading{min-width:0;display:grid;align-content:start;justify-items:start;gap:.37rem}
 .host-card-name{min-width:0;max-width:100%;margin:0;padding:0;border:0;background:transparent;box-shadow:none;color:var(--tx);font:inherit;font-size:1.04rem;font-weight:790;line-height:1.25;text-align:left;overflow-wrap:anywhere;cursor:pointer}
 .host-card-name:hover{color:var(--a)}
+.host-card-description{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mu);font-size:.73rem;line-height:1.22;font-weight:590}
+.host-description-hint{display:block;min-width:0;padding:.3rem .12rem;color:var(--mu);font-size:.71rem;line-height:1.45}
+
 .host-card-state{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:999px;color:var(--mu);background:var(--nx-section-bg);font-size:.72rem;font-weight:710;line-height:1.3}
 .host-card-state .ic{width:.85rem;height:.85rem;flex:none}
 .host-card-state.is-enabled{color:var(--ok);background:color-mix(in srgb,var(--ok) 11%,var(--nx-section-bg))}
