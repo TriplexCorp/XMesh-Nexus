@@ -154,10 +154,9 @@ window.XMeshSubscriptionStudio = (() => {
       ' value="'+esc(value)+'" placeholder="'+esc((opts&&opts.placeholder)||'')+'" autocomplete="off" spellcheck="false">')+
     (help?'<small>'+help+'</small>':'')+'</label>';
   const choice = (name,selected,choices) => '<label class="f subscription-field"><span>'+
-    (name==='subscriptionLanguage'?'Язык портала по умолчанию':'Размещение')+'</span><select name="'+name+'">'+
+    'Язык портала по умолчанию'+'</span><select name="'+name+'">'+
     choices.map(x=>'<option value="'+x[0]+'"'+(selected===x[0]?' selected':'')+'>'+x[1]+'</option>').join('')+
     '</select></label>';
-  const slot = [['a','Сервер A'],['b','Сервер B'],['c','Сервер C']];
   const locale = {
     ru:['Подписка активна','Трафик','Действует до','Настройка подключения','Скопировать ссылку'],
     en:['Subscription active','Traffic','Expires','Connection settings','Copy link']
@@ -178,47 +177,20 @@ window.XMeshSubscriptionStudio = (() => {
     data.subscriptionClientLinks={...(settings?.subscriptionClientLinks||{})};
     data.subscriptionCustomClients=Array.isArray(settings?.subscriptionCustomClients)?settings.subscriptionCustomClients.slice(0,maxCustomClients):[];
 
-    if(!slot.some(([id])=>id===data.subscriptionPlacement)) data.subscriptionPlacement='a';
-    if(!slot.some(([id])=>id===data.nodePlacement)) data.nodePlacement='a';
     const markup = [
-      '<div class="subscription-studio">',
+      '<div class="subscription-studio" data-subscription-view="settings">',
       '<header class="subscription-studio-intro"><div><h2>SUBSCRIPTION STUDIO</h2>',
       '<p>Оформление действующей страницы подписки, её публичный URL и каталог приложений.</p></div>',
       '<button type="submit" form="subscription-studio-form" class="btn">'+
         '<span aria-hidden="true">✓</span> Сохранить настройки</button></header>',
+      '<nav class="subscription-studio-tabs" role="tablist" aria-label="Разделы Subscription Studio">',
+      '<button type="button" class="on" data-substudio-tab="settings" id="substudio-tab-settings" role="tab" aria-selected="true" aria-controls="substudio-settings">Настройки подписок</button>',
+      '<button type="button" data-substudio-tab="servers" id="substudio-tab-servers" role="tab" aria-selected="false" aria-controls="substudio-servers" tabindex="-1">Серверы подписок</button>',
+      '</nav>',
       '<form id="subscription-studio-form" class="subscription-studio-layout">',
-      '<div class="subscription-studio-main">',
+      '<div class="subscription-studio-main" id="substudio-settings" role="tabpanel" aria-labelledby="substudio-tab-settings">',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>01</span><div><h3>Адрес выдачи</h3><p>Отдельно от домена панели и адресов VPN-узлов.</p></div></div>',
-      '<div class="subscription-studio-pair">',
-      field('subscriptionDomain','Домен подписки',data.subscriptionDomain,'Публичный адрес подписок.',{placeholder:'sub.example.com',max:253}),
-      field('subscriptionPath','Публичный путь',data.subscriptionPath,'Например /s или /subscription.',{placeholder:'/s',max:64}),
-      '</div>',
-      '<div class="subscription-studio-url"><span>Формат персональной ссылки</span><code data-subscription-link>Укажите домен подписки</code></div>',
-      '</section>',
-      '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>02</span><div><h3>Архитектура LEGO</h3><p>Три роли, три условных сервера. Можно разместить всё вместе или разнести.</p></div></div>',
-      '<div class="subscription-roles">',
-      '<div class="subscription-role"><span class="subscription-role-icon">▦</span><div><b>Панель управления</b><small>Control plane • XMesh Nexus</small></div><strong>Сервер A</strong></div>',
-      '<div class="subscription-role"><span class="subscription-role-icon">↗</span><div><b>Сервис подписок</b><small>Отдельный HTTPS-сервер XMesh Sub · выдачу авторизует Nexus</small></div>',
-      choice('subscriptionPlacement',data.subscriptionPlacement,slot),'</div>',
-      '<div class="subscription-role"><span class="subscription-role-icon">⌘</span><div><b>VPN-ноды</b><small>Пример топологии; реальные ноды задаются в «Узлах»</small></div>',
-      choice('nodePlacement',data.nodePlacement,slot),'</div>',
-      '</div>',
-      '<div class="subscription-studio-pair">',
-      field('deploymentServerB','Сервер B · адрес / заметка',data.deploymentServerB,'Необязательно, для планирования.',{placeholder:'server-b.example.com',max:253}),
-      field('deploymentServerC','Сервер C · адрес / заметка',data.deploymentServerC,'Необязательно, для планирования.',{placeholder:'server-c.example.com',max:253}),
-      '</div>',
-      '<div class="subscription-topology" data-subscription-topology aria-live="polite"></div>',
-      '<div class="subscription-studio-toolbar"><button type="button" class="gh sm" data-subscription-export>Экспорт схемы JSON</button><small>Сохранить схему размещения в формате JSON.</small></div>',
-      '<div class="subscription-sub-install"><div class="subscription-sub-install-title"><b>XMesh Sub · отдельный VPS</b>',
-      '<p>Сохраните адрес подписок. На чистом VPS выполните эту команду; HTTPS настроится автоматически.</p></div>',
-      '<div class="subscription-sub-install-command"><code data-sub-install-command>Укажите адреса панели и подписок</code>',
-      '<button type="button" class="btn sm" data-sub-install-copy disabled>Скопировать команду</button></div>',
-      '<small data-sub-install-note role="status" aria-live="polite">Настройте DNS A/AAAA нового VPS и откройте 80/443.</small></div>',
-      '</section>',
-      '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
+      '<div class="subscription-studio-heading"><span>01</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
       field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Сообщения чередуются с заданной ниже периодичностью.',{area:true,rows:3,max:4000,placeholder:'Пользователь: {USERNAME}\nОсталось LTE: {CDN_DATA_LEFT}'}),
       announcementHelp(),
@@ -246,7 +218,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label><input type="checkbox" name="subscriptionShowExpiry"'+(data.subscriptionShowExpiry?' checked':'')+'> Показывать срок доступа</label>',
       '</div></section>',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>04</span><div><h3>Дизайн и композиция</h3><p>Настройка каждой детали клиентской страницы без кода.</p></div></div>',
+      '<div class="subscription-studio-heading"><span>02</span><div><h3>Дизайн и композиция</h3><p>Настройка каждой детали клиентской страницы без кода.</p></div></div>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Компоновка</span><select name="subscriptionLayout"><option value="standard"'+(data.subscriptionLayout==='standard'?' selected':'')+'>Классическая</option><option value="centered"'+(data.subscriptionLayout==='centered'?' selected':'')+'>По центру</option><option value="compact"'+(data.subscriptionLayout==='compact'?' selected':'')+'>Компактная</option></select></label>',
       '<label class="f subscription-field"><span>Карточки</span><select name="subscriptionCardStyle"><option value="soft"'+(data.subscriptionCardStyle==='soft'?' selected':'')+'>Мягкие</option><option value="outline"'+(data.subscriptionCardStyle==='outline'?' selected':'')+'>С контуром</option><option value="flat"'+(data.subscriptionCardStyle==='flat'?' selected':'')+'>Без фона</option><option value="glass"'+(data.subscriptionCardStyle==='glass'?' selected':'')+'>Стекло</option><option value="raised"'+(data.subscriptionCardStyle==='raised'?' selected':'')+'>Объёмные</option></select></label>',
@@ -280,7 +252,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label><input type="checkbox" name="subscriptionShowSupport"'+(data.subscriptionShowSupport?' checked':'')+'> Кнопка поддержки</label>',
       '</div></section>',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>05</span><div><h3>XRAY JSON ENGINE</h3><p>Клиентский JSON, DNS и локальные подключения. Балансировка настраивается отдельно.</p></div></div>',
+      '<div class="subscription-studio-heading"><span>03</span><div><h3>XRAY JSON ENGINE</h3><p>Клиентский JSON, DNS и локальные подключения. Балансировка настраивается отдельно.</p></div></div>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>DNS</span><select name="json_dns">'+
         [['cloudflare','Cloudflare · 1.1.1.1 (надёжный режим)'],['cloudflare_doh','Cloudflare · DoH по IP (расширенный)'],['yandex','Yandex · DoH'],['system','Системный DNS']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.dns===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
@@ -302,7 +274,7 @@ window.XMeshSubscriptionStudio = (() => {
       'Незащищённые подключения не публикуются. Серверы с одинаковым IP сохраняются.</p>',
       '</section>',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>06</span><div><h3>Клиентские приложения</h3><p>Выбирайте, какие программы показать пользователю, и задавайте собственные ссылки на установку.</p></div></div>',
+      '<div class="subscription-studio-heading"><span>04</span><div><h3>Клиентские приложения</h3><p>Выбирайте, какие программы показать пользователю, и задавайте собственные ссылки на установку.</p></div></div>',
       field('subscriptionAppsTitle','Заголовок приложений (RU)',data.subscriptionAppsTitle,'Пустое значение — перевод по умолчанию.',{placeholder:'Приложения для подключения',max:80}),
       field('subscriptionAppsTitleEn','Заголовок приложений (EN)',data.subscriptionAppsTitleEn,'Английский заголовок раздела.',{max:80}),
       '<div class="subscription-studio-toolbar"><span class="subscription-client-counter" data-subscription-client-count>—</span><div class="subscription-client-actions">',
@@ -492,7 +464,39 @@ window.XMeshSubscriptionStudio = (() => {
       '</main>',
       '</div>',
       '<div class="subscription-studio-stats"><div><small>Пользователей</small><b>'+esc(counts.users)+'</b></div><div><small>Узлов</small><b>'+esc(counts.nodes)+'</b></div></div>',
-      '</aside></form></div>'
+      '</aside>',
+      '<div class="subscription-servers-page" id="substudio-servers" role="tabpanel" aria-labelledby="substudio-tab-servers" hidden>',
+      '<section class="card subscription-studio-section">',
+      '<div class="subscription-studio-heading"><span>01</span><div><h3>Адрес подписок</h3><p>Отдельный публичный домен для получения подписок. Не совпадает с адресом управления Nexus.</p></div></div>',
+      '<div class="subscription-studio-pair">',
+      field('subscriptionDomain','Домен подписки',data.subscriptionDomain,'Домен с DNS A/AAAA на VPS с XMesh Sub.',{placeholder:'sub.example.com',max:253}),
+      field('subscriptionPath','Публичный путь',data.subscriptionPath,'Например /s или /subscription.',{placeholder:'/s',max:64}),
+      '</div>',
+      '<div class="subscription-studio-url"><span>Формат персональной ссылки</span><code data-subscription-link>Укажите домен и путь</code></div>',
+      '</section>',
+      '<section class="card subscription-studio-section subscription-server-provisioning">',
+      '<div class="subscription-studio-heading"><span>02</span><div><h3>Установка XMesh Sub</h3><p>Отдельный HTTPS-шлюз для подписок, который обращается к Nexus. База и пользователи остаются в панели.</p></div></div>',
+      '<div class="subscription-sub-workspace-head"><div><b>Новый VPS</b><small>Ubuntu 22.04/24.04 · установка одной командой</small></div>',
+      '<span class="subscription-sub-provision-status" data-sub-install-state>Требуется настройка</span></div>',
+      '<div class="subscription-sub-steps">',
+      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">1</span><div><b>Подготовьте домен</b>',
+      '<p>Направьте DNS A/AAAA домена подписок на новый VPS. Откройте TCP 80/443 и сохраните адрес и путь кнопкой «Сохранить настройки».</p></div></section>',
+      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">2</span><div><b>Установите XMesh Sub</b>',
+      '<p>Скопируйте команду, проверьте установщик и выполните её в терминале чистого VPS.</p>',
+      '<div class="subscription-sub-install-command"><code data-sub-install-command>Заполните и сохраните адрес подписок</code>',
+      '<button type="button" class="btn sm" data-sub-install-copy disabled>Скопировать команду</button></div>',
+      '<small data-sub-install-note role="status" aria-live="polite">Укажите отдельные домены Nexus и сервера подписок.</small>',
+      '</div></section>',
+      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">3</span><div><b>Проверьте доступность</b>',
+      '<p>После установки откройте адрес проверки. Ответ <code>ok</code> подтверждает работу HTTPS-шлюза, но не выдачу реальной подписки.</p>',
+      '<div class="subscription-sub-verify"><code data-sub-health-url>Укажите домен подписок</code>',
+      '<a class="gh sm" data-sub-health-link target="_blank" rel="noopener noreferrer" hidden>Открыть проверку</a></div>',
+      '<small>Выдачу подписки проверьте отдельно на тестовом пользователе.</small>',
+      '</div></section>',
+      '</div>',
+      '<p class="subscription-sub-scope"><strong>Текущая версия:</strong> XMesh Sub — отдельный HTTPS-шлюз. Генерация подписок, токены и ограничения остаются в Nexus. Автоматическая регистрация, статусы серверов и обновление из панели пока не реализованы.</p>',
+      '</section>',
+      '</div></form></div>'
     ].join('');
     const mount = () => {
       const form=document.getElementById('subscription-studio-form');
@@ -581,10 +585,6 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionShowTraffic:input(form,'subscriptionShowTraffic').checked,
         subscriptionStatusEmojis:Object.fromEntries(remarkStatuses.map(([status])=>[status,input(form,'remarkEmoji_'+status).value.trim()])),
         subscriptionShowExpiry:input(form,'subscriptionShowExpiry').checked,
-        subscriptionPlacement:input(form,'subscriptionPlacement').value,
-        nodePlacement:input(form,'nodePlacement').value,
-        deploymentServerB:input(form,'deploymentServerB').value.trim(),
-        deploymentServerC:input(form,'deploymentServerC').value.trim(),
         subscriptionBackground:input(form,'subscriptionBackground').value,
         subscriptionCardColor:input(form,'subscriptionCardColor').value,
         subscriptionTextColor:input(form,'subscriptionTextColor').value,
@@ -638,20 +638,60 @@ window.XMeshSubscriptionStudio = (() => {
       };
       const previewQr=previewShadow.querySelector('[data-subscription-qr]');
       previewShadow.querySelector('.subscription-public-primary-action')?.append(previewQr);
+      const tabButtons=[...form.closest('.subscription-studio').querySelectorAll('[data-substudio-tab]')];
+      const selectWorkspace=(next,focus=false)=>{
+        if(next!=='settings'&&next!=='servers')return;
+        const root=form.closest('.subscription-studio');
+        root.dataset.subscriptionView=next;
+        root.querySelector('.subscription-studio-main').hidden=next!=='settings';
+        root.querySelector('.subscription-studio-side').hidden=next!=='settings';
+        root.querySelector('.subscription-servers-page').hidden=next!=='servers';
+        for(const button of tabButtons){
+          const selected=button.dataset.substudioTab===next;
+          button.classList.toggle('on',selected);
+          button.setAttribute('aria-selected',String(selected));
+          button.tabIndex=selected?0:-1;
+          if(selected&&focus)button.focus();
+        }
+      };
+      tabButtons.forEach(button=>button.addEventListener('click',()=>selectWorkspace(button.dataset.substudioTab)));
+      form.closest('.subscription-studio').querySelector('.subscription-studio-tabs').addEventListener('keydown',event=>{
+        if(!['ArrowRight','ArrowLeft','Home','End'].includes(event.key))return;
+        const current=tabButtons.indexOf(document.activeElement);
+        if(current<0)return;
+        event.preventDefault();
+        const next=event.key==='Home'?0:event.key==='End'?tabButtons.length-1:
+          (current+(event.key==='ArrowRight'?1:-1)+tabButtons.length)%tabButtons.length;
+        selectWorkspace(tabButtons[next].dataset.substudioTab,true);
+      });
       const savedInstall={domain:String(data.subscriptionDomain||'').toLowerCase(),path:String(data.subscriptionPath||'')};
       const updateInstall=(d)=>{
         const panel=String(settings?.domain||window.location?.hostname||'').trim().toLowerCase();
         const command=installCommand(panel,d.subscriptionDomain,d.subscriptionPath);
         const dirty=savedInstall.domain!==d.subscriptionDomain||savedInstall.path!==d.subscriptionPath;
+        const ready=!!command&&!dirty;
+        const url=ready?'https://'+d.subscriptionDomain+'/healthz':'';
         const code=form.querySelector('[data-sub-install-command]');
         const copy=form.querySelector('[data-sub-install-copy]');
         const note=form.querySelector('[data-sub-install-note]');
-        if(code)code.textContent=command||'Укажите разные домены панели и подписок и корректный путь.';
-        if(copy)copy.disabled=!command||dirty;
-        if(note)note.textContent=dirty?'Сначала сохраните изменённые настройки адреса выдачи.':
-          command?'Перед установкой направьте DNS на новый VPS и откройте порты 80/443. Команда не содержит секретов.':
-          'Укажите корректные отдельные домены панели и подписок.';
-        return !dirty?command:'';
+        const state=form.querySelector('[data-sub-install-state]');
+        const health=form.querySelector('[data-sub-health-url]');
+        const link=form.querySelector('[data-sub-health-link]');
+        if(code)code.textContent=command||'Укажите отдельный домен подписок и корректный путь.';
+        if(copy)copy.disabled=!ready;
+        if(state){
+          state.dataset.state=dirty?'dirty':ready?'ready':'empty';
+          state.textContent=dirty?'Не сохранено':ready?'Команда готова':'Требуется настройка';
+        }
+        if(note)note.textContent=dirty?'Сначала сохраните изменённые адрес и путь.':
+          ready?'Команда не содержит секретов и не регистрирует VPS автоматически.':
+          'Нужны корректные разные домены панели и подписок.';
+        if(health)health.textContent=url||'Укажите домен подписок';
+        if(link){
+          link.hidden=!ready;
+          if(ready)link.href=url;else link.removeAttribute('href');
+        }
+        return ready?command:'';
       };
       const draw = () => {
         applyPanelTheme();
@@ -827,13 +867,7 @@ window.XMeshSubscriptionStudio = (() => {
         support.textContent=(english?d.subscriptionSupportLabelEn:d.subscriptionSupportLabel)||(english?'Support':'Поддержка');
         support.hidden=!d.subscriptionShowSupport;
         syncPreviewSections();
-        const labels={a:'Панель',b:'',c:''};
-        labels[d.subscriptionPlacement]+=(labels[d.subscriptionPlacement]?' + ':'')+'Подписки';
-        labels[d.nodePlacement]+=(labels[d.nodePlacement]?' + ':'')+'VPN-ноды';
-        const names={a:settings.domain||'Локальная панель',b:d.deploymentServerB||'Сервер B',c:d.deploymentServerC||'Сервер C'};
-        $('[data-subscription-topology]').innerHTML=slot.filter(([id])=>labels[id]).map(([id])=>
-          '<div class="subscription-topology-item"><span>'+esc('SERVER '+id.toUpperCase())+'</span><b>'+esc(labels[id])+'</b><small>'+esc(names[id])+'</small></div>'
-        ).join('');
+
       };
       previewShadow.addEventListener('click',event=>{
         const filter=event.target.closest('[data-app-filter]');
@@ -940,8 +974,6 @@ window.XMeshSubscriptionStudio = (() => {
         }
         if(!pathOK(draft.subscriptionPath)){notify('Некорректный путь подписки');return;}
         if(![draft.subscriptionJson.socksPort,draft.subscriptionJson.httpPort].every(p=>Number.isInteger(p)&&p>=1024&&p<=65535)||draft.subscriptionJson.socksPort===draft.subscriptionJson.httpPort){notify('Укажите разные локальные порты в диапазоне 1024–65535');return;}
-        for(const key of ['deploymentServerB','deploymentServerC'])
-          if(draft[key] && (draft[key].length>253 || /[\u0000-\u001f\u007f]/.test(draft[key]))) {notify('Некорректное описание сервера');return;}
         if(!Number.isInteger(draft.subscriptionUpdateInterval)||draft.subscriptionUpdateInterval<1||draft.subscriptionUpdateInterval>168){notify('Интервал обновления должен быть от 1 до 168 часов.');return;}
         for(const key of ['subscriptionLogoUrl','subscriptionSupportUrl']){
           if(!validHttps(draft[key])){notify('Укажите корректную HTTPS-ссылку без логина и порта.');return;}
@@ -987,16 +1019,6 @@ window.XMeshSubscriptionStudio = (() => {
           textarea.remove();
           notify(copied?'Команда XMesh Sub скопирована':'Скопируйте команду вручную из поля.');
         }
-      });
-      $('[data-subscription-export]').addEventListener('click',()=>{
-        const json=JSON.stringify({schema:'xmesh-subscription-blueprint/v1',panel:{domain:settings.domain||'',role:'control-plane'},
-          placement:{panel:'a',subscription:read().subscriptionPlacement,nodes:read().nodePlacement,
-            serverB:read().deploymentServerB,serverC:read().deploymentServerC},
-          portal:{...read()}},null,2);
-        const blob=new Blob([json],{type:'application/json'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');a.href=url;a.download='xmesh-subscription-blueprint.json';document.body.appendChild(a);a.click();a.remove();
-        setTimeout(()=>URL.revokeObjectURL(url),1000);
       });
       draw();
     };
