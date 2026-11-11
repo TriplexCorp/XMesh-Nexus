@@ -1195,11 +1195,18 @@ async function main() {
             const filter=root.querySelector('.xm-select-shell')||root.querySelector('#stats-node-filter');
             const toggle=root.querySelector('.stats-node-view-toggle'),count=root.querySelector('#stats-node-count');
             return {outer:rect(root),search:rect(search),filter:rect(filter),toggle:rect(toggle),count:rect(count),
+              toggleButtons:[...toggle.querySelectorAll('button')].map(rect),
               wrap:getComputedStyle(root).flexWrap,inputBorder:getComputedStyle(input).borderTopWidth,
               inputShadow:getComputedStyle(input).boxShadow};
           });
           assert.equal(toolbar.inputBorder,'0px','Statistics search must not draw a second pill border');
           assert.equal(toolbar.inputShadow,'none','Statistics search must not have a second shadow');
+          assert.equal(toolbar.toggleButtons.length,2,'Statistics must offer both grid and list views');
+          for(const button of toolbar.toggleButtons){
+            assert(button.x>=toolbar.toggle.x-1&&button.right<=toolbar.toggle.right+1&&
+              button.y>=toolbar.toggle.y-1&&button.bottom<=toolbar.toggle.bottom+1,
+              'Statistics grid/list button escapes its segmented track at '+width+'px');
+          }
           for(const part of ['search','filter','toggle','count']){
             const r=toolbar[part],outer=toolbar.outer;
             assert(r.x>=outer.x-2&&r.right<=outer.right+2,

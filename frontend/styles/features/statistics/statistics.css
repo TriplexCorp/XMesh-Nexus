@@ -1520,7 +1520,7 @@ html[data-motion=off] :is(.stats-bucket-detail,.stats-bucket-content,.stats-deta
 .stats-nodes-section .stats-nodes-header p{margin:0;color:var(--mu);font-size:.75rem}
 .stats-nodes-section .stats-nodes-toolbar{
   display:flex;align-items:center;flex-wrap:nowrap;
-  gap:.45rem;min-width:0;width:100%;
+  box-sizing:border-box;gap:.45rem;min-width:0;width:100%;
   margin:0 0 .7rem;padding:.38rem .5rem;
   border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);
   background:var(--nx-section-bg);
@@ -1528,7 +1528,7 @@ html[data-motion=off] :is(.stats-bucket-detail,.stats-bucket-content,.stats-deta
 .stats-nodes-section .stats-node-search{
   display:flex;align-items:center;gap:.45rem;box-sizing:border-box;
   flex:0 1 19rem;min-width:9rem;width:19rem;max-width:100%;
-  height:2.05rem;min-height:2.05rem;
+  height:var(--nx-control-h-sm);min-height:var(--nx-control-h-sm);
   margin:0 auto 0 0;padding:0 .62rem;
   border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);
   background:var(--nx-control-bg);color:var(--mu);
@@ -1548,25 +1548,29 @@ html[data-motion=off] :is(.stats-bucket-detail,.stats-bucket-content,.stats-deta
 .stats-nodes-section .stats-nodes-toolbar #stats-node-filter:not(.xm-select-source),
 .stats-nodes-section .stats-nodes-toolbar .xm-select-trigger{
   display:flex;align-items:center;
-  width:100%;height:2.05rem;min-height:2.05rem;
+  width:100%;height:var(--nx-control-h-sm);min-height:var(--nx-control-h-sm);
   padding:.35rem .55rem;border-radius:var(--ui-control-radius);
   background:var(--nx-control-bg);font-size:.77rem;line-height:1.2;
 }
 .stats-nodes-section .stats-nodes-toolbar #stats-node-filter.xm-select-source{
   position:absolute;min-height:0;width:1px;height:1px;
 }
+/* Two contained controls: the global button minimum must not outgrow this segmented track. */
 .stats-nodes-section .stats-node-view-toggle{
-  display:inline-flex;align-items:center;gap:.15rem;flex:0 0 auto;
-  height:2.05rem;box-sizing:border-box;padding:.15rem;
+  display:grid;grid-template-columns:repeat(2,1.95rem);align-items:stretch;
+  gap:.15rem;flex:0 0 auto;
+  height:var(--nx-control-h-sm);min-height:var(--nx-control-h-sm);
+  box-sizing:border-box;padding:.15rem;
   border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);
   background:var(--nx-control-bg);
 }
 .stats-nodes-section .stats-node-view-toggle button{
-  display:grid;place-items:center;width:1.75rem;height:1.65rem;
-  padding:0;border:0;border-radius:.4rem;background:transparent;
-  color:var(--mu);cursor:pointer;
+  display:grid;place-items:center;box-sizing:border-box;
+  width:100%;height:100%;min-width:0;min-height:0;
+  margin:0;padding:0;border:0;border-radius:.4rem;background:transparent;
+  color:var(--mu);line-height:1;cursor:pointer;
 }
-.stats-nodes-section .stats-node-view-toggle button .ic{width:.9rem;height:.9rem}
+.stats-nodes-section .stats-node-view-toggle button .ic{display:block;width:1rem;height:1rem}
 .stats-nodes-section .stats-node-view-toggle button[aria-pressed="true"]{
   background:color-mix(in srgb,var(--a) 16%,var(--nx-section-bg));color:var(--a);
 }
