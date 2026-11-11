@@ -18,11 +18,11 @@ mod panel_version;
 
 mod protocol_credentials;
 mod security;
+mod sub_server;
 mod subscription_finalmask;
 mod subscription_json;
 mod subscription_remark;
 mod subscription_settings;
-mod sub_server;
 mod subscription_transport;
 mod subscription_user_agent;
 mod user_subscriptions;
@@ -782,11 +782,15 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
             | "/api/v1/node/restart/poll"
             | "/api/v1/node/restart/progress"
             | "/api/v1/node/restart/ack" => request.headers().contains_key("x-xmesh-signature"),
-            "/api/v1/sub-server/agent/poll"
-            | "/api/v1/sub-server/agent/report" => request
+            "/api/v1/sub-server/agent/poll" | "/api/v1/sub-server/agent/report" => request
                 .headers()
                 .get(header::AUTHORIZATION)
-                .is_some_and(|value| value.to_str().ok().is_some_and(|s| s.starts_with("Bearer "))),
+                .is_some_and(|value| {
+                    value
+                        .to_str()
+                        .ok()
+                        .is_some_and(|s| s.starts_with("Bearer "))
+                }),
             "/api/v1/sub-server/claim" | "/api/v1/node/enroll" => request
                 .headers()
                 .get(header::CONTENT_TYPE)
