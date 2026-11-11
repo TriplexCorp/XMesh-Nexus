@@ -15,6 +15,20 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Поиск по узлам…": "Search nodes…",
+    "Поиск по узлам": "Search nodes",
+    "Фильтр телеметрии": "Telemetry filter",
+    "Свежие данные": "Fresh data",
+    "Без измерений": "No measurements",
+    "Вид карточек узлов": "Node display mode",
+    "Показано:": "Shown:",
+    "Актуально": "Up to date",
+    "Обновлено:": "Updated:",
+    "По этим условиям узлы не найдены.": "No nodes match these filters.",
+    "Узлы пока не созданы.": "No nodes added yet.",
+    "Данные устарели": "Data is stale",
+    "Нет телеметрии": "No telemetry",
+    "Нет измерений": "No measurements",
     "Быстрые действия пользователя": "Quick user actions",
     "Просмотреть": "View",
     "Включить доступ": "Enable access",

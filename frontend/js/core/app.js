@@ -70,6 +70,8 @@ const P={
   globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/>',
   languages:'<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3H2"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
   terminal:'<rect x="2" y="3" width="20" height="18" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/>',
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
   qr:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M5 5h3v3H5zM16 5h3v3h-3zM5 16h3v3H5zM14 14h3m3 0v3m-6 0v4m3-4h4m-4 4h4"/>',
   sparkles:'<path d="m12 3 1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6-5.6-1.9 5.6-1.9L12 3ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z"/>'
 };
@@ -1482,10 +1484,10 @@ const syncResponsiveTrafficChart=(kind,selector,renderSvg,logicalHeight)=>{
  update();
 };
 
-const statsRing=(label,percent,accent)=> {
+const statsRing=(label,percent,accent,detail='')=> {
  const valid=percent!==null&&percent!==undefined&&Number.isFinite(Number(percent));
  const pct=valid?Math.max(0,Math.min(100,Number(percent))):0;
- return '<div class="stats-ring-card" style="--ring-color:'+accent+';--ring-value:'+pct+'%"><div class="stats-ring"><div class="stats-ring-center"><strong>'+(valid?esc(fmt(pct,1))+'%':'—')+'</strong></div></div><span>'+esc(label)+'</span></div>';
+ return '<div class="stats-ring-card" style="--ring-color:'+accent+';--ring-value:'+pct+'%"><div class="stats-ring"><div class="stats-ring-center"><strong>'+(valid?esc(fmt(pct,1))+'%':'—')+'</strong></div></div><span>'+esc(label)+'</span>'+(detail?'<small class="stats-ring-detail" title="'+esc(detail)+'">'+esc(detail)+'</small>':'')+'</div>';
 };
 // Plot only observed Xray delta buckets; missing intervals are deliberately not invented.
 const statsXrayHistoryChart=points=>{
@@ -1593,7 +1595,7 @@ function statisticsP(){
    </section>
   </dialog>
   <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
-  <section class="card"><div class="hd"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
+  <section class="card stats-nodes-section"><div class="hd stats-nodes-header"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div><div class="stats-nodes-toolbar"><label class="stats-node-search">${ic('search')}<input type="search" id="stats-node-search" placeholder="Поиск по узлам…" aria-label="Поиск по узлам" autocomplete="off"></label><select id="stats-node-filter" aria-label="Фильтр телеметрии"><option value="all">Все узлы</option><option value="fresh">Свежие данные</option><option value="attention">Требуют внимания</option><option value="missing">Без измерений</option></select><div class="stats-node-view-toggle" role="group" aria-label="Вид карточек узлов"><button type="button" data-stats-node-view="grid" aria-label="Карточки" title="Карточки" aria-pressed="true">${ic('grid')}</button><button type="button" data-stats-node-view="list" aria-label="Список" title="Список" aria-pressed="false">${ic('list')}</button></div></div></div><div class="stats-nodes-summary"><span id="stats-node-count" role="status" aria-live="polite"></span></div><div id="stats-nodes" class="stats-node-grid"></div></section>
   <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
  </div>`;
  const init=()=>{
@@ -1607,6 +1609,57 @@ function statisticsP(){
   let lastOverview=0,lastSystem=0,overviewCache=null,systemCache=null;
   let requestFailed=false,lastSampleAt=0,lastTrafficSignature='',lastTrafficPeriod='';
   let selectedBucketMs=null,detailRequest=0,chartPoints=[];
+
+  let statsNodeRows=[];
+  const renderStatsNodes=()=>{
+    const root=$('#stats-nodes');
+    if(!root)return;
+    const query=String($('#stats-node-search')?.value||'').trim().toLocaleLowerCase();
+    const filter=$('#stats-node-filter')?.value||'all';
+    const visible=statsNodeRows.filter(n=>{
+      const match=!query||[n.name,n.hosting,n.flag].some(v=>String(v||'').toLocaleLowerCase().includes(query));
+      if(!match)return false;
+      const quality=n.telemetryState||(n.latest?(n.latest.stale?'stale':'fresh'):'never_received');
+      if(filter==='fresh')return quality==='fresh';
+      if(filter==='attention')return quality==='delayed'||quality==='stale'||quality==='invalid';
+      if(filter==='missing')return quality==='never_received';
+      return true;
+    });
+    const count=$('#stats-node-count');
+    if(count)count.textContent=(panelIsEnglish()?'Shown: ':'Показано: ')+visible.length+' / '+statsNodeRows.length;
+    root.innerHTML=visible.length?visible.map(n=>{
+      const v=n.latest,quality=n.telemetryState||(v?(v.stale?'stale':'fresh'):'never_received'),ok=!!v&&quality==='fresh';
+      const state=quality==='fresh'?'Свежие данные':quality==='delayed'?'Данные задерживаются':quality==='stale'?'Данные устарели':quality==='invalid'?'Недостоверная метка времени':'Нет телеметрии';
+      const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'):'Нет измерений';
+      const capacity=(used,total)=>ok?statsBytes(used)+' / '+statsBytes(total):'Нет данных';
+      const value=(key)=>ok?statsRate(v[key]):'Нет данных';
+      const status=ok?(['verified','direct'].includes(v.userStatsStatus)?'Подтверждён':v.userStatsStatus==='unavailable'?'Недоступен':'Статус не получен'):'Нет свежего подтверждения';
+      const verified=ok&&['verified','direct'].includes(v.userStatsStatus);
+      const fact=(name,value,icon,good=false)=>'<div class="stats-node-fact'+(good?' is-verified':'')+'"><span class="stats-node-fact-name">'+ic(icon)+esc(name)+'</span><strong>'+esc(value)+'</strong></div>';
+      return '<article class="stats-node" data-stats-quality="'+esc(quality)+'">'+
+        '<header class="stats-node-head"><div class="stats-node-identity">'+flagView(n.flag)+'<strong>'+esc(n.name)+'</strong>'+(n.hosting?'<small>'+esc(n.hosting)+'</small>':'')+'</div>'+
+        '<span class="stats-node-state" data-quality="'+esc(quality)+'" title="'+esc(state)+'">'+(quality==='fresh'?'Актуально':state)+'</span>'+
+        '<time class="stats-node-time" title="'+esc(last)+'">'+(panelIsEnglish()?'Updated: ':'Обновлено: ')+esc(last)+'</time></header>'+
+        '<div class="stats-node-rings">'+statsRing('CPU',ok?v.cpuPercent:null,'#6f9bff')+
+        statsRing('Steal time',ok?v.cpuStealPercent:null,'#f3ae63')+
+        statsRing('RAM',ok&&v.ramTotalBytes>0?v.ramUsedBytes/v.ramTotalBytes*100:null,'#c294e8',capacity(v?.ramUsedBytes,v?.ramTotalBytes))+
+        statsRing('Диск',ok&&v.diskTotalBytes>0?v.diskUsedBytes/v.diskTotalBytes*100:null,'#44c9b6',capacity(v?.diskUsedBytes,v?.diskTotalBytes))+'</div>'+
+        '<div class="stats-node-facts"><div class="stats-node-facts-network">'+
+        fact('RX',value('rxBytesPerSec'),'dl')+fact('TX',value('txBytesPerSec'),'upload')+
+        '</div><div class="stats-node-facts-service">'+
+        fact('TCP соединения',statsValue(ok?v.activeConnections:null),'layers')+
+        fact('Онлайн клиенты',statsValue(ok?v.onlineClients:null),'users')+
+        fact('Учёт Xray',status,verified?'check':'code',verified)+'</div></div>'+
+        '</article>';
+    }).join(''):'<p class="note stats-node-empty">'+(statsNodeRows.length?(panelIsEnglish()?'No nodes match the filters.':'По этим условиям узлы не найдены.'):(panelIsEnglish()?'No nodes added yet.':'Узлы пока не созданы.'))+'</p>';
+  };
+  $('#stats-node-search')?.addEventListener('input',renderStatsNodes);
+  $('#stats-node-filter')?.addEventListener('change',renderStatsNodes);
+  document.querySelectorAll('[data-stats-node-view]').forEach(button=>button.addEventListener('click',()=>{
+    const list=button.dataset.statsNodeView==='list';
+    $('#stats-nodes')?.classList.toggle('is-list',list);
+    document.querySelectorAll('[data-stats-node-view]').forEach(choice=>choice.setAttribute('aria-pressed',String(choice===button)));
+  }));
   const updateLiveStatus=()=>{
     const live=$('#stats-period')?.value==='live',badge=$('#stats-live-badge'),age=$('#stats-sample-age');
     if(badge)badge.classList.toggle('is-paused',!live||document.hidden||requestFailed);
@@ -1693,23 +1746,8 @@ function statisticsP(){
      }
     }
     updateLiveStatus();
-    $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
-      const v=n.latest,quality=n.telemetryState||(v?(v.stale?'stale':'fresh'):'never_received'),ok=v&&quality==='fresh';
-      const head=flagView(n.flag)+' <b>'+esc(n.name)+'</b>'+(n.hosting?'<small>'+esc(n.hosting)+'</small>':'');
-      const values=[
-        ['CPU',statsValue(ok?v.cpuPercent:null,'%')],
-        ['Steal time',statsValue(ok?v.cpuStealPercent:null,'%')],
-        ['RAM',statsBytes(ok?v.ramUsedBytes:null)+' / '+statsBytes(ok?v.ramTotalBytes:null)],
-        ['Диск',statsBytes(ok?v.diskUsedBytes:null)+' / '+statsBytes(ok?v.diskTotalBytes:null)],
-        ['RX',ok?statsRate(v.rxBytesPerSec):'Нет данных'],
-        ['TX',ok?statsRate(v.txBytesPerSec):'Нет данных'],
-        ['TCP соединения',statsValue(ok?v.activeConnections:null)],
-        ['Онлайн клиенты',statsValue(ok?v.onlineClients:null)],
-         ['Учёт Xray',ok?(['verified','direct'].includes(v.userStatsStatus)?'Подтверждён':v.userStatsStatus==='unavailable'?'Недоступен':'Статус не получен'):'Нет свежего подтверждения']
-      ];
-      const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'):'Нет измерений';
-      return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(quality==='fresh'?'Свежие данные':quality==='delayed'?'Данные задерживаются':quality==='stale'?'Данные устарели':quality==='invalid'?'Недостоверная метка времени':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-node-rings">'+statsRing('CPU',ok?v.cpuPercent:null,'#6f9bff')+statsRing('Steal time',ok?v.cpuStealPercent:null,'#f3ae63')+statsRing('RAM',ok&&v.ramTotalBytes>0?v.ramUsedBytes/v.ramTotalBytes*100:null,'#c294e8')+statsRing('Диск',ok&&v.diskTotalBytes>0?v.diskUsedBytes/v.diskTotalBytes*100:null,'#44c9b6')+'</div><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
-    }).join(''):'<p class="note">Узлы пока не созданы.</p>';
+    statsNodeRows=nodes;
+    renderStatsNodes();
     if(status)status.textContent=(panelIsEnglish()?'Data updated · API checked at ':'Данные обновлены · API проверен в ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
    }catch(error){requestFailed=true;updateLiveStatus();if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
    finally{refreshing=false;lastRefresh=Date.now();if(button?.isConnected)button.disabled=false}

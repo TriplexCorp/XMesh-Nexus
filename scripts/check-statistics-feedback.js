@@ -284,6 +284,25 @@ matches(css,/#stats-dashboard #stats-period\s*\{[\s\S]*?grid-column:2[\s\S]*?gri
 matches(css,/\.stats-node-grid\s*\{/);
 matches(css,/@media \(max-width:700px\)[\s\S]*?\.stats-node-grid\s*\{[\s\S]*?grid-template-columns:1fr/);
 
+// Compact node cards must keep real telemetry, status fidelity and filtering.
+matches(app,/const renderStatsNodes=\(\)=>/);
+matches(app,/statsNodeRows=nodes;\s*renderStatsNodes\(\)/);
+matches(app,/id="stats-node-search"/);
+matches(app,/id="stats-node-filter"/);
+matches(app,/data-stats-node-view="grid"/);
+matches(app,/data-stats-node-view="list"/);
+matches(app,/button\.dataset\.statsNodeView==='list'/);
+matches(app,/quality==='fresh'\?'Свежие данные'/);
+matches(app,/const verified=ok&&\['verified','direct'\]\.includes\(v\.userStatsStatus\)/);
+matches(app,/statsRing\('RAM',[^\n]*capacity\(v\?\.ramUsedBytes,v\?\.ramTotalBytes\)/);
+matches(app,/statsRing\('Диск',[^\n]*capacity\(v\?\.diskUsedBytes,v\?\.diskTotalBytes\)/);
+matches(app,/statsRate\(v\[key\]\)/);
+matches(css,/\.stats-nodes-section \.stats-node-grid\s*\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+matches(css,/#stats-nodes \.stats-node-rings\s*\{[\s\S]*?grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+matches(css,/\.stats-node-facts\s*\{[\s\S]*?grid-template-columns:/);
+matches(css,/@media\(max-width:390px\)[\s\S]*?\.stats-node-facts\s*\{grid-template-columns:1fr/);
+rejects(app,/\['CPU',statsValue\(ok\?v\.cpuPercent:null,'%'/,'Do not repeat CPU underneath the compact gauges');
+
 // Node breakdown colors are stable and separate from upload\/download semantics.
 matches(app,/function userServerColor\(id\)/);
 matches(app,/registerUserNodeColors\(servers\)/);
