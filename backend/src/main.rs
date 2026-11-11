@@ -4691,20 +4691,20 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
             }
         }
     }
-    if collection == "hosts" {
-        if let Some(description) = object.get("serverDescription") {
-            let description = description.as_str().ok_or_else(|| {
-                ApiError::new(
-                    StatusCode::BAD_REQUEST,
-                    "Описание сервера должно быть строкой.",
-                )
-            })?;
-            if description.chars().count() > 30 || description.chars().any(char::is_control) {
-                return Err(ApiError::new(
-                    StatusCode::BAD_REQUEST,
-                    "Описание сервера: максимум 30 символов, без управляющих знаков.",
-                ));
-            }
+    if collection == "hosts"
+        && let Some(description) = object.get("serverDescription")
+    {
+        let description = description.as_str().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Описание сервера должно быть строкой.",
+            )
+        })?;
+        if description.chars().count() > 30 || description.chars().any(char::is_control) {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Описание сервера: максимум 30 символов, без управляющих знаков.",
+            ));
         }
     }
     if collection == "users" {
