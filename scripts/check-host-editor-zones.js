@@ -18,7 +18,7 @@ const DB={
   nodes:[{id:5,name:'Netherlands',addr:'example.net',port:443,profileId:1}],
 };
 const field=(f,value)=>'<label class="f"><span>'+f.l+'</span><input name="'+f.k+'" value="'+String(value??'')+'"></label>';
-const names=['profileId','tag','nodes','disabled','remark','address','port','countryCode',
+const names=['profileId','tag','nodes','disabled','remark','serverDescription','address','port','countryCode',
  'securityLayer','tlsVerification','xhttpMode','useSniAsHost','sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'];
 const fspec=names.map(k=>({k,l:k}));
 const countries=[{code:'NL',flag:'🇳🇱'},{code:'PL',flag:'🇵🇱'},{code:'DE',flag:'🇩🇪'}];
@@ -91,6 +91,10 @@ assert(!html.includes('<details class="host-advanced'),'Existing transport and s
 assert.equal((html.match(/class="host-client-group"/g)||[]).length,2,'Client fields must have Transport and Security groupings');
 assert.match(html,/class="host-advanced-groups"/,'Both groups must remain inside the same Host form');
 assert(html.includes('host-client-settings'),'Expert client metadata must have its own disclosure');
+assert.match(feature, /\['remark','serverDescription','address','port','countryCode'\]/, 'Happ description belongs next to public host name');
+assert.match(html,/name="serverDescription"/,'The Host editor must expose the optional Happ subtitle');
+assert(html.includes('Описание сервера показывается'),'Help text must explain the Happ-specific metadata');
+
 // Bootstrap refreshes replace arrays. An existing feature instance must see
 // the new collections and must leave their objects untouched during rendering.
 DB.profiles=[{id:2,name:'Replacement profile'}];
