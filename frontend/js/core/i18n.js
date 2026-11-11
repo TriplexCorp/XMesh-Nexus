@@ -15,6 +15,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "После установки откройте адрес проверки. Ответ": "After installing, open the health URL. A response of",
+    "подтверждает работу HTTPS-шлюза, но не выдачу реальной подписки.": "confirms that the HTTPS gateway responds, not that an actual subscription works.",
     "Настройки подписок": "Subscription settings",
     "Серверы подписок": "Subscription servers",
     "Разделы Subscription Studio": "Subscription Studio sections",
