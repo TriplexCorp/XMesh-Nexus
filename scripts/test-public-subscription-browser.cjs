@@ -147,7 +147,13 @@ async function dismissDialog(page,dialog,opener){
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-traffic.js').toString()});
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-studio.js').toString()});
   await page.evaluate(()=>{
-    const [markup,mount]=window.XMeshSubscriptionStudio.create({domain:'panel.example.org',subscriptionLanguage:'en',subscriptionSyncPanelTheme:false,subscriptionShowDevices:true,subscriptionShowSupport:true},async()=>{},()=>{},{users:2,nodes:1});
+    window.__subEnrollCallCount=0;
+    const subApi={
+      status:async()=>({enrolled:false,online:false,domainMatches:false,update:{}}),
+      enroll:async()=>{window.__subEnrollCallCount++;return {enrollmentToken:'a'.repeat(64),expiresInSeconds:3600}},
+      update:async()=>{throw Error('Update requires a paired, online agent')}
+    };
+    const [markup,mount]=window.XMeshSubscriptionStudio.create({domain:'panel.example.org',subscriptionLanguage:'en',subscriptionSyncPanelTheme:false,subscriptionShowDevices:true,subscriptionShowSupport:true},async()=>{},()=>{},{users:2,nodes:1},null,subApi);
     document.body.innerHTML=markup;mount();
   });
   const studio=page.locator('[data-subscription-preview-frame]');
@@ -181,8 +187,16 @@ async function dismissDialog(page,dialog,opener){
   await page.locator('[name="subscriptionDomain"]').fill('sub.example.org');
   assert(await commandCopy.isDisabled(),'Editing the domain is not equivalent to saving it');
   await page.locator('button[form="subscription-studio-form"]').click();
-  assert(await commandCopy.isEnabled(),'Saving the domain allows copying the installer command');
-  assert.match(await page.locator('[data-sub-install-command]').innerText(),/--domain sub\.example\.org --path \/s/);
+  assert(await commandCopy.isDisabled(),'Saving a domain must not allow an unmanaged installer copy');
+  const installGenerate=page.locator('[data-sub-enroll]');
+  assert(await installGenerate.isEnabled(),'A saved domain must enable owner-only install generation');
+  await installGenerate.click();
+  await page.waitForFunction(()=>document.querySelector('[data-sub-install-command]').textContent.includes(' --enroll-token '));
+  assert(await commandCopy.isEnabled(),'Copy must only be available after one-time enrollment');
+  assert.equal(await page.evaluate(()=>window.__subEnrollCallCount),1,'Exactly one enroll request');
+  const managedInstall=await page.locator('[data-sub-install-command]').innerText();
+  assert(managedInstall.includes('--domain sub.example.org --path /s --enroll-token '+'a'.repeat(64)),
+    'Single install command must include domain, path and the temporary enrollment token');
   assert.equal(await page.locator('[data-sub-health-link]').getAttribute('href'),'https://sub.example.org/healthz');
   assert.match(await page.locator('[data-sub-install-state]').innerText(),/Команда готова/);
   assert(!/подключён|онлайн/i.test(await page.locator('[data-sub-install-state]').innerText()),
