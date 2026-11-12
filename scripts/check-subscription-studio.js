@@ -289,9 +289,10 @@ assert.match(css,/\.subscription-client-editor/);
 assert.match(css,/\.subscription-preview-apps/);
 assert.match(css,/\.subscription-custom-toolbar/);
 assert.match(css,/\.subscription-custom-header/);
+assert.match(src,/main\.dataset\.substudioPanel='portal'/,'Portal is the default mounted workspace');
 for(const workspace of ['portal','appearance','content','clients','servers','security']){
  assert.match(view,new RegExp('data-substudio-tab="'+workspace+'"'),workspace+' must be a navigable Studio workspace');
- assert.match(src,new RegExp("makePanel\\('"+workspace+"'\\)|data-substudio-panel=\\\""+workspace+"\\\""),workspace+' must mount real content');
+ if(workspace!=='portal')assert(src.includes("makePanel('"+workspace+"')"),workspace+' must mount real content');
 }
 assert.doesNotMatch(view,/<h2>SUBSCRIPTION STUDIO<\/h2>/,'Studio must not duplicate the global header');
 assert.match(view,/data-substudio-save-status/,'Toolbar must report unsaved settings');
