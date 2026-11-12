@@ -194,7 +194,7 @@ async function dismissDialog(page,dialog,opener){
   await page.waitForFunction(()=>document.querySelector('[data-sub-install-command]').textContent.includes('--enroll-token-stdin'));
   assert(await commandCopy.isEnabled(),'Copy must only be available after one-time enrollment');
   assert.equal(await page.evaluate(()=>window.__subEnrollCallCount),1,'Exactly one enroll request');
-  const managedInstall=await page.locator('[data-sub-install-command]').innerText();
+  const managedInstall=await page.locator('[data-sub-install-command]').textContent();
   assert(managedInstall.includes('--domain sub.example.org --path /s --enroll-token-stdin'), 'Installer must read enrollment from stdin');
   assert(managedInstall.includes('\\n'+'a'.repeat(64)+'\\nXMESH_ENROLL_TOKEN'), 'Single command carries one-use token in a heredoc');
   assert(managedInstall.includes('sha256sum --check --status'), 'Bootstrap must verify SHA-256 before root execution');
