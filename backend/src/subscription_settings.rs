@@ -203,6 +203,9 @@ fn validate_portal_appearance(object: &Map<String, Value>) -> Result<(), ApiErro
 }
 
 pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
+    if let Some(value) = object.get("subscriptionFlood") {
+        crate::subscription_flood::validate_settings(value)?;
+    }
     if let Some(json) = object.get("subscriptionJson") {
         crate::subscription_json::validate_settings(json).map_err(|message| bad(&message))?;
     }

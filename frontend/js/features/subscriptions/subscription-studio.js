@@ -11,6 +11,7 @@ window.XMeshSubscriptionStudio = (() => {
   }
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
+    subscriptionFlood:{enabled:true,mode:'monitor',ipPerMinute:120,tokenPerMinute:12},
     subscriptionBrand:'', subscriptionAnnouncement:'', subscriptionAnnouncementRotationHours:24, subscriptionUpdateInterval:24, subscriptionDescription:'Настройки подключения и информация о подписке.',
     subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78',subscriptionSecondaryAccent:'#c6e985', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
@@ -208,6 +209,7 @@ window.XMeshSubscriptionStudio = (() => {
   function create(settings,save,notify,counts,getPanelTheme,subApi=null) {
     const data = {...defaults,...settings};
     data.subscriptionJson={...defaults.subscriptionJson,...(settings?.subscriptionJson||{})};
+    data.subscriptionFlood={...defaults.subscriptionFlood,...(settings?.subscriptionFlood||{})};
     if(!['ru','en'].includes(data.subscriptionLanguage))data.subscriptionLanguage='ru';
     const panelTheme=()=>typeof getPanelTheme==='function'?getPanelTheme():null;
     if(data.subscriptionSyncPanelTheme!==false&&panelTheme())Object.assign(data,panelTheme());
@@ -555,6 +557,25 @@ window.XMeshSubscriptionStudio = (() => {
       '</div><span class="subscription-step-symbol">'+studioGlyph('shield')+'</span></section>',
       '</div>',
       '</section>',
+      '<section class="card subscription-studio-section subscription-flood-card" data-sub-flood-card>',
+      '<div class="subscription-studio-heading subscription-server-card-heading"><span class="subscription-server-symbol">'+studioGlyph('shield')+'</span><div><h3>Защита от флуда подписок</h3><p>Мониторинг по умолчанию — без блокировок клиентов. При необходимости включите отклонение лишних запросов.</p></div></div>',
+      '<div class="subscription-flood-toolbar"><label class="subscription-flood-switch"><input name="floodEnabled" type="checkbox"'+(data.subscriptionFlood.enabled?' checked':'')+'><span>Защита включена</span></label>',
+      '<span class="subscription-sub-provision-status" data-sub-flood-current-state>Мониторинг</span></div>',
+      '<fieldset class="subscription-flood-mode"><legend>Режим</legend>',
+      '<label><input type="radio" name="floodMode" value="monitor"'+(data.subscriptionFlood.mode!=='protect'?' checked':'')+'> Мониторинг — только считать превышения</label>',
+      '<label><input type="radio" name="floodMode" value="protect"'+(data.subscriptionFlood.mode==='protect'?' checked':'')+'> Защита — HTTP 429 + Retry-After</label></fieldset>',
+      '<div class="subscription-flood-sliders">',
+      '<label>На один IP <b data-sub-flood-ip-label>'+esc(data.subscriptionFlood.ipPerMinute)+'</b> запросов/мин',
+      '<input type="range" name="floodIpPerMinute" min="30" max="600" step="30" value="'+esc(data.subscriptionFlood.ipPerMinute)+'"><small>IP-фильтрация выполняется только на XMesh Sub. Для неё необходимо обновление шлюза.</small></label>',
+      '<label>На один токен <b data-sub-flood-token-label>'+esc(data.subscriptionFlood.tokenPerMinute)+'</b> запросов/мин',
+      '<input type="range" name="floodTokenPerMinute" min="3" max="60" step="3" value="'+esc(data.subscriptionFlood.tokenPerMinute)+'"><small>В Nexus дополнительный запас 10 запросов на короткие всплески.</small></label>',
+      '</div>',
+      '<div class="subscription-flood-telemetry"><div><small>Запросов за 2 мин</small><strong data-sub-flood-requests>—</strong></div>',
+      '<div><small>Превышений</small><strong data-sub-flood-exceeded>—</strong></div>',
+      '<div><small>Заблокировано Nexus</small><strong data-sub-flood-blocked>—</strong></div></div>',
+      '<div class="subscription-flood-footer"><small data-sub-flood-detail role="status" aria-live="polite">Для начала используйте мониторинг. Настройки сохраняются общей кнопкой «Сохранить настройки».</small>',
+      '<button type="button" class="gh" data-sub-flood-refresh>Обновить статистику</button></div>',
+      '</section>',
       '<aside class="card subscription-sub-scope"><span class="subscription-server-symbol">'+studioGlyph('shield')+'</span><strong>Безопасность</strong>',
       '<p>Агент сам обращается к Nexus по HTTPS — дополнительный административный порт не нужен. Установщик проверяется перед запуском, а обновления требуют подпись. Подписки и пользователи остаются в Nexus.</p></aside>',
       '</div></form></div>'
@@ -572,7 +593,7 @@ window.XMeshSubscriptionStudio = (() => {
       previewBody.className='subscription-studio-preview subscription-public';
       while(previewHost.firstChild)previewBody.appendChild(previewHost.firstChild);
       for(const href of [
-        '/subscription-studio.css?v=4a88c903f9e7',
+        '/subscription-studio.css?v=262af6d1ee44',
         '/subscription-surface.css?v=0a79377d5733',
         '/subscription-public.css?v=6a55fffe32d1'
       ]){
@@ -630,6 +651,10 @@ window.XMeshSubscriptionStudio = (() => {
           httpPort:Number(input(form,'json_httpPort').value)
         },
         subscriptionDomain:input(form,'subscriptionDomain').value.trim().toLowerCase(),
+        subscriptionFlood:{enabled:input(form,'floodEnabled').checked,
+          mode:form.querySelector('input[name="floodMode"]:checked')?.value||'monitor',
+          ipPerMinute:Number(input(form,'floodIpPerMinute').value),
+          tokenPerMinute:Number(input(form,'floodTokenPerMinute').value)},
         subscriptionPath:input(form,'subscriptionPath').value.trim(),
         subscriptionBrand:input(form,'subscriptionBrand').value.trim(),
         subscriptionAnnouncement:input(form,'subscriptionAnnouncement').value.trim(),
@@ -726,6 +751,37 @@ window.XMeshSubscriptionStudio = (() => {
           (current+(event.key==='ArrowRight'?1:-1)+tabButtons.length)%tabButtons.length;
         selectWorkspace(tabButtons[next].dataset.substudioTab,true);
       });
+      const refreshFlood=async()=>{
+        const detail=form.querySelector('[data-sub-flood-detail]');
+        if(!subApi?.floodStatus){if(detail)detail.textContent='Статистика доступна только владельцу панели.';return;}
+        try{
+          const stats=await subApi.floodStatus();
+          for(const [field,key] of [['requests','requests'],['exceeded','exceeded'],['blocked','blocked']]){
+            const el=form.querySelector('[data-sub-flood-'+field+']');
+            if(el)el.textContent=Number(stats?.[key]||0).toLocaleString();
+          }
+          if(detail)detail.textContent='Статистика за последние 2 минуты. IP-ограничитель на стороне XMesh Sub активируется отдельно после обновления подписанного релиза.';
+        }catch(error){
+          if(detail)detail.textContent='Не удалось получить статистику: '+(error.message||'API');
+        }
+      };
+      const showFlood=()=>{
+        const enabled=input(form,'floodEnabled').checked, mode=form.querySelector('input[name="floodMode"]:checked')?.value;
+        const status=form.querySelector('[data-sub-flood-current-state]');
+        if(status){status.textContent=!enabled?'Выключена':mode==='protect'?'Защита':'Мониторинг';status.dataset.state=enabled?'ready':'empty';}
+        for(const [name,target] of [['floodIpPerMinute','ip'],['floodTokenPerMinute','token']]){
+          const field=input(form,name),el=form.querySelector('[data-sub-flood-'+target+'-label]');
+          field.disabled=!enabled;
+          if(el)el.textContent=field.value;
+        }
+        form.querySelectorAll('input[name="floodMode"]').forEach(radio=>{radio.disabled=!enabled;});
+      };
+      for(const name of ['floodEnabled','floodIpPerMinute','floodTokenPerMinute']){
+        input(form,name).addEventListener('input',showFlood);
+      }
+      form.querySelectorAll('input[name="floodMode"]').forEach(radio=>radio.addEventListener('change',showFlood));
+      form.querySelector('[data-sub-flood-refresh]')?.addEventListener('click',refreshFlood);
+      showFlood();void refreshFlood();
       const savedInstall={domain:String(data.subscriptionDomain||'').toLowerCase(),path:String(data.subscriptionPath||'')};
       let enrollmentToken='';
       let enrollmentExpiresAt=0;
@@ -810,6 +866,7 @@ window.XMeshSubscriptionStudio = (() => {
         if(!form.isConnected){window.clearInterval(pollAgent);return;}
         if(enrollmentToken&&Date.now()>=enrollmentExpiresAt)updateInstall(read());
         if(form.closest('.subscription-studio')?.dataset.subscriptionView==='servers')void refreshAgent();
+        if(form.closest('.subscription-studio')?.dataset.subscriptionView==='servers')void refreshFlood();
       },20000);
       void refreshAgent();
 
@@ -1136,6 +1193,7 @@ window.XMeshSubscriptionStudio = (() => {
           notify('Эмодзи статуса должен содержать от 1 до 16 символов.');return;
         }
         if(!pathOK(draft.subscriptionPath)){notify('Некорректный путь подписки');return;}
+        if(![draft.subscriptionFlood.ipPerMinute,draft.subscriptionFlood.tokenPerMinute].every(Number.isInteger)||!['monitor','protect'].includes(draft.subscriptionFlood.mode)){notify('Проверьте лимиты защиты подписок.');return;}
         if(![draft.subscriptionJson.socksPort,draft.subscriptionJson.httpPort].every(p=>Number.isInteger(p)&&p>=1024&&p<=65535)||draft.subscriptionJson.socksPort===draft.subscriptionJson.httpPort){notify('Укажите разные локальные порты в диапазоне 1024–65535');return;}
         if(!Number.isInteger(draft.subscriptionUpdateInterval)||draft.subscriptionUpdateInterval<1||draft.subscriptionUpdateInterval>168){notify('Интервал обновления должен быть от 1 до 168 часов.');return;}
         for(const key of ['subscriptionLogoUrl','subscriptionSupportUrl']){

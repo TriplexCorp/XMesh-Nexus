@@ -221,6 +221,9 @@ pub async fn serve(
     headers: HeaderMap,
     Query(options): Query<HashMap<String, String>>,
 ) -> Result<Response, ApiError> {
+    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
+        return Ok(rejected);
+    }
     let fingerprint = token_fingerprint(&state, &token).await?;
     let request_headers = headers.clone();
     let response = base::serve(
@@ -260,6 +263,9 @@ pub async fn portal(
     if wants_feed {
         return serve(State(state), Path(token), headers, Query(options)).await;
     }
+    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
+        return Ok(rejected);
+    }
     base::portal(State(state), Path(token), headers, Query(options)).await
 }
 
@@ -296,6 +302,9 @@ pub async fn portal_route(
             Query(options),
         )
         .await;
+    }
+    if let Some(rejected) = crate::subscription_flood::enforce(&state, token).await {
+        return Ok(rejected);
     }
     base::portal_route(State(state), OriginalUri(uri), headers, Query(options)).await
 }
