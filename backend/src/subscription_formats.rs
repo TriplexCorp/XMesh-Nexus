@@ -537,6 +537,45 @@ mod tests {
         assert_eq!(doc["outbounds"][0]["transport"]["type"],"ws");
     }
     #[test]
+    fn classic_proxy_protocols_export_without_server_secrets() {
+        let mut trojan=json!({"protocol":"trojan","tag":"Trojan",
+            "settings":{"address":"edge.example.org","port":443,"password":"user-password"},
+            "streamSettings":{"network":"tcp","security":"tls","tlsSettings":{"serverName":"edge.example.org"}}});
+        let links=render(&[trojan.clone()],FeedFormat::Links).unwrap().body;
+        assert!(links.starts_with("trojan://user-password@edge.example.org:443?"));
+        assert!(render(&[trojan.clone()],FeedFormat::Mihomo).unwrap().body.contains(r#""type":"trojan""#));
+        assert!(render(&[trojan.clone()],FeedFormat::SingBox).unwrap().body.contains(r#""type":"trojan""#));
+        trojan["settings"]["password"]=json!("");
+        assert!(render(&[trojan],FeedFormat::Links).is_err());
+
+        let ss=json!({"protocol":"shadowsocks","tag":"SS",
+            "settings":{"address":"ss.example.org","port":8388,
+                "method":"aes-256-gcm","password":"user-pass"},
+            "streamSettings":{"network":"raw","security":"none"}});
+        assert!(render(&[ss.clone()],FeedFormat::Links).unwrap().body.starts_with("ss://"));
+        assert!(render(&[ss.clone()],FeedFormat::Mihomo).unwrap().body.contains(r#""type":"ss""#));
+        assert!(render(&[ss],FeedFormat::SingBox).unwrap().body.contains(r#""type":"shadowsocks""#));
+
+        let vmess=json!({"protocol":"vmess","tag":"VMess",
+            "settings":{"address":"vm.example.org","port":443,
+                "id":"bf000d23-0752-40b4-affe-68f7707a9661","security":"auto"},
+            "streamSettings":{"network":"ws","security":"tls",
+                "tlsSettings":{"serverName":"vm.example.org"},
+                "wsSettings":{"path":"/ray","headers":{"Host":"vm.example.org"}}}});
+        assert!(render(&[vmess.clone()],FeedFormat::Links).unwrap().body.starts_with("vmess://"));
+        assert!(render(&[vmess.clone()],FeedFormat::Mihomo).unwrap().body.contains(r#""type":"vmess""#));
+        assert!(render(&[vmess],FeedFormat::SingBox).unwrap().body.contains(r#""type":"vmess""#));
+    }
+    #[test]
+    fn partial_export_reports_skipped_and_never_returns_direct_only() {
+        let mut invalid=vless("xhttp","tls");
+        invalid["settings"]["vnext"][0]["users"][0]["encryption"]=json!("mlkem768x25519plus.example");
+        let result=render(&[vless("tcp","tls"),invalid],FeedFormat::SingBox).unwrap();
+        assert_eq!(result.skipped,1);
+        assert!(result.body.contains(r#""type":"selector""#));
+        assert!(!result.body.contains(r#""tag":"direct""#));
+    }
+    #[test]
     fn never_export_unencrypted_or_unsupported_vless() {
         let mut proxy=vless("tcp","tls");
         proxy["settings"]["vnext"][0]["users"][0]["encryption"]=json!("mlkem768x25519plus.secret");
