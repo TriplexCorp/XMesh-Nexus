@@ -23,8 +23,11 @@ assert.match(portal,/brandNote:'Your subscription'/,'English enterprise header n
 assert.match(portal,/brandNote:'Ваша подписка'/,'Russian enterprise header note must be localized');
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
 const publicCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
-assert.match(template,/subscription-portal\.js\?v=[a-f0-9]{12}/,'Public portal behavior must use a content fingerprint');
-assert.match(template,/subscription-public\.css\?v=[a-f0-9]{12}/,'Public portal must use a content fingerprint for its production stylesheet');
+const compiledPortal=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
+assert(template.includes('{{PUBLIC_SCRIPTS}}') && compiledPortal.includes('include_str!("../../frontend/js/features/subscriptions/subscription-portal.js")'),
+  'Visitor JavaScript must be embedded for gateways that do not serve static assets');
+assert(template.includes('{{PUBLIC_CSS}}') && compiledPortal.includes('include_str!("../../frontend/styles/features/subscriptions/subscription-public.css")'),
+  'Visitor CSS must be embedded for gateways that do not serve static assets');
 assert.match(template,/id="subscription-link-card"/,'Public portal must expose the enterprise subscription link surface');
 assert.match(template,/id="subscription-brand-note"/,'Public portal must expose the localized product-header note');
 assert.match(template,/class="subscription-public-workspace"/,'Public portal must use the workspace composition layer');
