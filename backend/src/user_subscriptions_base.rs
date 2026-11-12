@@ -1378,21 +1378,26 @@ pub async fn serve(
         // Preserve the proven native Happ/Xray feed including SMART entries,
         // individual user routing, and the exactly-once subscription accounting.
         let feed = crate::subscription_json::build_feed(outbounds, &scoped).map_err(|message| {
-            tracing::warn!(user_id=id, "Native subscription JSON could not be generated");
+            tracing::warn!(
+                user_id = id,
+                "Native subscription JSON could not be generated"
+            );
             ApiError::new(StatusCode::SERVICE_UNAVAILABLE, message)
         })?;
         (Json(feed).into_response(), 0)
     } else {
         let feed = crate::subscription_formats::render(&outbounds, format).map_err(|message| {
-            tracing::warn!(user_id=id, "Requested subscription format has no compatible public outbounds");
+            tracing::warn!(
+                user_id = id,
+                "Requested subscription format has no compatible public outbounds"
+            );
             ApiError::new(StatusCode::UNPROCESSABLE_ENTITY, message)
         })?;
         (feed.body.into_response(), feed.skipped)
     };
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        format.content_type().parse().unwrap(),
-    );
+    response
+        .headers_mut()
+        .insert(header::CONTENT_TYPE, format.content_type().parse().unwrap());
     if skipped > 0 {
         response.headers_mut().insert(
             "x-subscription-skipped",
