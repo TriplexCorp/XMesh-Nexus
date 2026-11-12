@@ -297,11 +297,13 @@ assert.match(src,/\/subscription-public[.]css[?]v=[a-f0-9]{12}/,
   'Studio preview must load the real public stylesheet inside its ShadowRoot');
 const visitorRuntime=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 const publicDocker=fs.readFileSync('backend/Dockerfile','utf8');
+const signerDocker=fs.readFileSync('backend/Dockerfile.xsp-signer','utf8');
 const backendMain=fs.readFileSync('backend/src/main.rs','utf8');
 for(const file of ['subscription-studio.css','subscription-surface.css','subscription-public.css',
                    'qr-code.js','subscription-experience.js','subscription-traffic.js','subscription-portal.js']) {
   assert(visitorRuntime.includes('include_str!("../../frontend/'), 'Public assets must be compiled into the API');
   assert(publicDocker.includes(file), 'Docker build must package '+file);
+  assert(signerDocker.includes('source=frontend,target=/source/frontend'), 'Experimental signer must bind-mount frontend sources for inline assets');
 }
 assert(visitorRuntime.includes("script-src 'nonce-{nonce}'"), 'Public scripts must use a fresh CSP nonce');
 assert(backendMain.includes('.entry(HeaderName::from_static("content-security-policy"))'),
