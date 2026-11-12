@@ -11,6 +11,9 @@ mod node_geodata;
 mod node_policy;
 mod node_rotation;
 mod node_routing;
+// Serde's deny_unknown_fields derives internal uninhabited enums for the
+// authenticated empty {} Agent update request; preserve their strict shape.
+#[allow(clippy::empty_enums)]
 mod node_runtime;
 mod node_user_quotas;
 mod node_xray_update;
@@ -1905,7 +1908,7 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
         {
             n_on += 1;
             node_on.insert(
-                node.get("id").map(ToString::to_string).unwrap_or_default(),
+                node.get("id").map_or_else(String::new, ToString::to_string),
                 json!(0),
             );
         }

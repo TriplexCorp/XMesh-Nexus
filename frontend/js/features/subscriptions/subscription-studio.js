@@ -222,17 +222,21 @@ window.XMeshSubscriptionStudio = (() => {
     data.subscriptionCustomClients=Array.isArray(settings?.subscriptionCustomClients)?settings.subscriptionCustomClients.slice(0,maxCustomClients):[];
 
     const markup = [
-      '<div class="subscription-studio" data-subscription-view="settings">',
-      '<header class="subscription-studio-intro"><div class="subscription-studio-hero"><span class="subscription-studio-hero-symbol">'+studioGlyph('layers')+'</span><div><h2>SUBSCRIPTION STUDIO</h2>',
-      '<p>Оформление действующей страницы подписки, её публичный URL и каталог приложений.</p></div></div>',
-      '<button type="submit" form="subscription-studio-form" class="btn">'+
-        '<span aria-hidden="true">✓</span> Сохранить настройки</button></header>',
-      '<nav class="subscription-studio-tabs" role="tablist" aria-label="Разделы Subscription Studio">',
-      '<button type="button" class="on" data-substudio-tab="settings" id="substudio-tab-settings" role="tab" aria-selected="true" aria-controls="substudio-settings">Настройки подписок</button>',
+      '<div class="subscription-studio" data-subscription-view="portal">',
+      '<div class="subscription-studio-intro"><nav class="subscription-studio-tabs" role="tablist" aria-label="Разделы Subscription Studio">',
+      '<button type="button" class="on" data-substudio-tab="portal" id="substudio-tab-portal" role="tab" aria-selected="true" aria-controls="substudio-portal">'+studioGlyph('globe')+'Портал</button>',
+      '<button type="button" data-substudio-tab="appearance" id="substudio-tab-appearance" role="tab" aria-selected="false" aria-controls="substudio-appearance" tabindex="-1">'+studioGlyph('layers')+'Оформление</button>',
+      '<button type="button" data-substudio-tab="content" id="substudio-tab-content" role="tab" aria-selected="false" aria-controls="substudio-content" tabindex="-1">'+studioGlyph('info')+'Контент</button>',
+      '<button type="button" data-substudio-tab="clients" id="substudio-tab-clients" role="tab" aria-selected="false" aria-controls="substudio-clients" tabindex="-1">'+studioGlyph('cube')+'Приложения</button>',
       '<button type="button" data-substudio-tab="servers" id="substudio-tab-servers" role="tab" aria-selected="false" aria-controls="substudio-servers" tabindex="-1">'+studioGlyph('server')+'Серверы подписок</button>',
-      '</nav>',
+      '<button type="button" data-substudio-tab="security" id="substudio-tab-security" role="tab" aria-selected="false" aria-controls="substudio-security" tabindex="-1">'+studioGlyph('shield')+'Защита и доступ</button>',
+      '</nav><div class="subscription-studio-actions">',
+      '<span data-substudio-save-status role="status" aria-live="polite">Все изменения сохранены</span>',
+      '<button type="button" class="gh sm" data-substudio-preview-toggle aria-pressed="true">Скрыть предпросмотр</button>',
+      '<button type="submit" form="subscription-studio-form" class="btn" data-substudio-save>'+studioGlyph('copy')+'Сохранить настройки</button>',
+      '</div></div>',
       '<form id="subscription-studio-form" class="subscription-studio-layout">',
-      '<div class="subscription-studio-main" id="substudio-settings" role="tabpanel" aria-labelledby="substudio-tab-settings">',
+      '<div class="subscription-studio-main" id="substudio-portal" role="tabpanel" aria-labelledby="substudio-tab-portal">',
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>01</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
@@ -336,7 +340,13 @@ window.XMeshSubscriptionStudio = (() => {
       '<p class="subscription-preview-caption">Указанные приложения и ссылки отображаются на странице подписки.</p>',
       '</section></div>',
       '<aside class="subscription-studio-side">',
-      '<div class="subscription-preview-label"><b>Предпросмотр публичной страницы</b><span>Адаптивный вид · демоданные</span></div>',
+      '<div class="subscription-preview-toolbar"><b>Живой предпросмотр</b>',
+      '<div class="subscription-preview-toolbar-controls">',
+      '<div role="group" aria-label="Язык предпросмотра"><button type="button" data-substudio-preview-lang="ru" aria-pressed="true">RU</button><button type="button" data-substudio-preview-lang="en" aria-pressed="false">EN</button></div>',
+      '<div role="group" aria-label="Размер экрана"><button type="button" data-substudio-preview-size="desktop" aria-pressed="true">Desktop</button><button type="button" data-substudio-preview-size="mobile" aria-pressed="false">Mobile</button></div>',
+      '<div role="group" aria-label="Тема предпросмотра"><button type="button" data-substudio-preview-theme="auto" aria-pressed="true">Авто</button><button type="button" data-substudio-preview-theme="light" aria-pressed="false">Светлая</button><button type="button" data-substudio-preview-theme="dark" aria-pressed="false">Тёмная</button></div>',
+      '</div></div>',
+      '<p class="subscription-preview-caption">Адаптивный вид · демоданные. Изменения темы и размера здесь не меняют сохранённые настройки.</p>',
       '<div class="subscription-studio-preview subscription-public" data-subscription-preview-frame="">',
       '<main class="subscription-public-shell">',
       '<div class="subscription-preview" data-subscription-preview="">',
@@ -588,6 +598,121 @@ window.XMeshSubscriptionStudio = (() => {
     const mount = () => {
       const form=document.getElementById('subscription-studio-form');
       if(!form)return;
+
+      // Keep the original form controls alive: moving nodes preserves values,
+      // listeners, custom editors and the existing unified save handler.
+      const root=form.closest('.subscription-studio');
+      const main=form.querySelector('.subscription-studio-main');
+      const [portalCard,appearanceCard,jsonCard,clientsCard]=[...main.children];
+      const servers=form.querySelector('.subscription-servers-page');
+      const flood=servers.querySelector('[data-sub-flood-card]');
+      const scope=servers.querySelector('.subscription-sub-scope');
+      const workspaces=document.createElement('div');
+      workspaces.className='subscription-studio-workspaces';
+      form.insertBefore(workspaces,main);
+      workspaces.append(main);
+      main.dataset.substudioPanel='portal';
+      const makePanel=(name)=>{
+        const panel=document.createElement('div');
+        panel.className='subscription-studio-main subscription-studio-pane';
+        panel.dataset.substudioPanel=name;
+        panel.id='substudio-'+name;
+        panel.setAttribute('role','tabpanel');
+        panel.setAttribute('aria-labelledby','substudio-tab-'+name);
+        panel.hidden=true;
+        workspaces.append(panel);
+        return panel;
+      };
+      const appearance=makePanel('appearance');
+      const content=makePanel('content');
+      const clients=makePanel('clients');
+      const serverPanel=makePanel('servers');
+      const security=makePanel('security');
+      appearance.append(appearanceCard);
+      clients.append(clientsCard);
+      servers.removeAttribute('role');
+      servers.removeAttribute('aria-labelledby');
+      servers.removeAttribute('id');
+      servers.hidden=false;
+      serverPanel.append(servers);
+      security.append(flood,scope);
+
+      const card=(title,description)=>{
+        const section=document.createElement('section');
+        section.className='card subscription-studio-section';
+        const heading=document.createElement('div');
+        heading.className='subscription-studio-heading';
+        const symbol=document.createElement('span');
+        symbol.textContent='✦';
+        const copy=document.createElement('div');
+        const h=document.createElement('h3');
+        h.textContent=title;
+        const p=document.createElement('p');
+        p.textContent=description;
+        copy.append(h,p);
+        heading.append(symbol,copy);
+        section.append(heading);
+        return section;
+      };
+      const makePair=parent=>{
+        const pair=document.createElement('div');
+        pair.className='subscription-studio-pair';
+        parent.append(pair);
+        return pair;
+      };
+      const moveFields=(parent,names)=>{
+        let pair;
+        for(const name of names){
+          const control=input(form,name);
+          const label=control?.closest('.subscription-field');
+          if(!label)throw Error('Subscription Studio field missing: '+name);
+          if(!pair||pair.childElementCount===2)pair=makePair(parent);
+          pair.append(label);
+        }
+      };
+      const announceCard=card('Анонсы и переменные','Сообщения в подписке и персональные значения для каждого пользователя.');
+      content.append(announceCard);
+      moveFields(announceCard,['subscriptionAnnouncement']);
+      const tools=portalCard.querySelector('.subscription-announcement-tools');
+      if(tools)announceCard.append(tools);
+      moveFields(announceCard,['subscriptionAnnouncementRotationHours']);
+      const emojis=portalCard.querySelector('.subscription-status-emojis');
+      if(emojis)announceCard.append(emojis);
+
+      const copyCard=card('Тексты и контакты','Заголовки, кнопки и подписи для русского и английского языков.');
+      content.append(copyCard);
+      moveFields(copyCard,[
+        'subscriptionHero','subscriptionHeroEn','subscriptionCta','subscriptionCtaEn',
+        'subscriptionSupportLabel','subscriptionSupportLabelEn','subscriptionSupportUrl',
+        'subscriptionFooter','subscriptionFooterEn'
+      ]);
+
+      portalCard.querySelector('h3').textContent='Клиентский портал';
+      portalCard.querySelector('.subscription-studio-heading p').textContent='Название, описание и язык публичной страницы подписки.';
+      moveFields(portalCard,['subscriptionLanguage']);
+      const visibilityCard=card('Состав страницы','Настройте, какие элементы увидит пользователь подписки.');
+      main.insertBefore(visibilityCard,jsonCard);
+      const traffic=portalCard.querySelector('.subscription-display-options');
+      if(traffic)visibilityCard.append(traffic);
+      const visibility=appearanceCard.querySelector('.subscription-visibility');
+      if(visibility)visibilityCard.append(visibility);
+      const visibilityHeading=[...appearanceCard.querySelectorAll('.subscription-studio-subheading')]
+        .find(h=>h.textContent.includes('Блоки страницы'));
+      visibilityHeading?.remove();
+
+      appearanceCard.querySelector('h3').textContent='Оформление и бренд';
+      appearanceCard.querySelector('.subscription-studio-heading p').textContent='Палитра, шрифт, карточки и визуальные параметры.';
+      const themeSync=portalCard.querySelector('.subscription-theme-sync');
+      if(themeSync)appearanceCard.insertBefore(themeSync,appearanceCard.children[1]);
+      const palette=card('Палитра и тема','Цвета и режим отображения клиентского портала.');
+      appearance.insertBefore(palette,appearanceCard);
+      moveFields(palette,['subscriptionAccent','subscriptionSecondaryAccent','subscriptionTheme']);
+      for(const parent of [portalCard,appearanceCard]){
+        parent.querySelectorAll('.subscription-studio-pair').forEach(pair=>{
+          if(!pair.childElementCount)pair.remove();
+        });
+      }
+
       // The visitor portal stylesheet is deliberately forbidden in the panel's
       // global CSS graph. Mount the real public markup inside a ShadowRoot,
       // then load the production CSS only there: no auth-panel style leakage.
@@ -706,6 +831,28 @@ window.XMeshSubscriptionStudio = (() => {
       });
       let previewLanguage=data.subscriptionLanguage;
       let previewPlatform='all';
+      let previewThemeOverride='auto';
+      const previewTools=root.querySelector('.subscription-preview-toolbar');
+      const updatePreviewTools=()=>{
+        previewTools?.querySelectorAll('[data-substudio-preview-lang]').forEach(button=>
+          button.setAttribute('aria-pressed',String(button.dataset.substudioPreviewLang===previewLanguage)));
+        previewTools?.querySelectorAll('[data-substudio-preview-theme]').forEach(button=>
+          button.setAttribute('aria-pressed',String(button.dataset.substudioPreviewTheme===previewThemeOverride)));
+      };
+      previewTools?.addEventListener('click',event=>{
+        const button=event.target.closest('button');
+        if(!button||!previewTools.contains(button))return;
+        if(button.dataset.substudioPreviewLang)previewLanguage=button.dataset.substudioPreviewLang;
+        if(button.dataset.substudioPreviewTheme)previewThemeOverride=button.dataset.substudioPreviewTheme;
+        if(button.dataset.substudioPreviewSize){
+          const frame=root.querySelector('[data-subscription-preview-frame]');
+          frame.dataset.substudioSize=button.dataset.substudioPreviewSize;
+          previewTools.querySelectorAll('[data-substudio-preview-size]').forEach(other=>
+            other.setAttribute('aria-pressed',String(other===button)));
+        }
+        updatePreviewTools();
+        draw();
+      });
       const syncPreviewSections=()=>{
         const enabled={apps:!previewShadow.querySelector('[data-subscription-apps]')?.hidden,connect:true,devices:!!input(form,'subscriptionShowDevices')?.checked,support:!!input(form,'subscriptionShowSupport')?.checked};
         previewShadow.querySelectorAll('[data-setup-section]').forEach(section=>{section.hidden=!enabled[section.dataset.setupSection]});
@@ -729,14 +876,12 @@ window.XMeshSubscriptionStudio = (() => {
       };
       const previewQr=previewShadow.querySelector('[data-subscription-qr]');
       previewShadow.querySelector('.subscription-public-primary-action')?.append(previewQr);
-      const tabButtons=[...form.closest('.subscription-studio').querySelectorAll('[data-substudio-tab]')];
+      const tabButtons=[...root.querySelectorAll('[data-substudio-tab]')];
+      const panes=[...workspaces.querySelectorAll('[data-substudio-panel]')];
       const selectWorkspace=(next,focus=false)=>{
-        if(next!=='settings'&&next!=='servers')return;
-        const root=form.closest('.subscription-studio');
+        if(!panes.some(panel=>panel.dataset.substudioPanel===next))return;
         root.dataset.subscriptionView=next;
-        root.querySelector('.subscription-studio-main').hidden=next!=='settings';
-        root.querySelector('.subscription-studio-side').hidden=next!=='settings';
-        root.querySelector('.subscription-servers-page').hidden=next!=='servers';
+        for(const panel of panes)panel.hidden=panel.dataset.substudioPanel!==next;
         for(const button of tabButtons){
           const selected=button.dataset.substudioTab===next;
           button.classList.toggle('on',selected);
@@ -746,7 +891,7 @@ window.XMeshSubscriptionStudio = (() => {
         }
       };
       tabButtons.forEach(button=>button.addEventListener('click',()=>selectWorkspace(button.dataset.substudioTab)));
-      form.closest('.subscription-studio').querySelector('.subscription-studio-tabs').addEventListener('keydown',event=>{
+      root.querySelector('.subscription-studio-tabs').addEventListener('keydown',event=>{
         if(!['ArrowRight','ArrowLeft','Home','End'].includes(event.key))return;
         const current=tabButtons.indexOf(document.activeElement);
         if(current<0)return;
@@ -754,6 +899,14 @@ window.XMeshSubscriptionStudio = (() => {
         const next=event.key==='Home'?0:event.key==='End'?tabButtons.length-1:
           (current+(event.key==='ArrowRight'?1:-1)+tabButtons.length)%tabButtons.length;
         selectWorkspace(tabButtons[next].dataset.substudioTab,true);
+      });
+      const togglePreview=root.querySelector('[data-substudio-preview-toggle]');
+      togglePreview?.addEventListener('click',()=>{
+        const side=root.querySelector('.subscription-studio-side');
+        side.hidden=!side.hidden;
+        root.dataset.previewHidden=side.hidden?'true':'false';
+        togglePreview.setAttribute('aria-pressed',String(!side.hidden));
+        togglePreview.textContent=side.hidden?'Показать предпросмотр':'Скрыть предпросмотр';
       });
       const refreshFlood=async()=>{
         const detail=form.querySelector('[data-sub-flood-detail]');
@@ -1004,11 +1157,13 @@ window.XMeshSubscriptionStudio = (() => {
         preview.style.setProperty('--portal-accent',d.subscriptionAccent);
         preview.style.setProperty('--portal-action-ink',actionInk(d.subscriptionAccent));
         preview.style.setProperty('--portal-secondary',d.subscriptionSecondaryAccent);
-        preview.style.setProperty('--portal-bg',d.subscriptionBackground);
-        preview.style.setProperty('--portal-card',d.subscriptionCardColor);
-        preview.style.setProperty('--portal-text',d.subscriptionTextColor);
+        const themePreview=previewThemeOverride==='auto'?null:themeColors[previewThemeOverride];
+        preview.style.setProperty('--portal-bg',themePreview?.subscriptionBackground||d.subscriptionBackground);
+        preview.style.setProperty('--portal-card',themePreview?.subscriptionCardColor||d.subscriptionCardColor);
+        preview.style.setProperty('--portal-text',themePreview?.subscriptionTextColor||d.subscriptionTextColor);
         preview.style.setProperty('--portal-radius',d.subscriptionRadius+'px');
-        preview.dataset.portalTheme=d.subscriptionTheme;
+        preview.dataset.portalTheme=previewThemeOverride==='auto'?d.subscriptionTheme:previewThemeOverride;
+        updatePreviewTools();
         preview.dataset.portalLayout=d.subscriptionLayout;
         preview.dataset.portalCards=d.subscriptionCardStyle;
         preview.dataset.portalFont=d.subscriptionFont;
@@ -1151,7 +1306,14 @@ window.XMeshSubscriptionStudio = (() => {
         draw();
       });
       previewShadow.querySelector('[data-preview-app-search]')?.addEventListener('input',applyPreviewFilter);
-      form.addEventListener('input',draw);
+      let savedSnapshot=JSON.stringify(read());
+      const dirtyStatus=root.querySelector('[data-substudio-save-status]');
+      const refreshDirty=()=>{
+        const dirty=JSON.stringify(read())!==savedSnapshot;
+        root.dataset.unsaved=dirty?'true':'false';
+        if(dirtyStatus)dirtyStatus.textContent=dirty?'Есть несохранённые изменения':'Все изменения сохранены';
+      };
+      form.addEventListener('input',()=>{draw();refreshDirty();});
       form.addEventListener('change',event=>{
         if(event.target.name==='subscriptionLanguage' && ['ru','en'].includes(event.target.value))previewLanguage=event.target.value;
         if(event.target.name==='subscriptionTheme'&&!input(form,'subscriptionSyncPanelTheme').checked){
@@ -1163,6 +1325,7 @@ window.XMeshSubscriptionStudio = (() => {
           }
         }
         draw();
+        refreshDirty();
       });
       $('[data-custom-client-add]').addEventListener('click',()=>{
         const current=readCustomClients();
@@ -1172,13 +1335,13 @@ window.XMeshSubscriptionStudio = (() => {
         editor.insertAdjacentHTML('beforeend',renderCustomClient(client,true));
         const added=editor.lastElementChild;
         added.querySelector('[data-custom-field="name"]').focus();
-        draw();
+        draw();refreshDirty();
       });
       $('[data-custom-client-editor]').addEventListener('click',event=>{
         const button=event.target.closest('[data-custom-client-remove]');
         if(!button)return;
         button.closest('[data-custom-client-row]').remove();
-        draw();
+        draw();refreshDirty();
       });
       $('[data-custom-client-editor]').addEventListener('input',event=>{
         if(!event.target.matches('[data-custom-field="name"]'))return;
@@ -1193,7 +1356,7 @@ window.XMeshSubscriptionStudio = (() => {
         if(mode!=='default')customRows().forEach(row=>{
           row.querySelector('[data-custom-field="enabled"]').checked=mode==='all';
         });
-        draw();
+        draw();refreshDirty();
       }));
       form.addEventListener('submit',async event=>{
         event.preventDefault();
@@ -1233,9 +1396,9 @@ window.XMeshSubscriptionStudio = (() => {
         for(const key of ['subscriptionHero','subscriptionHeroEn','subscriptionCta','subscriptionCtaEn','subscriptionSupportLabel','subscriptionSupportLabelEn','subscriptionDescriptionEn','subscriptionFooterEn','subscriptionAppsTitleEn']){
           if(/[\u0000-\u001f\u007f]/.test(draft[key])){notify('Заголовки не должны содержать управляющих символов.');return;}
         }
-        const button=form.closest('.subscription-studio').querySelector('.subscription-studio-intro button');
+        const button=root.querySelector('[data-substudio-save]');
         button.disabled=true;
-        try {await save(draft);savedInstall.domain=draft.subscriptionDomain;savedInstall.path=draft.subscriptionPath;draw();notify('Настройки SUBSCRIPTION STUDIO сохранены');}
+        try {await save(draft);savedInstall.domain=draft.subscriptionDomain;savedInstall.path=draft.subscriptionPath;savedSnapshot=JSON.stringify(read());refreshDirty();draw();notify('Настройки SUBSCRIPTION STUDIO сохранены');}
         catch(err){notify('Не удалось сохранить: '+(err.message||'ошибка API'));}
         finally{button.disabled=false;}
       });
@@ -1280,7 +1443,8 @@ window.XMeshSubscriptionStudio = (() => {
           notify(copied?'Команда XMesh Sub скопирована':'Скопируйте команду вручную из поля.');
         }
       });
-      draw();
+      selectWorkspace('portal');
+      draw();refreshDirty();
     };
     return [markup,mount];
   }

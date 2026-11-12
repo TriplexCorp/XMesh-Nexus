@@ -182,7 +182,7 @@ assert.match(src,/previewRoot\.lang=lang/,'Portal preview must set its own lang,
 assert.match(src,/textContent=copy\[4\]/,'Copy-link action must follow the visitor locale');
 assert.match(src,/english\?'Devices':'Устройства'/,'Device action must follow the visitor locale');
 assert.match(src,/\$\('\[data-subscription-description\]'\)\.textContent=/,'Custom copy must use textContent, not untrusted HTML');
-assert.match(view,/SUBSCRIPTION STUDIO/);
+assert.doesNotMatch(view,/<h2>SUBSCRIPTION STUDIO<\/h2>/,'Global shell is the only Studio header');
 assert.match(view,/name="subscriptionDomain"/);
 assert.match(view,/name="subscriptionPath"/);
 assert.match(view,/name="subscriptionBrand"/);
@@ -194,7 +194,8 @@ assert.match(app,/const syncSubscriptionTheme=/);
 assert.match(app,/syncSubscriptionTheme\(\)/);
 assert.match(rust,/"subscriptionSyncPanelTheme"/);
 assert.match(view,/name="subscriptionTheme"/);
-assert.match(src,/preview\.dataset\.portalTheme=d\.subscriptionTheme/);
+assert.match(src,/preview\.dataset\.portalTheme=previewThemeOverride==='auto'\?d\.subscriptionTheme:previewThemeOverride/,
+ 'Portal preview defaults to saved theme but can inspect other themes temporarily');
 assert.match(rust,/"subscriptionTheme", &\["dark", "light"\]/);
 assert.match(view,/name="subscriptionShowTraffic"/);
 assert.match(view,/name="subscriptionShowExpiry"/);
@@ -288,10 +289,19 @@ assert.match(css,/\.subscription-client-editor/);
 assert.match(css,/\.subscription-preview-apps/);
 assert.match(css,/\.subscription-custom-toolbar/);
 assert.match(css,/\.subscription-custom-header/);
-assert.match(view,/data-substudio-tab="settings"/,'Studio must have dedicated settings tab');
-assert.match(view,/data-substudio-tab="servers"/,'Studio must have separate Sub servers tab');
-assert.match(view,/role="tabpanel" aria-labelledby="substudio-tab-servers" hidden/,
- 'Sub server setup must start hidden, with settings as the default');
+assert.match(src,/main\.dataset\.substudioPanel='portal'/,'Portal is the default mounted workspace');
+for(const workspace of ['portal','appearance','content','clients','servers','security']){
+ assert.match(view,new RegExp('data-substudio-tab="'+workspace+'"'),workspace+' must be a navigable Studio workspace');
+ if(workspace!=='portal')assert(src.includes("makePanel('"+workspace+"')"),workspace+' must mount real content');
+}
+assert.doesNotMatch(view,/<h2>SUBSCRIPTION STUDIO<\/h2>/,'Studio must not duplicate the global header');
+assert.match(view,/data-substudio-save-status/,'Toolbar must report unsaved settings');
+assert.match(view,/data-substudio-preview-toggle/,'Preview must have a toolbar visibility control');
+assert.match(view,/data-substudio-preview-size="mobile"/,'Preview must support mobile dimensions');
+assert.match(view,/data-substudio-preview-lang="en"/,'Preview must support independent language');
+assert.match(view,/data-substudio-preview-theme="light"/,'Preview must allow light/dark inspection');
+assert.match(src,/append\(flood,scope\)/,'Flood protection must be isolated in Security workspace');
+assert.match(src,/panes\.some\(panel=>panel\.dataset\.substudioPanel===next\)/,'Navigation must switch real workspace panels');
 assert.doesNotMatch(view,/Архитектура LEGO|Экспорт схемы JSON|Сервер B · адрес|Сервер C · адрес/,
  'Remove misleading topology-only blueprint from user interface');
 assert.doesNotMatch(view,/name="subscriptionPlacement"|name="nodePlacement"|name="deploymentServerB"|name="deploymentServerC"/,
@@ -309,7 +319,7 @@ assert.match(src,/ArrowRight/,'Server tabs must support arrow-key navigation');
 assert(!view.includes('<script>alert(1)</script>'),'User-provided studio content must be escaped');
 assert.match(view,/&lt;script&gt;/);
 assert.doesNotMatch(view,/Экспорт схемы JSON/);
-assert.match(view,/Оформление действующей страницы подписки/);
+assert.match(view,/data-substudio-tab="appearance"/,'Subscription Studio offers an appearance workspace');
 assert.match(fs.readFileSync("backend/src/user_subscriptions.rs","utf8"),/subscriptionClientLinks/);
 assert.match(fs.readFileSync("backend/src/user_subscriptions.rs","utf8"),/subscriptionPath/);
 assert.match(app,/subscription:\['SUBSCRIPTION STUDIO',subscriptionStudioP\]/);
