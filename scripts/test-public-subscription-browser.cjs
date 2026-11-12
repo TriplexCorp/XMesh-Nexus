@@ -4,6 +4,19 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {chromium}=require('./browser/node_modules/playwright');
 const root=path.resolve(__dirname,'..'),out=process.env.XMESH_BROWSER_OUTPUT||'/tmp/xmesh-public-portal';
 const read=f=>fs.readFileSync(path.join(root,f));
+// Model an older XMesh Sub gateway: HTML is available, but static portal
+// CSS/JS URLs may return 404. The page must still render and work.
+const embeddedCss=[
+ 'frontend/styles/features/subscriptions/subscription-studio.css',
+ 'frontend/styles/features/subscriptions/subscription-surface.css',
+ 'frontend/styles/features/subscriptions/subscription-public.css'
+].map(file=>read(file).toString()).join('\n');
+const embeddedScripts=[
+ 'frontend/js/core/qr-code.js',
+ 'frontend/js/features/subscriptions/subscription-experience.js',
+ 'frontend/js/features/subscriptions/subscription-traffic.js',
+ 'frontend/js/features/subscriptions/subscription-portal.js'
+].map(file=>'<script nonce="fixture-test">\n'+read(file).toString()+'\n</script>').join('\n');
 const assets={
  '/subscription-studio.css':'frontend/styles/features/subscriptions/subscription-studio.css',
  '/subscription-surface.css':'frontend/styles/features/subscriptions/subscription-surface.css',
@@ -17,7 +30,7 @@ function fixture(url){
  const state=url.searchParams.get('state')||'ACTIVE';
  const en=url.searchParams.get('lang')==='en',active=url.searchParams.get('active')!=='0'&&!['EXPIRED','LIMITED','DISABLED'].includes(state),unlimited=url.searchParams.get('limit')==='0',light=url.searchParams.get('theme')==='light';
  const text=(ru,enText)=>en?enText:ru;
- const data={LANG:en?'en':'ru',BRAND:process.env.XMESH_TEST_BRAND||'Private VPN',LOGO:'<span aria-hidden="true">S</span>',
+ const data={PUBLIC_CSS:embeddedCss,PUBLIC_SCRIPTS:embeddedScripts,LANG:en?'en':'ru',BRAND:process.env.XMESH_TEST_BRAND||'Private VPN',LOGO:'<span aria-hidden="true">S</span>',
  ACCENT:url.searchParams.get('accent')==='dark'?'#2549bf':light?'#86e0b6':'#ff9788',SECONDARY_ACCENT:'#a3bffa',BACKGROUND:light?'#f6f8fa':'#0d1218',CARD_COLOR:light?'#ffffff':'#151c25',TEXT_COLOR:light?'#1c2938':'#edf2f7',RADIUS:'20',THEME:light?'light':'dark',LAYOUT:'standard',FONT:'system',CARD_STYLE:url.searchParams.get('material')||'soft',
  RU_SELECTED:en?'':'on',EN_SELECTED:en?'on':'',RU_CURRENT:en?'false':'page',EN_CURRENT:en?'page':'false',
  STATUS_DOT:'<span class="subscription-preview-ok">● '+text(active?'Активна':'Неактивна',active?'Active':'Inactive')+'</span>',
@@ -40,7 +53,7 @@ async function dismissDialog(page,dialog,opener){
 }
 (async()=>{
  fs.mkdirSync(out,{recursive:true});
- const server=http.createServer((req,res)=>{const u=new URL(req.url,'http://localhost');if(assets[u.pathname]){res.setHeader('Content-Type',u.pathname.endsWith('.js')?'text/javascript':'text/css');res.end(read(assets[u.pathname]));return;}if(u.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(fixture(u));return;}res.statusCode=404;res.end();});
+ const server=http.createServer((req,res)=>{const u=new URL(req.url,'http://localhost');if(assets[u.pathname]){res.statusCode=404;res.end('Legacy gateway does not serve static assets');return;}if(u.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(fixture(u));return;}res.statusCode=404;res.end();});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:process.env.XMESH_CHROMIUM_NO_SANDBOX==='1'?['--no-sandbox']:[]});
  let checks=0;
