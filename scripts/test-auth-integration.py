@@ -262,6 +262,11 @@ def main():
         ("v2rayTun/3.0", "links"),
         ("FlClash/1.0", "mihomo"),
         ("sing-box/1.14", "singbox"),
+        ("V2Box/1", "base64"),
+        ("Loon/1", "links"),
+        ("Stash/1", "mihomo"),
+        ("Mihomo Party/1", "mihomo"),
+        ("ClashVerge/1", "mihomo"),
     ]
     for agent, wire in [("Mozilla/5.0 (iPhone) AppleWebKit Safari/605.1", "html")] + agents:
         browser = wire == "html"
