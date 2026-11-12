@@ -134,7 +134,11 @@ fn token_digest(token: &str) -> String {
 pub async fn enforce(state: &AppState, token: &str) -> Option<Response> {
     // Other malformed tokens will still receive the usual 404 from the
     // subscription handler, with no Redis key allocated.
-    if token.len() != 64 || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if token.len() != 64
+        || !token
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    {
         return None;
     }
     let config = current(state).await;
