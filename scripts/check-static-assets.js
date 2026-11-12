@@ -68,7 +68,10 @@ assert.match(index,hashedAsset('i18n-consistency.js'),'Late-render i18n consiste
 assert(index.indexOf('/js/core/i18n.js?v=')<index.indexOf('/js/core/i18n-consistency.js?v='),'Canonical i18n must load before its dynamic consistency layer');
 assert(index.indexOf('/js/core/i18n-consistency.js?v=')<index.indexOf('/js/core/app.js?v='),'Dynamic i18n observer must exist before app routes render');
 assert.match(nexusCss,/subscription-surface\.css\?v=[a-f0-9]{12}/,'Panel preview must import the shared subscription surface');
-assert.match(subscriptionTemplate,/href="\/subscription-surface\.css\?v=[a-f0-9]{12}"/,'Live subscription portal must load the same shared surface');
+assert(subscriptionTemplate.includes('id="subscription-public-assets">{{PUBLIC_CSS}}</style>'),
+  'Live subscription portal must bundle CSS for legacy gateways');
+assert(read('backend/src/user_subscriptions_base.rs').includes('include_str!("../../frontend/styles/features/subscriptions/subscription-surface.css")'),
+  'Bundled portal CSS must include the same shared surface as Studio');
 for(const selector of ['subscription-preview-brand','subscription-preview-hero','subscription-preview-meta','subscription-preview-cta']){
   assert(subscriptionSurface.includes('.'+selector),'Shared subscription surface missing '+selector);
 }

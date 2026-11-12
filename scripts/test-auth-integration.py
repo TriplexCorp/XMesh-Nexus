@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import struct
 import time
 from urllib.error import HTTPError
@@ -262,7 +263,20 @@ def main():
             body = response.read()
             if browser:
                 assert content_type.startswith("text/html")
-                assert b"subscription-experience.js" in body
+                # The live portal must survive older Sub gateways that do
+                # not forward external CSS/JS paths. Exercise the real API
+                # response, not only the standalone browser fixture.
+                assert b'id="subscription-public-assets"' in body
+                assert b'body.subscription-public{margin:0' in body
+                assert b'window.qrcodegen?.QrCode' in body
+                nonces = re.findall(rb'<script nonce="([^"]+)">', body)
+                assert len(nonces) == 4 and len(set(nonces)) == 1, (
+                    "Public portal must embed four nonce-bound scripts")
+                csp = response.headers.get("Content-Security-Policy", "")
+                assert "script-src 'nonce-" + nonces[0].decode() + "'" in csp, (
+                    "CSP must allow only nonce-authorized embedded scripts")
+                assert b'<script src="/subscription-' not in body
+                assert b'<link rel="stylesheet" href="/subscription-' not in body
                 assert changed["xrayId"].encode() not in body
             else:
                 assert content_type.startswith("application/json")

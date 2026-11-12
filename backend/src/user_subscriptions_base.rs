@@ -6,7 +6,7 @@ use aes_gcm::{
 use axum::{
     Json,
     extract::{Extension, OriginalUri, Path, Query, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Response},
 };
 use base64::Engine as _;
@@ -2044,6 +2044,30 @@ fn portal_theme_changes(settings: &Value) -> Vec<(&'static str, String)> {
     ]
 }
 
+// The visitor page embeds its vetted assets: old XMesh Sub gateways only
+// forward bearer HTML URLs and may 404 separate CSS or JavaScript requests.
+// Scripts are bound to a fresh CSP nonce for each rendered subscription page.
+fn portal_assets(nonce: &str) -> (String, String) {
+    let css = [
+        include_str!("../../frontend/styles/features/subscriptions/subscription-studio.css"),
+        include_str!("../../frontend/styles/features/subscriptions/subscription-surface.css"),
+        include_str!("../../frontend/styles/features/subscriptions/subscription-public.css"),
+    ]
+    .join("\n");
+    let mut js = String::new();
+    for source in [
+        include_str!("../../frontend/js/core/qr-code.js"),
+        include_str!("../../frontend/js/features/subscriptions/subscription-experience.js"),
+        include_str!("../../frontend/js/features/subscriptions/subscription-traffic.js"),
+        include_str!("../../frontend/js/features/subscriptions/subscription-portal.js"),
+    ] {
+        let _ = writeln!(js, "<script nonce=\"{nonce}\">");
+        js.push_str(source);
+        js.push_str("\n</script>\n");
+    }
+    (css, js)
+}
+
 fn portal_html(
     settings: &Value,
     lang: &str,
@@ -2051,6 +2075,7 @@ fn portal_html(
     metrics: String,
     controls: PortalControls,
     decoration: PortalDecoration<'_>,
+    nonce: &str,
 ) -> String {
     let PortalControls {
         quick,
@@ -2068,8 +2093,11 @@ fn portal_html(
         logo_brand,
     } = decoration;
     let theme_changes = portal_theme_changes(settings);
+    let (styles, scripts) = portal_assets(nonce);
     let mut html = include_str!("subscription_template.html").to_owned();
     let changes = [
+        ("{{PUBLIC_CSS}}", styles),
+        ("{{PUBLIC_SCRIPTS}}", scripts),
         ("{{LANG}}", lang.to_owned()),
         ("{{BRAND}}", escape_html(logo_brand)),
         ("{{LOGO}}", logo_markup),
@@ -2260,7 +2288,10 @@ async fn portal_browser(
     let raw_link = studio_url(&settings, &token);
     let controls = portal_controls(&user, &settings, lang, en, active, &raw_link);
     let decoration = portal_decoration(&settings, en, active, waiting);
-    let html = portal_html(&settings, lang, en, metrics, controls, decoration).replacen(
+    let mut nonce_bytes = [0_u8; 16];
+    OsRng.fill_bytes(&mut nonce_bytes);
+    let nonce = base64::engine::general_purpose::STANDARD_NO_PAD.encode(nonce_bytes);
+    let html = portal_html(&settings, lang, en, metrics, controls, decoration, &nonce).replacen(
         "class=\"subscription-preview\"",
         &format!(
             "class=\"subscription-preview\" data-subscription-state=\"{}\"",
@@ -2273,6 +2304,15 @@ async fn portal_browser(
         1,
     );
     let mut response = Html(html).into_response();
+    // Compiled scripts alone receive this page-specific nonce. User-authored
+    // announcements, headings and app labels cannot execute JavaScript.
+    let csp = format!(
+        "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
+    );
+    response.headers_mut().insert(
+        HeaderName::from_static("content-security-policy"),
+        HeaderValue::from_str(&csp).expect("generated CSP must be ASCII"),
+    );
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, "private, no-store".parse().unwrap());
@@ -2282,6 +2322,21 @@ async fn portal_browser(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn public_portal_is_self_contained_for_legacy_sub_gateways() {
+        let template = include_str!("subscription_template.html");
+        assert!(template.contains("{{PUBLIC_CSS}}"));
+        assert!(template.contains("{{PUBLIC_SCRIPTS}}"));
+        assert!(!template.contains("href=\"/subscription-public.css"));
+        assert!(!template.contains("src=\"/subscription-portal.js"));
+        let (css, js) = portal_assets("test-nonce");
+        assert!(css.contains(".subscription-public-shell"));
+        assert!(css.contains(".subscription-preview-hero"));
+        assert_eq!(js.matches("<script nonce=\"test-nonce\">").count(), 4);
+        assert!(js.contains("subscription-public"));
+        assert!(!css.to_ascii_lowercase().contains("</style"));
+    }
+
     #[test]
     fn announcement_rotation_selects_message_before_personalization() {
         let settings = json!({

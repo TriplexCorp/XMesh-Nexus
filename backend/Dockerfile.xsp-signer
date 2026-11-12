@@ -15,6 +15,7 @@ ARG SIGNER_BUILD_TESTS=0
 # Cache mounts retain dependencies and outputs without baking them into images.
 RUN --mount=type=secret,id=proxy_ca \
     --mount=type=bind,source=backend,target=/source/backend \
+    --mount=type=bind,source=frontend,target=/source/frontend,ro \
     --mount=type=bind,source=docs,target=/source/docs \
     --mount=type=bind,source=VERSION,target=/source/VERSION,ro \
     --mount=type=cache,id=xmesh-signer-registry,target=/usr/local/cargo/registry \
@@ -23,6 +24,10 @@ RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export CARGO_HTTP_CAINFO=/run/secrets/proxy_ca CARGO_HTTP_PROXY_CAINFO=/run/secrets/proxy_ca; fi; \
     cp /source/backend/Cargo.toml .; \
     cp -a /source/backend/src /source/backend/migrations .; \
+    mkdir -p /build/frontend/styles/features /build/frontend/js/features /build/frontend/js/core; \
+    cp -a /source/frontend/styles/features/subscriptions /build/frontend/styles/features/; \
+    cp -a /source/frontend/js/features/subscriptions /build/frontend/js/features/; \
+    cp /source/frontend/js/core/qr-code.js /build/frontend/js/core/; \
     cp -a /source/docs /build/docs; \
     cp /source/VERSION /build/VERSION; \
     cargo build --profile "$SIGNER_BUILD_PROFILE" --features xsp-v2-experimental --bin xmesh-api; \
