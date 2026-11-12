@@ -272,7 +272,7 @@ for(const cls of ['subscription-preview','subscription-preview-brand','subscript
 }
 assert(template.includes('id="subscription-public-assets">{{PUBLIC_CSS}}</style>'),
   'Portal must embed CSS without requiring the gateway to proxy assets');
-assert(template.includes('{{PUBLIC_SCRIPTS}}'),
+assert(template.includes('{{PUBLIC_SCRIPTS}}'), 'Portal must embed working JavaScript');
 assert(!template.includes('href="/subscription-studio.css') && !template.includes('src="/subscription-portal.js'),
   'Portal must not depend on separate CSS/JS URLs from XMesh Sub');
 assert.match(portalCss,/subscription-public-shell/,'Live layout requires its mobile-safe shell');
@@ -303,7 +303,7 @@ for(const file of ['subscription-studio.css','subscription-surface.css','subscri
   assert(visitorRuntime.includes('include_str!("../../frontend/'), 'Public assets must be compiled into the API');
   assert(publicDocker.includes(file), 'Docker build must package '+file);
 }
-assert(visitorRuntime.includes("script-src 'nonce-{nonce}'"),
+assert(visitorRuntime.includes("script-src 'nonce-{nonce}'"), 'Public scripts must use a fresh CSP nonce');
 assert(backendMain.includes('.entry(HeaderName::from_static("content-security-policy"))'),
   'Generic middleware must preserve the portal-specific CSP');
 for(const cls of [
