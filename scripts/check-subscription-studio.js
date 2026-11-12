@@ -22,8 +22,17 @@ assert(!studio.hostnameOK('https://sub.example.com/'));
 assert(studio.pathOK('/subscription'));
 assert(!studio.pathOK('/api/v1'));
 assert(!studio.pathOK('//s'));
-const install=studio.installCommand('panel.example.org','sub.example.org','/s');
-assert.equal(install,'curl -fsSL https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/main/install.sh | sudo bash -s -- --panel https://panel.example.org --domain sub.example.org --path /s');
+const token='a'.repeat(64);
+const install=studio.installCommand('panel.example.org','sub.example.org','/s',token);
+assert.equal(studio.installCommand('panel.example.org','sub.example.org','/s'),'','No token must produce no command');
+assert(install.includes('TriplexCorp/XMesh-Sub/51d90ff15ef2a68415e23b325b3a37393b8b97b5/install.sh'),'Bootstrap must use an immutable audited Git revision');
+assert(install.includes('19d3049bff7d23a13ad00d06debfd86cfc3fd773ce49a87426e0a9723566579b'),'Bootstrap pins the vetted installer SHA-256');
+assert(install.includes('sha256sum --check --status'),'Installer SHA-256 must be checked before root execution');
+assert(install.includes("--enroll-token-stdin <<'XMESH_ENROLL_TOKEN'"),'One-time secret must be provided through stdin');
+assert(!install.includes('--enroll-token '+token),'Credential must not occur in argv');
+assert(install.includes('\n'+token+'\nXMESH_ENROLL_TOKEN'),'Token must be supplied as heredoc body only');
+const checkShell=require('node:child_process').spawnSync('bash',['-n'],{input:install,encoding:'utf8'});
+assert.equal(checkShell.status,0,'Generated installer must be valid Bash: '+checkShell.stderr);
 assert.equal(studio.installCommand('panel.example.org','panel.example.org','/s'),'');
 assert.equal(studio.installCommand('panel.example.org','sub.example.org','/api/v1'),'');
 assert.equal(studio.installCommand('panel.example.org','sub.example.org','/s;curl bad'),'');
@@ -54,7 +63,7 @@ assert.match(src,/subApi\.enroll\(\)/,'Pairing must call real protected API');
 assert.match(src,/subApi\.status\(\)/,'Status must call real protected API');
 assert.match(src,/subApi\.update\(\)/,'Update must queue an authenticated action');
 assert.match(src,/enrollmentToken=result\.enrollmentToken/,'Pairing code must be ephemeral UI state');
-assert.match(src,/--enroll-token/,'Managed install must contain the one-time enrollment code');
+assert.match(src,/--enroll-token-stdin/,'Managed install must pass the one-time code through stdin');
 assert(src.includes('if(copy)copy.disabled=!managedCommand;'),
   'Copy must be disabled until the entire authenticated installer is available');
 assert(src.includes('Date.now()>=enrollmentExpiresAt'),
