@@ -785,9 +785,7 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
             "/api/v1/sub-server/agent/poll" | "/api/v1/sub-server/agent/report" => request
                 .headers()
                 .get(header::AUTHORIZATION)
-                .is_some_and(|value| {
-                    value.to_str().is_ok_and(|s| s.starts_with("Bearer "))
-                }),
+                .is_some_and(|value| value.to_str().is_ok_and(|s| s.starts_with("Bearer "))),
             "/api/v1/sub-server/claim" | "/api/v1/node/enroll" => request
                 .headers()
                 .get(header::CONTENT_TYPE)
