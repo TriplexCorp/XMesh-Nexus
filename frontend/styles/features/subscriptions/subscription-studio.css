@@ -430,6 +430,12 @@
  flex:1;min-width:0;padding:0 .32rem;overflow-wrap:anywhere;
  color:var(--st-ink);font-size:.7rem;line-height:1.45;user-select:all;
 }
+.subscription-sub-install-command{align-items:flex-start}
+.subscription-sub-install-command code{
+ white-space:pre-wrap;max-height:11rem;overflow:auto;
+ scrollbar-width:thin;
+}
+.subscription-sub-install-command button{align-self:flex-start}
 .subscription-sub-install-command button,
 .subscription-sub-verify a{
  flex:none;min-height:2.15rem;display:inline-flex;align-items:center;
