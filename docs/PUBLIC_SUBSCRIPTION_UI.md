@@ -61,7 +61,7 @@ delay or client fetch requiring a decorative skeleton.
 
 `subscription_user_agent.rs` determines HTML or a client feed from User-Agent
 and the explicit `?format=` override. The unchanged canonical link and bearer token
-can deliver Xray JSON (`xray`, native Happ default), plaintext VLESS URI
+can deliver Xray JSON (`xray`, native Happ default), plaintext VLESS/VMess/Trojan/classic Shadowsocks URI
 (`links`), standard Base64 encoded URI lines (`base64`), Mihomo YAML
 (`mihomo`), or upstream sing-box JSON (`singbox`). Invalid formats fail with
 HTTP 400. Unsupported credentials/transports in alternate representations are
