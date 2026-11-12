@@ -482,8 +482,9 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="subscription-sub-step"><span class="subscription-sub-step-index">1</span><div><b>Подготовьте домен</b>',
       '<p>Направьте DNS A/AAAA домена подписок на новый VPS. Откройте TCP 80/443 и сохраните адрес и путь кнопкой «Сохранить настройки».</p></div></section>',
       '<section class="subscription-sub-step"><span class="subscription-sub-step-index">2</span><div><b>Установите XMesh Sub</b>',
-      '<p>Скопируйте команду, проверьте установщик и выполните её в терминале чистого VPS.</p>',
-      '<div class="subscription-sub-install-command"><code data-sub-install-command>Заполните и сохраните адрес подписок</code>',
+      '<p>Создайте одну команду и выполните её на чистом VPS. Она установит шлюз, подключит управляющий агент и зарегистрирует сервер в Nexus.</p>',
+      '<div class="subscription-sub-install-actions"><button type="button" class="btn sm" data-sub-enroll>Создать команду установки</button><small>Привязка встроена в установку. Ключ действителен 60 минут.</small></div>',
+      '<div class="subscription-sub-install-command"><code data-sub-install-command>Создайте команду установки</code>',
       '<button type="button" class="btn sm" data-sub-install-copy disabled>Скопировать команду</button></div>',
       '<small data-sub-install-note role="status" aria-live="polite">Укажите отдельные домены Nexus и сервера подписок.</small>',
       '</div></section>',
@@ -495,13 +496,12 @@ window.XMeshSubscriptionStudio = (() => {
       '</div></section>',
       '</div>',
       '<div class="subscription-sub-management">',
-      '<div class="subscription-sub-management-title"><div><b>Управление Sub-сервером</b><small>Привяжите VPS один раз для статуса и обновления из панели</small></div>',
+      '<div class="subscription-sub-management-title"><div><b>Управление Sub-сервером</b><small>Агент подключается автоматически после установки одной командой</small></div>',
       '<span class="subscription-sub-provision-status" data-sub-agent-state data-state="empty">Не подключён</span></div>',
       '<div class="subscription-sub-management-actions">',
-      '<button type="button" class="gh sm" data-sub-enroll>Создать команду привязки</button>',
       '<button type="button" class="gh sm" data-sub-check>Проверить статус</button>',
       '<button type="button" class="btn sm" data-sub-update disabled>Обновить XMesh Sub</button></div>',
-      '<small data-sub-agent-detail role="status" aria-live="polite">Для управления сервером создайте одноразовую команду привязки и выполните её на VPS.</small>',
+      '<small data-sub-agent-detail role="status" aria-live="polite">Сначала создайте единую команду установки выше и выполните её на VPS.</small>',
       '</div>',
       '<p class="subscription-sub-scope"><strong>Безопасность:</strong> агент на VPS сам обращается к Nexus по HTTPS; открывать отдельный административный порт не требуется. Обновление выполняет только официальный установщик XMesh Sub. Генерация подписок и пользователи остаются в Nexus.</p>',
       '</section>',
@@ -519,7 +519,7 @@ window.XMeshSubscriptionStudio = (() => {
       previewBody.className='subscription-studio-preview subscription-public';
       while(previewHost.firstChild)previewBody.appendChild(previewHost.firstChild);
       for(const href of [
-        '/subscription-studio.css?v=6fc2d828fd52',
+        '/subscription-studio.css?v=490fce317e12',
         '/subscription-surface.css?v=0a79377d5733',
         '/subscription-public.css?v=6a55fffe32d1'
       ]){
@@ -675,6 +675,8 @@ window.XMeshSubscriptionStudio = (() => {
       });
       const savedInstall={domain:String(data.subscriptionDomain||'').toLowerCase(),path:String(data.subscriptionPath||'')};
       let enrollmentToken='';
+      let enrollmentExpiresAt=0;
+      let enrollmentBusy=false;
       let latestAgentStatus=null;
       let statusBusy=false;
       let updateBusy=false;
@@ -694,7 +696,7 @@ window.XMeshSubscriptionStudio = (() => {
         const last=lastSeen>0?new Date(lastSeen*1000).toLocaleString():'—';
         const info=online?'Версия '+(status.version||'неизвестна')+' · последняя связь '+last:
           enrolled?'Связь не установлена. Последняя активность: '+last:
-          'Для управления создайте одноразовую команду привязки и выполните её на VPS.';
+          'Создайте установочную команду выше и выполните её на VPS. Агент подключится автоматически.';
         const stage=status?.update?.stage;
         const elapsed=Math.max(0,Date.now()/1000-Number(status?.update?.updatedAt||0));
         const activeJob=(stage==='queued'&&elapsed<1800)||(stage==='running'&&elapsed<3600);
@@ -714,19 +716,27 @@ window.XMeshSubscriptionStudio = (() => {
         finally{statusBusy=false;showAgent();}
       };
       if(enrollmentButton)enrollmentButton.addEventListener('click',async()=>{
-        const base=updateInstall(read());
-        if(!base){notify('Сначала сохраните действительный домен подписок и путь.');return;}
+        if(enrollmentBusy)return;
+        const draft=read();
+        const panel=String(settings?.domain||window.location?.hostname||'').trim().toLowerCase();
+        const command=installCommand(panel,draft.subscriptionDomain,draft.subscriptionPath);
+        if(!command||savedInstall.domain!==draft.subscriptionDomain||savedInstall.path!==draft.subscriptionPath){
+          notify('Сначала сохраните корректные домен и путь подписок.');return;
+        }
         if(!subApi?.enroll){notify('Управление Sub-сервером доступно только владельцу панели.');return;}
-        enrollmentButton.disabled=true;
+        enrollmentBusy=true;
+        updateInstall(draft);
         try{
           const result=await subApi.enroll();
           if(!/^[0-9a-f]{64}$/.test(result?.enrollmentToken||''))throw Error('Сервер не выдал корректный ключ привязки.');
+          const seconds=Number(result?.expiresInSeconds);
+          if(!Number.isInteger(seconds)||seconds<60||seconds>3600)throw Error('Некорректный срок действия команды.');
           enrollmentToken=result.enrollmentToken;
+          enrollmentExpiresAt=Date.now()+seconds*1000;
           updateInstall(read());
-          agentDetail.textContent='Одноразовая команда привязки готова на 10 минут. Скопируйте её и выполните на VPS с XMesh Sub.';
-          notify('Команда привязки готова. Она действительна 10 минут.');
+          notify('Единая команда готова. Скопируйте её и выполните на VPS.');
         }catch(error){notify('Не удалось создать команду: '+(error.message||'API'));}
-        finally{enrollmentButton.disabled=false;}
+        finally{enrollmentBusy=false;updateInstall(read());}
       });
       if(statusButton)statusButton.addEventListener('click',refreshAgent);
       if(updateButton)updateButton.addEventListener('click',async()=>{
@@ -741,6 +751,7 @@ window.XMeshSubscriptionStudio = (() => {
       });
       const pollAgent=window.setInterval(()=>{
         if(!form.isConnected){window.clearInterval(pollAgent);return;}
+        if(enrollmentToken&&Date.now()>=enrollmentExpiresAt)updateInstall(read());
         if(form.closest('.subscription-studio')?.dataset.subscriptionView==='servers')void refreshAgent();
       },20000);
       void refreshAgent();
@@ -750,9 +761,13 @@ window.XMeshSubscriptionStudio = (() => {
         const command=installCommand(panel,d.subscriptionDomain,d.subscriptionPath);
         const dirty=savedInstall.domain!==d.subscriptionDomain||savedInstall.path!==d.subscriptionPath;
         const ready=!!command&&!dirty;
-        if(!ready)enrollmentToken='';
-        const managedCommand=ready&&enrollmentToken?command+' --enroll-token '+enrollmentToken:command;
-        if(enrollmentButton)enrollmentButton.disabled=!ready||!subApi?.enroll;
+        const expired=!!enrollmentToken&&Date.now()>=enrollmentExpiresAt;
+        if(!ready||expired){enrollmentToken='';enrollmentExpiresAt=0;}
+        const managedCommand=ready&&enrollmentToken?command+' --enroll-token '+enrollmentToken:'';
+        if(enrollmentButton){
+          enrollmentButton.disabled=!ready||!subApi?.enroll||enrollmentBusy;
+          enrollmentButton.textContent=managedCommand?'Создать новую команду':'Создать команду установки';
+        }
         const url=ready?'https://'+d.subscriptionDomain+'/healthz':'';
         const code=form.querySelector('[data-sub-install-command]');
         const copy=form.querySelector('[data-sub-install-copy]');
@@ -760,22 +775,23 @@ window.XMeshSubscriptionStudio = (() => {
         const state=form.querySelector('[data-sub-install-state]');
         const health=form.querySelector('[data-sub-health-url]');
         const link=form.querySelector('[data-sub-health-link]');
-        if(code)code.textContent=managedCommand||'Укажите отдельный домен подписок и корректный путь.';
-        if(copy)copy.disabled=!ready;
+        if(code)code.textContent=managedCommand||(dirty?'Сначала сохраните настройки подписок.':ready?'Создайте команду установки выше.':'Укажите отдельный домен подписок и корректный путь.');
+        if(copy)copy.disabled=!managedCommand;
         if(state){
-          state.dataset.state=dirty?'dirty':ready?'ready':'empty';
-          state.textContent=dirty?'Не сохранено':ready?'Команда готова':'Требуется настройка';
+          state.dataset.state=dirty?'dirty':managedCommand?'ready':'empty';
+          state.textContent=dirty?'Не сохранено':managedCommand?'Команда готова':ready?'Ожидает команды':'Требуется настройка';
         }
         if(note)note.textContent=dirty?'Сначала сохраните изменённые адрес и путь.':
-          ready&&enrollmentToken?'Команда содержит одноразовый ключ привязки на 10 минут. Не публикуйте её и не передавайте третьим лицам.':
-          ready?'Это базовая установка без управления. Для кнопки обновления сначала создайте команду привязки.':
+          managedCommand?'Это единая команда установки и привязки. Код действует до '+new Date(enrollmentExpiresAt).toLocaleTimeString()+'. Не передавайте команду третьим лицам.':
+          expired?'Срок действия команды истёк. Создайте новую команду.':
+          ready?'Нажмите «Создать команду установки». В ней будет одноразовый ключ для автоматического подключения агента.':
           'Нужны корректные разные домены панели и подписок.';
         if(health)health.textContent=url||'Укажите домен подписок';
         if(link){
           link.hidden=!ready;
           if(ready)link.href=url;else link.removeAttribute('href');
         }
-        return ready?managedCommand:'';
+        return managedCommand;
       };
       const draw = () => {
         applyPanelTheme();
@@ -1089,11 +1105,11 @@ window.XMeshSubscriptionStudio = (() => {
       });
       form.querySelector('[data-sub-install-copy]').addEventListener('click',async()=>{
         const command=updateInstall(read());
-        if(!command){notify('Сначала сохраните настройки адреса выдачи.');return;}
+        if(!command){notify('Сначала создайте команду установки и привязки.');return;}
         try{
           if(!navigator.clipboard?.writeText)throw Error('Clipboard unavailable');
           await navigator.clipboard.writeText(command);
-          notify('Команда XMesh Sub скопирована');
+          notify('Команда установки и привязки XMesh Sub скопирована');
         }catch(_){
           const textarea=document.createElement('textarea');
           textarea.value=command;textarea.readOnly=true;textarea.style.position='fixed';

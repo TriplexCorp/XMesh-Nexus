@@ -15,6 +15,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
 
 const ENROLL_PREFIX: &str = "xmesh:sub:enroll:";
+// A fresh VPS may install Docker and Compose before exchanging its one-time code.
+const ENROLL_TTL_SECONDS: u64 = 3600;
 const HEARTBEAT: &str = "xmesh:sub:heartbeat";
 const PENDING_UPDATE: &str = "xmesh:sub:update:pending";
 const CURRENT_UPDATE: &str = "xmesh:sub:update:current";
@@ -118,7 +120,7 @@ pub async fn issue_enrollment(
         .arg(format!("{ENROLL_PREFIX}{}", sha256_hex(&token)))
         .arg(&domain)
         .arg("EX")
-        .arg(600)
+        .arg(ENROLL_TTL_SECONDS)
         .query_async::<String>(&mut conn)
         .await
         .map_err(|_| backend_error())?;
@@ -132,7 +134,7 @@ pub async fn issue_enrollment(
     )
     .await;
     Ok(Json(
-        json!({"enrollmentToken":token,"expiresInSeconds":600}),
+        json!({"enrollmentToken":token,"expiresInSeconds":ENROLL_TTL_SECONDS}),
     ))
 }
 

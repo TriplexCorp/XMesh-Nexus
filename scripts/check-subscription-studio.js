@@ -41,7 +41,12 @@ const [view,init]=studio.create({
 assert.equal(typeof init,'function');
 assert.match(view,/data-sub-install-command/);
 assert.match(view,/data-sub-install-copy/);
-assert.match(view,/data-sub-enroll/,'Pairing must be discoverable');
+assert.match(view,/data-sub-enroll/,'One-command managed installation must be discoverable');
+assert.match(view,/class="subscription-sub-install-actions"/,'The one-command generator belongs to the install step');
+assert.match(view,/Создать команду установки/,'Install must begin by generating a managed command');
+assert.doesNotMatch(view,/Создать команду привязки|Это базовая установка без управления/,
+  'Never present separate unmanaged install and enrollment flows');
+assert.equal((view.match(/data-sub-enroll/g)||[]).length,1,'Exactly one installer action');
 assert.match(view,/data-sub-check/,'Server status must have a refresh action');
 assert.match(view,/data-sub-update disabled/,'Update must remain disabled until authenticated heartbeat');
 assert.match(view,/data-sub-agent-state/,'Server state needs real managed status');
@@ -49,7 +54,12 @@ assert.match(src,/subApi\.enroll\(\)/,'Pairing must call real protected API');
 assert.match(src,/subApi\.status\(\)/,'Status must call real protected API');
 assert.match(src,/subApi\.update\(\)/,'Update must queue an authenticated action');
 assert.match(src,/enrollmentToken=result\.enrollmentToken/,'Pairing code must be ephemeral UI state');
-assert.match(src,/--enroll-token/,'Paired install must include only one-time enrollment code');
+assert.match(src,/--enroll-token/,'Managed install must contain the one-time enrollment code');
+assert(src.includes('if(copy)copy.disabled=!managedCommand;'),
+  'Copy must be disabled until the entire authenticated installer is available');
+assert(src.includes('Date.now()>=enrollmentExpiresAt'),
+  'Expired install commands must be invalidated automatically');
+assert(src.includes('expiresInSeconds'), 'Installer must use the server-generated enrollment expiry');
 assert.match(app,/\/api\/v1\/sub-server\/status/);
 assert.match(app,/\/api\/v1\/sub-server\/enrollment/);
 assert.match(app,/\/api\/v1\/sub-server\/update/);
@@ -57,6 +67,9 @@ const control=fs.readFileSync('backend/src/sub_server.rs','utf8');
 assert.match(control,/require_owner\(&actor\)/,'Management must be owner-only');
 assert.match(control,/subtle::ConstantTimeEq/,'Agent tokens require constant-time comparison');
 assert.match(control,/GETDEL/,'Single-use enrollment and jobs must be atomic');
+assert(control.includes('ENROLL_TTL_SECONDS: u64 = 3600'),
+  'Fresh VPS installation needs time to install Docker before consuming the code');
+assert(control.includes('.arg(ENROLL_TTL_SECONDS)'), 'Redis TTL must share the API response TTL');
 assert.match(control,/PENDING_UPDATE/,'Update queue is server-owned');
 assert.doesNotMatch(control,/std::process::Command|tokio::process::Command/,'Nexus must not execute remote shell commands');
 assert.match(rust,/\/sub-server\/agent\/poll/,'Authenticated outbound agent poll endpoint must be mounted');
