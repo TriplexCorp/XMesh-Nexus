@@ -15,6 +15,12 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Подписка выдаётся в подходящем для приложения формате, если поддерживается транспорт. Неподдерживаемые транспорты не подменяются. Проверьте версию приложения.": "The subscription is adapted for the app where its transport is supported. Unsupported transports are not silently replaced. Check the app version.",
+    "· проверяйте транспорт": "· verify transport support",
+    "Ни один сервер не поддерживает выбранный формат или транспорт. Выберите Xray JSON.": "No servers support this format or transport. Choose Xray JSON.",
+    "Ошибка сериализации YAML": "YAML serialization error",
+    "Ошибка сериализации sing-box JSON": "sing-box JSON serialization error",
+    "Неподдерживаемый формат подписки": "Unsupported subscription format",
     "Включённое приложение отображается в каталоге, но совместимость зависит от формата подписки, транспорта и версии клиента. Один токен поддерживает ручной выбор формата через ?format=xray, links, base64, mihomo или singbox.": "Enabled apps appear in the catalog, but compatibility depends on feed format, transport, and app version. The same bearer token supports manual selection with ?format=xray, links, base64, mihomo or singbox.",
     "Отображается:": "Shown:",
     "Формат:": "Format:",
