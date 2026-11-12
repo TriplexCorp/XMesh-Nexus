@@ -24,6 +24,7 @@ assert.match(subscriptions,/let feed = crate::subscription_json::build_feed\(out
  'Original Xray feed builder preserves independent balancers and user routing');
 assert.match(subscriptions,/crate::subscription_formats::render\(&outbounds, format\)/,
  'Alternate formats must reuse authenticated user-scoped client outbounds');
+const negotiation=fs.readFileSync('backend/src/subscription_user_agent.rs','utf8');
 assert.match(negotiation,/pub fn feed_format\(/,'Formats must be explicitly allowlisted');
 assert.match(negotiation,/options\.get\("format"\)/,'Explicit client format is available without changing the token');
 assert.match(negotiation,/options\.get\("device"\)/,
