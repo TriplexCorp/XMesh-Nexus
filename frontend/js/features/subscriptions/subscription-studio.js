@@ -482,8 +482,9 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="subscription-sub-step"><span class="subscription-sub-step-index">1</span><div><b>Подготовьте домен</b>',
       '<p>Направьте DNS A/AAAA домена подписок на новый VPS. Откройте TCP 80/443 и сохраните адрес и путь кнопкой «Сохранить настройки».</p></div></section>',
       '<section class="subscription-sub-step"><span class="subscription-sub-step-index">2</span><div><b>Установите XMesh Sub</b>',
-      '<p>Скопируйте команду, проверьте установщик и выполните её в терминале чистого VPS.</p>',
-      '<div class="subscription-sub-install-command"><code data-sub-install-command>Заполните и сохраните адрес подписок</code>',
+      '<p>Создайте одну команду и выполните её на чистом VPS. Она установит шлюз, подключит управляющий агент и зарегистрирует сервер в Nexus.</p>',
+      '<div class="subscription-sub-install-actions"><button type="button" class="btn sm" data-sub-enroll>Создать команду установки</button><small>Привязка встроена в установку. Ключ действителен 60 минут.</small></div>',
+      '<div class="subscription-sub-install-command"><code data-sub-install-command>Создайте команду установки</code>',
       '<button type="button" class="btn sm" data-sub-install-copy disabled>Скопировать команду</button></div>',
       '<small data-sub-install-note role="status" aria-live="polite">Укажите отдельные домены Nexus и сервера подписок.</small>',
       '</div></section>',
@@ -495,13 +496,12 @@ window.XMeshSubscriptionStudio = (() => {
       '</div></section>',
       '</div>',
       '<div class="subscription-sub-management">',
-      '<div class="subscription-sub-management-title"><div><b>Управление Sub-сервером</b><small>Привяжите VPS один раз для статуса и обновления из панели</small></div>',
+      '<div class="subscription-sub-management-title"><div><b>Управление Sub-сервером</b><small>Агент подключается автоматически после установки одной командой</small></div>',
       '<span class="subscription-sub-provision-status" data-sub-agent-state data-state="empty">Не подключён</span></div>',
       '<div class="subscription-sub-management-actions">',
-      '<button type="button" class="gh sm" data-sub-enroll>Создать команду привязки</button>',
       '<button type="button" class="gh sm" data-sub-check>Проверить статус</button>',
       '<button type="button" class="btn sm" data-sub-update disabled>Обновить XMesh Sub</button></div>',
-      '<small data-sub-agent-detail role="status" aria-live="polite">Для управления сервером создайте одноразовую команду привязки и выполните её на VPS.</small>',
+      '<small data-sub-agent-detail role="status" aria-live="polite">Сначала создайте единую команду установки выше и выполните её на VPS.</small>',
       '</div>',
       '<p class="subscription-sub-scope"><strong>Безопасность:</strong> агент на VPS сам обращается к Nexus по HTTPS; открывать отдельный административный порт не требуется. Обновление выполняет только официальный установщик XMesh Sub. Генерация подписок и пользователи остаются в Nexus.</p>',
       '</section>',
@@ -675,6 +675,8 @@ window.XMeshSubscriptionStudio = (() => {
       });
       const savedInstall={domain:String(data.subscriptionDomain||'').toLowerCase(),path:String(data.subscriptionPath||'')};
       let enrollmentToken='';
+      let enrollmentExpiresAt=0;
+      let enrollmentBusy=false;
       let latestAgentStatus=null;
       let statusBusy=false;
       let updateBusy=false;
@@ -694,7 +696,7 @@ window.XMeshSubscriptionStudio = (() => {
         const last=lastSeen>0?new Date(lastSeen*1000).toLocaleString():'—';
         const info=online?'Версия '+(status.version||'неизвестна')+' · последняя связь '+last:
           enrolled?'Связь не установлена. Последняя активность: '+last:
-          'Для управления создайте одноразовую команду привязки и выполните её на VPS.';
+          'Создайте установочную команду выше и выполните её на VPS. Агент подключится автоматически.';
         const stage=status?.update?.stage;
         const elapsed=Math.max(0,Date.now()/1000-Number(status?.update?.updatedAt||0));
         const activeJob=(stage==='queued'&&elapsed<1800)||(stage==='running'&&elapsed<3600);
