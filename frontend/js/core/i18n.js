@@ -15,6 +15,23 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Публичная ссылка (шаблон)": "Public link (template)",
+    "Копировать шаблон ссылки": "Copy link template",
+    "Настройте DNS A/AAAA домена на IP вашего VPS с XMesh Sub. Шаблон ссылки содержит заполнитель токена, а не действующий ключ.": "Point the domain's A/AAAA records to your XMesh Sub VPS. The sample link contains a token placeholder, not a real credential.",
+    "Агент подключается автоматически после установки одной командой.": "The agent connects automatically after the one-command installation.",
+    "Версия агента": "Agent version",
+    "Создайте установочную команду справа и выполните её на VPS.": "Generate the installation command on the right and run it on the VPS.",
+    "Копировать адрес проверки": "Copy health-check URL",
+    "Безопасность": "Security",
+    "Агент сам обращается к Nexus по HTTPS — дополнительный административный порт не нужен. Установщик проверяется перед запуском, а обновления требуют подпись. Подписки и пользователи остаются в Nexus.": "The agent contacts Nexus over HTTPS, with no additional management port. The installer is verified before execution, and updates require signatures. Subscriptions and users stay in Nexus.",
+    "Шаблон ссылки скопирован": "Link template copied",
+    "Адрес проверки скопирован": "Health-check URL copied",
+    "Не удалось скопировать. Выделите текст вручную.": "Copy failed. Select the text manually.",
+    "Публичная ссылка (пример)": "Public link (example)",
+    "Создайте установочную команду справа и выполните её на VPS. Агент подключится автоматически.": "Generate the installer on the right and run it on the VPS. The agent will connect automatically.",
+    "Домен подписки": "Subscription domain",
+    "Публичный путь": "Public path",
+    "Например /s или /subscription.": "For example /s or /subscription.",
     "Создайте одну команду и выполните её на чистом VPS. Она установит шлюз, подключит управляющий агент и зарегистрирует сервер в Nexus.": "Generate one command and run it on a clean VPS. It will install the gateway, set up the management agent, and register the server with Nexus.",
     "Создать команду установки": "Generate installation command",
     "Создайте команду установки": "Generate an installation command",

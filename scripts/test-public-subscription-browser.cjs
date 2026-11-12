@@ -146,10 +146,14 @@ async function dismissDialog(page,dialog,opener){
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-experience.js').toString()});
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-traffic.js').toString()});
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-studio.js').toString()});
+  await page.addStyleTag({content:read('frontend/styles/features/subscriptions/subscription-studio.css').toString()});
   await page.evaluate(()=>{
     window.__subEnrollCallCount=0;
+    window.__subOnline=false;
     const subApi={
-      status:async()=>({enrolled:false,online:false,domainMatches:false,update:{}}),
+      status:async()=>window.__subOnline
+        ? {enrolled:true,online:true,domainMatches:true,version:'v0.3.0',lastSeen:1794460000,update:{}}
+        : {enrolled:false,online:false,domainMatches:false,update:{}},
       enroll:async()=>{window.__subEnrollCallCount++;return {enrollmentToken:'a'.repeat(64),expiresInSeconds:3600}},
       update:async()=>{throw Error('Update requires a paired, online agent')}
     };
@@ -181,6 +185,39 @@ async function dismissDialog(page,dialog,opener){
   assert(await studio.isHidden(),'Preview stays separate from server provisioning');
   assert(await page.locator('.subscription-servers-page').isVisible());
   assert(await page.locator('.subscription-studio-main').isHidden());
+  assert.equal(await page.locator('.subscription-server-address').count(),1,'Address is a standalone card');
+  assert.equal(await page.locator('.subscription-server-management').count(),1,'Management is a standalone card');
+  assert.equal(await page.locator('.subscription-server-provisioning').count(),1,'Installation is a standalone card');
+  assert.equal(await page.locator('.subscription-sub-step').count(),3,'Installer renders three compact step cards');
+  assert(await page.locator('[data-sub-public-copy]').isDisabled(),'No copyable public template before domain is saved');
+  assert(await page.locator('[data-sub-health-copy]').isDisabled(),'Health address copy requires saved domain');
+  assert(await page.locator('.subscription-sub-install-command').isHidden(),
+    'Sensitive installer command is not displayed before enrollment');
+  await page.setViewportSize({width:1600,height:900});
+  const desktop=await page.evaluate(()=>{
+    const box=q=>{const r=document.querySelector(q).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}};
+    return {address:box('.subscription-server-address'),management:box('.subscription-server-management'),
+      installation:box('.subscription-server-provisioning'),security:box('.subscription-sub-scope'),
+      overflow:document.documentElement.scrollWidth>innerWidth+1};
+  });
+  assert(!desktop.overflow,'Desktop cards may not overflow horizontally');
+  assert(desktop.management.top>=desktop.address.bottom-2,'Managed server card must stack beneath the address card');
+  assert(desktop.installation.left>=desktop.address.right-2,'Installer must sit beside the left card stack');
+  assert(desktop.security.top>=Math.max(desktop.management.bottom,desktop.installation.bottom)-2,
+    'Security strip must span the bottom of the card workspace');
+  await page.screenshot({path:path.join(out,'studio-server-cards-desktop.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:390,height:844});
+  const mobile=await page.evaluate(()=>{
+    const box=q=>{const r=document.querySelector(q).getBoundingClientRect();return {top:r.top,bottom:r.bottom}};
+    return {management:box('.subscription-server-management'),installation:box('.subscription-server-provisioning'),
+      security:box('.subscription-sub-scope'),overflow:document.documentElement.scrollWidth>innerWidth+1};
+  });
+  assert(!mobile.overflow,'Mobile server cards may not cause horizontal scroll');
+  assert(mobile.installation.top>=mobile.management.bottom-2,'Mobile installation must stack below management');
+  assert(mobile.security.top>=mobile.installation.bottom-2,'Mobile security strip must remain after installation');
+  await page.screenshot({path:path.join(out,'studio-server-cards-mobile.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:1600,height:900});
+
   const commandCopy=page.locator('[data-sub-install-copy]');
   assert(await commandCopy.isDisabled(),'Installation cannot be copied before domain settings are saved');
   assert(await page.locator('[data-sub-health-link]').isHidden(),'Health link needs validated saved DNS');
@@ -205,6 +242,16 @@ async function dismissDialog(page,dialog,opener){
   assert.match(await page.locator('[data-sub-install-state]').innerText(),/Команда готова/);
   assert(!/подключён|онлайн/i.test(await page.locator('[data-sub-install-state]').innerText()),
     'A generated command is not proof of a paired or online server');
+
+  assert(await page.locator('[data-sub-agent-version]').innerText()==='—','Disconnected agent has no invented version');
+  assert(await page.locator('[data-sub-update]').isDisabled(),'Update must not run while offline');
+  await page.evaluate(()=>{window.__subOnline=true;});
+  await page.locator('[data-sub-check]').click();
+  await page.waitForFunction(()=>document.querySelector('[data-sub-agent-state]').textContent==='На связи');
+  assert.equal(await page.locator('[data-sub-agent-version]').innerText(),'v0.3.0','Agent version must come from the status API');
+  assert.notEqual(await page.locator('[data-sub-agent-seen]').innerText(),'—','Last seen is real API data');
+  assert(await page.locator('[data-sub-update]').isEnabled(),'Live managed agent enables update action');
+  checks++;
   await settingsTab.click();
   assert(await studio.isVisible(),'Portal preview must remain mounted after tab switches');
   assert.equal(await page.locator('[name="subscriptionDomain"]').inputValue(),'sub.example.org');

@@ -354,140 +354,255 @@
 }
 .subscription-studio-tabs button:hover:not(.on){color:var(--st-ink)}
 .subscription-studio-tabs button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
-.subscription-studio [data-subscription-view]{} /* no global CSS ownership */
+/* Subscription Studio / Servers: compact, card-based operations workspace. */
+.subscription-studio-hero{display:flex;align-items:center;gap:1rem;min-width:0}
+.subscription-studio-hero>div{min-width:0}
+.subscription-studio-hero-symbol{
+ display:none;width:3rem;height:3rem;flex:none;place-items:center;
+ color:var(--a);border:1px solid color-mix(in srgb,var(--a) 34%,var(--st-border));
+ border-radius:calc(var(--nx-control-radius) + 3px);
+ background:color-mix(in srgb,var(--a) 9%,var(--nx-control-bg));
+ box-shadow:0 8px 24px rgba(0,0,0,.1);
+}
+.subscription-studio-hero-symbol svg{width:1.65rem;height:1.65rem}
+.subscription-studio[data-subscription-view="servers"] .subscription-studio-hero-symbol{display:grid}
+.subscription-studio[data-subscription-view="servers"] .subscription-studio-intro{
+ position:relative;isolation:isolate;padding:.55rem .1rem .3rem;
+}
+.subscription-studio[data-subscription-view="servers"] .subscription-studio-intro:after{
+ content:"";position:absolute;z-index:-1;pointer-events:none;
+ right:7%;top:0;width:38%;height:2px;border-radius:100%;
+ background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--a) 45%,transparent),transparent);
+ opacity:.55;
+}
+.subscription-studio[data-subscription-view="servers"] .subscription-studio-intro h2{
+ font-size:clamp(1.55rem,2vw,2rem);letter-spacing:-.035em;
+}
+.subscription-studio-tabs [data-substudio-tab="servers"] svg{width:1rem;height:1rem}
+.subscription-studio-tabs button.on{
+ box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 15%,transparent),0 2px 12px rgba(0,0,0,.1);
+}
 .subscription-studio .subscription-studio-main[hidden],
 .subscription-studio .subscription-studio-side[hidden],
 .subscription-studio .subscription-servers-page[hidden]{display:none!important}
 .subscription-studio[data-subscription-view="servers"] .subscription-studio-layout{
- grid-template-columns:minmax(0,1fr);
+ display:grid;grid-template-columns:minmax(0,1fr);gap:0;
 }
 .subscription-servers-page{
- grid-column:1/-1;display:grid;
- grid-template-columns:minmax(17rem,.7fr) minmax(0,1.3fr);
- align-items:start;gap:1rem;min-width:0;
+ grid-column:1/-1;display:grid;grid-template-columns:minmax(0,.86fr) minmax(0,1.14fr);
+ gap:1rem;align-items:stretch;min-width:0;
 }
-.subscription-servers-page .subscription-studio-section{min-width:0}
-.subscription-server-provisioning{gap:.9rem}
-.subscription-sub-workspace-head{
- display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
- gap:.65rem;padding:.15rem 0;
-}
-.subscription-sub-workspace-head>div{display:grid;gap:.15rem;min-width:0}
-.subscription-sub-workspace-head b{font-size:.87rem;color:var(--st-ink)}
-.subscription-sub-workspace-head small{font-size:.72rem;color:var(--st-muted)}
-.subscription-sub-provision-status{
- display:inline-flex;align-items:center;gap:.38rem;white-space:nowrap;
- padding:.3rem .62rem;border:1px solid var(--st-border);
- border-radius:999px;background:var(--nx-section-bg);
- color:var(--st-muted);font-size:.7rem;font-weight:710;
-}
-.subscription-sub-provision-status:before{
- content:'';display:block;width:.36rem;height:.36rem;flex:none;
- border-radius:50%;background:currentColor;opacity:.7;
-}
-.subscription-sub-provision-status[data-state="dirty"]{
- color:var(--wa,var(--a));
- border-color:color-mix(in srgb,var(--a) 40%,var(--st-border));
-}
-.subscription-sub-provision-status[data-state="ready"]{
- color:var(--a);
- border-color:color-mix(in srgb,var(--a) 36%,var(--st-border));
-}
-/* "Ready" means command generated, not connected/online. */
-.subscription-sub-steps{
- display:grid;gap:0;min-width:0;border:1px solid var(--st-border);
- border-radius:var(--nx-control-radius);overflow:hidden;
+.subscription-server-left{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;align-content:start;min-width:0}
+.subscription-servers-page :is(.subscription-server-address,.subscription-server-provisioning,.subscription-server-management,.subscription-sub-scope){
+ min-width:0;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--a) 17%,var(--st-border));
+ border-radius:calc(var(--nx-control-radius) + 4px);
+ box-shadow:0 12px 32px rgba(0,0,0,.09);
  background:var(--nx-section-bg);
 }
-.subscription-sub-step{
- display:grid;grid-template-columns:1.85rem minmax(0,1fr);
- gap:.7rem;min-width:0;padding:.82rem .92rem;
+.subscription-servers-page :is(.subscription-server-address,.subscription-server-provisioning){
+ gap:1rem;padding:1.15rem 1.2rem;
 }
-.subscription-sub-step + .subscription-sub-step{border-top:1px solid var(--st-border)}
-.subscription-sub-step-index{
- width:1.8rem;height:1.8rem;display:grid;place-items:center;flex:none;
- border:1px solid color-mix(in srgb,var(--a) 26%,var(--st-border));
- border-radius:.55rem;color:var(--a);background:color-mix(in srgb,var(--a) 7%,var(--nx-section-bg));
- font-size:.77rem;font-weight:800;font-variant-numeric:tabular-nums;
+.subscription-servers-page .subscription-server-address{
+ background:radial-gradient(ellipse at 98% 0%,color-mix(in srgb,var(--a) 9%,transparent),transparent 47%),var(--nx-section-bg);
 }
-.subscription-sub-step>div{display:grid;align-content:start;gap:.4rem;min-width:0}
-.subscription-sub-step b{font-size:.82rem;color:var(--st-ink);font-weight:730}
-.subscription-sub-step p{font-size:.73rem;line-height:1.48;color:var(--st-muted);margin:0}
-.subscription-sub-step small{font-size:.68rem;line-height:1.4;color:var(--st-muted)}
-.subscription-sub-step code{font-size:.73rem}
-.subscription-sub-install-actions{
- display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;min-width:0;
+.subscription-server-card-heading{
+ display:flex;align-items:flex-start;gap:.85rem;padding:0 0 .9rem;
+ border-bottom:1px solid var(--st-border);
 }
-.subscription-sub-install-actions button{min-height:2.2rem;flex:none}
-.subscription-sub-install-actions small{flex:1 1 14rem}
-.subscription-sub-install-command,
-.subscription-sub-verify{
- display:flex;align-items:center;gap:.65rem;min-width:0;
- padding:.44rem;border:1px solid var(--st-border);
+.subscription-server-card-heading>div{min-width:0}
+.subscription-server-card-heading h3{margin:0 0 .25rem;font-size:1.09rem;line-height:1.3;letter-spacing:-.017em}
+.subscription-server-card-heading p{font-size:.77rem;line-height:1.5;margin:0;color:var(--st-muted)}
+.subscription-server-symbol{
+ display:grid;place-items:center;flex:none;width:2.7rem;height:2.7rem;
+ border:1px solid color-mix(in srgb,var(--a) 30%,var(--st-border));
+ border-radius:var(--nx-control-radius);
+ background:color-mix(in srgb,var(--a) 10%,var(--nx-control-bg));color:var(--a);
+}
+.subscription-server-symbol svg{width:1.3rem;height:1.3rem}
+.subscription-servers-page .subscription-server-fields{gap:.75rem}
+.subscription-servers-page .subscription-server-fields :is(input,select){min-height:2.55rem}
+.subscription-server-link-card{
+ display:flex;align-items:center;justify-content:space-between;min-width:0;gap:.75rem;
+ padding:.75rem .85rem;border:1px solid var(--st-border);
  border-radius:var(--nx-control-radius);background:var(--nx-control-bg);
 }
-.subscription-sub-install-command code,.subscription-sub-verify code{
- flex:1;min-width:0;padding:0 .32rem;overflow-wrap:anywhere;
- color:var(--st-ink);font-size:.7rem;line-height:1.45;user-select:all;
+.subscription-server-link-text{display:grid;gap:.2rem;min-width:0}
+.subscription-server-link-text span{font-size:.7rem;color:var(--st-muted)}
+.subscription-server-link-text code{font-size:.82rem;font-weight:700;color:var(--a);overflow-wrap:anywhere}
+.subscription-server-icon-button{
+ display:inline-grid!important;place-items:center;flex:none;width:2.2rem;min-height:2.2rem;
+ padding:.4rem;border:1px solid var(--st-border);border-radius:var(--nx-control-radius);
+ background:var(--nx-section-bg);color:var(--st-ink);
 }
-.subscription-sub-install-command{align-items:flex-start}
+.subscription-server-icon-button svg{width:1rem;height:1rem}
+.subscription-servers-page button:disabled{opacity:.48;cursor:not-allowed}
+.subscription-server-dns-hint{
+ display:flex;align-items:flex-start;gap:.55rem;margin:0;
+ color:var(--st-muted);font-size:.7rem;line-height:1.5;
+}
+.subscription-server-dns-hint svg{width:1.05rem;height:1.05rem;color:var(--a);flex:none;margin-top:.08rem}
+.subscription-server-management{display:grid;gap:.85rem;padding:1.05rem 1.2rem}
+.subscription-sub-management-title{
+ display:flex;align-items:flex-start;justify-content:space-between;gap:.7rem;
+ flex-wrap:wrap;min-width:0;
+}
+.subscription-server-title-with-icon{display:flex;gap:.85rem;align-items:center;min-width:0;flex:1 1 15rem}
+.subscription-server-title-with-icon>div{display:grid;gap:.26rem;min-width:0}
+.subscription-server-title-with-icon h3{font-size:1.05rem;font-weight:760;margin:0;line-height:1.3}
+.subscription-server-title-with-icon small{font-size:.72rem;line-height:1.45;color:var(--st-muted)}
+.subscription-sub-provision-status{
+ display:inline-flex;align-items:center;gap:.42rem;flex:none;
+ padding:.34rem .62rem;border:1px solid var(--st-border);
+ border-radius:999px;background:var(--nx-control-bg);
+ color:var(--st-muted);white-space:nowrap;font-size:.69rem;font-weight:730;
+}
+.subscription-sub-provision-status:before{
+ content:"";width:.36rem;height:.36rem;flex:none;border-radius:50%;
+ background:currentColor;opacity:.78;
+}
+.subscription-sub-provision-status[data-state="dirty"]{
+ color:var(--wa,var(--a));border-color:color-mix(in srgb,var(--a) 36%,var(--st-border));
+}
+.subscription-sub-provision-status[data-state="ready"]{
+ color:var(--a);border-color:color-mix(in srgb,var(--a) 36%,var(--st-border));
+}
+.subscription-sub-provision-status[data-sub-agent-state][data-state="ready"]{
+ color:#32cf8d;border-color:color-mix(in srgb,#32cf8d 46%,var(--st-border));
+ background:color-mix(in srgb,#32cf8d 9%,var(--nx-control-bg));
+}
+.subscription-sub-status-metrics{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0;
+ border:1px solid var(--st-border);border-radius:var(--nx-control-radius);
+ background:var(--nx-control-bg);padding:.65rem .75rem;gap:.7rem;
+}
+.subscription-sub-status-metric{
+ display:flex;align-items:center;gap:.65rem;min-width:0;
+}
+.subscription-sub-status-metric+.subscription-sub-status-metric{
+ border-left:1px solid var(--st-border);padding-left:.7rem;
+}
+.subscription-sub-status-metric>svg{width:1.12rem;height:1.12rem;flex:none;color:var(--st-muted)}
+.subscription-sub-status-metric>div{display:grid;gap:.12rem;min-width:0}
+.subscription-sub-status-metric small{color:var(--st-muted);font-size:.69rem}
+.subscription-sub-status-metric b{
+ color:var(--st-ink);font-size:.8rem;font-weight:750;overflow-wrap:anywhere;line-height:1.4;
+ font-variant-numeric:tabular-nums;
+}
+.subscription-sub-management-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+.subscription-sub-management-actions button{
+ display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+ min-height:2.55rem;min-width:0;padding:.55rem .7rem;font-weight:700;
+}
+.subscription-sub-management-actions svg{width:1.02rem;height:1.02rem;flex:none}
+.subscription-server-management>small{font-size:.69rem;line-height:1.4;color:var(--st-muted)}
+.subscription-server-provisioning{align-content:start;gap:.85rem}
+.subscription-sub-workspace-head{
+ display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;
+}
+.subscription-sub-workspace-head>div{display:grid;gap:.2rem;min-width:0}
+.subscription-sub-workspace-head b{font-size:.87rem;font-weight:760}
+.subscription-sub-workspace-head small{font-size:.72rem;color:var(--st-muted)}
+.subscription-sub-steps{display:grid;gap:.7rem;min-width:0}
+.subscription-sub-step{
+ display:grid;grid-template-columns:2.55rem minmax(0,1fr) 2.1rem;
+ gap:.75rem;align-items:start;min-width:0;padding:.85rem;
+ border:1px solid color-mix(in srgb,var(--a) 15%,var(--st-border));
+ border-radius:calc(var(--nx-control-radius) + 2px);
+ background:var(--nx-control-bg);
+ transition:border-color .16s ease,background-color .16s ease;
+}
+.subscription-sub-step:hover{border-color:color-mix(in srgb,var(--a) 35%,var(--st-border))}
+.subscription-sub-step-index{
+ display:grid;place-items:center;width:2.35rem;height:2.35rem;flex:none;
+ border:1px solid color-mix(in srgb,var(--a) 32%,var(--st-border));
+ border-radius:var(--nx-control-radius);
+ background:color-mix(in srgb,var(--a) 13%,var(--nx-section-bg));color:var(--a);
+ font-size:.84rem;font-weight:800;font-variant-numeric:tabular-nums;
+}
+.subscription-sub-step>div{display:grid;align-content:start;gap:.4rem;min-width:0}
+.subscription-sub-step b{font-size:.88rem;font-weight:770;line-height:1.35}
+.subscription-sub-step p{font-size:.74rem;color:var(--st-muted);line-height:1.5;margin:0}
+.subscription-sub-step small{font-size:.67rem;color:var(--st-muted);line-height:1.46}
+.subscription-step-symbol{
+ width:2rem;height:2rem;display:grid;place-items:center;color:var(--a);
+ background:color-mix(in srgb,var(--a) 9%,var(--nx-section-bg));
+ border-radius:var(--nx-control-radius);
+}
+.subscription-step-symbol svg{width:1.24rem;height:1.24rem}
+.subscription-sub-install-actions{
+ display:flex;align-items:center;flex-wrap:wrap;gap:.52rem;min-width:0;margin-top:.18rem;
+}
+.subscription-sub-install-actions button{
+ display:inline-flex;align-items:center;justify-content:center;gap:.48rem;
+ min-height:2.5rem;padding:.5rem .78rem;font-size:.76rem;font-weight:760;
+}
+.subscription-sub-install-actions svg{width:1.05rem;height:1.05rem;flex:none}
+.subscription-sub-install-command{
+ display:block;min-width:0;padding:.65rem .75rem;border:1px solid var(--st-border);
+ border-radius:var(--nx-control-radius);background:var(--nx-section-bg);
+}
+.subscription-sub-install-command[hidden]{display:none!important}
 .subscription-sub-install-command code{
- white-space:pre-wrap;max-height:11rem;overflow:auto;
- scrollbar-width:thin;
+ display:block;white-space:pre-wrap;overflow:auto;max-height:11rem;
+ color:var(--st-ink);font-size:.68rem;line-height:1.5;
+ overflow-wrap:anywhere;user-select:all;scrollbar-width:thin;
 }
-.subscription-sub-install-command button{align-self:flex-start}
-.subscription-sub-install-command button,
+.subscription-sub-verify{
+ display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;min-width:0;margin-top:.15rem;
+}
+.subscription-sub-verify code{
+ flex:1 1 11rem;display:flex;align-items:center;min-width:0;
+ padding:.65rem .75rem;border:1px solid var(--st-border);
+ border-radius:var(--nx-control-radius);background:var(--nx-section-bg);
+ color:var(--a);font-size:.74rem;font-weight:700;overflow-wrap:anywhere;
+}
 .subscription-sub-verify a{
- flex:none;min-height:2.15rem;display:inline-flex;align-items:center;
- justify-content:center;padding:.4rem .7rem;
+ display:inline-flex;align-items:center;justify-content:center;gap:.46rem;
+ min-height:2.35rem;padding:.52rem .7rem;text-decoration:none;
 }
-.subscription-sub-verify a[hidden]{display:none}
+.subscription-sub-verify a svg{width:.98rem;height:.98rem;flex:none}
+.subscription-sub-verify a[hidden]{display:none!important}
+.subscription-sub-verify .subscription-server-icon-button{min-height:2.35rem}
 .subscription-sub-scope{
- margin:0;padding:.75rem .85rem;border-radius:var(--nx-control-radius);
- border:1px solid var(--st-border);background:var(--nx-section-bg);
- color:var(--st-muted);font-size:.72rem;line-height:1.55;
+ grid-column:1/-1;display:grid;grid-template-columns:auto auto minmax(0,1fr);
+ align-items:center;gap:.8rem;padding:.85rem 1rem;
 }
-.subscription-sub-scope strong{color:var(--st-ink)}
-@media(max-width:1180px){
- .subscription-servers-page{grid-template-columns:minmax(0,1fr)}
+.subscription-sub-scope strong{font-size:.85rem;font-weight:750;color:var(--st-ink);white-space:nowrap}
+.subscription-sub-scope p{
+ margin:0;padding-left:.9rem;border-left:1px solid var(--st-border);
+ color:var(--st-muted);font-size:.72rem;line-height:1.5;
+}
+.subscription-servers-page :is(button,a):focus-visible{
+ outline:2px solid var(--a);outline-offset:2px;
+}
+@media(max-width:1230px){
+ .subscription-servers-page{grid-template-columns:minmax(0,1fr);gap:.85rem}
+ .subscription-server-left{grid-template-columns:repeat(2,minmax(0,1fr));gap:.85rem}
+ .subscription-sub-scope{grid-column:1}
+}
+@media(max-width:890px){
+ .subscription-server-left{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:780px){
  .subscription-studio-tabs{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
- .subscription-studio-tabs button{padding:.4rem .5rem;min-width:0;font-size:.76rem}
- .subscription-sub-install-command,.subscription-sub-verify{flex-wrap:wrap}
- .subscription-sub-install-command button,.subscription-sub-verify a{width:100%}
- .subscription-sub-step{padding:.7rem}
+ .subscription-studio-tabs button{min-width:0;padding:.44rem .5rem;font-size:.73rem}
+ .subscription-servers-page :is(.subscription-server-address,.subscription-server-provisioning,.subscription-server-management){padding:.9rem}
+ .subscription-sub-step{grid-template-columns:2.25rem minmax(0,1fr);gap:.55rem;padding:.75rem}
+ .subscription-sub-step-index{width:2.15rem;height:2.15rem}
+ .subscription-step-symbol{display:none}
+ .subscription-server-card-heading h3{font-size:1rem}
+ .subscription-sub-scope{grid-template-columns:auto minmax(0,1fr)}
+ .subscription-sub-scope p{grid-column:1/-1;border-left:0;border-top:1px solid var(--st-border);padding:.65rem 0 0}
+}
+@media(max-width:520px){
+ .subscription-studio-hero-symbol{width:2.5rem;height:2.5rem}
+ .subscription-studio-hero{gap:.6rem}
+ .subscription-sub-management-actions{grid-template-columns:minmax(0,1fr)}
+ .subscription-sub-status-metrics{grid-template-columns:minmax(0,1fr)}
+ .subscription-sub-status-metric+.subscription-sub-status-metric{border-left:0;border-top:1px solid var(--st-border);padding:.55rem 0 0}
+ .subscription-sub-verify a{width:100%}
+ .subscription-sub-install-actions button{flex:1 1 100%}
 }
 @media(prefers-reduced-motion:reduce){
- .subscription-studio-tabs button{transition:none}
-}
-
-
-/* Managed XMesh Sub: inline, compact and separate from installation wizard. */
-.subscription-sub-management{
- display:grid;gap:.7rem;min-width:0;
- padding:.82rem .9rem;border:1px solid var(--st-border);
- border-radius:var(--nx-control-radius);background:var(--nx-section-bg);
-}
-.subscription-sub-management-title{
- display:flex;align-items:center;justify-content:space-between;
- gap:.8rem;flex-wrap:wrap;min-width:0;
-}
-.subscription-sub-management-title>div{display:grid;gap:.15rem;min-width:0}
-.subscription-sub-management-title b{font-size:.85rem;color:var(--st-ink)}
-.subscription-sub-management-title small,.subscription-sub-management>small{
- font-size:.69rem;line-height:1.45;color:var(--st-muted);
-}
-.subscription-sub-management-actions{
- display:flex;align-items:center;justify-content:flex-start;
- flex-wrap:wrap;gap:.45rem;min-width:0;
-}
-.subscription-sub-management-actions button{min-height:2.25rem}
-.subscription-sub-management-actions button:disabled{opacity:.5;cursor:not-allowed}
-.subscription-sub-management-actions [data-sub-update]{
- margin-left:auto;
-}
-@media(max-width:780px){
- .subscription-sub-management-actions [data-sub-update]{margin-left:0}
- .subscription-sub-management-actions button{flex:1 1 auto}
+ .subscription-studio-tabs button,.subscription-sub-step{transition:none}
 }

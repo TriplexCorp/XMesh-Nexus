@@ -59,6 +59,27 @@ assert.equal((view.match(/data-sub-enroll/g)||[]).length,1,'Exactly one installe
 assert.match(view,/data-sub-check/,'Server status must have a refresh action');
 assert.match(view,/data-sub-update disabled/,'Update must remain disabled until authenticated heartbeat');
 assert.match(view,/data-sub-agent-state/,'Server state needs real managed status');
+assert.match(view,/class="subscription-server-left"/,'Address and management must share a distinct left column');
+assert.match(view,/subscription-server-address/,'Address must be a standalone card');
+assert.match(view,/subscription-server-management/,'Management must be a standalone card');
+assert.match(view,/subscription-server-provisioning/,'Installation must be its own right-hand card');
+assert.match(view,/subscription-sub-scope/,'Security guidance must live in a full-width card');
+assert.match(view,/data-sub-agent-version/,'Server card must expose real agent version');
+assert.match(view,/data-sub-agent-seen/,'Server card must expose live last-seen timestamp');
+assert.match(view,/data-sub-public-copy/,'Address card must offer copyable link template');
+assert.match(view,/data-sub-health-copy/,'Health endpoint must be copyable');
+assert.equal((view.match(/class="subscription-sub-step"/g)||[]).length,3,
+  'Installer must render three distinct compact step cards');
+assert.equal((view.match(/class="subscription-sub-step-index"/g)||[]).length,3,
+  'Installer step numbers must remain visible');
+assert(!view.includes('Версия агента</small><b>v2.0'),
+  'The server card must never hardcode a fake agent version');
+assert(!view.includes('Последняя связь</small><b>12.11.2026'),
+  'The server card must never invent last-seen metadata');
+assert.match(src,/agentVersion\.textContent/,'The agent version must update from API status');
+assert.match(src,/agentSeen\.textContent/,'The last-seen field must update from API status');
+assert.match(src,/commandGroup\.hidden=!managedCommand/,'Installer code should be hidden until securely generated');
+
 assert.match(src,/subApi\.enroll\(\)/,'Pairing must call real protected API');
 assert.match(src,/subApi\.status\(\)/,'Status must call real protected API');
 assert.match(src,/subApi\.update\(\)/,'Update must queue an authenticated action');
@@ -353,6 +374,12 @@ assert.match(css,/\.subscription-studio-layout/);
 assert.match(css,/@media\(max-width:780px\)/);
 assert.match(css,/\.subscription-sub-install-command/);
 assert.match(css,/\.subscription-servers-page/,'Server setup must have its own bounded layout');
+assert.match(css,/\.subscription-server-left/,'Left card stack needs responsive layout');
+assert.match(css,/\.subscription-sub-status-metrics/,'Managed status needs two compact data fields');
+assert.match(css,/\.subscription-sub-step:hover/,'Installer steps need a subtle interactive hover surface');
+assert.match(css,/@media\(max-width:1230px\)/,'Desktop cards must collapse for tighter viewports');
+assert.match(css,/@media\(max-width:520px\)/,'Small mobile screens need compact controls');
+assert.match(css,/@media\(prefers-reduced-motion:reduce\)/,'Motion must respect reduced-motion settings');
 assert.match(css,/\.subscription-studio-tabs button\.on/,'Tab state must be visible');
 assert.match(css,/\[hidden\]\{display:none!important\}/,'Hidden workspace must not leak into the grid');
 
