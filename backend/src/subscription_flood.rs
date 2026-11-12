@@ -1,6 +1,6 @@
 //! Bounded Redis-side flood protection for public subscription bearer URLs.
 //! No request IP, raw URI, User-Agent, or bearer token is logged or persisted.
-//! The XMesh Sub edge, not Nexus, is responsible for unforgeable peer-IP limits.
+//! The `XMesh` Sub edge, not Nexus, is responsible for unforgeable peer-IP limits.
 use crate::{ApiError, AppState, auth};
 use axum::{
     Json,
@@ -18,7 +18,7 @@ const CACHE_SECONDS: u64 = 10;
 // Bound untrusted random bearer-token cardinality in Redis. Beyond this
 // threshold skip per-token keys (but still monitor) to preserve availability.
 const MAX_TOKEN_BUCKETS_PER_MINUTE: u64 = 20_000;
-const LUA: &str = r#"
+const LUA: &str = r"
 local total = redis.call('INCR',KEYS[1])
 if total == 1 then redis.call('EXPIRE',KEYS[1],75) end
 redis.call('HINCRBY',KEYS[3],'requests',1)
@@ -42,7 +42,7 @@ else
   end
 end
 return over
-"#;
+";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
@@ -66,9 +66,9 @@ impl FloodConfig {
     pub fn validate(&self) -> Result<(), ApiError> {
         if !matches!(self.mode.as_str(), "monitor" | "protect")
             || !(30..=600).contains(&self.ip_per_minute)
-            || self.ip_per_minute % 30 != 0
+            || !self.ip_per_minute.is_multiple_of(30)
             || !(3..=60).contains(&self.token_per_minute)
-            || self.token_per_minute % 3 != 0
+            || !self.token_per_minute.is_multiple_of(3)
         {
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
@@ -95,10 +95,10 @@ pub async fn current(state: &AppState) -> FloodConfig {
         .await
     {
         Ok(Some(saved)) => {
-            if let Ok(config) = serde_json::from_str::<FloodConfig>(&saved) {
-                if config.validate().is_ok() {
-                    return config;
-                }
+            if let Ok(config) = serde_json::from_str::<FloodConfig>(&saved)
+                && config.validate().is_ok()
+            {
+                return config;
             }
         }
         Ok(None) => {}
