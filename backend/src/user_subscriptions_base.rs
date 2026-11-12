@@ -1366,27 +1366,39 @@ pub async fn serve(
             "Subscription inactive",
         ));
     }
-    // Resolve content and XHTTP transport profile from the VPN client's
-    // actual User-Agent. Explicit query parameters remain optional overrides.
+    // Format and XHTTP device profile are independent. The same bearer URL
+    // returns a client-native document, while browsers keep the HTML portal.
     let client = crate::subscription_user_agent::negotiate(&headers, &options).map_err(bad)?;
+    let format = crate::subscription_user_agent::feed_format(&headers, &options).map_err(bad)?;
     let settings = crate::read_settings(&state.pool).await?;
     let outbounds =
         collect_user_outbounds(&state, &user, client.device.as_str(), true, &settings).await?;
-    // Native Xray JSON is the only supported subscription format.
-    // A disabled SMART selector changes routing, never the wire representation.
-    let json = crate::subscription_json::build_feed(
-        outbounds,
-        &crate::client_routing::scoped_settings(&settings, &user),
-    )
-    .map_err(|message| {
-        tracing::warn!(user_id=id, error=%message,"Subscription JSON could not be generated");
-        ApiError::new(StatusCode::SERVICE_UNAVAILABLE, message)
-    })?;
-    let mut response = Json(json).into_response();
+    let scoped = crate::client_routing::scoped_settings(&settings, &user);
+    let (mut response, skipped) = if format == crate::subscription_formats::FeedFormat::Xray {
+        // Preserve the proven native Happ/Xray feed including SMART entries,
+        // individual user routing, and the exactly-once subscription accounting.
+        let feed = crate::subscription_json::build_feed(outbounds, &scoped).map_err(|message| {
+            tracing::warn!(user_id=id, "Native subscription JSON could not be generated");
+            ApiError::new(StatusCode::SERVICE_UNAVAILABLE, message)
+        })?;
+        (Json(feed).into_response(), 0)
+    } else {
+        let feed = crate::subscription_formats::render(&outbounds, format).map_err(|message| {
+            tracing::warn!(user_id=id, "Requested subscription format has no compatible public outbounds");
+            ApiError::new(StatusCode::UNPROCESSABLE_ENTITY, message)
+        })?;
+        (feed.body.into_response(), feed.skipped)
+    };
     response.headers_mut().insert(
         header::CONTENT_TYPE,
-        "application/json; charset=utf-8".parse().unwrap(),
+        format.content_type().parse().unwrap(),
     );
+    if skipped > 0 {
+        response.headers_mut().insert(
+            "x-subscription-skipped",
+            header::HeaderValue::from_str(&skipped.to_string()).unwrap(),
+        );
+    }
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, "no-store, private".parse().unwrap());
