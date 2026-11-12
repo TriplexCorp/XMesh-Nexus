@@ -1,4 +1,4 @@
-//! One XMesh Sub deployment per Nexus. Outbound-only agent: no SSRF, SSH or
+//! One `XMesh` Sub deployment per Nexus. Outbound-only agent: no SSRF, SSH or
 //! public admin listener. Panel can enqueue one fixed update, not shell input.
 use crate::{ApiError, AppState, audit, auth, read_settings, require_owner};
 use axum::{

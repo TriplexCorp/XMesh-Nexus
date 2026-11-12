@@ -786,10 +786,7 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
                 .headers()
                 .get(header::AUTHORIZATION)
                 .is_some_and(|value| {
-                    value
-                        .to_str()
-                        .ok()
-                        .is_some_and(|s| s.starts_with("Bearer "))
+                    value.to_str().is_ok_and(|s| s.starts_with("Bearer "))
                 }),
             "/api/v1/sub-server/claim" | "/api/v1/node/enroll" => request
                 .headers()
