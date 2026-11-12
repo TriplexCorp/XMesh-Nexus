@@ -8,6 +8,11 @@ ARG PANEL_BUILD_REVISION=unknown
 COPY VERSION /build/VERSION
 COPY backend/Cargo.toml ./Cargo.toml
 COPY backend/src ./src
+# Bundle public portal assets at compile time: older XMesh Sub gateways may
+# block external static files, but the visitor page must remain functional.
+COPY frontend/styles/features/subscriptions/subscription-studio.css frontend/styles/features/subscriptions/subscription-surface.css frontend/styles/features/subscriptions/subscription-public.css /build/frontend/styles/features/subscriptions/
+COPY frontend/js/core/qr-code.js /build/frontend/js/core/
+COPY frontend/js/features/subscriptions/subscription-experience.js frontend/js/features/subscriptions/subscription-traffic.js frontend/js/features/subscriptions/subscription-portal.js /build/frontend/js/features/subscriptions/
 COPY backend/migrations ./migrations
 # Keep dependency downloads and compiled artifacts between Docker builds.
 # Mounting target as a cache requires copying the final binary outside it.

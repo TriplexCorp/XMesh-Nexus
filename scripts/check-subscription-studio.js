@@ -270,7 +270,11 @@ const liveBackend=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
 for(const cls of ['subscription-preview','subscription-preview-brand','subscription-preview-hero','subscription-preview-meta','subscription-preview-progress','subscription-preview-cta','subscription-preview-quick','subscription-preview-support']) {
   assert(template.includes(cls)||liveBackend.includes(cls), 'Live subscription missing preview component: '+cls);
 }
-assert.match(template,/href="\/subscription-studio[.]css[?]v=[a-f0-9]{12}"/,'Live portal must use the same versioned Studio stylesheet');
+assert.match(template, /id="subscription-public-assets">{{PUBLIC_CSS}}<\\/style>/,
+  'Portal must embed CSS without requiring the gateway to proxy assets');
+assert.match(template, /{{PUBLIC_SCRIPTS}}/, 'Portal must embed working JavaScript');
+assert.doesNotMatch(template, /<(?:link[^>]+href|script[^>]+src)="\\/(?:subscription-|qr-code)/,
+  'Portal must not depend on separate CSS/JS URLs from XMesh Sub');
 assert.match(portalCss,/subscription-public-shell/,'Live layout requires its mobile-safe shell');
 const surfaceCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-surface.css','utf8');
 const panelEntry=fs.readFileSync('frontend/styles/system/nexus-ui-v3.css','utf8');
@@ -291,8 +295,17 @@ assert.match(src,/previewHost\.attachShadow\(\{mode:'open'\}\)/,
   'Studio must use an isolated ShadowRoot for the production portal preview');
 assert.match(src,/\/subscription-public[.]css[?]v=[a-f0-9]{12}/,
   'Studio preview must load the real public stylesheet inside its ShadowRoot');
-assert.match(template,/subscription-surface\.css[^"]*"[^>]*>[\s\S]*subscription-public\.css/,
-  'Visitor portal must apply public layout after shared surface tokens');
+const visitorRuntime=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
+const publicDocker=fs.readFileSync('backend/Dockerfile','utf8');
+const backendMain=fs.readFileSync('backend/src/main.rs','utf8');
+for(const file of ['subscription-studio.css','subscription-surface.css','subscription-public.css',
+                   'qr-code.js','subscription-experience.js','subscription-traffic.js','subscription-portal.js']) {
+  assert(visitorRuntime.includes('include_str!("../../frontend/'), 'Public assets must be compiled into the API');
+  assert(publicDocker.includes(file), 'Docker build must package '+file);
+}
+assert.match(visitorRuntime,/script-src 'nonce-\\{nonce\\}'/, 'Public scripts must use a fresh CSP nonce');
+assert.match(backendMain, /\\.entry\\(HeaderName::from_static\\("content-security-policy"\\)\\)/,
+  'Generic middleware must preserve the portal-specific CSP');
 for(const cls of [
  'subscription-public-shell','subscription-public-workspace','subscription-public-access-panel',
  'subscription-public-info-panel','subscription-public-status-stack','subscription-public-catalog',
