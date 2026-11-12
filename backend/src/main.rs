@@ -11,6 +11,9 @@ mod node_geodata;
 mod node_policy;
 mod node_rotation;
 mod node_routing;
+// Serde's deny_unknown_fields derives internal uninhabited enums for the
+// authenticated empty {} Agent update request; preserve their strict shape.
+#[allow(clippy::empty_enums)]
 mod node_runtime;
 mod node_user_quotas;
 mod node_xray_update;
