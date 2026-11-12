@@ -177,14 +177,16 @@ async function dismissDialog(page,dialog,opener){
   assert(await studio.locator('.subscription-public-info-panel').isHidden());
   await page.locator('[name="subscriptionShowQr"]').uncheck();
   assert(await studio.locator('[data-subscription-qr]').isHidden());checks++;
-  // Sub server installation must be a discoverable, functional and isolated tab.
-  const settingsTab=page.locator('[data-substudio-tab="settings"]');
+  // Keep the live preview mounted across six Studio workspaces.
+  const portalTab=page.locator('[data-substudio-tab="portal"]');
   const serversTab=page.locator('[data-substudio-tab="servers"]');
+  const securityTab=page.locator('[data-substudio-tab="security"]');
+  assert.equal(await page.locator('[data-substudio-tab]').count(),6,'Studio has six functional workspaces');
   await serversTab.click();
   assert.equal(await serversTab.getAttribute('aria-selected'),'true');
-  assert(await studio.isHidden(),'Preview stays separate from server provisioning');
+  assert(await studio.isVisible(),'Preview must remain visible across settings and server workspaces');
   assert(await page.locator('.subscription-servers-page').isVisible());
-  assert(await page.locator('.subscription-studio-main').isHidden());
+  assert(await page.locator('#substudio-portal').isHidden());
   assert.equal(await page.locator('.subscription-server-address').count(),1,'Address is a standalone card');
   assert.equal(await page.locator('.subscription-server-management').count(),1,'Management is a standalone card');
   assert.equal(await page.locator('.subscription-server-provisioning').count(),1,'Installation is a standalone card');
@@ -197,24 +199,27 @@ async function dismissDialog(page,dialog,opener){
   const desktop=await page.evaluate(()=>{
     const box=q=>{const r=document.querySelector(q).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}};
     return {address:box('.subscription-server-address'),management:box('.subscription-server-management'),
-      installation:box('.subscription-server-provisioning'),security:box('.subscription-sub-scope'),
+      installation:box('.subscription-server-provisioning'),
       overflow:document.documentElement.scrollWidth>innerWidth+1};
   });
   assert(!desktop.overflow,'Desktop cards may not overflow horizontally');
-  assert(desktop.management.top>=desktop.address.bottom-2,'Managed server card must stack beneath the address card');
-  assert(desktop.installation.left>=desktop.address.right-2,'Installer must sit beside the left card stack');
-  assert(desktop.security.top>=Math.max(desktop.management.bottom,desktop.installation.bottom)-2,
-    'Security strip must span the bottom of the card workspace');
+  assert(desktop.installation.top>=Math.min(desktop.address.top,desktop.management.top)-2,
+    'Installation should remain in the server workspace beneath or alongside the management cards');
   await page.screenshot({path:path.join(out,'studio-server-cards-desktop.png'),fullPage:true,animations:'disabled'});
+  await securityTab.click();
+  assert(await page.locator('[data-sub-flood-card]').isVisible(),'Flood protection belongs to its own security workspace');
+  assert(await page.locator('.subscription-sub-scope').isVisible(),'Security explanation belongs to its workspace');
+  assert(await studio.isVisible(),'Security settings preserve the live portal preview');
+  await serversTab.click();
   await page.setViewportSize({width:390,height:844});
   const mobile=await page.evaluate(()=>{
     const box=q=>{const r=document.querySelector(q).getBoundingClientRect();return {top:r.top,bottom:r.bottom}};
-    return {management:box('.subscription-server-management'),installation:box('.subscription-server-provisioning'),
-      security:box('.subscription-sub-scope'),overflow:document.documentElement.scrollWidth>innerWidth+1};
+    return {address:box('.subscription-server-address'),management:box('.subscription-server-management'),
+      installation:box('.subscription-server-provisioning'),overflow:document.documentElement.scrollWidth>innerWidth+1};
   });
   assert(!mobile.overflow,'Mobile server cards may not cause horizontal scroll');
+  assert(mobile.management.top>=mobile.address.bottom-2,'Mobile management must stack below address');
   assert(mobile.installation.top>=mobile.management.bottom-2,'Mobile installation must stack below management');
-  assert(mobile.security.top>=mobile.installation.bottom-2,'Mobile security strip must remain after installation');
   await page.screenshot({path:path.join(out,'studio-server-cards-mobile.png'),fullPage:true,animations:'disabled'});
   await page.setViewportSize({width:1600,height:900});
 
@@ -252,13 +257,16 @@ async function dismissDialog(page,dialog,opener){
   assert.notEqual(await page.locator('[data-sub-agent-seen]').innerText(),'—','Last seen is real API data');
   assert(await page.locator('[data-sub-update]').isEnabled(),'Live managed agent enables update action');
   checks++;
-  await settingsTab.click();
+  await portalTab.click();
   assert(await studio.isVisible(),'Portal preview must remain mounted after tab switches');
   assert.equal(await page.locator('[name="subscriptionDomain"]').inputValue(),'sub.example.org');
   assert(await page.locator('.subscription-servers-page').isHidden());
   await serversTab.focus();
-  await page.keyboard.press('ArrowLeft');
-  assert.equal(await settingsTab.getAttribute('aria-selected'),'true','Keyboard navigation must select the settings workspace');
+  await page.keyboard.press('Home');
+  assert.equal(await portalTab.getAttribute('aria-selected'),'true','Keyboard Home must select the first Studio workspace');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.locator('[data-substudio-tab="appearance"]').getAttribute('aria-selected'),'true',
+    'ArrowRight must navigate to the adjacent functional workspace');
   checks++;
   assert.deepEqual(errors,[]);console.log('Public portal: '+checks+' viewport/locale/state cases, onboarding, copy, QR, filters, keyboard, English, real usage and reduced motion passed');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
