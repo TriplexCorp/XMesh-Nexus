@@ -606,3 +606,40 @@
 @media(prefers-reduced-motion:reduce){
  .subscription-studio-tabs button,.subscription-sub-step{transition:none}
 }
+
+
+/* Per-token flood shield: dense, theme-aware control plane. */
+.subscription-flood-card{grid-column:1/-1;display:grid;gap:1rem;min-width:0;padding:1.15rem 1.2rem;
+ border:1px solid color-mix(in srgb,var(--a) 18%,var(--st-border));
+ border-radius:calc(var(--nx-control-radius) + 4px);background:var(--nx-section-bg)}
+.subscription-flood-toolbar{display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap}
+.subscription-flood-switch{display:flex;align-items:center;gap:.55rem;font-size:.82rem;font-weight:750;cursor:pointer}
+.subscription-flood-switch input{width:1.15rem;height:1.15rem;accent-color:var(--a)}
+.subscription-flood-mode{display:flex;gap:1rem 1.5rem;flex-wrap:wrap;min-width:0;
+ border:1px solid var(--st-border);border-radius:var(--nx-control-radius);padding:.7rem .85rem;background:var(--nx-control-bg)}
+.subscription-flood-mode legend{color:var(--st-muted);font-size:.7rem;padding:0 .4rem}
+.subscription-flood-mode label{display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.77rem;color:var(--st-ink)}
+.subscription-flood-mode input{accent-color:var(--a)}
+.subscription-flood-sliders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.subscription-flood-sliders label{display:grid;align-content:start;gap:.45rem;font-size:.78rem;font-weight:700;min-width:0}
+.subscription-flood-sliders b{color:var(--a);font-variant-numeric:tabular-nums}
+.subscription-flood-sliders input[type=range]{width:100%;accent-color:var(--a);cursor:pointer}
+.subscription-flood-sliders small{font-size:.67rem;font-weight:400;color:var(--st-muted);line-height:1.5}
+.subscription-flood-telemetry{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem}
+.subscription-flood-telemetry>div{display:grid;gap:.25rem;border:1px solid var(--st-border);
+ border-radius:var(--nx-control-radius);padding:.75rem .9rem;background:var(--nx-control-bg)}
+.subscription-flood-telemetry small{font-size:.69rem;color:var(--st-muted)}
+.subscription-flood-telemetry strong{font-size:1.13rem;color:var(--st-ink);font-variant-numeric:tabular-nums}
+.subscription-flood-footer{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+.subscription-flood-footer small{color:var(--st-muted);font-size:.7rem;line-height:1.55;flex:1 1 16rem}
+.subscription-flood-footer button{flex:none;min-height:2.25rem}
+@media(max-width:800px){.subscription-flood-sliders{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:520px){
+ .subscription-flood-card{padding:.9rem}
+ .subscription-flood-mode{display:grid;gap:.6rem}
+ .subscription-flood-telemetry{gap:.35rem}
+ .subscription-flood-telemetry>div{padding:.6rem .45rem}
+ .subscription-flood-telemetry small{font-size:.6rem}
+ .subscription-flood-telemetry strong{font-size:.9rem}
+ .subscription-flood-footer button{width:100%}
+}

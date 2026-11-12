@@ -66,6 +66,24 @@ assert.match(view,/subscription-server-provisioning/,'Installation must be its o
 assert.match(view,/subscription-sub-scope/,'Security guidance must live in a full-width card');
 assert.match(view,/data-sub-agent-version/,'Server card must expose real agent version');
 assert.match(view,/data-sub-agent-seen/,'Server card must expose live last-seen timestamp');
+assert.match(view,/data-sub-flood-card/,'Owner needs a compact flood protection card');
+assert.match(view,/name="floodEnabled"/,'Flood protection must be togglable');
+assert.match(view,/name="floodMode" value="monitor"/,'Monitoring must be available');
+assert.match(view,/name="floodMode" value="protect"/,'Protection must be available');
+assert.match(view,/name="floodIpPerMinute"/,'Edge IP slider must be configurable');
+assert.match(view,/name="floodTokenPerMinute"/,'Token slider must be configurable');
+assert.match(view,/data-sub-flood-requests/,'Rate control needs live request telemetry');
+assert.match(view,/data-sub-flood-blocked/,'Rate control needs blocked-request telemetry');
+assert.match(app,/floodStatus:\(\)=>backendRequest/,'Telemetry must come from owner API');
+const guard=fs.readFileSync('backend/src/subscription_flood.rs','utf8');
+const route=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
+assert.match(guard,/MAX_TOKEN_BUCKETS_PER_MINUTE/,'Untrusted-token keys must be bounded');
+assert.match(guard,/RETRY_AFTER/,'429 responses must include Retry-After');
+assert.match(guard,/const LUA/,'Redis counters must use atomic scripts');
+assert.match(route,/subscription_flood::enforce/,'Public feed and portal paths require enforcement');
+assert.match(rust,/get\(subscription_flood::status\)/,'Owner status route must exist');
+assert.match(guard,/mode: "monitor"/,'Default must not block live customers');
+
 assert.match(view,/data-sub-public-copy/,'Address card must offer copyable link template');
 assert.match(view,/data-sub-health-copy/,'Health endpoint must be copyable');
 assert.equal((view.match(/class="subscription-sub-step"/g)||[]).length,3,

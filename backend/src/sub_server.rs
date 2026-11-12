@@ -345,6 +345,14 @@ pub async fn poll(
     {
         return Err(api_error("Недопустимая версия агента."));
     }
+    // Authenticated agent receives non-secret edge IP policy. Untrusted
+    // X-Forwarded-For headers are never used by Nexus for IP accounting.
+    let edge = crate::subscription_flood::current(&state).await;
+    let edge_policy = json!({
+        "enabled":edge.enabled,
+        "mode":edge.mode,
+        "ipPerMinute":edge.ip_per_minute
+    });
     let mut conn = state.redis.clone();
     let heartbeat = json!({"lastSeen":now(),"version":body.version});
     redis::cmd("SET")
@@ -361,7 +369,7 @@ pub async fn poll(
         .await
         .map_err(|_| backend_error())?;
     let Some(job) = job.filter(|job| is_hex(job, 32)) else {
-        return Ok(Json(json!({"command":"none"})));
+        return Ok(Json(json!({"command":"none","flood":edge_policy})));
     };
     redis::cmd("SET")
         .arg(CURRENT_UPDATE)
@@ -371,7 +379,9 @@ pub async fn poll(
         .query_async::<String>(&mut conn)
         .await
         .map_err(|_| backend_error())?;
-    Ok(Json(json!({"command":"update","jobId":job})))
+    Ok(Json(
+        json!({"command":"update","jobId":job,"flood":edge_policy}),
+    ))
 }
 
 #[derive(Deserialize)]

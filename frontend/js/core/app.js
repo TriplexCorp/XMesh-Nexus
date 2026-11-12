@@ -1029,6 +1029,7 @@ const syncSubscriptionTheme=()=>{
 const subServerApi={
  enroll:()=>backendRequest('/api/v1/sub-server/enrollment',{method:'POST',body:'{}'}),
  status:()=>backendRequest('/api/v1/sub-server/status'),
+ floodStatus:()=>backendRequest('/api/v1/sub-server/flood'),
  update:()=>backendRequest('/api/v1/sub-server/update',{method:'POST',body:'{}'})
 };
 const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(

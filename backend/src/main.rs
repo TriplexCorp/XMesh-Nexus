@@ -20,6 +20,7 @@ mod protocol_credentials;
 mod security;
 mod sub_server;
 mod subscription_finalmask;
+mod subscription_flood;
 mod subscription_json;
 mod subscription_remark;
 mod subscription_settings;
@@ -341,6 +342,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .merge(protected_management_routes())
         .route("/settings", get(get_settings).patch(patch_settings))
         .route("/sub-server/status", get(sub_server::status))
+        .route("/sub-server/flood", get(subscription_flood::status))
         .route("/sub-server/enrollment", post(sub_server::issue_enrollment))
         .route("/sub-server/update", post(sub_server::request_update))
         .route("/client-routing", patch(patch_client_routing))
@@ -1538,6 +1540,7 @@ fn validate_settings_keys(object: &serde_json::Map<String, Value>) -> Result<(),
                 | "subscriptionAppsTitleEn"
                 | "subscriptionCustomClients"
                 | "subscriptionStatusEmojis"
+                | "subscriptionFlood"
         ) {
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
