@@ -214,10 +214,15 @@ async function dismissDialog(page,dialog,opener){
   await page.setViewportSize({width:390,height:844});
   const mobile=await page.evaluate(()=>{
     const box=q=>{const r=document.querySelector(q).getBoundingClientRect();return {top:r.top,bottom:r.bottom}};
+    const offenders=[...document.querySelectorAll('body *')].filter(el=>{
+      const r=el.getBoundingClientRect();
+      return r.width>0&&r.height>0&&r.right>innerWidth+1;
+    }).map(el=>({tag:el.tagName,cls:String(el.className||'').slice(0,75),
+      width:Math.round(el.getBoundingClientRect().width),right:Math.round(el.getBoundingClientRect().right)})).slice(0,12);
     return {address:box('.subscription-server-address'),management:box('.subscription-server-management'),
-      installation:box('.subscription-server-provisioning'),overflow:document.documentElement.scrollWidth>innerWidth+1};
+      installation:box('.subscription-server-provisioning'),overflow:document.documentElement.scrollWidth>innerWidth+1,offenders};
   });
-  assert(!mobile.overflow,'Mobile server cards may not cause horizontal scroll');
+  assert(!mobile.overflow,'Mobile server cards may not cause horizontal scroll: '+JSON.stringify(mobile.offenders));
   assert(mobile.management.top>=mobile.address.bottom-2,'Mobile management must stack below address');
   assert(mobile.installation.top>=mobile.management.bottom-2,'Mobile installation must stack below management');
   await page.screenshot({path:path.join(out,'studio-server-cards-mobile.png'),fullPage:true,animations:'disabled'});
