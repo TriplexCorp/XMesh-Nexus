@@ -17,6 +17,7 @@ window.XMeshI18n=(()=>{
   const dict=new Map(Object.entries({
     "Создайте одну команду и выполните её на чистом VPS. Она установит шлюз, подключит управляющий агент и зарегистрирует сервер в Nexus.": "Generate one command and run it on a clean VPS. It will install the gateway, set up the management agent, and register the server with Nexus.",
     "Создать команду установки": "Generate installation command",
+    "Создайте команду установки": "Generate an installation command",
     "Привязка встроена в установку. Ключ действителен 60 минут.": "Pairing is included in setup. The token is valid for 60 minutes.",
     "Агент подключается автоматически после установки одной командой": "The agent connects automatically after the one-command installation",
     "Сначала создайте единую команду установки выше и выполните её на VPS.": "Generate the single installation command above and run it on the VPS first.",
