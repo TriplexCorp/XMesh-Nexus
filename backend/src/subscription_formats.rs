@@ -56,10 +56,8 @@ fn encode(value: &str) -> String {
     out
 }
 fn address(value: &Value) -> Option<(String, u16)> {
-    let server = text(value, &["settings", "vnext", "0", "address"])
-        .or_else(|| text(value, &["settings", "address"]));
-    // JSON arrays must be accessed by index, not by a text key.
-    let server = server.or_else(|| value["settings"]["vnext"][0]["address"].as_str())?;
+    let server = value["settings"]["vnext"][0]["address"].as_str()
+        .or_else(|| text(value, &["settings", "address"]))?;
     if server.len() > 253 || server.chars().any(char::is_control)
         || server.bytes().any(|b| b"@/?# \\".contains(&b))
     {
@@ -161,9 +159,7 @@ fn link_for(value: &Value) -> Option<String> {
             options.push(format!("spx={}",encode(spider)));
         }
     }
-    if let Some(flow) = text(value,&["settings","vnext","0","users","0","flow"])
-        .or_else(||value["settings"]["vnext"][0]["users"][0]["flow"].as_str())
-    {
+    if let Some(flow) = value["settings"]["vnext"][0]["users"][0]["flow"].as_str() {
         options.push(format!("flow={}",encode(flow)));
     }
     match network {
@@ -185,10 +181,13 @@ fn link_for(value: &Value) -> Option<String> {
             options.push(format!("path={}",encode(cfg["path"].as_str().unwrap_or("/"))));
             if let Some(host)=cfg["host"].as_str() { options.push(format!("host={}",encode(host))); }
             if let Some(mode)=cfg["mode"].as_str() { options.push(format!("mode={}",encode(mode))); }
-            // XHTTP's extra client metadata cannot be represented by every URI importer.
-            // Reject advanced settings rather than dropping critical transport parameters.
-            if cfg.as_object()?.keys().any(|k| !["path","host","mode"].contains(&k.as_str())) {
-                return None;
+            // Standard Xray share links carry advanced XHTTP settings in
+            // the percent-encoded 'extra' JSON parameter, never as raw URL text.
+            let mut extra=cfg.as_object()?.clone();
+            for key in ["path","host","mode"] {extra.remove(key);}
+            if !extra.is_empty() {
+                let serialized=serde_json::to_string(&extra).ok()?;
+                options.push(format!("extra={}",encode(&serialized)));
             }
         }
         _ => {}
@@ -230,15 +229,33 @@ fn mihomo_proxy(value: &Value) -> Option<Value> {
         "xhttp" => {
             // Only publish basic xhttp: advanced Xray-only params are not interchangeable.
             let cfg=&stream["xhttpSettings"];
-            if cfg.as_object()?.keys().any(|k| !["path","host","mode"].contains(&k.as_str())) {
-                return None;
-            }
-            p["network"]=json!("xhttp");
-            p["xhttp-opts"]=json!({
+            let mut opts=json!({
                 "path":cfg["path"].as_str().unwrap_or("/"),
                 "host":cfg["host"].as_str().unwrap_or(""),
                 "mode":cfg["mode"].as_str().unwrap_or("auto")
             });
+            for (source,target) in [
+                ("xPaddingBytes","x-padding-bytes"),
+                ("xPaddingObfsMode","x-padding-obfs-mode"),
+                ("xPaddingKey","x-padding-key"),
+                ("xPaddingHeader","x-padding-header"),
+                ("xPaddingPlacement","x-padding-placement"),
+                ("xPaddingMethod","x-padding-method"),
+                ("noGRPCHeader","no-grpc-header"),
+                ("noSSEHeader","no-sse-header"),
+                ("headers","headers")
+            ] {
+                if let Some(v)=cfg.get(source) {opts[target]=v.clone();}
+            }
+            // Unmapped Xray-only fields cannot be silently dropped, since
+            // padding/splitting mismatches cause intermittent connection errors.
+            if cfg.as_object()?.keys().any(|k| ![
+                "path","host","mode","xPaddingBytes","xPaddingObfsMode",
+                "xPaddingKey","xPaddingHeader","xPaddingPlacement",
+                "xPaddingMethod","noGRPCHeader","noSSEHeader","headers"
+            ].contains(&k.as_str())) {return None;}
+            p["network"]=json!("xhttp");
+            p["xhttp-opts"]=opts;
         }
         _ => return None,
     }
@@ -380,6 +397,16 @@ mod tests {
         let mut proxy=vless("tcp","tls");
         proxy["streamSettings"]["security"]=json!("none");
         assert!(render(&[proxy],FeedFormat::Mihomo).is_err());
+    }
+    #[test]
+    fn xhttp_advanced_settings_are_preserved_in_links() {
+        let mut proxy=vless("xhttp","reality");
+        proxy["streamSettings"]["xhttpSettings"]["xPaddingBytes"]=json!("100-1000");
+        let url=render(&[proxy.clone()],FeedFormat::Links).unwrap().body;
+        assert!(url.contains("extra=%7B"));
+        assert!(url.contains("xPaddingBytes"));
+        let yaml=render(&[proxy],FeedFormat::Mihomo).unwrap().body;
+        assert!(yaml.contains("x-padding-bytes"));
     }
     #[test]
     fn yaml_uses_quoted_flow_nodes_to_prevent_name_injection() {
