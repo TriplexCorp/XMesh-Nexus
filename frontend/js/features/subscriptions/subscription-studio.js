@@ -716,19 +716,27 @@ window.XMeshSubscriptionStudio = (() => {
         finally{statusBusy=false;showAgent();}
       };
       if(enrollmentButton)enrollmentButton.addEventListener('click',async()=>{
-        const base=updateInstall(read());
-        if(!base){notify('Сначала сохраните действительный домен подписок и путь.');return;}
+        if(enrollmentBusy)return;
+        const draft=read();
+        const panel=String(settings?.domain||window.location?.hostname||'').trim().toLowerCase();
+        const command=installCommand(panel,draft.subscriptionDomain,draft.subscriptionPath);
+        if(!command||savedInstall.domain!==draft.subscriptionDomain||savedInstall.path!==draft.subscriptionPath){
+          notify('Сначала сохраните корректные домен и путь подписок.');return;
+        }
         if(!subApi?.enroll){notify('Управление Sub-сервером доступно только владельцу панели.');return;}
-        enrollmentButton.disabled=true;
+        enrollmentBusy=true;
+        updateInstall(draft);
         try{
           const result=await subApi.enroll();
           if(!/^[0-9a-f]{64}$/.test(result?.enrollmentToken||''))throw Error('Сервер не выдал корректный ключ привязки.');
+          const seconds=Number(result?.expiresInSeconds);
+          if(!Number.isInteger(seconds)||seconds<60||seconds>3600)throw Error('Некорректный срок действия команды.');
           enrollmentToken=result.enrollmentToken;
+          enrollmentExpiresAt=Date.now()+seconds*1000;
           updateInstall(read());
-          agentDetail.textContent='Одноразовая команда привязки готова на 10 минут. Скопируйте её и выполните на VPS с XMesh Sub.';
-          notify('Команда привязки готова. Она действительна 10 минут.');
+          notify('Единая команда готова. Скопируйте её и выполните на VPS.');
         }catch(error){notify('Не удалось создать команду: '+(error.message||'API'));}
-        finally{enrollmentButton.disabled=false;}
+        finally{enrollmentBusy=false;updateInstall(read());}
       });
       if(statusButton)statusButton.addEventListener('click',refreshAgent);
       if(updateButton)updateButton.addEventListener('click',async()=>{
