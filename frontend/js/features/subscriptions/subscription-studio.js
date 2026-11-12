@@ -540,7 +540,7 @@ window.XMeshSubscriptionStudio = (() => {
       previewBody.className='subscription-studio-preview subscription-public';
       while(previewHost.firstChild)previewBody.appendChild(previewHost.firstChild);
       for(const href of [
-        '/subscription-studio.css?v=490fce317e12',
+        '/subscription-studio.css?v=00a116454b60',
         '/subscription-surface.css?v=0a79377d5733',
         '/subscription-public.css?v=6a55fffe32d1'
       ]){
