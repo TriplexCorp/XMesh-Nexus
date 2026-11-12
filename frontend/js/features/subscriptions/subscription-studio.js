@@ -751,6 +751,7 @@ window.XMeshSubscriptionStudio = (() => {
       });
       const pollAgent=window.setInterval(()=>{
         if(!form.isConnected){window.clearInterval(pollAgent);return;}
+        if(enrollmentToken&&Date.now()>=enrollmentExpiresAt)updateInstall(read());
         if(form.closest('.subscription-studio')?.dataset.subscriptionView==='servers')void refreshAgent();
       },20000);
       void refreshAgent();
@@ -760,9 +761,13 @@ window.XMeshSubscriptionStudio = (() => {
         const command=installCommand(panel,d.subscriptionDomain,d.subscriptionPath);
         const dirty=savedInstall.domain!==d.subscriptionDomain||savedInstall.path!==d.subscriptionPath;
         const ready=!!command&&!dirty;
-        if(!ready)enrollmentToken='';
-        const managedCommand=ready&&enrollmentToken?command+' --enroll-token '+enrollmentToken:command;
-        if(enrollmentButton)enrollmentButton.disabled=!ready||!subApi?.enroll;
+        const expired=!!enrollmentToken&&Date.now()>=enrollmentExpiresAt;
+        if(!ready||expired){enrollmentToken='';enrollmentExpiresAt=0;}
+        const managedCommand=ready&&enrollmentToken?command+' --enroll-token '+enrollmentToken:'';
+        if(enrollmentButton){
+          enrollmentButton.disabled=!ready||!subApi?.enroll||enrollmentBusy;
+          enrollmentButton.textContent=managedCommand?'Создать новую команду':'Создать команду установки';
+        }
         const url=ready?'https://'+d.subscriptionDomain+'/healthz':'';
         const code=form.querySelector('[data-sub-install-command]');
         const copy=form.querySelector('[data-sub-install-copy]');
@@ -770,22 +775,23 @@ window.XMeshSubscriptionStudio = (() => {
         const state=form.querySelector('[data-sub-install-state]');
         const health=form.querySelector('[data-sub-health-url]');
         const link=form.querySelector('[data-sub-health-link]');
-        if(code)code.textContent=managedCommand||'Укажите отдельный домен подписок и корректный путь.';
-        if(copy)copy.disabled=!ready;
+        if(code)code.textContent=managedCommand||(dirty?'Сначала сохраните настройки подписок.':ready?'Создайте команду установки выше.':'Укажите отдельный домен подписок и корректный путь.');
+        if(copy)copy.disabled=!managedCommand;
         if(state){
-          state.dataset.state=dirty?'dirty':ready?'ready':'empty';
-          state.textContent=dirty?'Не сохранено':ready?'Команда готова':'Требуется настройка';
+          state.dataset.state=dirty?'dirty':managedCommand?'ready':'empty';
+          state.textContent=dirty?'Не сохранено':managedCommand?'Команда готова':ready?'Ожидает команды':'Требуется настройка';
         }
         if(note)note.textContent=dirty?'Сначала сохраните изменённые адрес и путь.':
-          ready&&enrollmentToken?'Команда содержит одноразовый ключ привязки на 10 минут. Не публикуйте её и не передавайте третьим лицам.':
-          ready?'Это базовая установка без управления. Для кнопки обновления сначала создайте команду привязки.':
+          managedCommand?'Это единая команда установки и привязки. Код действует до '+new Date(enrollmentExpiresAt).toLocaleTimeString()+'. Не передавайте команду третьим лицам.':
+          expired?'Срок действия команды истёк. Создайте новую команду.':
+          ready?'Нажмите «Создать команду установки». В ней будет одноразовый ключ для автоматического подключения агента.':
           'Нужны корректные разные домены панели и подписок.';
         if(health)health.textContent=url||'Укажите домен подписок';
         if(link){
           link.hidden=!ready;
           if(ready)link.href=url;else link.removeAttribute('href');
         }
-        return ready?managedCommand:'';
+        return managedCommand;
       };
       const draw = () => {
         applyPanelTheme();
@@ -1099,11 +1105,11 @@ window.XMeshSubscriptionStudio = (() => {
       });
       form.querySelector('[data-sub-install-copy]').addEventListener('click',async()=>{
         const command=updateInstall(read());
-        if(!command){notify('Сначала сохраните настройки адреса выдачи.');return;}
+        if(!command){notify('Сначала создайте команду установки и привязки.');return;}
         try{
           if(!navigator.clipboard?.writeText)throw Error('Clipboard unavailable');
           await navigator.clipboard.writeText(command);
-          notify('Команда XMesh Sub скопирована');
+          notify('Команда установки и привязки XMesh Sub скопирована');
         }catch(_){
           const textarea=document.createElement('textarea');
           textarea.value=command;textarea.readOnly=true;textarea.style.position='fixed';
