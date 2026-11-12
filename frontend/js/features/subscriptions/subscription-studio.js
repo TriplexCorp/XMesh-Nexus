@@ -101,7 +101,7 @@ window.XMeshSubscriptionStudio = (() => {
     ['clashverge','Clash Verge Rev','Windows · macOS · Linux','Компьютер']
   ]);
   const defaultClients = Object.freeze(Object.fromEntries(clientCatalog.map(([key],index)=>[key,index<7])));
-  const clientFormats=Object.freeze({happ:'Xray JSON',incy:'VLESS',v2raytun:'VLESS',v2rayn:'Base64',v2rayng:'Base64',streisand:'VLESS',hiddify:'Base64',nekobox:'VLESS',shadowrocket:'Base64',flclash:'Mihomo YAML',stash:'Mihomo YAML',singbox:'sing-box JSON',v2box:'Base64',loon:'VLESS',mihomo:'Mihomo YAML',clashverge:'Mihomo YAML'});
+  const clientFormats=Object.freeze({happ:'Xray JSON',incy:'URI',v2raytun:'URI',v2rayn:'Base64',v2rayng:'Base64',streisand:'VLESS',hiddify:'Base64',nekobox:'VLESS',shadowrocket:'Base64',flclash:'Mihomo YAML',stash:'Mihomo YAML',singbox:'sing-box JSON',v2box:'Base64',loon:'VLESS',mihomo:'Mihomo YAML',clashverge:'Mihomo YAML'});
   // The live portal renders only enabled clients with validated HTTPS download links.
   const maxCustomClients=32;
   const appsHeading = lang => lang==='en'?'Connection apps':'Приложения для подключения';
