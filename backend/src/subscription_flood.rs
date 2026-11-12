@@ -65,10 +65,8 @@ impl Default for FloodConfig {
 impl FloodConfig {
     pub fn validate(&self) -> Result<(), ApiError> {
         if !matches!(self.mode.as_str(), "monitor" | "protect")
-            || !(30..=600).contains(&self.ip_per_minute)
-            || !self.ip_per_minute.is_multiple_of(30)
-            || !(3..=60).contains(&self.token_per_minute)
-            || !self.token_per_minute.is_multiple_of(3)
+            || !(1..=600).contains(&self.ip_per_minute)
+            || !(1..=60).contains(&self.token_per_minute)
         {
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
@@ -238,6 +236,31 @@ mod tests {
             .is_err()
         );
         assert!(validate_settings(&json!({"mode":"monitor","extra":"unsafe"})).is_err());
+    }
+    #[test]
+    fn accepts_precise_low_rate_limits_and_rejects_out_of_range() {
+        for ip in [1, 2, 7, 30, 120, 600] {
+            for token in [1, 2, 5, 12, 60] {
+                let config = FloodConfig {
+                    ip_per_minute: ip,
+                    token_per_minute: token,
+                    ..FloodConfig::default()
+                };
+                assert!(config.validate().is_ok(), "ip={ip}, token={token}");
+                assert!(validate_settings(&json!({
+                    "enabled": true, "mode": "protect",
+                    "ipPerMinute": ip, "tokenPerMinute": token
+                })).is_ok());
+            }
+        }
+        for (ip, token) in [(0, 12), (601, 12), (30, 0), (30, 61)] {
+            let config = FloodConfig {
+                ip_per_minute: ip,
+                token_per_minute: token,
+                ..FloodConfig::default()
+            };
+            assert!(config.validate().is_err(), "ip={ip}, token={token}");
+        }
     }
     #[test]
     fn script_binds_keyspace_and_sets_ttls() {
