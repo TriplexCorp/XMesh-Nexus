@@ -194,7 +194,7 @@ assert.match(app,/const syncSubscriptionTheme=/);
 assert.match(app,/syncSubscriptionTheme\(\)/);
 assert.match(rust,/"subscriptionSyncPanelTheme"/);
 assert.match(view,/name="subscriptionTheme"/);
-assert.match(src,/preview\\.dataset\\.portalTheme=previewThemeOverride==='auto'\\?d\\.subscriptionTheme:previewThemeOverride/,
+assert.match(src,/preview\.dataset\.portalTheme=previewThemeOverride==='auto'\?d\.subscriptionTheme:previewThemeOverride/,
  'Portal preview defaults to saved theme but can inspect other themes temporarily');
 assert.match(rust,/"subscriptionTheme", &\["dark", "light"\]/);
 assert.match(view,/name="subscriptionShowTraffic"/);
