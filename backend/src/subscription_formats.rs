@@ -140,6 +140,151 @@ fn ws_options(stream: &Value) -> Value {
 fn grpc_options(stream: &Value) -> Value {
     json!({"service_name":stream["grpcSettings"]["serviceName"].as_str().unwrap_or("")})
 }
+fn supported_shadowsocks(value: &Value) -> Option<(&str,&str)> {
+    if value["protocol"] != "shadowsocks" {return None;}
+    let cipher=text(value,&["settings","method"])?;
+    if !["aes-128-gcm","aes-256-gcm","chacha20-poly1305"].contains(&cipher) {
+        // SS2022 multi-user compound PSKs require client-specific validation.
+        return None;
+    }
+    let password=text(value,&["settings","password"])?;
+    if !["none",""].contains(&value["streamSettings"]["security"].as_str().unwrap_or("none"))
+        || !["raw","tcp"].contains(&value["streamSettings"]["network"].as_str().unwrap_or("tcp"))
+    {
+        return None;
+    }
+    Some((cipher,password))
+}
+fn alt_link(value: &Value) -> Option<String> {
+    let protocol=value["protocol"].as_str()?;
+    if protocol=="vless" {return link_for(value);}
+    let (server,port)=address(value)?;
+    let tag=encode(&name(value));
+    match protocol {
+        "trojan" => {
+            let password=text(value,&["settings","password"])?;
+            let mode=security(value)?;
+            if mode!="tls" {return None;}
+            let net=transport(value)?;
+            if !["tcp","ws","grpc"].contains(&net) {return None;}
+            let mut params=vec![format!("security={mode}"),format!("type={net}")];
+            params.push(format!("sni={}",encode(sni(value,mode)?)));
+            if net=="ws" {
+                let options=ws_options(&value["streamSettings"]);
+                params.push(format!("path={}",encode(options["path"].as_str()?)));
+                if let Some(host)=options["headers"]["Host"].as_str() {
+                    params.push(format!("host={}",encode(host)));
+                }
+            }
+            if net=="grpc" {
+                params.push(format!("serviceName={}",encode(value["streamSettings"]["grpcSettings"]["serviceName"].as_str().unwrap_or(""))));
+            }
+            Some(format!("trojan://{}@{}:{port}?{}#{tag}",encode(password),link_address(&server),params.join("&")))
+        }
+        "shadowsocks" => {
+            let (cipher,password)=supported_shadowsocks(value)?;
+            let user=base64::engine::general_purpose::STANDARD_NO_PAD.encode(format!("{cipher}:{password}"));
+            Some(format!("ss://{user}@{}:{port}#{tag}",link_address(&server)))
+        }
+        "vmess" => {
+            let uuid=text(value,&["settings","id"])?;
+            uuid::Uuid::parse_str(uuid).ok()?;
+            let mode=security(value)?;
+            if mode!="tls" {return None;}
+            let net=transport(value)?;
+            if !["tcp","ws","grpc"].contains(&net) {return None;}
+            let stream=&value["streamSettings"];
+            let mut item=json!({"v":"2","ps":name(value),"add":server,"port":port.to_string(),
+                "id":uuid,"aid":"0","scy":"auto","net":net,"type":"none",
+                "host":"","path":"","tls":"tls","sni":sni(value,mode)?});
+            if net=="ws" {
+                let opt=ws_options(stream);
+                item["path"]=opt["path"].clone();
+                if let Some(host)=opt["headers"]["Host"].as_str() {
+                    item["host"]=json!(host);
+                }
+            }
+            if net=="grpc" {
+                item["path"]=json!(stream["grpcSettings"]["serviceName"].as_str().unwrap_or(""));
+            }
+            let encoded=base64::engine::general_purpose::STANDARD.encode(serde_json::to_vec(&item).ok()?);
+            Some(format!("vmess://{encoded}"))
+        }
+        _ => None,
+    }
+}
+fn other_mihomo(value: &Value) -> Option<Value> {
+    let protocol=value["protocol"].as_str()?;
+    let (server,port)=address(value)?;
+    if protocol=="shadowsocks" {
+        let (cipher,password)=supported_shadowsocks(value)?;
+        return Some(json!({"name":name(value),"type":"ss","server":server,"port":port,
+            "cipher":cipher,"password":password,"udp":true}));
+    }
+    let mode=security(value)?;
+    if mode!="tls" {return None;}
+    let net=transport(value)?;
+    if !["tcp","ws","grpc"].contains(&net) {return None;}
+    let tls=tls_options(value,mode)?;
+    let mut proxy=match protocol {
+        "trojan" => json!({"name":name(value),"type":"trojan","server":server,
+            "port":port,"password":text(value,&["settings","password"])?,
+            "sni":tls["server_name"],"udp":true}),
+        "vmess" => {
+            let uuid=text(value,&["settings","id"])?;
+            uuid::Uuid::parse_str(uuid).ok()?;
+            json!({"name":name(value),"type":"vmess","server":server,"port":port,
+                "uuid":uuid,"alterId":0,"cipher":"auto","tls":true,"servername":tls["server_name"],"udp":true})
+        }
+        _ => return None,
+    };
+    if net=="ws" {
+        proxy["network"]=json!("ws");
+        proxy["ws-opts"]=ws_options(&value["streamSettings"]);
+    }
+    if net=="grpc" {
+        proxy["network"]=json!("grpc");
+        proxy["grpc-opts"]=json!({"grpc-service-name":
+            value["streamSettings"]["grpcSettings"]["serviceName"].as_str().unwrap_or("")});
+    }
+    Some(proxy)
+}
+fn other_singbox(value: &Value) -> Option<Value> {
+    let protocol=value["protocol"].as_str()?;
+    let (server,port)=address(value)?;
+    if protocol=="shadowsocks" {
+        let (method,password)=supported_shadowsocks(value)?;
+        return Some(json!({"tag":name(value),"type":"shadowsocks","server":server,
+            "server_port":port,"method":method,"password":password}));
+    }
+    let mode=security(value)?;
+    if mode!="tls" {return None;}
+    let net=transport(value)?;
+    if !["tcp","ws","grpc"].contains(&net) {return None;}
+    let mut proxy=match protocol {
+        "trojan" => json!({"type":"trojan","tag":name(value),"server":server,
+            "server_port":port,"password":text(value,&["settings","password"])?,
+            "tls":tls_options(value,mode)?}),
+        "vmess" => {
+            let uuid=text(value,&["settings","id"])?;
+            uuid::Uuid::parse_str(uuid).ok()?;
+            json!({"type":"vmess","tag":name(value),"server":server,"server_port":port,
+                "uuid":uuid,"security":"auto","alter_id":0,"tls":tls_options(value,mode)?})
+        }
+        _ => return None,
+    };
+    if net=="ws" {
+        let ws=ws_options(&value["streamSettings"]);
+        let mut transport=json!({"type":"ws","path":ws["path"]});
+        if let Some(headers)=ws.get("headers") {transport["headers"]=headers.clone();}
+        proxy["transport"]=transport;
+    }
+    if net=="grpc" {
+        proxy["transport"]=json!({"type":"grpc","service_name":
+            value["streamSettings"]["grpcSettings"]["serviceName"].as_str().unwrap_or("")});
+    }
+    Some(proxy)
+}
 fn link_for(value: &Value) -> Option<String> {
     let (server,port) = address(value)?;
     let stream=&value["streamSettings"];
@@ -197,6 +342,7 @@ fn link_for(value: &Value) -> Option<String> {
         link_address(&server), options.join("&"),encode(&name(value))))
 }
 fn mihomo_proxy(value: &Value) -> Option<Value> {
+    if value["protocol"] != "vless" {return other_mihomo(value);}
     let (server,port)=address(value)?;
     let net=transport(value)?;
     let sec=security(value)?;
@@ -262,6 +408,7 @@ fn mihomo_proxy(value: &Value) -> Option<Value> {
     Some(p)
 }
 fn singbox_proxy(value: &Value) -> Option<Value> {
+    if value["protocol"] != "vless" {return other_singbox(value);}
     let (server,port)=address(value)?;
     let net=transport(value)?;
     // Upstream sing-box does not support Xray XHTTP or Xray's new VLESS encryption.
@@ -299,7 +446,7 @@ pub fn render(outbounds:&[Value], format:FeedFormat) -> Result<Rendered,String> 
     let mut skipped=0;
     for proxy in outbounds {
         let item=match format {
-            FeedFormat::Links | FeedFormat::Base64 => link_for(proxy).map(Value::String),
+            FeedFormat::Links | FeedFormat::Base64 => alt_link(proxy).map(Value::String),
             FeedFormat::Mihomo => mihomo_proxy(proxy),
             FeedFormat::SingBox => singbox_proxy(proxy),
             FeedFormat::Xray => return Err("Native Xray is rendered by the existing feed engine".into()),
