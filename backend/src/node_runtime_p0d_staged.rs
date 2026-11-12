@@ -33,8 +33,6 @@ use sqlx::Row;
 // entrypoint. The legacy implementation uses the same fixed version.
 pub const CONTROL_AGENT_VERSION: &str = "control-v5.1.3";
 
-// Serde generates an empty internal enum when rejecting unknown fields on {}.
-#[allow(clippy::empty_enums)]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LegacyAgentUpdateRequest {}
