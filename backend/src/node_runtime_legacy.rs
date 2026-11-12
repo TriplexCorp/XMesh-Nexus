@@ -948,6 +948,8 @@ pub async fn request_xray_update(
 // Only v4+ nodes understand this action. Older nodes need one bootstrap upgrade.
 pub const CONTROL_AGENT_VERSION: &str = "control-v5.1.3";
 
+// Serde generates an empty internal enum when rejecting unknown fields on {}.
+#[allow(clippy::empty_enums)]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AgentUpdateRequest {}
