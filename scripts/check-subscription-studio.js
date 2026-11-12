@@ -41,6 +41,28 @@ const [view,init]=studio.create({
 assert.equal(typeof init,'function');
 assert.match(view,/data-sub-install-command/);
 assert.match(view,/data-sub-install-copy/);
+assert.match(view,/data-sub-enroll/,'Pairing must be discoverable');
+assert.match(view,/data-sub-check/,'Server status must have a refresh action');
+assert.match(view,/data-sub-update disabled/,'Update must remain disabled until authenticated heartbeat');
+assert.match(view,/data-sub-agent-state/,'Server state needs real managed status');
+assert.match(src,/subApi\.enroll\(\)/,'Pairing must call real protected API');
+assert.match(src,/subApi\.status\(\)/,'Status must call real protected API');
+assert.match(src,/subApi\.update\(\)/,'Update must queue an authenticated action');
+assert.match(src,/enrollmentToken=result\.enrollmentToken/,'Pairing code must be ephemeral UI state');
+assert.match(src,/--enroll-token/,'Paired install must include only one-time enrollment code');
+assert.match(app,/\/api\/v1\/sub-server\/status/);
+assert.match(app,/\/api\/v1\/sub-server\/enrollment/);
+assert.match(app,/\/api\/v1\/sub-server\/update/);
+const control=fs.readFileSync('backend/src/sub_server.rs','utf8');
+assert.match(control,/require_owner\(&actor\)/,'Management must be owner-only');
+assert.match(control,/subtle::ConstantTimeEq/,'Agent tokens require constant-time comparison');
+assert.match(control,/GETDEL/,'Single-use enrollment and jobs must be atomic');
+assert.match(control,/PENDING_UPDATE/,'Update queue is server-owned');
+assert.doesNotMatch(control,/std::process::Command|tokio::process::Command/,'Nexus must not execute remote shell commands');
+assert.match(rust,/\/sub-server\/agent\/poll/,'Authenticated outbound agent poll endpoint must be mounted');
+assert.match(rust,/\/sub-server\/agent\/report/,'Authenticated update results must be mounted');
+assert.match(rust,/\/sub-server\/claim/,'One-time pairing endpoint must be mounted');
+
 assert.match(view,/XMesh Sub/);
 const linkedPalette={
  subscriptionAccent:'#4488cc',subscriptionSecondaryAccent:'#f0a560',subscriptionTheme:'light',
@@ -210,7 +232,9 @@ assert.doesNotMatch(src,/input\(form,'subscriptionPlacement'\)|input\(form,'node
  'Legacy planning keys must not be included in future saves');
 assert.match(view,/data-sub-health-url/,'VPS workflow needs explicit health endpoint guidance');
 assert.match(view,/data-sub-health-link/,'VPS workflow must expose a real health link');
-assert.match(view,/не регистр|пока не реализованы/,'Do not pretend phase-one edge automatically pairs or reports uptime');
+assert.match(view,/data-sub-agent-state/,'Managed status must be backed by the agent API');
+assert.match(view,/агент на VPS сам обращается к Nexus по HTTPS/,'Explain outbound-only management');
+assert.match(src,/status\?\.online&&status\?\.domainMatches/,'Online state must require an authenticated and domain-matched heartbeat');
 assert.match(src,/root\.dataset\.subscriptionView=next/,'Tabs must switch actual content, not just visual selection');
 assert.match(src,/ArrowRight/,'Server tabs must support arrow-key navigation');
 
