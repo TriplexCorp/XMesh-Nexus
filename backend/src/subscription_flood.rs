@@ -247,10 +247,13 @@ mod tests {
                     ..FloodConfig::default()
                 };
                 assert!(config.validate().is_ok(), "ip={ip}, token={token}");
-                assert!(validate_settings(&json!({
-                    "enabled": true, "mode": "protect",
-                    "ipPerMinute": ip, "tokenPerMinute": token
-                })).is_ok());
+                assert!(
+                    validate_settings(&json!({
+                        "enabled": true, "mode": "protect",
+                        "ipPerMinute": ip, "tokenPerMinute": token
+                    }))
+                    .is_ok()
+                );
             }
         }
         for (ip, token) in [(0, 12), (601, 12), (30, 0), (30, 61)] {
