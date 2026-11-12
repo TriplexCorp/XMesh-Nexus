@@ -1,7 +1,8 @@
 //! Auditable, fail-closed conversion of already authorized client outbounds.
-//! Never parse server-side inbounds here: only sanitized user_subscriptions::collect_user_outbounds.
+//! Never parse server-side inbounds here: only sanitized `user_subscriptions::collect_user_outbounds`.
 use base64::Engine as _;
 use serde_json::{Value, json};
+use std::fmt::Write as _;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FeedFormat {
@@ -50,7 +51,7 @@ fn encode(value: &str) -> String {
         if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
             out.push(char::from(byte));
         } else {
-            out.push_str(&format!("%{byte:02X}"));
+            let _ = write!(out, "%{byte:02X}");
         }
     }
     out
@@ -571,12 +572,12 @@ fn singbox_proxy(value: &Value) -> Option<Value> {
         }
         "grpc" => {
             proxy["transport"] = json!({"type":"grpc",
-            "service_name":grpc_options(stream)["service_name"]})
+            "service_name":grpc_options(stream)["service_name"]});
         }
         "httpupgrade" => {
             proxy["transport"] = json!({"type":"httpupgrade",
             "path":stream["httpupgradeSettings"]["path"].as_str().unwrap_or("/"),
-            "host":stream["httpupgradeSettings"]["host"].as_str().unwrap_or("")})
+            "host":stream["httpupgradeSettings"]["host"].as_str().unwrap_or("")});
         }
         _ => return None,
     }
@@ -704,7 +705,7 @@ mod tests {
     fn mihomo_and_singbox_never_silently_convert_unsupported_xhttp() {
         let proxy = vless("xhttp", "reality");
         assert!(
-            render(&[proxy.clone()], FeedFormat::Mihomo)
+            render(std::slice::from_ref(&proxy), FeedFormat::Mihomo)
                 .unwrap()
                 .body
                 .contains("reality-opts")
@@ -741,13 +742,13 @@ mod tests {
                 "method":"aes-256-gcm","password":"user-pass"},
             "streamSettings":{"network":"raw","security":"none"}});
         assert!(
-            render(&[ss.clone()], FeedFormat::Links)
+            render(std::slice::from_ref(&ss), FeedFormat::Links)
                 .unwrap()
                 .body
                 .starts_with("ss://")
         );
         assert!(
-            render(&[ss.clone()], FeedFormat::Mihomo)
+            render(std::slice::from_ref(&ss), FeedFormat::Mihomo)
                 .unwrap()
                 .body
                 .contains(r#""type":"ss""#)
@@ -766,13 +767,13 @@ mod tests {
                 "tlsSettings":{"serverName":"vm.example.org"},
                 "wsSettings":{"path":"/ray","headers":{"Host":"vm.example.org"}}}});
         assert!(
-            render(&[vmess.clone()], FeedFormat::Links)
+            render(std::slice::from_ref(&vmess), FeedFormat::Links)
                 .unwrap()
                 .body
                 .starts_with("vmess://")
         );
         assert!(
-            render(&[vmess.clone()], FeedFormat::Mihomo)
+            render(std::slice::from_ref(&vmess), FeedFormat::Mihomo)
                 .unwrap()
                 .body
                 .contains(r#""type":"vmess""#)
