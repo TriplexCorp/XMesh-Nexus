@@ -415,6 +415,11 @@
 .subscription-sub-step p{font-size:.73rem;line-height:1.48;color:var(--st-muted);margin:0}
 .subscription-sub-step small{font-size:.68rem;line-height:1.4;color:var(--st-muted)}
 .subscription-sub-step code{font-size:.73rem}
+.subscription-sub-install-actions{
+ display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;min-width:0;
+}
+.subscription-sub-install-actions button{min-height:2.2rem;flex:none}
+.subscription-sub-install-actions small{flex:1 1 14rem}
 .subscription-sub-install-command,
 .subscription-sub-verify{
  display:flex;align-items:center;gap:.65rem;min-width:0;
