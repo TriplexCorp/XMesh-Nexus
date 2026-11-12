@@ -118,7 +118,7 @@ fn transport(value: &Value) -> Option<&str> {
         _ => None,
     }
 }
-fn sni(value: &Value, mode: &str) -> Option<&str> {
+fn sni<'a>(value: &'a Value, mode: &str) -> Option<&'a str> {
     text(
         value,
         &[
