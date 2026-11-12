@@ -18,15 +18,14 @@ assert.match(engine,/enabled\(\s*opts\s*,\s*"smart"\s*,\s*false\s*\)/);
 assert.match(engine,/if\s+smart\s*&&\s*tags\.len\(\)\s*>\s*1\s*&&\s*balance\s*!=\s*"off"/);
 assert.match(engine,/fn balancers_are_opt_in_and_servers_remain_distinct/);
 const subscriptions=fs.readFileSync('backend/src/user_subscriptions.rs','utf8')+'\n'+fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
-assert.match(subscriptions,/let\s+mut\s+response\s*=\s*Json\(\s*json\s*\)\.into_response\(\)/,
- 'Every subscription returns native JSON regardless of SMART');
-assert.doesNotMatch(subscriptions,/vless_link\(|links\.join\(|use_vless_feed\(/,
- 'Legacy URI generation and fallback must remain removed');
-const negotiation=fs.readFileSync('backend/src/subscription_user_agent.rs','utf8');
-assert.doesNotMatch(negotiation,/\bFormat\b|contains_key\("format"\)|options\.get\("format"\)/,
- 'Do not negotiate a format: JSON is the only response type');
-assert.doesNotMatch(subscriptions,/Format::|options\.get\("format"\)|options\.contains_key\("format"\)/,
- 'Feed generation must not support a format selector');
+assert.match(subscriptions,/if format == crate::subscription_formats::FeedFormat::Xray/,
+ 'Native Xray branch must remain explicit and separate');
+assert.match(subscriptions,/let feed = crate::subscription_json::build_feed\(outbounds, &scoped\)/,
+ 'Original Xray feed builder preserves independent balancers and user routing');
+assert.match(subscriptions,/crate::subscription_formats::render\(&outbounds, format\)/,
+ 'Alternate formats must reuse authenticated user-scoped client outbounds');
+assert.match(negotiation,/pub fn feed_format\(/,'Formats must be explicitly allowlisted');
+assert.match(negotiation,/options\.get\("format"\)/,'Explicit client format is available without changing the token');
 assert.match(negotiation,/options\.get\("device"\)/,
  'Keep device-specific XHTTP configuration');
 assert.match(engine,/fn disabled_smart_never_emits_balancer_or_observatory\(\)/);
@@ -41,8 +40,10 @@ assert.match(engine,/fn smart_is_an_optional_additional_profile\(\)/);
 // while allowing per-user routing without mutating the shared configuration.
 const subscriptionBase=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 const routing=fs.readFileSync('backend/src/client_routing.rs','utf8');
-assert.match(subscriptionBase,/subscription_json::build_feed\(\s*outbounds\s*,\s*&crate::client_routing::scoped_settings\(\s*&settings\s*,\s*&user\s*\)\s*,?\s*\)/,
- 'Public client JSON must retain global balancers with per-user routing');
+assert.match(subscriptionBase,/let scoped = crate::client_routing::scoped_settings\(&settings, &user\)/,
+ 'Every feed must compute its own user-scoped settings before serialization');
+assert.match(subscriptionBase,/subscription_json::build_feed\(outbounds, &scoped\)/,
+ 'Native client JSON must retain global balancers with per-user routing');
 assert.match(subscriptionBase,/subscription_json::build_feed\(\s*proxies\s*,\s*&crate::client_routing::scoped_settings\(\s*&setting\s*,\s*&user\s*\)\s*,?\s*\)/,
  'Admin preview must use the same scoped settings as the public feed');
 assert.match(routing,/let mut scoped = settings\.clone\(\)/,
