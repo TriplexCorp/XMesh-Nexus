@@ -183,6 +183,27 @@ window.XMeshSubscriptionStudio = (() => {
     en:['Subscription active','Traffic','Expires','Connection settings','Copy link']
 
   };
+
+  // Decorative interface icons are static SVG, never derived from admin input.
+  const studioGlyph=(name)=>{
+    const paths={
+      layers:'<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/>',
+      link:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.71-1.71"/>',
+      server:'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M11 6.5h7M11 17.5h7"/>',
+      cube:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5 9-5V7M12 12v10"/>',
+      globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
+      shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+      copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+      refresh:'<path d="M20 11a8 8 0 0 0-14-5L4 8M4 4v4h4M4 13a8 8 0 0 0 14 5l2-2M20 20v-4h-4"/>',
+      terminal:'<rect x="2.5" y="3.5" width="19" height="17" rx="2"/><path d="m7 9 3 3-3 3M12 16h5"/>',
+      external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/>',
+      calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/>',
+      tag:'<path d="M11 3H4a1 1 0 0 0-1 1v7l9 9a2 2 0 0 0 3 0l5-5a2 2 0 0 0 0-3l-9-9Z"/><circle cx="7.5" cy="7.5" r="1"/>',
+      info:'<circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/>'
+    };
+    return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(paths[name]||paths.server)+'</svg>';
+  };
+
   const input = (form,name) => form.elements.namedItem(name);
   function create(settings,save,notify,counts,getPanelTheme,subApi=null) {
     const data = {...defaults,...settings};
@@ -200,13 +221,13 @@ window.XMeshSubscriptionStudio = (() => {
 
     const markup = [
       '<div class="subscription-studio" data-subscription-view="settings">',
-      '<header class="subscription-studio-intro"><div><h2>SUBSCRIPTION STUDIO</h2>',
-      '<p>Оформление действующей страницы подписки, её публичный URL и каталог приложений.</p></div>',
+      '<header class="subscription-studio-intro"><div class="subscription-studio-hero"><span class="subscription-studio-hero-symbol">'+studioGlyph('layers')+'</span><div><h2>SUBSCRIPTION STUDIO</h2>',
+      '<p>Оформление действующей страницы подписки, её публичный URL и каталог приложений.</p></div></div>',
       '<button type="submit" form="subscription-studio-form" class="btn">'+
         '<span aria-hidden="true">✓</span> Сохранить настройки</button></header>',
       '<nav class="subscription-studio-tabs" role="tablist" aria-label="Разделы Subscription Studio">',
       '<button type="button" class="on" data-substudio-tab="settings" id="substudio-tab-settings" role="tab" aria-selected="true" aria-controls="substudio-settings">Настройки подписок</button>',
-      '<button type="button" data-substudio-tab="servers" id="substudio-tab-servers" role="tab" aria-selected="false" aria-controls="substudio-servers" tabindex="-1">Серверы подписок</button>',
+      '<button type="button" data-substudio-tab="servers" id="substudio-tab-servers" role="tab" aria-selected="false" aria-controls="substudio-servers" tabindex="-1">'+studioGlyph('server')+'Серверы подписок</button>',
       '</nav>',
       '<form id="subscription-studio-form" class="subscription-studio-layout">',
       '<div class="subscription-studio-main" id="substudio-settings" role="tabpanel" aria-labelledby="substudio-tab-settings">',
@@ -487,46 +508,57 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-stats"><div><small>Пользователей</small><b>'+esc(counts.users)+'</b></div><div><small>Узлов</small><b>'+esc(counts.nodes)+'</b></div></div>',
       '</aside>',
       '<div class="subscription-servers-page" id="substudio-servers" role="tabpanel" aria-labelledby="substudio-tab-servers" hidden>',
-      '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>01</span><div><h3>Адрес подписок</h3><p>Отдельный публичный домен для получения подписок. Не совпадает с адресом управления Nexus.</p></div></div>',
-      '<div class="subscription-studio-pair">',
+      '<div class="subscription-server-left">',
+      '<section class="card subscription-studio-section subscription-server-address">',
+      '<div class="subscription-studio-heading subscription-server-card-heading"><span class="subscription-server-symbol">'+studioGlyph('link')+'</span><div><h3>Адрес подписок</h3><p>Отдельный публичный домен для получения подписок. Не совпадает с адресом управления Nexus.</p></div></div>',
+      '<div class="subscription-studio-pair subscription-server-fields">',
       field('subscriptionDomain','Домен подписки',data.subscriptionDomain,'Домен с DNS A/AAAA на VPS с XMesh Sub.',{placeholder:'sub.example.com',max:253}),
       field('subscriptionPath','Публичный путь',data.subscriptionPath,'Например /s или /subscription.',{placeholder:'/s',max:64}),
       '</div>',
-      '<div class="subscription-studio-url"><span>Формат персональной ссылки</span><code data-subscription-link>Укажите домен и путь</code></div>',
+      '<div class="subscription-studio-url subscription-server-link-card"><div class="subscription-server-link-text"><span>Публичная ссылка (шаблон)</span><code data-subscription-link>Укажите домен и путь</code></div>',
+      '<button type="button" class="gh subscription-server-icon-button" data-sub-public-copy disabled title="Копировать шаблон ссылки" aria-label="Копировать шаблон ссылки">'+studioGlyph('copy')+'</button></div>',
+      '<p class="subscription-server-dns-hint">'+studioGlyph('info')+'<span>Настройте DNS A/AAAA домена на IP вашего VPS с XMesh Sub. Шаблон ссылки содержит заполнитель токена, а не действующий ключ.</span></p>',
       '</section>',
+      '<section class="card subscription-sub-management subscription-server-management">',
+      '<div class="subscription-sub-management-title"><div class="subscription-server-title-with-icon"><span class="subscription-server-symbol">'+studioGlyph('server')+'</span><div><h3>Управление Sub-сервером</h3><small>Агент подключается автоматически после установки одной командой.</small></div></div>',
+      '<span class="subscription-sub-provision-status" data-sub-agent-state data-state="empty">Не подключён</span></div>',
+      '<div class="subscription-sub-status-metrics">',
+      '<div class="subscription-sub-status-metric">'+studioGlyph('tag')+'<div><small>Версия агента</small><b data-sub-agent-version>—</b></div></div>',
+      '<div class="subscription-sub-status-metric">'+studioGlyph('calendar')+'<div><small>Последняя связь</small><b data-sub-agent-seen>—</b></div></div>',
+      '</div>',
+      '<div class="subscription-sub-management-actions">',
+      '<button type="button" class="gh" data-sub-check>'+studioGlyph('refresh')+'Проверить статус</button>',
+      '<button type="button" class="btn" data-sub-update disabled>'+studioGlyph('refresh')+'Обновить XMesh Sub</button></div>',
+      '<small data-sub-agent-detail role="status" aria-live="polite">Создайте установочную команду справа и выполните её на VPS.</small>',
+      '</section>',
+      '</div>',
       '<section class="card subscription-studio-section subscription-server-provisioning">',
-      '<div class="subscription-studio-heading"><span>02</span><div><h3>Установка XMesh Sub</h3><p>Отдельный HTTPS-шлюз для подписок, который обращается к Nexus. База и пользователи остаются в панели.</p></div></div>',
+      '<div class="subscription-studio-heading subscription-server-card-heading"><span class="subscription-server-symbol">'+studioGlyph('cube')+'</span><div><h3>Установка XMesh Sub</h3><p>Отдельный HTTPS-шлюз для подписок, который обращается к Nexus. База и пользователи остаются в панели.</p></div></div>',
       '<div class="subscription-sub-workspace-head"><div><b>Новый VPS</b><small>Ubuntu 22.04/24.04 · установка одной командой</small></div>',
       '<span class="subscription-sub-provision-status" data-sub-install-state>Требуется настройка</span></div>',
       '<div class="subscription-sub-steps">',
-      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">1</span><div><b>Подготовьте домен</b>',
-      '<p>Направьте DNS A/AAAA домена подписок на новый VPS. Откройте TCP 80/443 и сохраните адрес и путь кнопкой «Сохранить настройки».</p></div></section>',
-      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">2</span><div><b>Установите XMesh Sub</b>',
+      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">01</span><div><b>Подготовьте домен</b>',
+      '<p>Направьте DNS A/AAAA домена подписок на новый VPS. Откройте TCP 80/443 и сохраните адрес и путь кнопкой «Сохранить настройки».</p></div><span class="subscription-step-symbol">'+studioGlyph('globe')+'</span></section>',
+      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">02</span><div><b>Установите XMesh Sub</b>',
       '<p>Создайте одну команду и выполните её на чистом VPS. Она установит шлюз, подключит управляющий агент и зарегистрирует сервер в Nexus.</p>',
-      '<div class="subscription-sub-install-actions"><button type="button" class="btn sm" data-sub-enroll>Создать команду установки</button><small>Привязка включена в установку. Ключ передаётся через stdin и действует 60 минут.</small></div>',
-      '<div class="subscription-sub-install-command"><code data-sub-install-command>Создайте команду установки</code>',
-      '<button type="button" class="btn sm" data-sub-install-copy disabled>Скопировать команду</button></div>',
-      '<small data-sub-install-note role="status" aria-live="polite">Укажите отдельные домены Nexus и сервера подписок.</small>',
-      '</div></section>',
-      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">3</span><div><b>Проверьте доступность</b>',
+      '<div class="subscription-sub-install-actions"><button type="button" class="btn" data-sub-enroll>'+studioGlyph('terminal')+'Создать команду установки</button>',
+      '<button type="button" class="gh" data-sub-install-copy disabled>'+studioGlyph('copy')+'Скопировать команду</button></div>',
+      '<div class="subscription-sub-install-command" data-state="empty" hidden><code data-sub-install-command>Создайте команду установки</code></div>',
+      '<small data-sub-install-note role="status" aria-live="polite">Привязка встроена в установку. Ключ действителен 60 минут.</small>',
+      '</div><span class="subscription-step-symbol">'+studioGlyph('server')+'</span></section>',
+      '<section class="subscription-sub-step"><span class="subscription-sub-step-index">03</span><div><b>Проверьте доступность</b>',
       '<p>После установки откройте адрес проверки. Ответ <code>ok</code> подтверждает работу HTTPS-шлюза, но не выдачу реальной подписки.</p>',
       '<div class="subscription-sub-verify"><code data-sub-health-url>Укажите домен подписок</code>',
-      '<a class="gh sm" data-sub-health-link target="_blank" rel="noopener noreferrer" hidden>Открыть проверку</a></div>',
+      '<button type="button" class="gh subscription-server-icon-button" data-sub-health-copy disabled title="Копировать адрес проверки" aria-label="Копировать адрес проверки">'+studioGlyph('copy')+'</button>',
+      '<a class="gh" data-sub-health-link target="_blank" rel="noopener noreferrer" hidden>'+studioGlyph('external')+'Открыть проверку</a></div>',
       '<small>Выдачу подписки проверьте отдельно на тестовом пользователе.</small>',
-      '</div></section>',
+      '</div><span class="subscription-step-symbol">'+studioGlyph('shield')+'</span></section>',
       '</div>',
-      '<div class="subscription-sub-management">',
-      '<div class="subscription-sub-management-title"><div><b>Управление Sub-сервером</b><small>Агент подключается автоматически после установки одной командой</small></div>',
-      '<span class="subscription-sub-provision-status" data-sub-agent-state data-state="empty">Не подключён</span></div>',
-      '<div class="subscription-sub-management-actions">',
-      '<button type="button" class="gh sm" data-sub-check>Проверить статус</button>',
-      '<button type="button" class="btn sm" data-sub-update disabled>Обновить XMesh Sub</button></div>',
-      '<small data-sub-agent-detail role="status" aria-live="polite">Сначала создайте единую команду установки выше и выполните её на VPS.</small>',
-      '</div>',
-      '<p class="subscription-sub-scope"><strong>Безопасность:</strong> агент на VPS сам обращается к Nexus по HTTPS; открывать отдельный административный порт не требуется. Перед запуском root проверяется SHA-256 установщика; обновления дополнительно требуют подпись Ed25519. Генерация подписок и пользователи остаются в Nexus.</p>',
       '</section>',
+      '<aside class="card subscription-sub-scope"><span class="subscription-server-symbol">'+studioGlyph('shield')+'</span><strong>Безопасность</strong>',
+      '<p>Агент сам обращается к Nexus по HTTPS — дополнительный административный порт не нужен. Установщик проверяется перед запуском, а обновления требуют подпись. Подписки и пользователи остаются в Nexus.</p></aside>',
       '</div></form></div>'
+
     ].join('');
     const mount = () => {
       const form=document.getElementById('subscription-studio-form');
@@ -540,7 +572,7 @@ window.XMeshSubscriptionStudio = (() => {
       previewBody.className='subscription-studio-preview subscription-public';
       while(previewHost.firstChild)previewBody.appendChild(previewHost.firstChild);
       for(const href of [
-        '/subscription-studio.css?v=00a116454b60',
+        '/subscription-studio.css?v=4a88c903f9e7',
         '/subscription-surface.css?v=0a79377d5733',
         '/subscription-public.css?v=6a55fffe32d1'
       ]){
@@ -705,6 +737,8 @@ window.XMeshSubscriptionStudio = (() => {
       const updateButton=form.querySelector('[data-sub-update]');
       const statusButton=form.querySelector('[data-sub-check]');
       const agentState=form.querySelector('[data-sub-agent-state]');
+      const agentVersion=form.querySelector('[data-sub-agent-version]');
+      const agentSeen=form.querySelector('[data-sub-agent-seen]');
       const agentDetail=form.querySelector('[data-sub-agent-detail]');
       const showAgent=()=>{
         if(!agentState||!agentDetail)return;
@@ -715,6 +749,8 @@ window.XMeshSubscriptionStudio = (() => {
         agentState.textContent=online?'На связи':enrolled?'Нет связи':'Не подключён';
         const lastSeen=Number(status?.lastSeen||0);
         const last=lastSeen>0?new Date(lastSeen*1000).toLocaleString():'—';
+        if(agentVersion)agentVersion.textContent=enrolled&&status?.version?String(status.version):'—';
+        if(agentSeen)agentSeen.textContent=enrolled?last:'—';
         const info=online?'Версия '+(status.version||'неизвестна')+' · последняя связь '+last:
           enrolled?'Связь не установлена. Последняя активность: '+last:
           'Создайте установочную команду выше и выполните её на VPS. Агент подключится автоматически.';
@@ -796,8 +832,14 @@ window.XMeshSubscriptionStudio = (() => {
         const state=form.querySelector('[data-sub-install-state]');
         const health=form.querySelector('[data-sub-health-url]');
         const link=form.querySelector('[data-sub-health-link]');
+        const healthCopy=form.querySelector('[data-sub-health-copy]');
+        const publicCopy=form.querySelector('[data-sub-public-copy]');
+        const commandGroup=form.querySelector('.subscription-sub-install-command');
         if(code)code.textContent=managedCommand||(dirty?'Сначала сохраните настройки подписок.':ready?'Создайте команду установки выше.':'Укажите отдельный домен подписок и корректный путь.');
         if(copy)copy.disabled=!managedCommand;
+        if(commandGroup){commandGroup.hidden=!managedCommand;commandGroup.dataset.state=managedCommand?'ready':'empty';}
+        if(healthCopy)healthCopy.disabled=!ready;
+        if(publicCopy)publicCopy.disabled=!ready;
         if(state){
           state.dataset.state=dirty?'dirty':managedCommand?'ready':'empty';
           state.textContent=dirty?'Не сохранено':managedCommand?'Команда готова':ready?'Ожидает команды':'Требуется настройка';
@@ -1123,6 +1165,30 @@ window.XMeshSubscriptionStudio = (() => {
         try {await save(draft);savedInstall.domain=draft.subscriptionDomain;savedInstall.path=draft.subscriptionPath;draw();notify('Настройки SUBSCRIPTION STUDIO сохранены');}
         catch(err){notify('Не удалось сохранить: '+(err.message||'ошибка API'));}
         finally{button.disabled=false;}
+      });
+      const copyStudioValue=async(text,successMessage)=>{
+        try{
+          if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);
+          else{
+            const input=document.createElement('textarea');
+            input.value=text;input.readOnly=true;input.style.position='fixed';input.style.opacity='0';
+            document.body.appendChild(input);input.select();
+            const success=document.execCommand('copy');input.remove();
+            if(!success)throw Error('Clipboard unavailable');
+          }
+          notify(successMessage);
+        }catch(_){notify('Не удалось скопировать. Выделите текст вручную.');}
+      };
+      form.querySelector('[data-sub-public-copy]')?.addEventListener('click',()=>{
+        const draft=read();
+        if(!hostnameOK(draft.subscriptionDomain)||!pathOK(draft.subscriptionPath))return;
+        copyStudioValue('https://'+draft.subscriptionDomain+draft.subscriptionPath+'/<token>','Шаблон ссылки скопирован');
+      });
+      form.querySelector('[data-sub-health-copy]')?.addEventListener('click',()=>{
+        const draft=read();
+        const link=form.querySelector('[data-sub-health-link]');
+        if(!link?.href||link.hidden)return;
+        copyStudioValue(link.href,'Адрес проверки скопирован');
       });
       form.querySelector('[data-sub-install-copy]').addEventListener('click',async()=>{
         const command=updateInstall(read());
