@@ -15,6 +15,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Включённое приложение отображается в каталоге, но совместимость зависит от формата подписки, транспорта и версии клиента. Один токен поддерживает ручной выбор формата через ?format=xray, links, base64, mihomo или singbox.": "Enabled apps appear in the catalog, but compatibility depends on feed format, transport, and app version. The same bearer token supports manual selection with ?format=xray, links, base64, mihomo or singbox.",
+    "Отображается:": "Shown:",
+    "Формат:": "Format:",
+    " · проверяйте транспорт": " · verify transport support",
     "Портал": "Portal",
     "Контент": "Content",
     "Защита и доступ": "Protection and access",
