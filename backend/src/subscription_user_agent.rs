@@ -55,7 +55,11 @@ pub fn detect(headers: &HeaderMap) -> Client {
     let hiddify = has_agent_token(&ua, "hiddify");
     let singbox = has_agent_token(&ua, "sing-box") || has_agent_token(&ua, "singbox");
     let clash = has_agent_token(&ua, "clash") || has_agent_token(&ua, "mihomo");
-    let known_app = happ
+    let flclash = has_agent_token(&ua, "flclash");
+    let clashverge = has_agent_token(&ua, "clashverge") || ua.contains("clash verge");
+    let stash = has_agent_token(&ua, "stash");
+    let loon = has_agent_token(&ua, "loon");
+    let known_app = flclash || clashverge || stash || loon || happ
         || incy
         || v2raytun
         || v2rayn
@@ -93,6 +97,39 @@ pub fn detect(headers: &HeaderMap) -> Client {
     };
     Client { device, known_app }
 }
+/// Resolve wire format independently of the device-specific XHTTP profile.
+/// Explicit selection is an allowlisted override; unknown formats must never
+/// silently fall back to a misleading but syntactically valid Xray document.
+pub fn feed_format(
+    headers: &HeaderMap,
+    options: &HashMap<String, String>,
+) -> Result<crate::subscription_formats::FeedFormat, &'static str> {
+    use crate::subscription_formats::FeedFormat;
+    if let Some(name) = options.get("format") {
+        return FeedFormat::from_name(name).ok_or("Неподдерживаемый формат подписки");
+    }
+    let ua = headers.get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok()).unwrap_or("").to_ascii_lowercase();
+    if ["clash", "mihomo", "flclash", "clashverge", "stash"].iter()
+        .any(|name| has_agent_token(&ua, name)) || ua.contains("clash verge")
+    {
+        return Ok(FeedFormat::Mihomo);
+    }
+    if has_agent_token(&ua, "sing-box") || has_agent_token(&ua, "singbox") {
+        return Ok(FeedFormat::SingBox);
+    }
+    if ["v2rayn", "v2rayng", "shadowrocket", "v2box", "hiddify"].iter()
+        .any(|name| has_agent_token(&ua, name))
+    {
+        return Ok(FeedFormat::Base64);
+    }
+    if ["incy", "v2raytun", "streisand", "nekobox", "loon"].iter()
+        .any(|name| has_agent_token(&ua, name))
+    {
+        return Ok(FeedFormat::Links);
+    }
+    Ok(FeedFormat::Xray)
+}
 /// The canonical subscription URL serves a portal to ordinary browsers,
 /// and a client configuration to VPN applications, with no query required.
 pub fn wants_feed(
@@ -109,7 +146,8 @@ pub fn wants_feed(
     Ok(app.known_app
         || !html
         || options.get("raw").is_some_and(|v| v == "1")
-        || options.contains_key("device"))
+        || options.contains_key("device")
+        || options.contains_key("format"))
 }
 pub fn negotiate(
     headers: &HeaderMap,
@@ -197,6 +235,37 @@ mod tests {
         overrides.insert("format".to_owned(), "json".to_owned());
         overrides.insert("device".to_owned(), "unknown".to_owned());
         assert!(negotiate(&headers, &overrides).is_err());
+    }
+    #[test]
+    fn format_matrix_and_invalid_overrides() {
+        use crate::subscription_formats::FeedFormat;
+        let tests=[
+            ("Happ/26.7.28",FeedFormat::Xray),
+            ("Incy/1.0",FeedFormat::Links),
+            ("v2rayTun/3",FeedFormat::Links),
+            ("v2rayN/7",FeedFormat::Base64),
+            ("v2rayNG/1",FeedFormat::Base64),
+            ("Streisand/1",FeedFormat::Links),
+            ("Hiddify/2",FeedFormat::Base64),
+            ("NekoBox/1",FeedFormat::Links),
+            ("Shadowrocket/2",FeedFormat::Base64),
+            ("FlClash/1",FeedFormat::Mihomo),
+            ("Stash/1",FeedFormat::Mihomo),
+            ("sing-box/1",FeedFormat::SingBox),
+            ("V2Box/1",FeedFormat::Base64),
+            ("Loon/1",FeedFormat::Links),
+            ("Mihomo Party/1",FeedFormat::Mihomo),
+            ("ClashVerge/1",FeedFormat::Mihomo),
+            ("Mozilla/5.0",FeedFormat::Xray)
+        ];
+        for (ua,wanted) in tests {
+            assert_eq!(feed_format(&headers(ua,"*/*"),&HashMap::new()).unwrap(),wanted,"{ua}");
+        }
+        let mut options=HashMap::new();
+        options.insert("format".to_owned(),"singbox".to_owned());
+        assert_eq!(feed_format(&headers("Happ/1","text/html"),&options).unwrap(),FeedFormat::SingBox);
+        options.insert("format".to_owned(),"secret".to_owned());
+        assert!(feed_format(&headers("Happ/1","*/*"),&options).is_err());
     }
     #[test]
     fn bare_https_url_negotiates_portal_or_feed() {
