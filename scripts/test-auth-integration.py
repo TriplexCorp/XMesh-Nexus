@@ -250,11 +250,21 @@ def main():
     # Same bearer URL, real API: HTML for browsers, native JSON for VPN apps.
     # Keep the request on the disposable local API, never the configured public domain.
     subscription_path = urlsplit(new_sub["url"]).path
-    agents = ["Happ/26.7.28 (iPhone; iOS 18)", "v2rayNG/1.10 Android",
-              "v2rayN/7.7 Windows", "Hiddify/2.0", "NekoBox/1.0 Android",
-              "Shadowrocket/2.2", "Streisand/1.0", "Incy/1.0", "v2rayTun/3.0"]
-    for agent in ["Mozilla/5.0 (iPhone) AppleWebKit Safari/605.1"] + agents:
-        browser = agent.startswith("Mozilla")
+    agents = [
+        ("Happ/26.7.28 (iPhone; iOS 18)", "xray"),
+        ("v2rayNG/1.10 Android", "base64"),
+        ("v2rayN/7.7 Windows", "base64"),
+        ("Hiddify/2.0", "base64"),
+        ("NekoBox/1.0 Android", "links"),
+        ("Shadowrocket/2.2", "base64"),
+        ("Streisand/1.0", "links"),
+        ("Incy/1.0", "links"),
+        ("v2rayTun/3.0", "links"),
+        ("FlClash/1.0", "mihomo"),
+        ("sing-box/1.14", "singbox"),
+    ]
+    for agent, wire in [("Mozilla/5.0 (iPhone) AppleWebKit Safari/605.1", "html")] + agents:
+        browser = wire == "html"
         req = Request(BASE + subscription_path,
                       headers={"User-Agent": agent, "Accept": "text/html"})
         with urlopen(req, timeout=30) as response:
@@ -278,11 +288,41 @@ def main():
                 assert b'<script src="/subscription-' not in body
                 assert b'<link rel="stylesheet" href="/subscription-' not in body
                 assert changed["xrayId"].encode() not in body
-            else:
+            elif wire == "xray":
                 assert content_type.startswith("application/json")
-                assert isinstance(json.loads(body), list)
-                assert len(json.loads(body)) == 1
-    print("PASS: HTML/client content negotiation for browser and nine VPN agents")
+                feed = json.loads(body)
+                assert isinstance(feed, list) and len(feed) == 1
+            elif wire == "singbox":
+                assert content_type.startswith("application/json")
+                profile = json.loads(body)
+                assert profile["outbounds"][0]["type"] == "vless"
+                assert profile["outbounds"][0]["server"] == "ci-host.example.com"
+            elif wire == "mihomo":
+                assert content_type.startswith("application/yaml")
+                assert b"proxies:" in body and b"proxy-groups:" in body
+                assert b'"type":"vless"' in body
+            else:
+                assert content_type.startswith("text/plain")
+                links = base64.b64decode(body) if wire == "base64" else body
+                assert links.startswith(b"vless://")
+                assert b"@ci-host.example.com:" in links
+    # Explicit format override works even when the User-Agent is a browser.
+    for fmt, expected_type in [("xray","application/json"),("links","text/plain"),
+                               ("base64","text/plain"),("mihomo","application/yaml"),
+                               ("singbox","application/json")]:
+        req=Request(BASE + subscription_path + "?format=" + fmt,
+                    headers={"User-Agent":"Mozilla/5.0","Accept":"text/html"})
+        with urlopen(req,timeout=30) as response:
+            assert response.status==200
+            assert response.headers["Content-Type"].startswith(expected_type)
+    req=Request(BASE + subscription_path + "?format=unknown",
+                headers={"User-Agent":"Happ/26.7.28","Accept":"*/*"})
+    try:
+        urlopen(req,timeout=30)
+        raise AssertionError("Invalid format must be rejected")
+    except HTTPError as error:
+        assert error.code==400
+    print("PASS: HTML and native/multi-format content negotiation for eleven VPN agents")
 
     check(api("PATCH", f"/collections/hosts/{host['id']}",
               {"disabled": True}, admin_cookie)[0], 200,
