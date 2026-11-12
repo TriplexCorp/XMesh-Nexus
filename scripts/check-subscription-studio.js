@@ -70,8 +70,15 @@ assert.match(view,/data-sub-flood-card/,'Owner needs a compact flood protection 
 assert.match(view,/name="floodEnabled"/,'Flood protection must be togglable');
 assert.match(view,/name="floodMode" value="monitor"/,'Monitoring must be available');
 assert.match(view,/name="floodMode" value="protect"/,'Protection must be available');
-assert.match(view,/name="floodIpPerMinute"/,'Edge IP slider must be configurable');
-assert.match(view,/name="floodTokenPerMinute"/,'Token slider must be configurable');
+assert.match(view,/name="floodIpPerMinute" min="1" max="600" step="1"/,'Edge IP slider must allow every integer, including 1 and 2');
+assert.match(view,/name="floodTokenPerMinute" min="1" max="60" step="1"/,'Token slider must allow every integer, including 1 and 2');
+assert.match(view,/name="floodIpExact" min="1" max="600" step="1"/,'IP limit needs an exact number input');
+assert.match(view,/name="floodTokenExact" min="1" max="60" step="1"/,'Token limit needs an exact number input');
+assert.match(src,/bindFloodLimit\('floodIpPerMinute','floodIpExact'\)/,'IP slider and number input must stay in sync');
+assert.match(src,/bindFloodLimit\('floodTokenPerMinute','floodTokenExact'\)/,'Token slider and number input must stay in sync');
+const [smallLimitsView]=studio.create({subscriptionFlood:{enabled:true,mode:'protect',ipPerMinute:1,tokenPerMinute:2}},async()=>{},()=>{},{});
+assert.match(smallLimitsView,/name="floodIpExact"[^>]*value="1"/,'One request per minute must persist on render');
+assert.match(smallLimitsView,/name="floodTokenExact"[^>]*value="2"/,'Two requests per minute must persist on render');
 assert.match(view,/data-sub-flood-requests/,'Rate control needs live request telemetry');
 assert.match(view,/data-sub-flood-blocked/,'Rate control needs blocked-request telemetry');
 assert.match(app,/floodStatus:\(\)=>backendRequest/,'Telemetry must come from owner API');

@@ -565,10 +565,14 @@ window.XMeshSubscriptionStudio = (() => {
       '<label><input type="radio" name="floodMode" value="monitor"'+(data.subscriptionFlood.mode!=='protect'?' checked':'')+'> Мониторинг — только считать превышения</label>',
       '<label><input type="radio" name="floodMode" value="protect"'+(data.subscriptionFlood.mode==='protect'?' checked':'')+'> Защита — HTTP 429 + Retry-After</label></fieldset>',
       '<div class="subscription-flood-sliders">',
-      '<label>На один IP <b data-sub-flood-ip-label>'+esc(data.subscriptionFlood.ipPerMinute)+'</b> запросов/мин',
-      '<input type="range" name="floodIpPerMinute" min="30" max="600" step="30" value="'+esc(data.subscriptionFlood.ipPerMinute)+'"><small>IP-фильтрация выполняется только на XMesh Sub. Для неё необходимо обновление шлюза.</small></label>',
-      '<label>На один токен <b data-sub-flood-token-label>'+esc(data.subscriptionFlood.tokenPerMinute)+'</b> запросов/мин',
-      '<input type="range" name="floodTokenPerMinute" min="3" max="60" step="3" value="'+esc(data.subscriptionFlood.tokenPerMinute)+'"><small>В Nexus дополнительный запас 10 запросов на короткие всплески.</small></label>',
+      '<div class="subscription-flood-limit"><div class="subscription-flood-limit-head"><label for="sub-flood-ip-slider">На один IP</label>',
+      '<span class="subscription-flood-limit-value"><input type="number" id="sub-flood-ip-value" name="floodIpExact" min="1" max="600" step="1" required aria-label="Лимит запросов в минуту на IP" value="'+esc(data.subscriptionFlood.ipPerMinute)+'"><span>запросов/мин</span></span></div>',
+      '<input type="range" id="sub-flood-ip-slider" name="floodIpPerMinute" min="1" max="600" step="1" value="'+esc(data.subscriptionFlood.ipPerMinute)+'">',
+      '<small>IP-фильтрация выполняется только на XMesh Sub. Для неё необходимо обновление шлюза.</small></div>',
+      '<div class="subscription-flood-limit"><div class="subscription-flood-limit-head"><label for="sub-flood-token-slider">На один токен</label>',
+      '<span class="subscription-flood-limit-value"><input type="number" id="sub-flood-token-value" name="floodTokenExact" min="1" max="60" step="1" required aria-label="Лимит запросов в минуту на токен" value="'+esc(data.subscriptionFlood.tokenPerMinute)+'"><span>запросов/мин</span></span></div>',
+      '<input type="range" id="sub-flood-token-slider" name="floodTokenPerMinute" min="1" max="60" step="1" value="'+esc(data.subscriptionFlood.tokenPerMinute)+'">',
+      '<small>В Nexus дополнительный запас 10 запросов на короткие всплески.</small></div>',
       '</div>',
       '<div class="subscription-flood-telemetry"><div><small>Запросов за 2 мин</small><strong data-sub-flood-requests>—</strong></div>',
       '<div><small>Превышений</small><strong data-sub-flood-exceeded>—</strong></div>',
@@ -653,8 +657,8 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionDomain:input(form,'subscriptionDomain').value.trim().toLowerCase(),
         subscriptionFlood:{enabled:input(form,'floodEnabled').checked,
           mode:form.querySelector('input[name="floodMode"]:checked')?.value||'monitor',
-          ipPerMinute:Number(input(form,'floodIpPerMinute').value),
-          tokenPerMinute:Number(input(form,'floodTokenPerMinute').value)},
+          ipPerMinute:Number(input(form,'floodIpExact').value),
+          tokenPerMinute:Number(input(form,'floodTokenExact').value)},
         subscriptionPath:input(form,'subscriptionPath').value.trim(),
         subscriptionBrand:input(form,'subscriptionBrand').value.trim(),
         subscriptionAnnouncement:input(form,'subscriptionAnnouncement').value.trim(),
@@ -769,16 +773,23 @@ window.XMeshSubscriptionStudio = (() => {
         const enabled=input(form,'floodEnabled').checked, mode=form.querySelector('input[name="floodMode"]:checked')?.value;
         const status=form.querySelector('[data-sub-flood-current-state]');
         if(status){status.textContent=!enabled?'Выключена':mode==='protect'?'Защита':'Мониторинг';status.dataset.state=enabled?'ready':'empty';}
-        for(const [name,target] of [['floodIpPerMinute','ip'],['floodTokenPerMinute','token']]){
-          const field=input(form,name),el=form.querySelector('[data-sub-flood-'+target+'-label]');
-          field.disabled=!enabled;
-          if(el)el.textContent=field.value;
+        for(const name of ['floodIpPerMinute','floodIpExact','floodTokenPerMinute','floodTokenExact']){
+          input(form,name).disabled=!enabled;
         }
         form.querySelectorAll('input[name="floodMode"]').forEach(radio=>{radio.disabled=!enabled;});
       };
-      for(const name of ['floodEnabled','floodIpPerMinute','floodTokenPerMinute']){
-        input(form,name).addEventListener('input',showFlood);
-      }
+      const bindFloodLimit=(sliderName,exactName)=>{
+        const slider=input(form,sliderName),exact=input(form,exactName);
+        slider.addEventListener('input',()=>{exact.value=slider.value;showFlood();});
+        exact.addEventListener('input',()=>{
+          const value=exact.valueAsNumber;
+          if(Number.isInteger(value)&&value>=Number(slider.min)&&value<=Number(slider.max))slider.value=String(value);
+          showFlood();
+        });
+      };
+      input(form,'floodEnabled').addEventListener('change',showFlood);
+      bindFloodLimit('floodIpPerMinute','floodIpExact');
+      bindFloodLimit('floodTokenPerMinute','floodTokenExact');
       form.querySelectorAll('input[name="floodMode"]').forEach(radio=>radio.addEventListener('change',showFlood));
       form.querySelector('[data-sub-flood-refresh]')?.addEventListener('click',refreshFlood);
       showFlood();void refreshFlood();
@@ -1193,7 +1204,11 @@ window.XMeshSubscriptionStudio = (() => {
           notify('Эмодзи статуса должен содержать от 1 до 16 символов.');return;
         }
         if(!pathOK(draft.subscriptionPath)){notify('Некорректный путь подписки');return;}
-        if(![draft.subscriptionFlood.ipPerMinute,draft.subscriptionFlood.tokenPerMinute].every(Number.isInteger)||!['monitor','protect'].includes(draft.subscriptionFlood.mode)){notify('Проверьте лимиты защиты подписок.');return;}
+        if(!['monitor','protect'].includes(draft.subscriptionFlood.mode)||
+          !Number.isInteger(draft.subscriptionFlood.ipPerMinute)||draft.subscriptionFlood.ipPerMinute<1||draft.subscriptionFlood.ipPerMinute>600||
+          !Number.isInteger(draft.subscriptionFlood.tokenPerMinute)||draft.subscriptionFlood.tokenPerMinute<1||draft.subscriptionFlood.tokenPerMinute>60){
+          notify('Проверьте лимиты защиты подписок: IP — 1–600, токен — 1–60 запросов/мин.');return;
+        }
         if(![draft.subscriptionJson.socksPort,draft.subscriptionJson.httpPort].every(p=>Number.isInteger(p)&&p>=1024&&p<=65535)||draft.subscriptionJson.socksPort===draft.subscriptionJson.httpPort){notify('Укажите разные локальные порты в диапазоне 1024–65535');return;}
         if(!Number.isInteger(draft.subscriptionUpdateInterval)||draft.subscriptionUpdateInterval<1||draft.subscriptionUpdateInterval>168){notify('Интервал обновления должен быть от 1 до 168 часов.');return;}
         for(const key of ['subscriptionLogoUrl','subscriptionSupportUrl']){
