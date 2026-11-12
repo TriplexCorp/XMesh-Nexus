@@ -1846,3 +1846,37 @@
   #dlg.user-create-modal .user-create-quota-controls{gap:.38rem}
   #dlg.user-create-modal .user-create-node-quota-note{margin-top:.43rem}
 }
+
+
+/* Wide-but-short desktops (including browser zoom-out) have enough horizontal
+ * room to keep the node quota editor beside the identity and limit cards.
+ * Prevent a hidden 274px scroll range without clipping any editable fields.
+ * Taller windows retain the normal two-column composition. */
+@media (min-width:2800px) and (max-height:1300px){
+  #dlg.user-create-modal{
+    --dialog-width:98rem;
+    width:min(var(--dialog-width),calc(100vw - 2rem));
+    zoom:1.12;
+    height:min(48rem,calc(100dvh - 2rem));
+    max-height:calc(100dvh - 2rem);
+  }
+  #dlg.user-create-modal .user-create-workspace{
+    grid-template-columns:minmax(0,1.02fr) minmax(0,1.02fr) minmax(0,1fr);
+    align-items:start;
+  }
+  #dlg.user-create-modal .user-create-node-quotas{
+    grid-column:3;
+    grid-row:1;
+    align-self:stretch;
+  }
+  #dlg.user-create-modal .user-create-node-quota-list{
+    grid-template-columns:minmax(0,1fr);
+    max-height:20rem;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+  #dlg.user-create-modal .user-create-section-extra{
+    grid-column:1/-1;
+    grid-row:2;
+  }
+}
