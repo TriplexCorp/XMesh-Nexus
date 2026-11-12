@@ -704,9 +704,9 @@ window.XMeshSubscriptionStudio = (() => {
       appearanceCard.querySelector('.subscription-studio-heading p').textContent='Палитра, шрифт, карточки и визуальные параметры.';
       const themeSync=portalCard.querySelector('.subscription-theme-sync');
       if(themeSync)appearanceCard.insertBefore(themeSync,appearanceCard.children[1]);
-      const palette=makePair(appearanceCard);
+      const palette=card('Палитра и тема','Цвета и режим отображения клиентского портала.');
+      appearance.insertBefore(palette,appearanceCard);
       moveFields(palette,['subscriptionAccent','subscriptionSecondaryAccent','subscriptionTheme']);
-      appearanceCard.insertBefore(palette,themeSync?.nextSibling||appearanceCard.children[1]);
       for(const parent of [portalCard,appearanceCard]){
         parent.querySelectorAll('.subscription-studio-pair').forEach(pair=>{
           if(!pair.childElementCount)pair.remove();
