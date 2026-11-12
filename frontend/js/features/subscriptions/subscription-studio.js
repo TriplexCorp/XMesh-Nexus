@@ -141,12 +141,33 @@ window.XMeshSubscriptionStudio = (() => {
   const esc = x => String(x ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const hostnameOK = v => !v || (v.length <= 253 && /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?)*$/i.test(v));
   const pathOK = v => v.length <= 64 && v.split('/').length <= 9 && /^\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/i.test(v) && !/^\/(?:api|login|dashboard)(?:\/|$)/i.test(v);
-  const installCommand=(panel,sub,path)=>{
+  // Immutable vetted XMesh Sub installer. SHA-256 must match before root execution.
+  const approvedSubInstaller={
+    revision:'51d90ff15ef2a68415e23b325b3a37393b8b97b5',
+    sha256:'19d3049bff7d23a13ad00d06debfd86cfc3fd773ce49a87426e0a9723566579b'
+  };
+  const validInstallParams=(panel,sub,path)=>{
     const valid=host=>typeof host==='string'&&host.includes('.')&&hostnameOK(host)&&
       /^[a-z0-9.-]+$/i.test(host)&&/\.[a-z]{2,}$/i.test(host);
-    if(!valid(panel)||!valid(sub)||panel===sub||!pathOK(path))return '';
-    return 'curl -fsSL https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/main/install.sh | sudo bash -s -- --panel https://'+panel+
-      ' --domain '+sub+' --path '+path;
+    return valid(panel)&&valid(sub)&&panel!==sub&&pathOK(path);
+  };
+  const installCommand=(panel,sub,path,token='')=>{
+    if(!validInstallParams(panel,sub,path)||!/^[a-f0-9]{64}$/.test(token))return '';
+    const installerUrl='https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/'+approvedSubInstaller.revision+'/install.sh';
+    // A single pasted shell group. The one-time credential is stdin (not argv).
+    // A local tempfile is verified before starting the privileged installer.
+    return [
+      '(',
+      '  set -eu',
+      '  xmesh_sub_installer="$(mktemp)"',
+      '  trap \'rm -f "$xmesh_sub_installer"\' EXIT',
+      '  curl --proto \'=https\' --tlsv1.2 -fsSL '+installerUrl+' -o "$xmesh_sub_installer"',
+      "  printf '"+approvedSubInstaller.sha256+"  %s\\n' \"$xmesh_sub_installer\" | sha256sum --check --status || { echo 'XMesh Sub: installer SHA-256 mismatch' >&2; exit 1; }",
+      '  sudo bash "$xmesh_sub_installer" --panel https://'+panel+' --domain '+sub+' --path '+path+" --enroll-token-stdin <<'XMESH_ENROLL_TOKEN'",
+      token,
+      'XMESH_ENROLL_TOKEN',
+      ')'
+    ].join('\n');
   };
   const field = (name,label,value,help,opts) => '<label class="f subscription-field"><span>'+label+'</span>'+
     (opts && opts.area ? '<textarea name="'+name+'" rows="'+(opts.rows||2)+'" maxlength="'+(opts.max||240)+'"'+(opts.placeholder?' placeholder="'+esc(opts.placeholder)+'"':'')+'>'+esc(value)+'</textarea>' :
@@ -483,7 +504,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<p>Направьте DNS A/AAAA домена подписок на новый VPS. Откройте TCP 80/443 и сохраните адрес и путь кнопкой «Сохранить настройки».</p></div></section>',
       '<section class="subscription-sub-step"><span class="subscription-sub-step-index">2</span><div><b>Установите XMesh Sub</b>',
       '<p>Создайте одну команду и выполните её на чистом VPS. Она установит шлюз, подключит управляющий агент и зарегистрирует сервер в Nexus.</p>',
-      '<div class="subscription-sub-install-actions"><button type="button" class="btn sm" data-sub-enroll>Создать команду установки</button><small>Привязка встроена в установку. Ключ действителен 60 минут.</small></div>',
+      '<div class="subscription-sub-install-actions"><button type="button" class="btn sm" data-sub-enroll>Создать команду установки</button><small>Привязка включена в установку. Ключ передаётся через stdin и действует 60 минут.</small></div>',
       '<div class="subscription-sub-install-command"><code data-sub-install-command>Создайте команду установки</code>',
       '<button type="button" class="btn sm" data-sub-install-copy disabled>Скопировать команду</button></div>',
       '<small data-sub-install-note role="status" aria-live="polite">Укажите отдельные домены Nexus и сервера подписок.</small>',
@@ -503,7 +524,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<button type="button" class="btn sm" data-sub-update disabled>Обновить XMesh Sub</button></div>',
       '<small data-sub-agent-detail role="status" aria-live="polite">Сначала создайте единую команду установки выше и выполните её на VPS.</small>',
       '</div>',
-      '<p class="subscription-sub-scope"><strong>Безопасность:</strong> агент на VPS сам обращается к Nexus по HTTPS; открывать отдельный административный порт не требуется. Обновление выполняет только официальный установщик XMesh Sub. Генерация подписок и пользователи остаются в Nexus.</p>',
+      '<p class="subscription-sub-scope"><strong>Безопасность:</strong> агент на VPS сам обращается к Nexus по HTTPS; открывать отдельный административный порт не требуется. Перед запуском root проверяется SHA-256 установщика; обновления дополнительно требуют подпись Ed25519. Генерация подписок и пользователи остаются в Nexus.</p>',
       '</section>',
       '</div></form></div>'
     ].join('');
@@ -719,8 +740,8 @@ window.XMeshSubscriptionStudio = (() => {
         if(enrollmentBusy)return;
         const draft=read();
         const panel=String(settings?.domain||window.location?.hostname||'').trim().toLowerCase();
-        const command=installCommand(panel,draft.subscriptionDomain,draft.subscriptionPath);
-        if(!command||savedInstall.domain!==draft.subscriptionDomain||savedInstall.path!==draft.subscriptionPath){
+        const valid=validInstallParams(panel,draft.subscriptionDomain,draft.subscriptionPath);
+        if(!valid||savedInstall.domain!==draft.subscriptionDomain||savedInstall.path!==draft.subscriptionPath){
           notify('Сначала сохраните корректные домен и путь подписок.');return;
         }
         if(!subApi?.enroll){notify('Управление Sub-сервером доступно только владельцу панели.');return;}
@@ -758,12 +779,12 @@ window.XMeshSubscriptionStudio = (() => {
 
       const updateInstall=(d)=>{
         const panel=String(settings?.domain||window.location?.hostname||'').trim().toLowerCase();
-        const command=installCommand(panel,d.subscriptionDomain,d.subscriptionPath);
+        const valid=validInstallParams(panel,d.subscriptionDomain,d.subscriptionPath);
         const dirty=savedInstall.domain!==d.subscriptionDomain||savedInstall.path!==d.subscriptionPath;
-        const ready=!!command&&!dirty;
+        const ready=valid&&!dirty;
         const expired=!!enrollmentToken&&Date.now()>=enrollmentExpiresAt;
         if(!ready||expired){enrollmentToken='';enrollmentExpiresAt=0;}
-        const managedCommand=ready&&enrollmentToken?command+' --enroll-token '+enrollmentToken:'';
+        const managedCommand=ready&&enrollmentToken?installCommand(panel,d.subscriptionDomain,d.subscriptionPath,enrollmentToken):'';
         if(enrollmentButton){
           enrollmentButton.disabled=!ready||!subApi?.enroll||enrollmentBusy;
           enrollmentButton.textContent=managedCommand?'Создать новую команду':'Создать команду установки';
@@ -782,7 +803,7 @@ window.XMeshSubscriptionStudio = (() => {
           state.textContent=dirty?'Не сохранено':managedCommand?'Команда готова':ready?'Ожидает команды':'Требуется настройка';
         }
         if(note)note.textContent=dirty?'Сначала сохраните изменённые адрес и путь.':
-          managedCommand?'Это единая команда установки и привязки. Код действует до '+new Date(enrollmentExpiresAt).toLocaleTimeString()+'. Не передавайте команду третьим лицам.':
+          managedCommand?'Это единая команда установки и привязки. Код действует до '+new Date(enrollmentExpiresAt).toLocaleTimeString()+'. Не публикуйте команду: она содержит одноразовый секрет.':
           expired?'Срок действия команды истёк. Создайте новую команду.':
           ready?'Нажмите «Создать команду установки». В ней будет одноразовый ключ для автоматического подключения агента.':
           'Нужны корректные разные домены панели и подписок.';
