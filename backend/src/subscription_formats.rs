@@ -819,7 +819,7 @@ mod tests {
         let mut proxy = vless("tcp", "tls");
         proxy["tag"] = json!("Test\"\nrules:\n- MATCH,DIRECT");
         let y = render(&[proxy], FeedFormat::Mihomo).unwrap().body;
-        assert!(y.contains("\\n"));
+        assert!(!y.contains("\n- MATCH,DIRECT"));
         assert_eq!(y.matches("\nrules:\n").count(), 1);
     }
 }
