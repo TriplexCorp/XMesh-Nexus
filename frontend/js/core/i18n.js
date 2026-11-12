@@ -22,6 +22,7 @@ window.XMeshI18n=(()=>{
     "Скрыть предпросмотр": "Hide preview",
     "Показать предпросмотр": "Show preview",
     "Живой предпросмотр": "Live preview",
+    "Язык предпросмотра": "Preview language",
     "Размер экрана": "Screen size",
     "Тема предпросмотра": "Preview theme",
     "Авто": "Auto",
