@@ -182,7 +182,7 @@ assert.match(src,/previewRoot\.lang=lang/,'Portal preview must set its own lang,
 assert.match(src,/textContent=copy\[4\]/,'Copy-link action must follow the visitor locale');
 assert.match(src,/english\?'Devices':'Устройства'/,'Device action must follow the visitor locale');
 assert.match(src,/\$\('\[data-subscription-description\]'\)\.textContent=/,'Custom copy must use textContent, not untrusted HTML');
-assert.match(view,/SUBSCRIPTION STUDIO/);
+assert.doesNotMatch(view,/<h2>SUBSCRIPTION STUDIO<\/h2>/,'Global shell is the only Studio header');
 assert.match(view,/name="subscriptionDomain"/);
 assert.match(view,/name="subscriptionPath"/);
 assert.match(view,/name="subscriptionBrand"/);
