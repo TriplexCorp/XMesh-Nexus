@@ -59,14 +59,13 @@ pub fn tags(settings: &Value) -> Result<HashSet<String>, ApiError> {
     Ok(settings
         .get("cdnInboundTags")
         .and_then(Value::as_array)
-        .map(|values| {
+        .map_or_else(HashSet::new, |values| {
             values
                 .iter()
                 .filter_map(Value::as_str)
                 .map(str::to_owned)
                 .collect()
-        })
-        .unwrap_or_default())
+        }))
 }
 
 /// Node-scoped quota policy. Legacy global tags remain supported.
