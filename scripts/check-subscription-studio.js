@@ -42,7 +42,7 @@ assert.equal(typeof init,'function');
 assert.match(view,/data-sub-install-command/);
 assert.match(view,/data-sub-install-copy/);
 assert.match(view,/data-sub-enroll/,'One-command managed installation must be discoverable');
-assert.match(view,/data-sub-install-actions/,'The one-command generator belongs to the install step');
+assert.match(view,/class="subscription-sub-install-actions"/,'The one-command generator belongs to the install step');
 assert.match(view,/Создать команду установки/,'Install must begin by generating a managed command');
 assert.doesNotMatch(view,/Создать команду привязки|Это базовая установка без управления/,
   'Never present separate unmanaged install and enrollment flows');
