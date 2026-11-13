@@ -587,3 +587,56 @@ html[data-link-style=underline] .settings-workspace .settings-type-link{
  .settings-workspace .settings-feature-links a,
  .settings-workspace .settings-palette-gallery .palette-preset{transition:none}
 }
+
+
+/* Security and Administrators keep their existing API owners and permissions:
+   the workspace provides useful navigation/context, not simulated toggles. */
+.settings-workspace .settings-security-routes{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:.7rem;margin:1rem 0;min-width:0
+}
+.settings-workspace .settings-security-routes a{
+ display:grid;grid-template-columns:auto minmax(0,1fr);gap:.25rem .65rem;
+ align-content:start;min-width:0;padding:.9rem;color:var(--tx);
+ text-decoration:none;border:1px solid var(--nx-border);
+ border-radius:var(--nx-card-radius);background:var(--nx-section-bg)
+}
+.settings-workspace .settings-security-routes a:hover{background:var(--nx-hover-bg)}
+.settings-workspace .settings-security-routes a:focus-visible{
+ outline:2px solid var(--nx-focus);outline-offset:2px
+}
+.settings-workspace .settings-security-routes a>span{
+ display:grid;place-items:center;grid-row:1/3;
+ width:2rem;height:2rem;border-radius:.6rem;
+ background:color-mix(in srgb,var(--a) 12%,var(--nx-panel-bg));
+ color:var(--a);font-size:.82rem;font-weight:750
+}
+.settings-workspace .settings-security-routes b{
+ font-size:.89rem;line-height:1.3
+}
+.settings-workspace .settings-security-routes small{
+ color:var(--mu);font-size:.79rem;line-height:1.45
+}
+.settings-workspace .settings-admin-role-guide{
+ display:grid;gap:.85rem;min-width:0;padding:var(--nx-card-pad);
+ border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);
+ background:var(--nx-panel-bg)
+}
+.settings-workspace .settings-admin-role-grid{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem
+}
+.settings-workspace .settings-admin-role-grid>div{
+ display:grid;align-content:start;gap:.35rem;min-width:0;
+ padding:1rem;border:1px solid var(--nx-border);
+ border-radius:var(--nx-control-radius);background:var(--nx-section-bg)
+}
+.settings-workspace .settings-admin-role-grid b{font-size:.9rem}
+.settings-workspace .settings-admin-role-grid p{
+ margin:0;font-size:.79rem;line-height:1.55;color:var(--mu)
+}
+@container settings-workspace (max-width:56rem){
+ .settings-workspace .settings-security-routes,
+ .settings-workspace .settings-admin-role-grid{
+  grid-template-columns:minmax(0,1fr)
+ }
+}
