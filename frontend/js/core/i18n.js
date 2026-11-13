@@ -15,6 +15,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Отменить правки после последнего сохранения": "Discard edits since the last save",
+    "Сбросить изменения": "Discard changes",
     "Создан пользователь": "User created",
     "Достигнут лимит": "Limit reached",
     "Исчерпан лимит трафика пользователя": "User traffic limit exceeded",

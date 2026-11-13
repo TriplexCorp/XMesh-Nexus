@@ -132,4 +132,18 @@ assert(html.indexOf('xray-studio-composer.js')<html.indexOf('xray-studio-v4.js')
 assertPackaged(assert,['xray-studio-composer.js']);
 assert(css.includes('.sv-compose-workspace'),'Enterprise composer styles must exist');
 assert(css.includes('.sv-compose-preview'),'JSON preview must exist');
+
+/* The editor may fill the viewport; the save state and reset action must be
+   directly in its top toolbar, not a footer requiring vertical scrolling. */
+const toolbarSource=studio.slice(studio.indexOf("'<div class=\"sv-topbar\">"),studio.indexOf("'<section class=\"sv-profiles-page\""));
+assert(toolbarSource.includes('data-v=\"saveState\"'),'Draft status must be in the XRAY STUDIO top toolbar');
+assert(toolbarSource.includes('data-action=\"reset\"'),'Reset changes must be in the same toolbar as Save');
+assert(toolbarSource.indexOf('data-action=\"reset\"')<toolbarSource.indexOf('data-action=\"save\"'),'Reset must appear just before Save');
+assert(!studio.includes('class=\"sv-bottom\"'),'Do not render a duplicate bottom draft bar');
+assert(!studio.includes("querySelector('.sv-bottom')"),'Page switching must not depend on the retired footer');
+assert.match(studio,/get\('saveState'\)\.dataset\.state=dirty\?'pending':'saved'/,'Draft status must reflect the real editor state');
+assert.match(studio,/querySelector\('\.sv-toolbar-reset'\)\.disabled=!dirty/,'Reset must be disabled when the profile is unchanged');
+assert.match(css,/\.sv-toolbar-save-state\[data-state=pending\]/,'Unsaved state needs an obvious active style');
+assert.match(css,/@container sv-studio-workspace \(max-width:1500px\)/,'Extra toolbar controls must wrap safely at medium widths');
+
 console.log('XRAY STUDIO composer: '+comboCount+' documented combinations, Shadowsocks XHTTP REALITY, safe generator, append/no-overwrite and UI packaging OK.');
