@@ -1395,7 +1395,7 @@ fn add_subscription_userinfo_header(response: &mut Response, user: &Value) {
         response
             .headers_mut()
             .insert("subscription-userinfo", value);
-    }
+   }
  }
 
 pub async fn serve(
