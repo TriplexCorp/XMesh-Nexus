@@ -153,7 +153,10 @@ pub(super) fn now_ms() -> i64 {
         .unwrap_or(i64::MAX)
 }
 
-#[expect(clippy::needless_pass_by_value, reason = "Owned API response data is serialized into a new envelope")]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Owned API response data is serialized into a new envelope"
+)]
 pub(super) fn reply(data: Value) -> Json<Value> {
     Json(json!({
         "data": data,
