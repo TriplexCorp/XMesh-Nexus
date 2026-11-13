@@ -15,6 +15,9 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "0 или пусто — без ограничения на этой ноде. Периоды обновляются по UTC: день в 00:00, неделя в понедельник 00:00. Доступ изменится после синхронизации ноды.": "Zero or blank means unlimited on that node. UTC resets: daily at 00:00 and weekly on Monday at 00:00. Access updates after node synchronization.",
+    "Проверьте лимит и период ноды: положительное число до 1 000 000 ГБ и ежедневный/еженедельный/ежемесячный/за всё время.": "Check the node limit and period: a positive number up to 1,000,000 GB and daily/weekly/monthly/lifetime.",
+    "Некорректная квота ноды: ID, положительный лимит ГБ и период daily/weekly/monthly/lifetime обязательны.": "Invalid node quota: a valid node ID, positive GB limit, and daily/weekly/monthly/lifetime period are required.",
     "Использование": "Usage",
     "Контейнер панели": "Panel container",
     "Тренд появится после двух измерений": "Trend appears after two measurements",

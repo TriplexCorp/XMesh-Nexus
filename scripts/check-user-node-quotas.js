@@ -6,6 +6,7 @@ const quota=source('backend/src/node_user_quotas.rs');
 const backend=source('backend/src/main.rs');
 const runtime=source('backend/src/node_runtime_legacy.rs');
 const migration=source('backend/migrations/0115_user_node_quota_ledgers.sql');
+const calendarMigration=source('backend/migrations/0116_user_node_quota_day_week.sql');
 const renderer=source('backend/src/subscription_remark.rs');
 const subscription=source('backend/src/user_subscriptions_base.rs');
 const ui=source('frontend/js/features/users/user-node-quotas.js');
@@ -20,6 +21,10 @@ for(const [regex,message] of [
 assert.match(backend,/persist_verified_traffic_deltas\(conn, node_id, &serialized, sampled_at, false\)\.await\?;/);
 assert.match(backend,/INSERT INTO user_node_quota_lifetime AS quota/);
 assert.match(backend,/INSERT INTO user_node_quota_monthly AS monthly/);
+assert.match(backend,/INSERT INTO user_node_quota_daily AS daily/);
+assert.match(backend,/INSERT INTO user_node_quota_weekly AS weekly/);
+assert.match(backend,/ON CONFLICT \(day_start,node_id,user_id\)/);
+assert.match(backend,/ON CONFLICT \(week_start,node_id,user_id\)/);
 assert.match(backend,/previous\.last_uplink_bytes/);
 assert.match(backend,/JOIN user_node_traffic_totals AS previous/);
 assert.match(backend,/node_user_quotas::validate_user\(data\)/);
@@ -31,6 +36,18 @@ assert.match(runtime,/node_user_quotas::offline_remaining\(user, node_id\)/);
 assert.match(quota,/nodeQuotaUsedBytes/);
 assert.match(quota,/MAX_NODE_POLICIES/);
 assert.match(quota,/remaining_for\(/);
+assert.match(quota,/Some\("daily"\) => "daily"/);
+assert.match(quota,/Some\("weekly"\) => "weekly"/);
+assert.match(quota,/bytes_for_period\(found, rule\.period\)/);
+assert.match(quota,/user_node_quota_daily/);
+assert.match(quota,/user_node_quota_weekly/);
+assert.match(quota,/"dailyBytes":sampled\.daily/);
+assert.match(quota,/"weeklyBytes":sampled\.weekly/);
+assert.match(calendarMigration,/CREATE TABLE user_node_quota_daily/);
+assert.match(calendarMigration,/CREATE TABLE user_node_quota_weekly/);
+assert.match(calendarMigration,/date_trunc\('week',\s*sampled_at AT TIME ZONE 'UTC'\)/);
+assert.match(calendarMigration,/source_type='user'/);
+assert.match(calendarMigration,/FROM verified_traffic_deltas/);
 assert.match(quota,/is_none_or\(\|used\| used < 0 \|\| used >= rule\.limit_bytes\)/);
 assert.match(renderer,/"NODE_DATA_LEFT"/);
 assert.match(renderer,/node_remaining/);
@@ -64,6 +81,10 @@ assert.match(created,/data-user-create-quota-row="12"/);
 assert.match(created,/data-user-create-quota-row="19"/);
 assert.match(created,/data-user-create-quota-count/);
 assert.match(created,/Безлимит/);
+for(const [period,label] of [['daily','Каждый день'],['weekly','Каждую неделю'],['monthly','Ежемесячно'],['lifetime','За всё время']]){
+  assert.match(created,new RegExp('value="'+period+'"[^>]*>'+label));
+}
+assert.match(ui,/periodOptions\(node\.period\)/);
 assert.equal(created.includes('<details'),false,'The per-node panel must appear immediately');
 assert.match(helper.createMarkup([{id:3,name:'A & <B>'}]),/A &amp; &lt;B&gt;/,
   'Node names must be escaped before rendering');
@@ -75,6 +96,9 @@ const nodeRow=(id,value,period)=>({
     selector==='[data-user-create-quota-period]'?{value:period}:null
 });
 const form=rows=>({querySelectorAll:()=>rows});
+assert.deepEqual(helper.readCreate(form([nodeRow(12,'5','daily'),nodeRow(19,'847','weekly')])),{
+  '12':{limitGb:5,period:'daily'},'19':{limitGb:847,period:'weekly'}
+});
 assert.deepEqual(helper.readCreate(form([nodeRow(12,'5','monthly'),nodeRow(19,'847','lifetime')])),{
   '12':{limitGb:5,period:'monthly'},'19':{limitGb:847,period:'lifetime'}
 });
@@ -82,7 +106,7 @@ assert.deepEqual(helper.readCreate(form([nodeRow(12,'','monthly'),nodeRow(19,'0'
 for(const value of ['-1','1000001','abc','0.0000000001']){
   assert.throws(()=>helper.readCreate(form([nodeRow(12,value,'monthly')])));
 }
-assert.throws(()=>helper.readCreate(form([nodeRow(12,'5','weekly')])));
+assert.throws(()=>helper.readCreate(form([nodeRow(12,'5','hourly')])));
 const quotaRow=(id,value,period)=>({
   dataset:{nodeQuotaRow:String(id)},
   querySelector:selector=>selector==='[data-node-quota-limit]'?
@@ -98,11 +122,14 @@ assert.equal(helper.readDraft(draftRoot(false,[quotaRow(12,'5','monthly')])),nul
 assert.deepEqual(helper.readDraft(draftRoot(true,[quotaRow(12,'5','monthly')])),{
   '12':{limitGb:5,period:'monthly'}
 });
+assert.deepEqual(helper.readDraft(draftRoot(true,[quotaRow(12,'5','daily'),quotaRow(19,'847','weekly')])),{
+  '12':{limitGb:5,period:'daily'},'19':{limitGb:847,period:'weekly'}
+});
 assert.deepEqual(helper.readDraft(draftRoot(true,[quotaRow(12,'','monthly')])),{},
   'Clearing a quota must transmit an empty policy map');
 assert.throws(()=>helper.readDraft(draftRoot(true,[quotaRow(12,'-1','monthly')])),
   /Лимит должен быть положительным/);
-assert.throws(()=>helper.readDraft(draftRoot(true,[quotaRow(12,'5','weekly')])),
+assert.throws(()=>helper.readDraft(draftRoot(true,[quotaRow(12,'5','hourly')])),
   /Некорректный период/);
 
 assert.doesNotMatch(ui,/data-node-quota-save/,

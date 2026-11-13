@@ -208,15 +208,21 @@ async function main() {
       assert.equal(await details.locator('.user-create-node-quotas-head').isVisible(),true,
         'A visible quota heading and summary must appear on creation');
       const row=form.locator('[data-user-create-quota-row="'+node.id+'"]');
+      assert.deepEqual(
+        await row.locator('[data-user-create-quota-period] option').evaluateAll(
+          options=>options.map(option=>option.value)),
+        ['daily','weekly','monthly','lifetime'],
+        'New users should have all four per-node periods'
+      );
       await row.locator('[data-user-create-quota-limit]').fill('5');
       await row.locator('[data-user-create-quota-period]').evaluate(select=>{
-        select.value='lifetime';select.dispatchEvent(new Event('change',{bubbles:true}));
+        select.value='daily';select.dispatchEvent(new Event('change',{bubbles:true}));
       });
       assert.match(await details.locator('[data-user-create-quota-count]').innerText(),/1\s*\/\s*\d+/);
       assert.equal(await row.getAttribute('data-limited'),'true','Configured node has an active state');
       assert.match(await row.locator('[data-user-create-quota-status]').innerText(),/5/);
       const sampled=await form.evaluate(f=>window.XMeshNodeQuotas.readCreate(f));
-      assert.deepEqual(sampled[String(node.id)],{limitGb:5,period:'lifetime'});
+      assert.deepEqual(sampled[String(node.id)],{limitGb:5,period:'daily'});
       await form.locator('input[name="username"]').fill(prefix+'-node-quota-create');
       await form.locator('[name="squads"][value="'+squad.id+'"]').check();
       const response=page.waitForResponse(res=>res.url().includes('/api/v1/collections/users')&&res.request().method()==='POST');
@@ -224,11 +230,11 @@ async function main() {
       const created=await response;
       assert.equal(created.status(),201,'User and node policy must be accepted in one create request');
       const payload=JSON.parse(created.request().postData()||'{}');
-      assert.deepEqual(payload.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'lifetime'});
+      assert.deepEqual(payload.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'daily'});
       assert.equal(payload.nodeQuotaUsedBytes,undefined,'Browser must never submit quota meter state');
       const saved=await created.json();
       fixtures.push({collection:'users',id:saved.id});
-      assert.deepEqual(saved.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'lifetime'});
+      assert.deepEqual(saved.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'daily'});
     });
 
     await checked('Version popover: available, completed, unavailable and accessible actions',async()=>{
@@ -1955,7 +1961,13 @@ async function main() {
         'Invalid quota must keep the Traffic tab selected');
       assert(await page.locator('#dlg #fe').isVisible(),'Quota validation must show an error');
       await quotaRow.locator('[data-node-quota-limit]').fill('5');
-      await quotaRow.locator('[data-node-quota-period]').selectOption('lifetime');
+      assert.deepEqual(
+        await quotaRow.locator('[data-node-quota-period] option').evaluateAll(
+          options=>options.map(option=>option.value)),
+        ['daily','weekly','monthly','lifetime'],
+        'Existing users should have all four per-node periods'
+      );
+      await quotaRow.locator('[data-node-quota-period]').selectOption('weekly');
       assert.match(await page.locator('[data-user-edit-dirty]').innerText(),/несохранённые|Unsaved/i,
         'Editing quotas must flag unsaved user changes');
       const saved=page.waitForResponse(r=>r.url().endsWith(`/collections/users/${otherUser.id}`)&&r.request().method()==='PATCH');
@@ -1963,13 +1975,13 @@ async function main() {
       const response=await saved;
       assert(response.ok());
       const patch=JSON.parse(response.request().postData()||'{}');
-      assert.deepEqual(patch.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'lifetime'},
+      assert.deepEqual(patch.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'weekly'},
         'The one user Save must submit the changed quota alongside other settings');
       assert.equal(patch.nodeQuotaUsedBytes,undefined,'Never send server-owned counters');
       await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
       const result=(await api('GET','/bootstrap')).collections.users.find(u=>u.id===otherUser.id);
       assert.equal(result.desc,'User tab draft');assert.equal(result.hwid,4);assert.deepEqual(result.squads,[]);
-      assert.deepEqual(result.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'lifetime'});
+      assert.deepEqual(result.nodeTrafficLimits[String(node.id)],{limitGb:5,period:'weekly'});
       await api('PATCH',`/collections/users/${otherUser.id}`,{desc:'',hwid:2,squads:[squad.id],nodeTrafficLimits:{}});
     });
 
