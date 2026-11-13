@@ -20,7 +20,7 @@ window.XMeshSubscriptionStudio = (() => {
     subscriptionBackground:'#0c131b',subscriptionCardColor:'#15212b',subscriptionTextColor:'#ecf3f6',
     subscriptionLayout:'standard',subscriptionCardStyle:'soft',subscriptionFont:'system',subscriptionRadius:16,
     subscriptionHero:'',subscriptionHeroEn:'',subscriptionCta:'',subscriptionCtaEn:'',subscriptionLogoUrl:'',subscriptionSupportLabel:'Поддержка',subscriptionSupportLabelEn:'',
-    subscriptionSupportUrl:'',subscriptionClientLayout:'grid',
+    subscriptionSupportUrl:'',subscriptionProfileWebPageUrl:'',subscriptionProfileWebPageEnabled:true,subscriptionClientLayout:'grid',
     subscriptionJson:{dns:'cloudflare',queryStrategy:'UseIPv4',routingStrategy:'IPIfNonMatch',
       customDnsAddress:'',
       balance:'leastPing',smart:false,sniffing:true,dnsRouting:false,socksPort:10808,httpPort:10809},
@@ -303,6 +303,9 @@ window.XMeshSubscriptionStudio = (() => {
       field('subscriptionSupportLabelEn','Название поддержки (EN)',data.subscriptionSupportLabelEn,'Английское название поддержки.',{max:80}),
       field('subscriptionSupportUrl','Ссылка поддержки',data.subscriptionSupportUrl,'HTTPS-ссылка на сайт или чат.',{placeholder:'https://example.com/help',max:512}),
       '</div>',
+      '<label class="subscription-theme-sync subscription-profile-page-toggle"><input type="checkbox" name="subscriptionProfileWebPageEnabled"'+(data.subscriptionProfileWebPageEnabled!==false?' checked':'')+'> <span><b>Личный кабинет в VPN-приложениях</b><small>Показывать кнопку сайта подписки в поддерживающих клиентах.</small></span></label>',
+      field('subscriptionProfileWebPageUrl','Свой адрес кабинета (необязательно)',data.subscriptionProfileWebPageUrl,'Оставьте пустым — приложение откроет персональный портал XMesh. Если указать свой HTTPS-адрес, он будет общим для всех подписчиков.',{placeholder:'Автоматически: личная страница XMesh',max:512}),
+      '<p class="note subscription-profile-page-preview" data-subscription-profile-page-preview role="status">Будет доступен после настройки домена подписок.</p>',
       '<div class="subscription-studio-heading subscription-studio-subheading"><span>◈</span><div><h3>Блоки страницы</h3><p>Каждый элемент включается независимо.</p></div></div>',
       '<div class="subscription-display-options subscription-visibility">',
       '<label><input type="checkbox" name="subscriptionShowStatus"'+(data.subscriptionShowStatus?' checked':'')+'> Статус подписки</label>',
@@ -703,6 +706,11 @@ window.XMeshSubscriptionStudio = (() => {
         'subscriptionSupportLabel','subscriptionSupportLabelEn','subscriptionSupportUrl',
         'subscriptionFooter','subscriptionFooterEn'
       ]);
+      const profileToggle=portalCard.querySelector('.subscription-profile-page-toggle');
+      if(profileToggle)copyCard.append(profileToggle);
+      moveFields(copyCard,['subscriptionProfileWebPageUrl']);
+      const profilePreview=portalCard.querySelector('[data-subscription-profile-page-preview]');
+      if(profilePreview)copyCard.append(profilePreview);
 
       portalCard.querySelector('h3').textContent='Клиентский портал';
       portalCard.querySelector('.subscription-studio-heading p').textContent='Название, описание и язык публичной страницы подписки.';
@@ -835,6 +843,8 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionSupportLabel:input(form,'subscriptionSupportLabel').value.trim(),
         subscriptionSupportLabelEn:input(form,'subscriptionSupportLabelEn').value.trim(),
         subscriptionSupportUrl:input(form,'subscriptionSupportUrl').value.trim(),
+        subscriptionProfileWebPageUrl:input(form,'subscriptionProfileWebPageUrl').value.trim(),
+        subscriptionProfileWebPageEnabled:input(form,'subscriptionProfileWebPageEnabled').checked,
         subscriptionClientLayout:input(form,'subscriptionClientLayout').value,
         subscriptionAppsTitle:input(form,'subscriptionAppsTitle').value.trim(),
         subscriptionAppsTitleEn:input(form,'subscriptionAppsTitleEn').value.trim(),
@@ -1100,6 +1110,18 @@ window.XMeshSubscriptionStudio = (() => {
         applyPanelTheme();
         const d=read();
         updateInstall(d);
+        const profilePagePreview=root.querySelector('[data-subscription-profile-page-preview]');
+        if(profilePagePreview){
+          const pageUrl=d.subscriptionProfileWebPageUrl||
+            (d.subscriptionDomain&&hostnameOK(d.subscriptionDomain)&&pathOK(d.subscriptionPath)
+              ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/<персональный-токен>?view=portal'
+              : '');
+          profilePagePreview.textContent=!d.subscriptionProfileWebPageEnabled
+            ? 'Кнопка личного кабинета скрыта в VPN-приложениях.'
+            : pageUrl
+              ? 'В VPN-приложениях: '+pageUrl
+              : 'Укажите домен подписок в разделе «Серверы подписок».';
+        }
         if(!['ru','en'].includes(previewLanguage))previewLanguage='ru';
         const lang=previewLanguage,english=lang==='en',copy=locale[lang];
         const previewRoot=$('[data-subscription-preview]');
@@ -1396,7 +1418,7 @@ window.XMeshSubscriptionStudio = (() => {
         }
         if(![draft.subscriptionJson.socksPort,draft.subscriptionJson.httpPort].every(p=>Number.isInteger(p)&&p>=1024&&p<=65535)||draft.subscriptionJson.socksPort===draft.subscriptionJson.httpPort){notify('Укажите разные локальные порты в диапазоне 1024–65535');return;}
         if(!Number.isInteger(draft.subscriptionUpdateInterval)||draft.subscriptionUpdateInterval<1||draft.subscriptionUpdateInterval>168){notify('Интервал обновления должен быть от 1 до 168 часов.');return;}
-        for(const key of ['subscriptionLogoUrl','subscriptionSupportUrl']){
+        for(const key of ['subscriptionLogoUrl','subscriptionSupportUrl','subscriptionProfileWebPageUrl']){
           if(!validHttps(draft[key])){notify('Укажите корректную HTTPS-ссылку без логина и порта.');return;}
         }
         for(const [id,url] of Object.entries(draft.subscriptionClientLinks)){
