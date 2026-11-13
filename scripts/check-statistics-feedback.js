@@ -303,6 +303,18 @@ matches(css,/\.stats-node-facts\s*\{[\s\S]*?grid-template-columns:/);
 matches(css,/@media\(max-width:390px\)[\s\S]*?\.stats-node-facts\s*\{grid-template-columns:1fr/);
 rejects(app,/\['CPU',statsValue\(ok\?v\.cpuPercent:null,'%'/,'Do not repeat CPU underneath the compact gauges');
 
+// Readability is a feature contract, not a browser zoom workaround.
+matches(css,/\.stats-nodes-section\s*\{[^}]*container:stats-nodes \/ inline-size/);
+matches(css,/#stats-dashboard \.stats-nodes-section \.stats-nodes-header h3\s*\{[^}]*font-size:clamp\(1\.12rem/);
+matches(css,/\.stats-node-identity strong\s*\{[^}]*font-size:1\.07rem/);
+matches(css,/#stats-nodes \.stats-ring\s*\{width:clamp\(4\.25rem/);
+matches(css,/#stats-nodes \.stats-ring strong\s*\{[^}]*font-size:clamp\(\.88rem/);
+matches(css,/#stats-nodes \.stats-ring-card\s*\{[^}]*min-height:9rem/);
+matches(css,/\.stats-node-facts-network \.stats-node-fact strong\s*\{font-size:1\.02rem/);
+matches(css,/@container stats-nodes \(max-width:1279px\)\s*\{[\s\S]*?\.stats-nodes-section \.stats-node-grid\{grid-template-columns:minmax\(0,1fr\)/);
+matches(css,/@container stats-nodes \(max-width:680px\)\s*\{[\s\S]*?#stats-nodes \.stats-node-rings\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+matches(css,/@container stats-nodes \(max-width:520px\)\s*\{[\s\S]*?\.stats-node-facts\{grid-template-columns:minmax\(0,1fr\)/);
+
 // Node controls share ONE toolbar (including the count), with enhanced-select geometry.
 matches(app,/class="stats-nodes-toolbar" role="toolbar"/);
 matches(app,/id="stats-node-count" class="stats-node-count" role="status"/);
