@@ -22,7 +22,7 @@ use uuid::Uuid;
 pub use auth::{create_token, list_tokens, revoke_token};
 
 #[derive(Clone, Debug)]
-pub(super) struct ServicePrincipal {
+pub struct ServicePrincipal {
     client_id: i64,
     token_id: i64,
     name: String,
@@ -69,7 +69,7 @@ impl ServicePrincipal {
 }
 
 #[derive(Debug)]
-pub(super) struct Problem {
+pub struct Problem {
     status: StatusCode,
     code: &'static str,
     message: &'static str,
@@ -83,7 +83,7 @@ impl Problem {
             message,
         }
     }
-    fn unavailable() -> Self {
+    const fn unavailable() -> Self {
         Self::new(
             StatusCode::SERVICE_UNAVAILABLE,
             "temporarily_unavailable",
@@ -144,7 +144,7 @@ impl IntoResponse for Problem {
     }
 }
 
-pub(super) fn now_ms() -> i64 {
+pub fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -157,7 +157,7 @@ pub(super) fn now_ms() -> i64 {
     clippy::needless_pass_by_value,
     reason = "Owned API response data is serialized into a new envelope"
 )]
-pub(super) fn reply(data: Value) -> Json<Value> {
+pub fn reply(data: Value) -> Json<Value> {
     Json(json!({
         "data": data,
         "meta": {
