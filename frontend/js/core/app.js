@@ -5066,7 +5066,8 @@ async function setP(){
     </section>
     <section class="card sg settings-palette-gallery" data-settings-group="colors">
       <div class="appearance-card-heading"><h3>Готовые палитры</h3><small>Выбор сразу применяется ко всей панели. Свой вариант — слева.</small></div>
-[object Object]      <div class="settings-theme-specimen" aria-label="Пример компонентов интерфейса" role="img">
+      <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
+      <div class="settings-theme-specimen" aria-label="Пример компонентов интерфейса" role="img">
         <div class="settings-specimen-head"><span class="settings-specimen-mark"></span><span><b>Предпросмотр интерфейса</b><small>Действующая тема и выбранный акцент</small></span><span class="settings-specimen-chip">Активно</span></div>
         <div class="settings-specimen-content"><span class="settings-specimen-field">Название параметра</span><span class="settings-specimen-primary">Основное действие</span><span class="settings-specimen-secondary">Вторичное действие</span></div>
         <div class="settings-specimen-foot"><i></i><span>Цвета, кнопки и границы в действующем оформлении</span></div>
