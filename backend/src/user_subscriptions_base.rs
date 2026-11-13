@@ -627,10 +627,7 @@ pub async fn rotate_credentials(
 /// Service-controlled, read-only subscription URL access. Caller MUST have
 /// already enforced subscriptions:read AND the user's scope restriction.
 /// Never include the raw token in this response or silently rotate a link.
-pub async fn service_subscription_status(
-    state: &AppState,
-    id: i64,
-) -> Result<Value, ApiError> {
+pub async fn service_subscription_status(state: &AppState, id: i64) -> Result<Value, ApiError> {
     if id <= 0 {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found"));
     }
