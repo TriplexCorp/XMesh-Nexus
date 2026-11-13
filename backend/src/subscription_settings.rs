@@ -271,6 +271,7 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
         "subscriptionShowSupport",
         "subscriptionShowDevices",
         "subscriptionProfileWebPageEnabled",
+        "subscriptionAnnouncementEnabled",
     ] {
         if let Some(v) = object.get(key)
             && !v.is_boolean()
