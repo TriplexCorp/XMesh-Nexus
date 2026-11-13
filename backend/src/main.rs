@@ -239,6 +239,12 @@ impl From<sqlx::Error> for ApiError {
         if let sqlx::Error::Database(db_error) = &error
             && db_error.code().as_deref() == Some("23505")
         {
+            if db_error.constraint() == Some("panel_records_user_username_lower_uq") {
+                return Self::new(
+                    StatusCode::CONFLICT,
+                    "Такое имя пользователя уже существует.",
+                );
+            }
             return Self::new(
                 StatusCode::CONFLICT,
                 "Запись с такими данными уже существует.",
