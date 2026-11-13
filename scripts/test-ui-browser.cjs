@@ -1260,6 +1260,13 @@ async function main() {
         await navigate(route);
         const g = await geometry(page);
         if(route==='statistics'){
+          // Navigation only confirms the view shell. Node metrics arrive from an
+          // independent asynchronous request; do not measure its counter while
+          // it is still empty rather than reporting a real filtered/total count.
+          await page.waitForFunction(()=>{
+            const nodeCount=document.querySelector('#stats-node-count');
+            return nodeCount && /^\\d+ (?:из|of) \\d+$/.test(nodeCount.textContent.trim());
+          },null,{timeout:15000});
           const toolbar=await page.locator('.stats-nodes-toolbar').evaluate(root=>{
             const rect=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,centerY:r.y+r.height/2}};
             const search=root.querySelector('.stats-node-search'),input=root.querySelector('#stats-node-search');
