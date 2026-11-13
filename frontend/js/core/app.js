@@ -1611,7 +1611,7 @@ function statisticsP(){
     <p class="note stats-user-footnote">Источник: подписанные Xray-счётчики. Значения пользовательского и inbound-учёта не суммируются. Нет измерений ≠ нулевой расход.</p></div><aside class="stats-user-aside" aria-label="Сводка по трафику"><section class="stats-insight-card"><h3>Источники трафика</h3><div id="stats-user-source-insight" class="stats-insight-content">Загрузка подтверждённых измерений…</div></section><section class="stats-insight-card"><h3>Ноды с трафиком</h3><div id="stats-user-node-insight" class="stats-insight-content">Загрузка…</div></section><section class="stats-insight-card"><h3>Качество данных</h3><p class="note">Только подтверждённые дельты Xray. Отсутствие показаний не означает нулевой трафик.</p></section></aside></div>
    </section>
   </dialog>
-  <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
+  <section class="card stats-control-panel"><div class="hd stats-control-header"><span class="stats-control-emblem" aria-hidden="true">${ic('layers')}</span><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
   <section class="card stats-nodes-section"><div class="hd stats-nodes-header"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div class="stats-nodes-toolbar" role="toolbar" aria-label="Поиск и отображение узлов"><label class="stats-node-search">${ic('search')}<input type="search" id="stats-node-search" placeholder="Поиск по узлам…" aria-label="Поиск по узлам" autocomplete="off"></label><div class="stats-node-toolbar-actions"><select id="stats-node-filter" aria-label="Фильтр телеметрии"><option value="all">Все узлы</option><option value="fresh">Свежие данные</option><option value="attention">Требуют внимания</option><option value="missing">Без измерений</option></select><div class="stats-node-view-toggle" role="group" aria-label="Вид карточек узлов"><button type="button" data-stats-node-view="grid" aria-label="Карточки" title="Карточки" aria-pressed="true">${ic('grid')}</button><button type="button" data-stats-node-view="list" aria-label="Список" title="Список" aria-pressed="false">${ic('list')}</button></div><span id="stats-node-count" class="stats-node-count" role="status" aria-live="polite" aria-atomic="true"></span></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
   <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
  </div>`;
@@ -1624,6 +1624,39 @@ function statisticsP(){
   let refreshing=false;
   let lastRefresh=0;
   let lastOverview=0,lastSystem=0,overviewCache=null,systemCache=null;
+  // Session-only Control Plane telemetry history, sampled from real API values.
+  // No synthetic points, extrapolation or persisted/claimed historical series.
+  let lastControlSampleAt=0;
+  const controlMetricHistory={cpu:[],ram:[],disk:[]};
+  const appendControlSample=(sys)=>{
+    const timestamp=Number(sys?.sampledAt);
+    if(!Number.isFinite(timestamp)||timestamp<=lastControlSampleAt)return;
+    lastControlSampleAt=timestamp;
+    for(const [key,field] of [['cpu',sys?.cpu?.percent],['ram',sys?.ram?.percent],['disk',sys?.disk?.percent]]){
+      if(field==null||!Number.isFinite(Number(field)))continue;
+      controlMetricHistory[key].push(Math.max(0,Math.min(100,Number(field))));
+      if(controlMetricHistory[key].length>60)controlMetricHistory[key].shift();
+    }
+  };
+  const controlTrend=(key)=>{
+    const samples=controlMetricHistory[key]||[];
+    if(samples.length<2)return '<div class="stats-control-trend-empty">'+
+      (panelIsEnglish()?'Trend appears after two measurements':'Тренд появится после двух измерений')+'</div>';
+    const coordinates=samples.map((v,i)=>[4+192*i/(samples.length-1),40-36*v/100]);
+    const data=coordinates.map(([x,y])=>x.toFixed(2)+','+y.toFixed(2)).join(' ');
+    const fillPath='M'+data.replaceAll(' ',' L')+' L196,44 L4,44 Z';
+    return '<svg class="stats-control-trend-plot" viewBox="0 0 200 44" preserveAspectRatio="none" aria-hidden="true">'+
+      '<path d="'+fillPath+'" class="stats-control-trend-fill"/>'+
+      '<polyline points="'+data+'" fill="none" class="stats-control-trend-line"/></svg>';
+  };
+  const controlMetric=(key,label,percent,accent,icon,detail)=>{
+    const labelUsage=panelIsEnglish()?'Usage':'Использование';
+    return '<div class="stats-control-metric" data-metric="'+key+'" style="--control-accent:'+accent+'">'+
+      '<header class="stats-control-metric-title"><span class="stats-control-metric-icon">'+ic(icon)+'</span><strong>'+esc(label)+'</strong></header>'+
+      statsRing(labelUsage,percent,accent)+
+      '<div class="stats-control-metric-baseline"><span>'+esc(detail)+'</span></div>'+
+      '<div class="stats-control-trend">'+controlTrend(key)+'</div></div>';
+  };
   let requestFailed=false,lastSampleAt=0,lastTrafficSignature='',lastTrafficPeriod='';
   let selectedBucketMs=null,detailRequest=0,chartPoints=[];
 
@@ -1733,15 +1766,31 @@ function statisticsP(){
       ['Downlink',Number(overview.inboundTraffic?.counters)>0?statsBytes(overview.inboundTraffic?.downlinkBytes):'Нет данных','Накопленный персональный трафик, не за выбранный период']
     ];
     $('#stats-summary').innerHTML=tiles.map(x=>statsMetric(...x)).join('');
+    appendControlSample(sys);
+    const loadAverage=[sys?.loadAverage?.one,sys?.loadAverage?.five,sys?.loadAverage?.fifteen]
+      .map(v=>v==null?'Нет данных':statsValue(v)).join(' / ');
     const control=[
-      ['CPU',statsValue(sys.cpu?.percent,'%')],['RAM',statsValue(sys.ram?.percent,'%')],
-      ['ОЗУ занято',statsBytes(sys.ram?.usedBytes)],['ОЗУ всего',statsBytes(sys.ram?.totalBytes)],
-      ['Диск',statsValue(sys.disk?.percent,'%')],['Диск занят',statsBytes(sys.disk?.usedBytes)],
-      ['Загрузка 1/5/15',Array.isArray([sys.loadAverage?.one,sys.loadAverage?.five,sys.loadAverage?.fifteen])?[sys.loadAverage?.one,sys.loadAverage?.five,sys.loadAverage?.fifteen].map(v=>statsValue(v)).join(' / '):'Нет данных'],
-      ['Процессы',statsValue(sys.processCount)],['PostgreSQL',sys.database==='online'?'Онлайн':'Не отвечает'],
-      ['Uptime',sys.uptimeSeconds==null?'Нет данных':Math.floor(sys.uptimeSeconds/3600)+(panelIsEnglish()?' h':' ч')]
+      ['CPU',statsValue(sys?.cpu?.percent,'%'),'activity'],
+      ['RAM',statsValue(sys?.ram?.percent,'%'),'layers'],
+      ['ОЗУ занято',statsBytes(sys?.ram?.usedBytes),'layers'],
+      ['ОЗУ всего',statsBytes(sys?.ram?.totalBytes),'layers'],
+      ['Диск',statsValue(sys?.disk?.percent,'%'),'server'],
+      ['Диск занят',statsBytes(sys?.disk?.usedBytes),'server'],
+      ['Загрузка 1/5/15',loadAverage,'activity'],
+      ['Процессы',statsInteger(sys?.processCount),'list'],
+      ['PostgreSQL',sys?.database==='online'?'Онлайн':sys?.database==='offline'?'Не отвечает':'Нет данных','server',sys?.database==='online'?'online':sys?.database==='offline'?'offline':''],
+      ['Uptime',sys?.uptimeSeconds==null?'Нет данных':Math.floor(sys.uptimeSeconds/3600)+(panelIsEnglish()?' h':' ч'),'activity']
     ];
-    $('#stats-control').innerHTML='<div class="stats-control-rings">'+statsRing('CPU',sys.cpu?.percent,'#6f9bff')+statsRing('RAM',sys.ram?.percent,'#c294e8')+statsRing('Диск',sys.disk?.percent,'#44c9b6')+'</div><div class="stats-kvs">'+control.map(x=>statsRow(...x)).join('')+'</div>';
+    const controlRow=([label,value,icon,status])=>
+      '<div class="stats-control-kv"><span class="stats-control-kv-name">'+ic(icon)+esc(label)+'</span>'+
+      '<b'+(status?' class="stats-control-db-status" data-status="'+status+'"':'')+'>'+esc(String(value))+'</b></div>';
+    const controlCards=[
+      controlMetric('cpu','CPU',sys?.cpu?.percent,'#6f9bff','activity',panelIsEnglish()?'Panel container':'Контейнер панели'),
+      controlMetric('ram','RAM',sys?.ram?.percent,'#c294e8','layers',statsBytes(sys?.ram?.usedBytes)+' / '+statsBytes(sys?.ram?.totalBytes)),
+      controlMetric('disk',panelIsEnglish()?'Disk':'Диск',sys?.disk?.percent,'#44c9b6','server',statsBytes(sys?.disk?.usedBytes)+' / '+statsBytes(sys?.disk?.totalBytes))
+    ];
+    $('#stats-control').innerHTML='<div class="stats-control-rings">'+controlCards.join('')+'</div>'+
+      '<div class="stats-control-details" role="group" aria-label="Control Plane">'+control.map(controlRow).join('')+'</div>';
     const points=traffic.points||[];
     chartPoints=points;
     const latest=points[points.length-1]||{};

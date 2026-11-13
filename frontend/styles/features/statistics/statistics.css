@@ -1760,3 +1760,178 @@ html[data-motion=off] :is(.stats-bucket-detail,.stats-bucket-content,.stats-deta
 @media(prefers-reduced-motion:reduce){
   .stats-node-view-toggle button,.stats-nodes-section .stats-node{transition:none}
 }
+
+
+/* Control Plane — premium, genuinely live gauges and measured session trends.
+   Only this module is restyled: node cards keep their own layout and geometry. */
+#stats-dashboard .stats-control-panel{
+  position:relative;isolation:isolate;min-width:0;
+  overflow:hidden;padding:clamp(1rem,1.7vw,1.6rem);
+  border:1px solid color-mix(in srgb,var(--a) 21%,var(--nx-border));
+  border-radius:var(--ui-radius,16px);
+  background:
+    radial-gradient(ellipse at 78% -25%,color-mix(in srgb,var(--a) 12%,transparent),transparent 65%),
+    linear-gradient(115deg,color-mix(in srgb,var(--nx-panel-bg) 93%,#132640),var(--nx-panel-bg));
+  container:control-plane / inline-size;
+}
+#stats-dashboard .stats-control-panel::before{
+  content:"";position:absolute;pointer-events:none;z-index:-1;
+  width:46%;height:7rem;right:-4%;top:-3rem;
+  border-radius:50%;filter:blur(28px);opacity:.52;
+  background:radial-gradient(ellipse,rgba(147,104,236,.24),transparent 72%);
+}
+#stats-dashboard .stats-control-panel .stats-control-header{
+  display:flex;align-items:center;gap:1rem;min-width:0;
+  padding:0 0 1.25rem;margin:0;border:0;background:transparent;
+}
+#stats-dashboard .stats-control-header>div{min-width:0}
+#stats-dashboard .stats-control-header h3{
+  font-size:clamp(1.3rem,1.65vw,1.85rem);line-height:1.2;
+  font-weight:790;letter-spacing:-.035em;margin:0 0 .3rem;
+}
+#stats-dashboard .card.stats-control-panel>.stats-control-header p{
+  margin:0;max-width:none;font-size:.88rem;line-height:1.45;color:var(--mu);
+}
+#stats-dashboard .stats-control-emblem{
+  display:grid;place-items:center;flex:0 0 3.3rem;
+  width:3.3rem;height:3.3rem;
+  border-radius:1rem;border:1px solid color-mix(in srgb,var(--a) 32%,var(--nx-border));
+  background:linear-gradient(145deg,color-mix(in srgb,var(--a) 16%,var(--nx-section-bg)),var(--nx-section-bg));
+  color:var(--a);
+}
+#stats-dashboard .stats-control-emblem .ic{width:1.65rem;height:1.65rem}
+#stats-dashboard #stats-control{
+  display:grid;grid-template-columns:minmax(0,1.55fr) minmax(20rem,1fr);
+  align-items:stretch;gap:clamp(.8rem,1.3vw,1.25rem);min-width:0;
+}
+#stats-dashboard #stats-control .stats-control-rings{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:clamp(.65rem,1vw,1rem);margin:0;align-items:stretch;min-width:0;
+}
+#stats-dashboard #stats-control .stats-control-metric{
+  --control-surface:color-mix(in srgb,var(--nx-section-bg) 91%,#0f192b);
+  display:flex;flex-direction:column;align-items:stretch;gap:.55rem;
+  min-width:0;min-height:24.5rem;overflow:hidden;
+  padding:clamp(.75rem,1.1vw,1.1rem);
+  border:1px solid color-mix(in srgb,var(--control-accent) 30%,var(--nx-border));
+  border-radius:1rem;
+  background:
+    radial-gradient(ellipse at 50% 35%,color-mix(in srgb,var(--control-accent) 11%,transparent),transparent 72%),
+    var(--control-surface);
+}
+#stats-dashboard #stats-control .stats-control-metric-title{
+  display:flex;align-items:center;gap:.6rem;min-width:0;
+  font-size:1.03rem;line-height:1.25;
+}
+#stats-dashboard #stats-control .stats-control-metric-title strong{
+  font-size:1.05rem;font-weight:760;color:var(--tx);
+}
+#stats-dashboard #stats-control .stats-control-metric-icon{
+  display:grid;place-items:center;flex:none;
+  width:2.35rem;height:2.35rem;border-radius:.7rem;
+  background:color-mix(in srgb,var(--control-accent) 18%,transparent);
+  color:var(--control-accent);
+}
+#stats-dashboard #stats-control .stats-control-metric-icon .ic{width:1.18rem;height:1.18rem}
+#stats-dashboard #stats-control .stats-ring-card{
+  flex:1 1 auto;min-height:10rem;gap:.45rem;
+  padding:.8rem 0 .2rem;border:0;background:transparent;
+  justify-content:center;
+}
+#stats-dashboard #stats-control .stats-ring{
+  width:clamp(7.5rem,11vw,11.5rem);height:auto;
+  max-width:100%;
+  box-shadow:0 0 20px color-mix(in srgb,var(--control-accent) 11%,transparent);
+}
+#stats-dashboard #stats-control .stats-ring-center{
+  inset:clamp(9px,.75vw,13px);
+  background:color-mix(in srgb,var(--nx-panel-bg) 87%,#0d1829);
+}
+#stats-dashboard #stats-control .stats-ring strong{
+  font-size:clamp(1.35rem,2vw,2.05rem);letter-spacing:-.045em;
+}
+#stats-dashboard #stats-control .stats-ring-card>span{
+  font-size:.81rem;font-weight:620;color:var(--mu);
+}
+#stats-dashboard #stats-control .stats-control-metric-baseline{
+  display:flex;justify-content:center;align-items:center;
+  min-width:0;min-height:1.4rem;text-align:center;
+  font-size:.8rem;color:var(--mu);line-height:1.3;
+  font-variant-numeric:tabular-nums;
+}
+#stats-dashboard #stats-control .stats-control-metric-baseline span{min-width:0;overflow-wrap:anywhere}
+#stats-dashboard #stats-control .stats-control-trend{
+  height:3.2rem;min-width:0;flex:0 0 3.2rem;
+  display:flex;align-items:center;justify-content:center;
+  border-top:1px solid color-mix(in srgb,var(--nx-border) 70%,transparent);
+}
+#stats-dashboard #stats-control .stats-control-trend-plot{
+  display:block;width:100%;height:2.6rem;color:var(--control-accent);
+}
+#stats-dashboard #stats-control .stats-control-trend-line{
+  stroke:currentColor;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;
+}
+#stats-dashboard #stats-control .stats-control-trend-fill{
+  fill:color-mix(in srgb,var(--control-accent) 19%,transparent);
+}
+#stats-dashboard #stats-control .stats-control-trend-empty{
+  font-size:.73rem;line-height:1.25;color:var(--mu);text-align:center;
+}
+#stats-dashboard #stats-control .stats-control-details{
+  display:grid;align-content:stretch;min-width:0;
+  padding:.35rem .95rem;border:1px solid var(--nx-border);
+  border-radius:1rem;background:color-mix(in srgb,var(--nx-section-bg) 84%,transparent);
+}
+#stats-dashboard #stats-control .stats-control-kv{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:.75rem;min-width:0;min-height:2.7rem;
+  padding:.47rem .25rem;border-bottom:1px solid var(--nx-border);
+  font-size:.88rem;line-height:1.25;
+}
+#stats-dashboard #stats-control .stats-control-kv:last-child{border-bottom:0}
+#stats-dashboard #stats-control .stats-control-kv-name{
+  display:inline-flex;align-items:center;gap:.65rem;
+  min-width:0;color:var(--mu);
+}
+#stats-dashboard #stats-control .stats-control-kv-name .ic{
+  width:1.05rem;height:1.05rem;flex:none;color:color-mix(in srgb,var(--a) 45%,var(--mu));
+}
+#stats-dashboard #stats-control .stats-control-kv b{
+  flex:0 1 auto;min-width:0;overflow-wrap:anywhere;
+  text-align:right;color:var(--tx);font-weight:760;font-size:1rem;
+  font-variant-numeric:tabular-nums;
+}
+#stats-dashboard #stats-control .stats-control-db-status{
+  border-radius:999px;padding:.24rem .55rem;
+  background:color-mix(in srgb,var(--mu) 10%,transparent);
+}
+#stats-dashboard #stats-control .stats-control-db-status[data-status="online"]{
+  color:var(--ok,#43cda6);
+  background:color-mix(in srgb,var(--ok,#43cda6) 14%,transparent);
+}
+#stats-dashboard #stats-control .stats-control-db-status[data-status="offline"]{
+  color:var(--er);
+  background:color-mix(in srgb,var(--er) 10%,transparent);
+}
+@container control-plane (max-width:1100px){
+  #stats-dashboard #stats-control{grid-template-columns:minmax(0,1fr)}
+  #stats-dashboard #stats-control .stats-control-metric{min-height:19.5rem}
+  #stats-dashboard #stats-control .stats-control-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 1.25rem}
+  #stats-dashboard #stats-control .stats-control-kv:nth-last-child(-n+2){border-bottom:0}
+}
+@container control-plane (max-width:710px){
+  #stats-dashboard #stats-control .stats-control-rings{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #stats-dashboard #stats-control .stats-control-metric{min-height:19rem}
+  #stats-dashboard #stats-control .stats-control-metric:last-child{grid-column:1/-1}
+  #stats-dashboard #stats-control .stats-control-details{grid-template-columns:minmax(0,1fr)}
+  #stats-dashboard #stats-control .stats-control-kv:nth-last-child(2){border-bottom:1px solid var(--nx-border)}
+}
+@container control-plane (max-width:490px){
+  #stats-dashboard #stats-control .stats-control-rings{grid-template-columns:minmax(0,1fr)}
+  #stats-dashboard #stats-control .stats-control-metric:last-child{grid-column:auto}
+  #stats-dashboard #stats-control .stats-control-metric{min-height:16rem}
+  #stats-dashboard #stats-control .stats-ring{width:8.5rem}
+}
+@media(prefers-reduced-motion:reduce){
+  #stats-dashboard #stats-control .stats-control-trend-plot{animation:none}
+}
