@@ -8,7 +8,10 @@ const start=app.indexOf("if(k=='user'){"),end=app.indexOf("else if(k=='uedit')",
 assert(start>=0&&end>start,'User create handler present');
 const flow=app.slice(start,end);
 assert.match(flow,/e\.preventDefault\(\)/,'Submit should not close before API completes');
-assert.match(flow,/const c=await api\.create\('users',u\)/);
+assert.match(flow,/try\{c=await api\.create\('users',u\);break\}/,
+ 'User create must await API success before closing the dialog, including collision retries');
+assert.match(flow,/for\(let attempt=0;attempt<5;attempt\+\+\)/,
+ 'Generated usernames may be retried after concurrent uniqueness conflicts');
 assert.match(flow,/dlg\.close\(\)/,'Successful creation closes form');
 assert.match(flow,/location\.hash='users'/,'Successful creation navigates to users');
 assert.match(flow,/'Открыть',\(\)=>userDrawer\(c\.id,'ov'\)/,

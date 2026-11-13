@@ -2714,23 +2714,36 @@ async function loadUserSubscription(id){
     target.textContent=(panelIsEnglish()?'Subscription loading error: ':'Ошибка загрузки подписки: ')+(error.message||'API');
   }
 }
-// Usernames: cryptographically random, readable and comfortably below 32 chars.
-const USERNAME_ADJECTIVES=['silent','cosmic','silver','hidden','rapid','midnight','stellar','shadow','gentle','arctic','velvet','lunar','mystic','amber','crystal','steady','bright','frozen','swift','nebula'];
-const USERNAME_NOUNS=['ninja','falcon','voyager','comet','raven','panda','tiger','orbit','phoenix','fox','otter','dragon','sparrow','pilot','meteor','cipher','pioneer','wolf','echo','nebula'];
+// Readable usernames with an unbiased, case-insensitive ~126-bit name space.
+// 64 adjectives x 64 nouns x 36^22 lowercase base36 suffixes; max 32 chars.
+const USERNAME_ADJECTIVES=Object.freeze('able airy aqua avid bold calm chic cool cozy cute dark deep deft fair fast fine firm free glad glow gold good gray hale hazy icy jade keen kind lush mild mint neat neon nice nova opal pale pink pure rare rich rosy ruby safe sage silk slim slow snug soft solo spry star tall teal tidy tiny true vast warm wary wild wise'.split(' '));
+const USERNAME_NOUNS=Object.freeze('ant ape arch atom bat bear bee bird boar bolt buck bull calf carp cat chip code cone crow cub deer dove duck dune echo elk fern fawn fish flux fox frog gate goat hare hawk hill ibis iris kite lake lamb leaf lion lynx moon mole moth newt nova orca owl puma reef seal ship slug snow star swan toad tuna wolf wren'.split(' '));
+const USERNAME_ALPHABET='0123456789abcdefghijklmnopqrstuvwxyz';
 function randomUsername(){
   if(!globalThis.crypto?.getRandomValues)throw new Error('Безопасная генерация недоступна: требуется HTTPS.');
-  const words=new Uint32Array(2);
+  // Both word lists have 64 entries, so masking six random bits is unbiased.
+  const words=new Uint8Array(2);
   crypto.getRandomValues(words);
-  const bytes=new Uint8Array(5);
-  crypto.getRandomValues(bytes);
-  const suffix=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
-  return (USERNAME_ADJECTIVES[words[0]%USERNAME_ADJECTIVES.length]+'_'+USERNAME_NOUNS[words[1]%USERNAME_NOUNS.length]+'_'+suffix).slice(0,32);
+  const prefix=USERNAME_ADJECTIVES[words[0]&63]+'_'+USERNAME_NOUNS[words[1]&63];
+  const suffix=[];
+  while(suffix.length<22){
+    const bytes=new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    for(const byte of bytes){
+      // 252 is divisible by 36: reject larger bytes to remove modulo bias.
+      if(byte>=252)continue;
+      suffix.push(USERNAME_ALPHABET[byte%36]);
+      if(suffix.length===22)break;
+    }
+  }
+  return prefix+'_'+suffix.join('');
 }
 function generateAvailableUsername(current=''){
   const taken=new Set(DB.users.map(user=>String(user.username||'').toLowerCase()));
+  const previous=String(current).toLowerCase();
   for(let attempt=0;attempt<30;attempt++){
     const name=randomUsername();
-    if(name!==current&& !taken.has(name.toLowerCase()))return name;
+    if(name.toLowerCase()!==previous&&!taken.has(name.toLowerCase()))return name;
   }
   throw new Error('Не удалось подобрать уникальное имя. Повторите попытку.');
 }
@@ -2756,6 +2769,8 @@ document.addEventListener('click',event=>{
   try{
     input.value=generateAvailableUsername(input.value);
     input.dispatchEvent(new Event('input',{bubbles:true}));
+    // Remember exactly which value came from the generator, not a manual edit.
+    input.dataset.generatedUsername=input.value;
     input.focus();
     input.setSelectionRange(input.value.length,input.value.length);
     const error=form.querySelector('#fe');
@@ -6173,6 +6188,7 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     // Prevent premature method=dialog closure, duplicate clicks and stale dialogs.
     if(f.dataset.creating==='1')return;
     const d=read(FU,f);
+    const usernameInput=f.querySelector('[name="username"]');
     if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()))return er('Такое имя уже есть. Выберите другое.');
     if(!d.squads.length)return er('Выберите хотя бы один сквад.');
     let nodePolicies={};
@@ -6192,7 +6208,20 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     f.dataset.creating='1';
     if(submitButton)submitButton.disabled=true;
     try{
-      const c=await api.create('users',u);
+      let c;
+      for(let attempt=0;attempt<5;attempt++){
+        try{c=await api.create('users',u);break}
+        catch(error){
+          // PostgreSQL is authoritative. A concurrent insert may win after
+          // the local check; retry only auto-generated names, never manual ones.
+          if(error.status!==409||error.message!=='Такое имя пользователя уже существует.'||
+             usernameInput?.dataset.generatedUsername!==u.username||attempt===4)throw error;
+          u.username=generateAvailableUsername(u.username);
+          usernameInput.value=u.username;
+          usernameInput.dispatchEvent(new Event('input',{bubbles:true}));
+          usernameInput.dataset.generatedUsername=u.username;
+        }
+      }
       let xrayWarning='';
       if(c.xrayProfileId){
         try{await syncXrayUserToProfile(c)}
