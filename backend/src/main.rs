@@ -1502,6 +1502,7 @@ fn validate_settings_keys(object: &serde_json::Map<String, Value>) -> Result<(),
                 | "subscriptionAnnouncement"
                 | "subscriptionUpdateInterval"
                 | "subscriptionAnnouncementRotationHours"
+                | "subscriptionAnnouncementEnabled"
                 | "subscriptionDescription"
                 | "subscriptionDescriptionEn"
                 | "subscriptionFooter"
