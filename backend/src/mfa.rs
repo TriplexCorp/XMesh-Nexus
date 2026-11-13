@@ -243,6 +243,63 @@ pub async fn new_challenge_in_transaction(
         .bind(hash(&challenge)).bind(id).execute(&mut **tx).await?;
     Ok(challenge)
 }
+/// Step-up MFA for issuance/revocation of external Integration API credentials.
+/// Owner-only sessions are necessary but NOT sufficient: require a new,
+/// one-time TOTP step with replay prevention, locking and rate limits.
+pub(crate) async fn verify_integrations_step_up(
+    state: &AppState,
+    actor: &AuthUser,
+    headers: &HeaderMap,
+    code: &str,
+) -> Result<(), ApiError> {
+    let rate_key = format!("integration-mfa:{}", actor.id);
+    if auth::is_rate_limited(state, &rate_key).await? {
+        return Err(err(StatusCode::TOO_MANY_REQUESTS, "Too many MFA attempts"));
+    }
+    if !enabled(state, actor.id).await? {
+        return Err(err(StatusCode::PRECONDITION_REQUIRED,
+            "Enable two-factor authentication before managing Integration API tokens"));
+    }
+    // Lock administrator before factor: the same lock order as login and disable.
+    let mut tx = state.pool.begin().await?;
+    let account = sqlx::query(
+        "SELECT is_active,role FROM panel_auth_users WHERE id=$1 FOR UPDATE"
+    ).bind(actor.id).fetch_optional(&mut *tx).await?
+        .ok_or_else(|| err(StatusCode::UNAUTHORIZED, "Session is no longer valid"))?;
+    if !account.try_get::<bool,_>("is_active")?
+        || account.try_get::<String,_>("role")? != "owner"
+    {
+        return Err(err(StatusCode::UNAUTHORIZED, "Session is no longer valid"));
+    }
+    let session_hash = auth::session_token_hash(headers)
+        .ok_or_else(|| err(StatusCode::UNAUTHORIZED, "Session is required"))?;
+    let session_ok: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM panel_sessions
+           WHERE admin_id=$1 AND token_hash=$2 AND expires_at>NOW())"
+    ).bind(actor.id).bind(session_hash).fetch_one(&mut *tx).await?;
+    if !session_ok {
+        return Err(err(StatusCode::UNAUTHORIZED, "Session is no longer valid"));
+    }
+    let factor = sqlx::query(
+        "SELECT secret_encrypted,last_used_step FROM panel_totp
+         WHERE admin_id=$1 AND enabled=TRUE FOR UPDATE"
+    ).bind(actor.id).fetch_optional(&mut *tx).await?
+        .ok_or_else(|| err(StatusCode::PRECONDITION_REQUIRED, "Enable 2FA first"))?;
+    let encrypted: String = factor.try_get("secret_encrypted")?;
+    let secret = decrypt(state, &encrypted)?;
+    let last: i64 = factor.try_get("last_used_step")?;
+    let Some(step) = matching_step(&secret, code, last, current_seconds()) else {
+        tx.rollback().await?;
+        auth::record_failed_login(state, &rate_key).await?;
+        return Err(err(StatusCode::UNAUTHORIZED, "Invalid one-time code"));
+    };
+    sqlx::query("UPDATE panel_totp SET last_used_step=$2 WHERE admin_id=$1")
+        .bind(actor.id).bind(step).execute(&mut *tx).await?;
+    tx.commit().await?;
+    auth::clear_failed_login(state, &rate_key).await?;
+    Ok(())
+}
+
 pub async fn status(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
