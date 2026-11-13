@@ -1334,8 +1334,8 @@ fn add_subscription_profile_headers(
     }
     // Use the existing personal bearer URL with a forced browser view.
     // XMesh Sub forwards query strings and response headers unchanged.
-    if let Some(url) = subscription_token
-        .and_then(|token| subscription_profile_page_url(settings, token))
+    if let Some(url) =
+        subscription_token.and_then(|token| subscription_profile_page_url(settings, token))
         && let Ok(value) = header::HeaderValue::from_str(&url)
     {
         response.headers_mut().insert("profile-web-page-url", value);
@@ -1445,7 +1445,12 @@ pub async fn serve(
         .headers_mut()
         .insert(header::VARY, "User-Agent, Accept".parse().unwrap());
     let announcement = personalized_subscription_announcement(&state, &user, &settings, now).await;
-    add_subscription_profile_headers(&mut response, &settings, announcement.as_deref(), Some(&token));
+    add_subscription_profile_headers(
+        &mut response,
+        &settings,
+        announcement.as_deref(),
+        Some(&token),
+    );
     // User limits are expressed in decimal GB in panel records; the conventional subscription-userinfo
     // header expects bytes and Unix seconds.
     let consumed_gb = user
@@ -2425,8 +2430,16 @@ mod tests {
         });
         let mut first = Json(json!({"type": "feed"})).into_response();
         add_subscription_profile_headers(&mut first, &settings, None, Some(&token));
-        let webpage = first.headers().get("profile-web-page-url").unwrap().to_str().unwrap();
-        assert_eq!(webpage, format!("https://uk.example.com/s/{token}?view=portal"));
+        let webpage = first
+            .headers()
+            .get("profile-web-page-url")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(
+            webpage,
+            format!("https://uk.example.com/s/{token}?view=portal")
+        );
         assert_eq!(first.headers()["support-url"], "https://t.me/example");
         assert_eq!(first.headers()["profile-update-interval"], "24");
         let mut second = Json(json!({})).into_response();
@@ -2468,11 +2481,19 @@ mod tests {
             "https://account.example.com/my"
         );
 
-        for url in ["http://example.com", "https://a.com\r\nx-secret: bad",
-                    "https://user@host.example.com", "https://host.example.com:8443/"] {
-            assert!(subscription_profile_page_url(
-                &json!({"subscriptionProfileWebPageUrl":url}), &token
-            ).is_none());
+        for url in [
+            "http://example.com",
+            "https://a.com\r\nx-secret: bad",
+            "https://user@host.example.com",
+            "https://host.example.com:8443/",
+        ] {
+            assert!(
+                subscription_profile_page_url(
+                    &json!({"subscriptionProfileWebPageUrl":url}),
+                    &token
+                )
+                .is_none()
+            );
         }
     }
 
