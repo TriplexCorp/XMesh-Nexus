@@ -22,7 +22,7 @@ window.XMeshSubscriptionStudio = (() => {
     subscriptionHero:'',subscriptionHeroEn:'',subscriptionCta:'',subscriptionCtaEn:'',subscriptionLogoUrl:'',subscriptionSupportLabel:'Поддержка',subscriptionSupportLabelEn:'',
     subscriptionSupportUrl:'',subscriptionClientLayout:'grid',
     subscriptionJson:{dns:'cloudflare',queryStrategy:'UseIPv4',routingStrategy:'IPIfNonMatch',
-      customDnsProtocol:'udp',customDnsAddress:'',
+      customDnsAddress:'',
       balance:'leastPing',smart:false,sniffing:true,dnsRouting:false,socksPort:10808,httpPort:10809},
     subscriptionAppsTitle:'',subscriptionAppsTitleEn:'',subscriptionCustomClients:[],
     subscriptionShowStatus:true,subscriptionShowApps:true,subscriptionShowQr:true,
@@ -211,6 +211,9 @@ window.XMeshSubscriptionStudio = (() => {
   function create(settings,save,notify,counts,getPanelTheme,subApi=null) {
     const data = {...defaults,...settings};
     data.subscriptionJson={...defaults.subscriptionJson,...(settings?.subscriptionJson||{})};
+    // Earlier experimental DNS settings used a fifth 'custom' option. Keep
+    // its saved URL, but display the original preset and the plain text field.
+    if(data.subscriptionJson.dns==='custom')data.subscriptionJson.dns='cloudflare';
     data.subscriptionFlood={...defaults.subscriptionFlood,...(settings?.subscriptionFlood||{})};
     if(!['ru','en'].includes(data.subscriptionLanguage))data.subscriptionLanguage='ru';
     const panelTheme=()=>typeof getPanelTheme==='function'?getPanelTheme():null;
@@ -305,23 +308,15 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-heading"><span>03</span><div><h3>XRAY JSON ENGINE</h3><p>Клиентский JSON, DNS и локальные подключения. Балансировка настраивается отдельно.</p></div></div>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>DNS</span><select name="json_dns">'+
-        [['cloudflare','Cloudflare · 1.1.1.1 (надёжный режим)'],['cloudflare_doh','Cloudflare · DoH по IP (расширенный)'],['yandex','Yandex · DoH'],['system','Системный DNS'],['custom','Свой DNS · UDP / DoH']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.dns===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
+        [['cloudflare','Cloudflare · 1.1.1.1 (надёжный режим)'],['cloudflare_doh','Cloudflare · DoH по IP (расширенный)'],['yandex','Yandex · DoH'],['system','Системный DNS']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.dns===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
       '<label class="f subscription-field"><span>DNS Query Strategy</span><select name="json_queryStrategy">'+
         [['UseIPv4','IPv4'],['UseIPv6','IPv6'],['UseIP','IPv4 + IPv6']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.queryStrategy===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
       '</div>',
-      '<div class="subscription-custom-dns" data-subscription-custom-dns'+(data.subscriptionJson.dns==='custom'?'':' hidden')+'>',
-      '<div class="subscription-studio-pair">',
-      '<label class="f subscription-field"><span>Протокол своего DNS</span><select name="json_customDnsProtocol">'+
-        [['udp','UDP (DoU)'],['doh','DNS over HTTPS (DoH)']].map(([key,title])=>
-          '<option value="'+key+'"'+(data.subscriptionJson.customDnsProtocol===key?' selected':'')+'>'+title+'</option>').join('')+
-        '</select></label>',
-      '<label class="f subscription-field"><span>Адрес своего DNS</span>'+
-        '<input type="text" name="json_customDnsAddress" maxlength="512" autocomplete="off" spellcheck="false"'+
-          ' value="'+esc(data.subscriptionJson.customDnsAddress||'')+'"'+(data.subscriptionJson.dns==='custom'?' required':'')+
-          ' placeholder="1.1.1.1 или 8.8.8.8:5353"></label>',
-      '</div>',
-      '<p class="note" data-subscription-custom-dns-hint>UDP: IP-адрес с необязательным портом. Запросы идут через правила маршрутизации Xray.</p>',
-      '</div>',
+      '<label class="f subscription-field"><span>Свой DNS (необязательно)</span>'+
+        '<input name="json_customDnsAddress" type="text" maxlength="512" autocomplete="off" spellcheck="false"'+
+          ' value="'+esc(data.subscriptionJson.customDnsAddress||'')+'"'+
+          ' placeholder="9.9.9.9 или https://dns.example.org/dns-query">'+
+        '<small>IP / IP:порт — UDP; HTTPS-ссылка — DoH. Заполненное поле имеет приоритет над выбранным DNS. Очистите его, чтобы вернуть пресет.</small></label>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Маршрутизация доменов</span><select name="json_routingStrategy">'+
         [['IPIfNonMatch','IPIfNonMatch'],['AsIs','AsIs'],['IPOnDemand','IPOnDemand']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.routingStrategy===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
@@ -789,7 +784,6 @@ window.XMeshSubscriptionStudio = (() => {
       const read = () => ({
         subscriptionJson:{
           dns:input(form,'json_dns').value,
-          customDnsProtocol:input(form,'json_customDnsProtocol').value,
           customDnsAddress:input(form,'json_customDnsAddress').value.trim(),
           queryStrategy:input(form,'json_queryStrategy').value,
           routingStrategy:input(form,'json_routingStrategy').value,
@@ -1326,21 +1320,6 @@ window.XMeshSubscriptionStudio = (() => {
         draw();
       });
       previewShadow.querySelector('[data-preview-app-search]')?.addEventListener('input',applyPreviewFilter);
-      const syncCustomDns=()=>{
-        const custom=input(form,'json_dns').value==='custom';
-        const mode=input(form,'json_customDnsProtocol').value;
-        const panel=form.querySelector('[data-subscription-custom-dns]');
-        const address=input(form,'json_customDnsAddress');
-        panel.hidden=!custom;
-        address.required=custom;
-        address.placeholder=mode==='doh'
-          ?'https://dns.example.org:8443/dns-query'
-          :'1.1.1.1 или 8.8.8.8:5353';
-        panel.querySelector('[data-subscription-custom-dns-hint]').textContent=mode==='doh'
-          ?'DoH: полный HTTPS-адрес с путём, включая свой порт. При использовании домена может потребоваться начальное DNS-разрешение.'
-          :'UDP: IPv4/IPv6 с необязательным портом, например 9.9.9.9 или [2606:4700:4700::1111]:53. Запросы следуют правилам Xray.';
-      };
-      syncCustomDns();
       let savedSnapshot=JSON.stringify(read());
       const dirtyStatus=root.querySelector('[data-substudio-save-status]');
       const refreshDirty=()=>{
@@ -1350,7 +1329,6 @@ window.XMeshSubscriptionStudio = (() => {
       };
       form.addEventListener('input',()=>{draw();refreshDirty();});
       form.addEventListener('change',event=>{
-        if(['json_dns','json_customDnsProtocol'].includes(event.target.name))syncCustomDns();
         if(event.target.name==='subscriptionLanguage' && ['ru','en'].includes(event.target.value))previewLanguage=event.target.value;
         if(event.target.name==='subscriptionTheme'&&!input(form,'subscriptionSyncPanelTheme').checked){
           const from=themeColors[event.target.value==='light'?'dark':'light'];
@@ -1408,11 +1386,8 @@ window.XMeshSubscriptionStudio = (() => {
           !Number.isInteger(draft.subscriptionFlood.tokenPerMinute)||draft.subscriptionFlood.tokenPerMinute<1||draft.subscriptionFlood.tokenPerMinute>60){
           notify('Проверьте лимиты защиты подписок: IP — 1–600, токен — 1–60 запросов/мин.');return;
         }
-        if(draft.subscriptionJson.dns==='custom' &&
-          (!['udp','doh'].includes(draft.subscriptionJson.customDnsProtocol) ||
-          !draft.subscriptionJson.customDnsAddress ||
-          draft.subscriptionJson.customDnsAddress.length>512)){
-          notify('Укажите свой DNS: адрес UDP (IP[:порт]) или полный HTTPS-адрес DoH.');return;
+        if(draft.subscriptionJson.customDnsAddress.length>512){
+          notify('Адрес своего DNS не должен превышать 512 символов.');return;
         }
         if(![draft.subscriptionJson.socksPort,draft.subscriptionJson.httpPort].every(p=>Number.isInteger(p)&&p>=1024&&p<=65535)||draft.subscriptionJson.socksPort===draft.subscriptionJson.httpPort){notify('Укажите разные локальные порты в диапазоне 1024–65535');return;}
         if(!Number.isInteger(draft.subscriptionUpdateInterval)||draft.subscriptionUpdateInterval<1||draft.subscriptionUpdateInterval>168){notify('Интервал обновления должен быть от 1 до 168 часов.');return;}
