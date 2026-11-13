@@ -1,5 +1,6 @@
 mod admin_accounts;
 mod auth;
+mod integration_api;
 mod cdn_quota;
 mod client_routing;
 mod core;
@@ -330,6 +331,14 @@ fn protected_management_routes() -> Router<AppState> {
             "/security/policy",
             get(security::get_settings).patch(security::update_settings),
         )
+        .route(
+            "/integration-tokens",
+            get(integration_api::list_tokens).post(integration_api::create_token),
+        )
+        .route(
+            "/integration-tokens/{id}",
+            axum::routing::delete(integration_api::revoke_token),
+        )
         .route("/security/audit", get(security::audit_events))
         .route("/security/sessions", get(security::sessions))
         .route(
@@ -570,6 +579,7 @@ fn application_router(state: AppState) -> Router {
             "/api/v1",
             public
                 .merge(protected)
+                .nest("/integrations", integration_api::service_router(&state))
                 .fallback(|| async { StatusCode::NOT_FOUND }),
         )
         .merge(experimental_v2_routes(&state))
@@ -788,6 +798,12 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
         && request.headers().get(header::COOKIE).is_none()
         && request.headers().get("sec-fetch-site").is_none()
         && match path {
+            // Explicit machine-only service namespace: token middleware enforces
+            // credentials, scopes, revocation and fail-closed Redis rate limits.
+            p if p.starts_with("/api/v1/integrations/") => request.headers()
+                .get(header::AUTHORIZATION)
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.starts_with("Bearer xmni_v1_")),
             "/api/v1/metrics/ingest"
             | "/api/v1/node/heartbeat"
             | "/api/v1/node/desired-config"
