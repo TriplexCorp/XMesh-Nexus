@@ -2377,8 +2377,8 @@ async fn portal_browser(
     let mut nonce_bytes = [0_u8; 16];
     OsRng.fill_bytes(&mut nonce_bytes);
     let nonce = base64::engine::general_purpose::STANDARD_NO_PAD.encode(nonce_bytes);
-    let html = portal_html(&settings, &user, lang, metrics, controls, decoration, &nonce)
-        .replacen(
+    let mut html = portal_html(&settings, &user, lang, metrics, controls, decoration, &nonce);
+    html = html.replacen(
         "class=\"subscription-preview\"",
         &format!(
             "class=\"subscription-preview\" data-subscription-state=\"{}\"",
