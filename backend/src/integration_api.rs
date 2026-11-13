@@ -2,15 +2,15 @@
 //! An integration token never authenticates to legacy /api/v1/collections.
 #[path = "integration_api_auth.rs"]
 mod auth;
-#[path = "integration_api_users.rs"]
-mod users;
 #[path = "integration_api_grants.rs"]
 mod grants;
+#[path = "integration_api_users.rs"]
+mod users;
 
 use crate::{ApiError, AppState};
 use axum::{
     Json, Router,
-    http::{StatusCode, header, HeaderValue},
+    http::{HeaderValue, StatusCode, header},
     middleware,
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -35,19 +35,35 @@ impl ServicePrincipal {
         if self.scopes.iter().any(|s| s == scope) {
             Ok(())
         } else {
-            Err(Problem::new(StatusCode::FORBIDDEN, "insufficient_scope", "Insufficient scope"))
+            Err(Problem::new(
+                StatusCode::FORBIDDEN,
+                "insufficient_scope",
+                "Insufficient scope",
+            ))
         }
     }
 
     fn allow_user(&self, id: i64) -> Result<(), Problem> {
         if id < 1 {
-            return Err(Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"));
+            return Err(Problem::new(
+                StatusCode::NOT_FOUND,
+                "not_found",
+                "User not found",
+            ));
         }
-        if self.allowed_user_ids.as_ref().is_none_or(|ids| ids.contains(&id)) {
+        if self
+            .allowed_user_ids
+            .as_ref()
+            .is_none_or(|ids| ids.contains(&id))
+        {
             Ok(())
         } else {
             // Never reveal if an inaccessible ID exists.
-            Err(Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))
+            Err(Problem::new(
+                StatusCode::NOT_FOUND,
+                "not_found",
+                "User not found",
+            ))
         }
     }
 }
@@ -61,10 +77,18 @@ pub(super) struct Problem {
 
 impl Problem {
     fn new(status: StatusCode, code: &'static str, message: &'static str) -> Self {
-        Self { status, code, message }
+        Self {
+            status,
+            code,
+            message,
+        }
     }
     fn unavailable() -> Self {
-        Self::new(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable", "Service unavailable")
+        Self::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "temporarily_unavailable",
+            "Service unavailable",
+        )
     }
 }
 
@@ -73,7 +97,11 @@ impl From<ApiError> for Problem {
         match error.status {
             StatusCode::NOT_FOUND => Self::new(StatusCode::NOT_FOUND, "not_found", "Not found"),
             StatusCode::CONFLICT => Self::new(StatusCode::CONFLICT, "conflict", "Conflict"),
-            StatusCode::BAD_REQUEST => Self::new(StatusCode::BAD_REQUEST, "validation_error", "Invalid request"),
+            StatusCode::BAD_REQUEST => Self::new(
+                StatusCode::BAD_REQUEST,
+                "validation_error",
+                "Invalid request",
+            ),
             _ => Self::unavailable(),
         }
     }
@@ -89,22 +117,25 @@ impl From<sqlx::Error> for Problem {
 impl IntoResponse for Problem {
     fn into_response(self) -> Response {
         let request_id = Uuid::new_v4().to_string();
-        let mut response = (self.status, Json(json!({
-            "type": format!("urn:xmesh:problem:{}", self.code),
-            "title": self.message,
-            "status": self.status.as_u16(),
-            "code": self.code,
-            "requestId": request_id
-        }))).into_response();
+        let mut response = (
+            self.status,
+            Json(json!({
+                "type": format!("urn:xmesh:problem:{}", self.code),
+                "title": self.message,
+                "status": self.status.as_u16(),
+                "code": self.code,
+                "requestId": request_id
+            })),
+        )
+            .into_response();
         response.headers_mut().insert(
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/problem+json"),
         );
         if self.status == StatusCode::TOO_MANY_REQUESTS {
-            response.headers_mut().insert(
-                header::RETRY_AFTER,
-                HeaderValue::from_static("60"),
-            );
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from_static("60"));
         }
         if let Ok(value) = HeaderValue::from_str(&request_id) {
             response.headers_mut().insert("x-request-id", value);
@@ -114,8 +145,12 @@ impl IntoResponse for Problem {
 }
 
 pub(super) fn now_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default()
-        .as_millis().try_into().unwrap_or(i64::MAX)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX)
 }
 
 pub(super) fn reply(data: Value) -> Json<Value> {
@@ -157,7 +192,8 @@ pub(crate) fn service_router(state: &AppState) -> Router<AppState> {
         .route("/users/{id}/disable", post(users::disable))
         .route("/users/{id}/entitlements/grant", post(grants::grant))
         .route_layer(middleware::from_fn_with_state(
-            state.clone(), auth::require_service,
+            state.clone(),
+            auth::require_service,
         ))
         .layer(tower_http::limit::RequestBodyLimitLayer::new(64 * 1024))
 }
