@@ -271,4 +271,48 @@ assert.ok(app.includes("querySelector('.user-create-submit, .act .btn')"),
 assert.ok(userCss.includes('.user-create-contact-grid{'),
  'Canonical user editor must own contact field styles');
 
+
+const vm=require('node:vm');
+const webcrypto=require('node:crypto').webcrypto;
+const generatorStart=app.indexOf('const USERNAME_ADJECTIVES=');
+const generatorEnd=app.indexOf("document.addEventListener('click',event=>",generatorStart);
+assert(generatorStart>=0&&generatorEnd>generatorStart,'Username generator must be present');
+const generatorSource=app.slice(generatorStart,generatorEnd);
+const buildGenerator=(crypto,DB)=>vm.runInNewContext(
+  generatorSource+'\n({randomUsername,generateAvailableUsername,USERNAME_ADJECTIVES,USERNAME_NOUNS})',
+  {crypto,Uint8Array,DB},
+  {timeout:1000}
+);
+const usernameGenerator=buildGenerator(webcrypto,{users:[]});
+assert.equal(usernameGenerator.USERNAME_ADJECTIVES.length,64);
+assert.equal(usernameGenerator.USERNAME_NOUNS.length,64);
+for(const group of [usernameGenerator.USERNAME_ADJECTIVES,usernameGenerator.USERNAME_NOUNS]){
+  assert.equal(new Set(group).size,64,'Username words must not repeat');
+  assert(group.every(word=>/^[a-z]{3,4}$/.test(word)),'Readable words must fit in 32 chars');
+}
+const observed=new Set();
+for(let i=0;i<3000;i++){
+  const name=usernameGenerator.randomUsername();
+  assert.match(name,/^[a-z]{3,4}_[a-z]{3,4}_[a-z0-9]{22}$/);
+  assert(name.length<=32,'Generated names must fit user schema');
+  assert(!observed.has(name),'Generated usernames should not collide in this sample');
+  observed.add(name);
+}
+assert.equal((64n*64n*36n**22n).toString(),'70960221889910699425460815403591663616',
+ 'Username space must remain approximately 126 bits');
+// Deterministic collision injection: no fallback must return a taken name.
+const fixedCrypto={getRandomValues(bytes){bytes.fill(0);return bytes;}};
+const db={users:[]},fixedGenerator=buildGenerator(fixedCrypto,db);
+const existing=fixedGenerator.randomUsername();
+db.users.push({username:existing.toUpperCase()});
+assert.throws(()=>fixedGenerator.generateAvailableUsername(),/Не удалось подобрать уникальное имя/);
+db.users.length=0;
+assert.throws(()=>fixedGenerator.generateAvailableUsername(existing.toUpperCase()),/Не удалось подобрать уникальное имя/);
+assert.match(app,/usernameInput\?\.dataset\.generatedUsername!==u\.username/,
+ 'Only automatically generated names may be retried after a concurrent conflict');
+assert.match(app,/error\.status!==409/, 'Automatic retry must be limited to conflicts');
+const apiBackend=fs.readFileSync('backend/src/main.rs','utf8');
+assert(apiBackend.includes('db_error.constraint() == Some("panel_records_user_username_lower_uq")'),
+ 'Backend must identify the specific case-insensitive username index conflict');
+
 console.log('Node action: create-user v5 + explainable anti-sharing risk, strict-PQ repair and dialog contracts OK');
