@@ -164,6 +164,28 @@ assert.match(settingsCss,/width:100%;max-width:none;margin:0/,'Settings should u
 assert.doesNotMatch(app,/class="settings-center-heading"/,'The duplicate category title and description must not return');
 assert.match(settingsCss,/\.settings-center-embedded/,'Dedicated feature screens should mount inside the Settings workspace');
 
+// Every settings section should contain useful controls or live context,
+ // not a gigantic preset column beside a tiny unrelated form.
+for(const surface of ['settings-palette-gallery','settings-theme-specimen',
+  'settings-layout-specimen','settings-type-specimen','settings-feature-links',
+  'settings-notification-trigger','settings-update-outline','settings-data-summary',
+  'settings-security-routes','settings-admin-role-guide']){
+ assert(app.includes(surface),'Settings workspace missing functional context: '+surface);
+}
+assert.match(app,/data-settings-test-toast/,'Notification preview must have an actual click action');
+assert.match(app,/toast\('Тестовое уведомление: настройки отображения работают\.'/,
+ 'Test button must use actual panel notification mechanism');
+assert.match(app,/Object\.values\(DB\.set\.hooks\|\|\{\}\)\.filter\(Boolean\)/,
+ 'Webhook counter must derive from configured events');
+assert.match(app,/settingsPage==='system'&&card\.dataset\.settingsGroup==='traffic'/,
+ 'CDN policy should fill the shorter column in System & Traffic');
+assert.doesNotMatch(app,/API-токены<\/h3><p>Выдача API-токенов для интеграций ещё не реализована/,
+ 'Unimplemented integration placeholders should not occupy an entire card');
+assert.match(settingsCss,/\.settings-palette-gallery \.palette-preset-grid/,
+ 'Palette tiles must have readable column dimensions');
+assert.match(settingsCss,/\.settings-security-routes/,
+ 'Operational security links must be styled within the workspace');
+
 // Functional settings must affect real runtime behavior, persist, and be translated.
 for(const key of ['contrast','linkStyle','lineSpacing','tabularNums','followReducedMotion','stickyTopbar','navCounter','startPage','toastDuration','toastPosition']){
  assert(app.includes(key+':'),'Functional appearance preference not initialized: '+key);
