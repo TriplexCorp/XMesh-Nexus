@@ -27,6 +27,11 @@ fn custom_dns_server(opts: &Value) -> Result<String, String> {
     {
         return Err("Некорректный адрес DNS: не более 512 символов, без пробелов".into());
     }
+    // The legacy "System DNS" preset used this Xray-reserved value.
+    // Preserve it when migrating from the old dropdown to the text field.
+    if raw == "localhost" {
+        return Ok("localhost".into());
+    }
     if raw.starts_with("https://") {
             let url =
                 reqwest::Url::parse(raw).map_err(|_| "DNS DoH: укажите корректную HTTPS-ссылку")?;
@@ -1307,6 +1312,7 @@ mod tests {
             ("udp://1.1.1.1:53", "1.1.1.1:53"),
             ("2606:4700:4700::1111", "2606:4700:4700::1111"),
             ("[2606:4700:4700::1111]:5353", "[2606:4700:4700::1111]:5353"),
+            ("localhost", "localhost"),
             ("https://dns.google/dns-query", "https://dns.google/dns-query"),
             ("https://1.1.1.1/dns-query", "https://1.1.1.1/dns-query"),
             ("https://dns.example.org:8443/custom-query?profile=1", "https://dns.example.org:8443/custom-query?profile=1"),
