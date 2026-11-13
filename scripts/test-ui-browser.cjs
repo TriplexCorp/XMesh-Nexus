@@ -440,12 +440,24 @@ async function main() {
       await page.locator('[data-settings-test-toast]').click();
       assert.match(await page.locator('#xmesh-feedback-toast').innerText(),/Тестовое уведомление|Test notification/);
       assert(await page.locator('[data-hook-count]').isVisible());
+      assert(await page.locator('.settings-hook-item').count()>=6,'Webhook events should be presented as readable rows');
+      assert.equal(await page.locator('.settings-hook-item code').first().innerText(),'user.created',
+        'Technical event code must remain available for integrators');
+      assert(await page.locator('.settings-hook-item b').first().isVisible(),
+        'A human-readable event name must precede its technical code');
       await navigate('set/general');
       assert.equal(await page.locator('.settings-feature-links a[href="#subscription"]').count(),1);
       await navigate('set/data');
       assert.equal(await page.locator('.settings-data-summary').count(),2);
       await navigate('set/system');
       assert(await page.locator('.settings-update-outline').count()>0);
+      const systemRow=await page.evaluate(()=>{
+        const grid=document.querySelector('.settings-center-grid').getBoundingClientRect();
+        const footer=document.querySelector('.settings-system-footer').getBoundingClientRect();
+        return{width:grid.width,footerWidth:footer.width,footerLeft:footer.left-grid.left};
+      });
+      assert(Math.abs(systemRow.width-systemRow.footerWidth)<3&&Math.abs(systemRow.footerLeft)<3,
+        'CDN configuration must form a complete row under update controls');
       await page.setViewportSize({width:390,height:844});
       await navigate('set/colors');
       const mobile=await page.evaluate(()=>({viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,
@@ -513,6 +525,10 @@ async function main() {
       }
       await navigate('set/security');
       assert(await page.locator('#security-tab-auth').isVisible(),'Security keeps its functional internal tabs');
+      assert(await page.locator('#security-tab-auth .ic').isVisible(),'Security tabs should use consistent icons');
+      await page.locator('#security-tab-infra').click();
+      assert(await page.locator('.settings-security-routes a[href="#tools"]').isVisible(),
+        'Infrastructure panel must have a working diagnostics route');
       await navigate('set/admins');
       assert(await page.locator('[data-ne="admins"]').first().isVisible(),'Admins remains a functional Settings category');
       await navigate('set/data');
