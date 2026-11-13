@@ -15,6 +15,15 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Личный кабинет в VPN-приложениях": "Personal webpage in VPN apps",
+    "Показывать кнопку сайта подписки в поддерживающих клиентах.": "Show a subscription webpage button in compatible apps.",
+    "Свой адрес кабинета (необязательно)": "Custom account webpage URL (optional)",
+    "Оставьте пустым — приложение откроет персональный портал XMesh. Если указать свой HTTPS-адрес, он будет общим для всех подписчиков.": "Leave blank to open the personal XMesh portal. A custom HTTPS URL will be shared by all subscribers.",
+    "Автоматически: личная страница XMesh": "Automatically use the personal XMesh portal",
+    "Будет доступен после настройки домена подписок.": "Available after setting up the subscription domain.",
+    "Кнопка личного кабинета скрыта в VPN-приложениях.": "The personal webpage button is hidden in VPN apps.",
+    "В VPN-приложениях:": "Shown in VPN apps:",
+    "Укажите домен подписок в разделе «Серверы подписок».": "Set your subscription domain in Subscription servers.",
     "Отменить правки после последнего сохранения": "Discard edits since the last save",
     "Сбросить изменения": "Discard changes",
     "Создан пользователь": "User created",
