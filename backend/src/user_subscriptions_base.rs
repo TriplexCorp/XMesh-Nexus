@@ -1364,6 +1364,40 @@ fn subscription_gb_to_bytes(gb: f64) -> u64 {
     u64::try_from(crate::gb_to_bytes_i64(gb)).unwrap_or(0)
 }
 
+/// Attach conventional subscription-userinfo metadata without changing
+/// traffic accounting or the native feed. Existing limits are decimal GB.
+fn add_subscription_userinfo_header(response: &mut Response, user: &Value) {
+    // User limits are expressed in decimal GB in panel records; the conventional subscription-userinfo
+    // header expects bytes and Unix seconds.
+    let consumed_gb = user
+        .get("used")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0)
+        .max(0.0);
+    let limit = user
+        .get("limit")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0)
+        .max(0.0);
+    let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
+    let to_bytes = subscription_gb_to_bytes;
+    let info = format!(
+        "upload=0; download={}; total={}; expire={}",
+        to_bytes(consumed_gb),
+        to_bytes(limit),
+        if expiry > 1_000_000_000_000 {
+            expiry / 1000
+        } else {
+            expiry
+        }
+    );
+    if let Ok(value) = header::HeaderValue::from_str(&info) {
+        response
+            .headers_mut()
+            .insert("subscription-userinfo", value);
+    }
+ }
+
 pub async fn serve(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -1451,35 +1485,7 @@ pub async fn serve(
         announcement.as_deref(),
         Some(&token),
     );
-    // User limits are expressed in decimal GB in panel records; the conventional subscription-userinfo
-    // header expects bytes and Unix seconds.
-    let consumed_gb = user
-        .get("used")
-        .and_then(Value::as_f64)
-        .unwrap_or(0.0)
-        .max(0.0);
-    let limit = user
-        .get("limit")
-        .and_then(Value::as_f64)
-        .unwrap_or(0.0)
-        .max(0.0);
-    let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
-    let to_bytes = subscription_gb_to_bytes;
-    let info = format!(
-        "upload=0; download={}; total={}; expire={}",
-        to_bytes(consumed_gb),
-        to_bytes(limit),
-        if expiry > 1_000_000_000_000 {
-            expiry / 1000
-        } else {
-            expiry
-        }
-    );
-    if let Ok(value) = header::HeaderValue::from_str(&info) {
-        response
-            .headers_mut()
-            .insert("subscription-userinfo", value);
-    }
+    add_subscription_userinfo_header(&mut response, &user);
     Ok(response)
 }
 
