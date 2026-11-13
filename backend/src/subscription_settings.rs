@@ -333,13 +333,23 @@ mod tests {
             &json!({"subscriptionSupportUrl":"http://example.com"})
         ));
         assert!(accepts(&json!({"subscriptionProfileWebPageEnabled": true})));
-        assert!(accepts(&json!({"subscriptionProfileWebPageEnabled": false})));
-        assert!(!accepts(&json!({"subscriptionProfileWebPageEnabled": "on"})));
+        assert!(accepts(
+            &json!({"subscriptionProfileWebPageEnabled": false})
+        ));
+        assert!(!accepts(
+            &json!({"subscriptionProfileWebPageEnabled": "on"})
+        ));
         assert!(accepts(&json!({"subscriptionProfileWebPageUrl": ""})));
-        assert!(accepts(&json!({"subscriptionProfileWebPageUrl": "https://account.example.org/me"})));
-        for url in ["http://example.org", "javascript:alert(1)",
-            "https://user:pass@host.example.org", "https://host.example.org:444/",
-            "https://host.example.org/abc\r\nx-bad: value"] {
+        assert!(accepts(
+            &json!({"subscriptionProfileWebPageUrl": "https://account.example.org/me"})
+        ));
+        for url in [
+            "http://example.org",
+            "javascript:alert(1)",
+            "https://user:pass@host.example.org",
+            "https://host.example.org:444/",
+            "https://host.example.org/abc\r\nx-bad: value",
+        ] {
             assert!(!accepts(&json!({"subscriptionProfileWebPageUrl":url})));
         }
         assert!(accepts(&json!({"subscriptionRadius":29})));
