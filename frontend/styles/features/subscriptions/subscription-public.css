@@ -640,7 +640,6 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
   border-left:1px solid var(--cabinet-line);
 }
 .subscription-public .experience-account .experience-directions b{font-size:15px!important}
-.subscription-public .experience-account .experience-server-details{display:none}
 .subscription-public .experience-dashboard [data-setup-section=connect]{
   grid-column:2!important;grid-row:3!important;min-width:0;
 }
