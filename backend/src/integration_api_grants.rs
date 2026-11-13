@@ -147,6 +147,7 @@ fn replay(value: Value) -> Json<Value> {
     result
 }
 
+#[expect(clippy::too_many_lines, reason = "Entitlement grant must remain atomic with ledger deduplication and account updates")]
 pub(super) async fn grant(
     State(state): State<AppState>,
     Extension(principal): Extension<ServicePrincipal>,
