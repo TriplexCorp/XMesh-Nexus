@@ -373,6 +373,12 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 .subscription-public .experience-connect-steps li{display:flex;align-items:center;gap:9px;min-width:0;padding:12px 10px;border:1px solid color-mix(in srgb,var(--cabinet-line) 50%,transparent);border-radius:calc(var(--portal-radius)*.6);background:color-mix(in srgb,var(--portal-text) 3%,transparent);font-size:13px;font-weight:550;line-height:1.4}
 .subscription-public .experience-connect-steps li>span{color:var(--portal-accent-text);font-size:12px;font-variant-numeric:tabular-nums}
 .subscription-public .experience-dashboard .subscription-public-primary-action{grid-template-columns:1.35fr 1.15fr .8fr;gap:10px;margin-top:0;padding-top:16px;border-top:1px solid var(--cabinet-line)}
+.subscription-public .experience-dashboard .subscription-public-primary-action:not(:has(> #toggle-qr, > [data-subscription-qr])){
+  grid-template-columns:minmax(0,1fr) 52px;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action:not(:has(> #toggle-qr, > [data-subscription-qr])):not(:has(> #connect-link, > [data-subscription-copy])){
+  grid-template-columns:minmax(0,1fr);
+}
 .subscription-public .experience-dashboard .subscription-public-primary-action>.experience-start{grid-column:auto;min-height:52px;font-size:16px;background:linear-gradient(130deg,color-mix(in srgb,var(--portal-accent) 86%,white),var(--portal-accent));box-shadow:0 4px 18px -12px var(--portal-accent)}
 .subscription-public .experience-dashboard .subscription-public-primary-action>button{padding:12px 10px;min-height:52px;font-size:14px;line-height:1.4}
 .subscription-public .experience-account{grid-column:2;grid-row:2;display:flex;flex-direction:column;justify-content:center;min-width:0;padding:24px;border:1px solid var(--cabinet-line);border-radius:var(--portal-radius);background:linear-gradient(125deg,color-mix(in srgb,var(--portal-card) 95%,var(--portal-accent)),var(--portal-card) 70%)}
@@ -501,3 +507,256 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 .subscription-public .experience-dashboard .experience-account>[data-subscription-traffic]{order:1}
 .subscription-public .experience-dashboard:not(:has([data-setup-section=connect]:not([hidden]))) .experience-account{grid-column:1/-1;grid-row:2}
 .subscription-public .experience-dashboard:not(:has([data-setup-section=connect]:not([hidden]))) .experience-dashboard-lower{grid-template-columns:1fr}
+
+
+/* Minimal owner-first subscription cabinet: shared by live bearer page and Studio.
+   No duplicated onboarding checklist, no hard-coded theme or fabricated quotas. */
+.subscription-public .experience-dashboard::before{
+  background:radial-gradient(ellipse 50% 35% at 79% 9%,color-mix(in srgb,var(--portal-accent) 10%,transparent),transparent 95%);
+}
+.subscription-public .subscription-public-shell:has(.experience-dashboard){
+  width:min(calc(100% - 48px),1240px);
+  padding-top:22px;
+}
+.subscription-public .experience-dashboard .subscription-preview-brand{
+  min-height:60px;padding:10px 16px;background:color-mix(in srgb,var(--portal-card) 52%,var(--portal-bg));
+  border-color:color-mix(in srgb,var(--portal-text) 10%,transparent);box-shadow:none;
+}
+.subscription-public .experience-dashboard .subscription-public-overview{
+  display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);
+  grid-template-rows:auto minmax(182px,auto) auto;gap:16px;padding:28px 0 18px;align-items:stretch;
+}
+.subscription-public .experience-dashboard .subscription-preview-hero{
+  grid-column:1/-1!important;grid-row:1!important;padding:0 0 8px;min-height:0;
+}
+.subscription-public .experience-dashboard .subscription-preview-hero-copy{gap:8px}
+.subscription-public .experience-dashboard .subscription-preview-hero h1{
+  font-size:clamp(32px,3vw,43px);letter-spacing:-.04em;line-height:1.12;
+}
+.subscription-public .experience-dashboard .subscription-preview-hero p{font-size:15px;margin-top:0}
+.subscription-public .experience-dashboard .subscription-preview-ok{
+  display:inline-flex;align-items:center;gap:8px;width:max-content;padding:5px 11px;
+  border-radius:999px;font-size:13px;font-weight:650;
+  color:#76dcb1!important;background:rgba(50,160,116,.12);
+}
+.subscription-public .experience-dashboard .subscription-preview-ok::first-letter{font-size:15px}
+.subscription-public .experience-dashboard[data-subscription-state="EXPIRED"] .subscription-preview-ok,
+.subscription-public .experience-dashboard[data-subscription-state="DISABLED"] .subscription-preview-ok,
+.subscription-public .experience-dashboard[data-subscription-state="LIMITED"] .subscription-preview-ok{
+  color:#ffab9b!important;background:rgba(255,120,100,.12);
+}
+.subscription-public .experience-dashboard[data-subscription-state="ON_HOLD"] .subscription-preview-ok{
+  color:#ffdc88!important;background:rgba(252,182,80,.12);
+}
+.subscription-public :is(.experience-plan,.experience-owner){
+  position:relative;min-width:0;border:1px solid var(--cabinet-line);
+  border-radius:var(--portal-radius);background:var(--portal-card);
+}
+.subscription-public .experience-plan{
+  grid-column:1;grid-row:2;display:flex;align-items:flex-start;gap:20px;
+  padding:28px;overflow:hidden;isolation:isolate;
+  background:linear-gradient(118deg,color-mix(in srgb,var(--portal-accent) 11%,var(--portal-card)),var(--portal-card) 74%);
+}
+.subscription-public .experience-plan::after{
+  content:"";position:absolute;inset:-85% -32% -60% 43%;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse,color-mix(in srgb,var(--portal-accent) 24%,transparent),transparent 66%);
+  transform:translateX(3%);animation:experienceGlow 9s ease-in-out infinite alternate;
+}
+.subscription-public .experience-plan-symbol{
+  flex:none;display:grid;place-items:center;width:64px;height:64px;
+  border-radius:calc(var(--portal-radius)*.78);font-size:32px;color:var(--portal-accent);
+  background:color-mix(in srgb,var(--portal-accent) 12%,var(--portal-card));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--portal-accent) 19%,transparent);
+}
+.subscription-public .experience-plan-content{min-width:0}
+.subscription-public .experience-plan-label,.subscription-public .experience-owner-details>small{
+  display:block;font-size:13px;color:var(--cabinet-muted);line-height:1.45;
+}
+.subscription-public .experience-plan-name{
+  margin:5px 0 6px;font-size:clamp(24px,2.6vw,34px);line-height:1.1;
+  font-weight:720;letter-spacing:-.035em;overflow-wrap:anywhere;
+}
+.subscription-public .experience-plan-note{margin:0;font-size:14px;line-height:1.55;color:var(--cabinet-muted)}
+.subscription-public .experience-owner{
+  grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:14px;justify-content:space-between;
+  padding:22px 24px;
+}
+.subscription-public .experience-owner-heading{display:flex;gap:14px;align-items:center;min-width:0}
+.subscription-public .experience-owner-avatar{
+  display:grid;place-items:center;flex:none;width:52px;height:52px;border-radius:50%;
+  color:var(--portal-accent);background:color-mix(in srgb,var(--portal-accent) 11%,var(--portal-card));
+}
+.subscription-public .experience-owner-avatar svg{
+  width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;
+}
+.subscription-public .experience-owner-details{min-width:0}
+.subscription-public .experience-owner-name{
+  display:block;margin-top:2px;font-size:20px;line-height:1.35;overflow-wrap:anywhere;
+}
+.subscription-public .experience-owner>[data-subscription-expiry]{
+  display:flex;flex-wrap:wrap;align-items:center;gap:5px 14px;min-height:0;
+  padding:15px 0 0;border:0;border-top:1px solid var(--cabinet-line);background:none;
+  box-shadow:none;border-radius:0;margin:0;
+}
+.subscription-public .experience-owner>[data-subscription-expiry]>small{
+  display:block;flex-basis:100%;font-size:12px;color:var(--cabinet-muted);
+}
+.subscription-public .experience-owner>[data-subscription-expiry]>b{
+  display:block;font-size:15px;font-weight:600;letter-spacing:0;color:var(--cabinet-ink);
+}
+.subscription-public .experience-owner .experience-days{
+  order:4;display:inline-flex;align-items:center;
+  padding:4px 9px;border-radius:99px;font-size:12px;line-height:1.4;
+  color:var(--portal-accent-text);background:color-mix(in srgb,var(--portal-accent) 10%,transparent);
+}
+.subscription-public .experience-owner .experience-days[hidden]{display:none}
+.subscription-public .experience-dashboard .experience-account{
+  grid-column:1;grid-row:3;display:block;min-height:116px;padding:18px 24px;
+  background:var(--portal-card);box-shadow:none;
+}
+.subscription-public .experience-account>[data-subscription-traffic]{
+  display:block;padding:0;border:0;background:transparent;box-shadow:none;min-height:0;
+}
+.subscription-public .experience-account>[data-subscription-traffic]>small{
+  font-size:14px;font-weight:600;line-height:1.3;
+}
+.subscription-public .experience-account .portal-donut{
+  display:grid!important;grid-template-columns:minmax(0,1fr) minmax(100px,.28fr);
+  gap:2px 20px;align-items:center;margin-top:6px;
+}
+.subscription-public .experience-account .experience-unlimited-summary{
+  grid-column:1;grid-row:1;gap:8px;margin:0;align-items:baseline;
+}
+.subscription-public .experience-account .experience-unlimited-summary>b{font-size:24px;line-height:1.25}
+.subscription-public .experience-account .experience-unlimited-summary>small{font-size:13px}
+.subscription-public .experience-account .experience-quota-meter{
+  grid-column:1;grid-row:2;margin:8px 0;height:6px;
+}
+.subscription-public .experience-account .portal-donut-allowance{
+  grid-column:1;grid-row:3;margin:0;font-size:12px;color:var(--cabinet-muted);
+}
+.subscription-public .experience-account .experience-directions{
+  grid-column:2;grid-row:1/4;padding:0 0 0 18px;gap:7px;
+  border-left:1px solid var(--cabinet-line);
+}
+.subscription-public .experience-account .experience-directions b{font-size:15px!important}
+.subscription-public .experience-dashboard [data-setup-section=connect]{
+  grid-column:2!important;grid-row:3!important;min-width:0;
+}
+.subscription-public .experience-dashboard .subscription-public-access-panel{
+  height:100%;min-height:116px;display:flex;align-items:center;justify-content:center;
+  padding:18px;gap:0;background:var(--portal-card);box-shadow:none;
+}
+.subscription-public .experience-dashboard .subscription-public-access-panel>.subscription-public-panel-title{display:none}
+.subscription-public .experience-dashboard .subscription-public-primary-action{
+  display:grid;grid-template-columns:minmax(0,1fr) 52px 52px;gap:9px;
+  width:100%;margin:0;padding:0;border:0;align-items:stretch;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>.experience-start{
+  grid-column:1;min-width:0;min-height:54px;margin:0;font-size:15px;font-weight:650;
+  border-radius:calc(var(--portal-radius)*.67);
+  background:var(--portal-accent);color:var(--portal-action-ink,#111);
+  box-shadow:0 6px 18px -15px var(--portal-accent);
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>:is(#connect-link,#toggle-qr,[data-subscription-copy],[data-subscription-qr]){
+  width:52px;min-width:0;min-height:54px;padding:0;font-size:0;
+  border:1px solid var(--cabinet-line);border-radius:calc(var(--portal-radius)*.67);
+  background:color-mix(in srgb,var(--portal-text) 3%,var(--portal-card));
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>:is(#connect-link,[data-subscription-copy])::before{
+  content:"⧉";font-size:26px;line-height:1;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>:is(#toggle-qr,[data-subscription-qr])::before{
+  content:"▦";font-size:27px;line-height:1;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>:is(#connect-link,#toggle-qr,[data-subscription-copy],[data-subscription-qr]):hover{
+  border-color:color-mix(in srgb,var(--portal-accent) 48%,var(--cabinet-line));
+}
+.subscription-public .experience-dashboard .subscription-preview-quick,
+.subscription-public .experience-dashboard .subscription-public-access-panel>.subscription-public-secondary-surfaces:empty{display:none}
+.subscription-public .experience-dashboard-lower{gap:16px;margin:0 0 16px}
+.subscription-public :is(.experience-quick-setup,.experience-server-panel){
+  padding:22px;background:var(--portal-card);box-shadow:none;
+}
+.subscription-public :is(.experience-quick-setup,.experience-server-panel)>h2{
+  font-size:18px;font-weight:650;margin:0 0 3px;
+}
+.subscription-public :is(.experience-quick-setup,.experience-server-panel)>p{
+  font-size:13px;margin:0 0 14px;
+}
+.subscription-public .experience-quick-platforms{gap:8px;margin:12px 0}
+.subscription-public .experience-quick-platforms button{min-height:64px;gap:5px;font-size:11px}
+.subscription-public .experience-quick-platforms svg{width:23px;height:23px}
+.subscription-public .experience-quick-open{min-height:42px;padding:8px 12px;font-size:13px;background:transparent}
+.subscription-public .experience-server-panel .experience-server-details[open]{margin:0}
+.subscription-public .experience-server-panel .experience-distribution-content{gap:12px}
+.subscription-public .experience-shortcuts{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;order:4;
+  padding:4px;margin:0 0 16px;background:var(--portal-card);box-shadow:none;
+}
+.subscription-public .experience-shortcuts>button{gap:10px;padding:12px;min-height:58px}
+.subscription-public .experience-shortcuts svg{width:21px;height:21px}
+.subscription-public .experience-shortcuts strong{font-size:13px}
+.subscription-public .experience-shortcuts small{font-size:11px}
+.subscription-public .experience-shortcuts .experience-chevron{font-size:18px}
+.subscription-public .experience-dashboard{display:flex;flex-direction:column}
+.subscription-public .experience-dashboard>.subscription-preview-brand{order:0}
+.subscription-public .experience-dashboard>.subscription-public-overview{order:1}
+.subscription-public .experience-dashboard>.experience-dashboard-lower{order:2}
+.subscription-public .experience-dashboard>.subscription-public-workspace{order:5}
+.subscription-public .experience-dashboard>footer{order:6}
+.subscription-public .experience-dashboard .subscription-public-workspace{margin:0}
+.subscription-public .experience-dashboard .experience-support-shortcut-only{display:none}
+.subscription-public .experience-dashboard .subscription-cabinet-support-card{
+  min-height:68px;padding:12px 18px;box-shadow:none;background:var(--portal-card);
+}
+.subscription-public .experience-dashboard .experience-help-title{font-size:15px}
+.subscription-public .experience-dashboard .experience-support-icon{width:40px;height:40px}
+.subscription-public .experience-dashboard .experience-support-icon svg{width:21px;height:21px}
+.subscription-public .experience-dashboard .subscription-preview-support{min-height:40px;padding:8px 14px;font-size:13px}
+.subscription-public .experience-dashboard[data-portal-cards=flat] :is(.experience-plan,.experience-owner){background:transparent;border-color:transparent}
+.subscription-public .experience-dashboard[data-portal-cards=outline] :is(.experience-plan,.experience-owner){background:transparent}
+.subscription-public .experience-dashboard[data-portal-cards=glass] :is(.experience-plan,.experience-owner){background:color-mix(in srgb,var(--portal-card) 78%,transparent);backdrop-filter:blur(12px)}
+.subscription-public .experience-dashboard[data-portal-cards=raised] :is(.experience-plan,.experience-owner){box-shadow:0 6px 22px -16px #0008}
+@keyframes experienceGlow{from{transform:translateX(-7%);opacity:.45}to{transform:translateX(7%);opacity:.88}}
+@container cabinet (max-width:900px){
+  .subscription-public .experience-dashboard .subscription-public-overview{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px}
+  .subscription-public .experience-plan{padding:22px}
+  .subscription-public .experience-owner{padding:18px}
+  .subscription-public .experience-dashboard .subscription-public-access-panel{padding:12px}
+  .subscription-public .experience-dashboard .subscription-public-primary-action{grid-template-columns:minmax(0,1fr) 48px 48px;gap:6px}
+  .subscription-public .experience-dashboard .subscription-public-primary-action>:is(#connect-link,#toggle-qr,[data-subscription-copy],[data-subscription-qr]){width:48px}
+}
+@container cabinet (max-width:760px){
+  .subscription-public .experience-dashboard .subscription-public-overview{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:none}
+  .subscription-public .experience-dashboard .subscription-preview-hero{grid-column:1!important;grid-row:auto!important}
+  .subscription-public .experience-plan,.subscription-public .experience-owner,.subscription-public .experience-dashboard .experience-account,.subscription-public .experience-dashboard [data-setup-section=connect]{
+    grid-column:1!important;grid-row:auto!important;
+  }
+  .subscription-public .experience-dashboard .subscription-public-overview .subscription-public-info-panel{display:none}
+  .subscription-public .experience-dashboard .subscription-preview-hero{order:0}
+  .subscription-public .experience-dashboard .experience-plan{order:1}
+  .subscription-public .experience-dashboard .experience-owner{order:2}
+  .subscription-public .experience-dashboard [data-setup-section=connect]{order:3}
+  .subscription-public .experience-dashboard .experience-account{order:4}
+  .subscription-public .experience-plan{min-height:150px}
+  .subscription-public .experience-dashboard .subscription-public-access-panel{min-height:90px}
+  .subscription-public .experience-dashboard-lower{grid-template-columns:minmax(0,1fr)}
+  .subscription-public .experience-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@container cabinet (max-width:430px){
+  .subscription-public .experience-dashboard .subscription-public-overview{gap:12px;padding-top:20px}
+  .subscription-public .experience-plan{padding:18px;gap:14px;min-height:136px}
+  .subscription-public .experience-plan-symbol{width:46px;height:46px;font-size:26px}
+  .subscription-public .experience-plan-name{font-size:25px}
+  .subscription-public .experience-owner{gap:10px;padding:16px}
+  .subscription-public .experience-dashboard .experience-account{padding:16px}
+  .subscription-public .experience-account .portal-donut{grid-template-columns:1fr;gap:8px}
+  .subscription-public .experience-account .experience-directions{grid-column:1;grid-row:auto;display:flex;gap:20px;border-left:0;border-top:1px solid var(--cabinet-line);padding:10px 0 0}
+  .subscription-public .experience-dashboard .subscription-public-primary-action{grid-template-columns:minmax(0,1fr) 48px 48px}
+  .subscription-public .experience-dashboard .subscription-public-primary-action>.experience-start{grid-column:1}
+  .subscription-public .experience-dashboard .subscription-public-primary-action>button:not(.experience-start){min-height:52px}
+  .subscription-public .experience-quick-platforms{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .subscription-public .experience-shortcuts>button{min-height:62px;padding:8px}
+}
+@media(prefers-reduced-motion:reduce){.subscription-public .experience-plan::after{animation:none}}

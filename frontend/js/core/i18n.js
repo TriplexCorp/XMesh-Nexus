@@ -15,6 +15,12 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Ваш тариф": "Your plan",
+    "VPN-доступ": "VPN access",
+    "Персональная подписка для подключения к VPN.": "Your personal VPN subscription.",
+    "Владелец подписки": "Subscription owner",
+    "Ваш аккаунт": "Your account",
+    "Ваш доступ, срок действия и расход трафика.": "Your access, expiry and data usage.",
     "Использовать анонсы": "Enable announcements",
     "Отключение убирает announce из ответа подписки, но сохраняет текст черновика.": "Turning this off omits the announce header but keeps your saved draft.",
     "Персональные сообщения для VPN-приложений и подстановка значений.": "Personalized announcements and variables for VPN apps.",

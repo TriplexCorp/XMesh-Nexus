@@ -45,38 +45,62 @@ window.XMeshSubscriptionExperience={mount(root,options){
   const quickTitle=el('h2'),quickNote=el('p'),quickPlatforms=el('div','experience-quick-platforms'),quickOpen=el('button','experience-quick-open');quickOpen.type='button';
   quick.append(quickTitle,quickNote,quickPlatforms,quickOpen);dashboard.append(quick,serverPanel);
   const nav=el('nav','experience-shortcuts'),account=el('aside','experience-account');
+  const plan=el('section','experience-plan'),owner=el('section','experience-owner');
+  const planContent=el('div','experience-plan-content'),planBadge=el('span','experience-plan-symbol','✦');
+  const planLabel=el('small','experience-plan-label'),planName=el('h2','experience-plan-name'),planNote=el('p','experience-plan-note');
+  planContent.append(planLabel,planName,planNote);plan.append(planBadge,planContent);
+  const ownerHeading=el('div','experience-owner-heading'),ownerAvatar=el('span','experience-owner-avatar');
+  const ownerDetails=el('div','experience-owner-details'),ownerLabel=el('small'),ownerName=el('strong','experience-owner-name');
+  ownerAvatar.append(iconPlaceholder());ownerDetails.append(ownerLabel,ownerName);ownerHeading.append(ownerAvatar,ownerDetails);owner.append(ownerHeading);
+  function iconPlaceholder(){const s=doc.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('aria-hidden','true');s.innerHTML='<circle cx="12" cy="8" r="4"></circle><path d="M4 21v-2a8 8 0 0 1 16 0v2"></path>';return s}
   const overview=root.querySelector('.subscription-public-overview'),workspace=root.querySelector('.subscription-public-workspace');
-  if(overview){overview.append(account);overview.after(nav,dashboard)}
+  if(overview){overview.append(plan,owner,account);overview.after(nav,dashboard)}
   const deviceDialog=makeDialog('devices'),deviceNote=el('p','experience-intro');deviceDialog.node.append(deviceNote);
   const icon=name=>{const paths={bolt:'M13 2 3 14h8l-1 8 11-13h-8z',guide:'M4 4h6c2 0 2 2 2 2s0-2 2-2h6v16h-6c-2 0-2 2-2 2s0-2-2-2H4z M12 6v16',device:'M3 4h18v12H3z M8 21h8 M12 16v5',server:'M4 3h16v5H4z M4 11h16v5H4z M4 19h16v2H4z',help:'M4 14v-3a8 8 0 0 1 16 0v3 M4 12H2v7h4v-7z M20 12h2v7h-4v-7z M18 21h-6',windows:'M3 4l8-1v8H3z M13 3l8-1v9h-8z M3 13h8v8l-8-1z M13 13h8v9l-8-1z',macos:'M17 7c-2-2-3 0-5 0s-3-2-5 0c-4 3-1 12 2 13 1 1 2-1 3-1s2 2 4 1c1-1 3-4 3-6-4-2-3-5-2-7z M12 5c0-3 3-4 3-4 0 3-3 4-3 4',android:'M5 9h14v10H5z M5 7a7 7 0 0 1 14 0z M7 1l2 3 M17 1l-2 3 M8 19v3 M16 19v3 M2 10v7 M22 10v7',ios:'M7 2h10v20H7z M11 18h2',linux:'M8 10V6a4 4 0 0 1 8 0v4l4 9-5 2-3-2-3 2-5-2z M10 8h4',all:'M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M15 15h6v6h-6z'};const svg=doc.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');const path=doc.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',paths[name]||paths.device);svg.append(path);return svg};
   const access=root.querySelector('.subscription-public-access-panel'),accessHead=access?.querySelector('.subscription-public-panel-title');
-  if(accessHead){const emblem=el('span','experience-access-emblem');emblem.append(icon('bolt'));accessHead.prepend(emblem);const steps=el('ol','experience-connect-steps');for(let i=0;i<3;i++)steps.append(el('li'));accessHead.after(steps)}
-  const wave=doc.createElementNS('http://www.w3.org/2000/svg','svg');wave.setAttribute('viewBox','0 0 720 280');wave.setAttribute('aria-hidden','true');wave.classList.add('experience-wave');
-  for(let i=0;i<18;i++){const path=doc.createElementNS(wave.namespaceURI,'path');path.setAttribute('d',`M ${290+i*9} -40 C ${360+i*5} ${175-i*2}, ${530+i*7} ${80+i*4}, 780 ${180+i*5}`);wave.append(path)}access?.prepend(wave);
+  if(accessHead){const emblem=el('span','experience-access-emblem');emblem.append(icon('bolt'));accessHead.prepend(emblem)}
+  // A restrained CSS-only aurora provides motion without decorative SVG clutter.
+  access?.classList.add('experience-minimal-access');
   const showGuide=button=>{selectedApp=null;render();guide.open(button)};
   quickOpen.addEventListener('click',()=>showGuide(quickOpen));
   const refreshDashboard=()=>{
     const en=current.language==='en',t=(ru,english)=>en?english:ru;root.classList.add('experience-dashboard');
     const expiry=root.querySelector('[data-subscription-expiry]'),metric=root.querySelector('[data-subscription-traffic]');
-    for(const node of [expiry,metric])if(node&&node.parentElement!==account)account.append(node);
-    account.hidden=![expiry,metric].some(n=>n&&!n.hidden);root.classList.toggle('experience-no-account',account.hidden);
+    if(expiry&&expiry.parentElement!==owner)owner.append(expiry);
+    if(metric&&metric.parentElement!==account)account.append(metric);
+    owner.hidden=false;
+    account.hidden=!metric||metric.hidden;root.classList.toggle('experience-no-account',account.hidden);
+    const ownerValue=(root.dataset.subscriptionOwner||'').trim();
+    const planValue=(root.dataset.subscriptionPlan||'').trim();
+    planLabel.textContent=t('Ваш тариф','Your plan');
+    planName.textContent=planValue||t('VPN-доступ','VPN access');
+    planNote.textContent=t('Персональная подписка для подключения к VPN.','Your personal VPN subscription.');
+    ownerLabel.textContent=t('Владелец подписки','Subscription owner');
+    ownerName.textContent=ownerValue||t('Ваш аккаунт','Your account');
     const available=!!current.url;nav.hidden=!available;quick.hidden=!available;
-    const description=root.querySelector('.subscription-preview-hero p');if(description&&(description.hidden||!description.textContent.trim())){description.textContent=t('Подключение, устройства и расход — в одном месте.','Connection, devices and data usage in one place.');description.hidden=false}
+    const description=root.querySelector('.subscription-preview-hero p');if(description&&(description.hidden||!description.textContent.trim())){description.textContent=t('Ваш доступ, срок действия и расход трафика.','Your access, expiry and data usage.');description.hidden=false}
     const supportCard=root.querySelector('.subscription-cabinet-support-card');if(supportCard&&!supportCard.querySelector('.experience-support-icon')){const emblem=el('span','experience-support-icon');emblem.append(icon('help'));supportCard.prepend(emblem)}
     quickTitle.textContent=t('Быстрая настройка','Quick setup');quickNote.textContent=t('Выберите устройство, чтобы открыть инструкцию.','Choose your device to open the setup guide.');
     quickPlatforms.setAttribute('role','group');quickPlatforms.setAttribute('aria-label',t('Ваше устройство','Your device'));quickPlatforms.replaceChildren();
     for(const [id,title]of [['windows','Windows'],['macos','macOS'],['android','Android'],['ios','iOS'],['linux','Linux'],['all',t('Ещё','More')]]){const b=el('button');b.type='button';b.setAttribute('aria-pressed',String(id===selectedPlatform));b.append(icon(id),el('span','',title));b.addEventListener('click',()=>{selectedPlatform=id;selectedApp=null;render();refreshDashboard();quickPlatforms.querySelector('[aria-pressed=true]')?.focus({preventScroll:true})});quickPlatforms.append(b)}
     quickOpen.replaceChildren(icon('guide'),el('span','',selectedPlatform==='all'?t('Выбрать приложение','Choose an app'):t('Инструкция для ','Set up ')+({ios:'iOS / iPadOS',android:'Android',windows:'Windows',macos:'macOS',linux:'Linux'})[selectedPlatform]),el('span','experience-chevron','›'));
-    const steps=access?.querySelectorAll('.experience-connect-steps li');[t('Установите приложение','Install an app'),t('Добавьте подписку','Add subscription'),t('Включите VPN','Turn on VPN')].forEach((text,i)=>{if(steps?.[i]){steps[i].replaceChildren(el('span','',String(i+1).padStart(2,'0')),doc.createTextNode(text))}});
+    // The setup dialog contains guidance; the landing page has no three-step checklist.
     const distribution=metric?.querySelector('.experience-server-details');if(distribution){serverPanel.replaceChildren();const h=el('h2','',t('Трафик по серверам','Usage by server')),note=el('p','',t('Распределение учтённого расхода.','Distribution of measured data usage.'));serverPanel.append(h,note);distribution.open=true;distribution.querySelector('summary').hidden=true;serverPanel.append(distribution)}
     serverPanel.hidden=!metric||metric.hidden||!serverPanel.querySelector('.experience-server-details');dashboard.hidden=quick.hidden&&serverPanel.hidden;
     const device=root.querySelector('#subscription-devices,[data-preview-devices]')||root.querySelector('[data-setup-section=devices] .subscription-public-devices');
-    const support=root.querySelector('.subscription-preview-support');nav.setAttribute('aria-label',t('Быстрые действия','Quick actions'));nav.replaceChildren();
+    const support=root.querySelector('.subscription-preview-support');
+    const directSupport=available&&!!support?.matches('a[href^="https://"]');
+    support?.closest('[data-setup-section=support]')?.classList.toggle('experience-support-shortcut-only',directSupport);
+    nav.setAttribute('aria-label',t('Быстрые действия','Quick actions'));nav.replaceChildren();
     const addShortcut=(glyph,title,note,handler)=>{const b=el('button');b.type='button';b.append(icon(glyph));const text=el('span');text.append(el('strong','',title),el('small','',note));b.append(text,el('span','experience-chevron','›'));b.addEventListener('click',()=>handler(b));nav.append(b)};
     if(available)addShortcut('guide',t('Инструкции','Instructions'),t('Для ваших устройств','For your devices'),showGuide);
     if(device&&!device.hidden&&!device.closest('[data-setup-section=devices]')?.hidden){deviceDialog.title.textContent=t('Ваши устройства','Your devices');deviceDialog.close.setAttribute('aria-label',t('Закрыть','Close'));deviceNote.textContent=t('Это зарегистрированные устройства, а не число активных VPN-соединений.','This is the number of registered devices, not live VPN connections.');let value=deviceDialog.node.querySelector('.experience-device-value');if(!value){value=el('p','experience-device-value');deviceDialog.node.append(value)}value.textContent=device.textContent;addShortcut('device',t('Устройства','Devices'),device.textContent,b=>deviceDialog.open(b))}
     if(!serverPanel.hidden)addShortcut('server',t('По серверам','By server'),t('Распределение трафика','Data usage breakdown'),()=>{serverPanel.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});serverPanel.setAttribute('tabindex','-1');serverPanel.focus({preventScroll:true})});
-    if(support&&!support.hidden)addShortcut('help',t('Поддержка','Support'),t('Помощь с подключением','Connection help'),()=>{support.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});support.focus({preventScroll:true})});
+    if(support&&!support.hidden)addShortcut('help',t('Поддержка','Support'),t('Помощь с подключением','Connection help'),()=>{
+      if(directSupport){support.click();return}
+      support.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});
+      support.focus({preventScroll:true});
+    });
     if(workspace){const devices=workspace.querySelector('[data-setup-section=devices]');if(devices)devices.classList.add('experience-devices-source')}
   };
   const update=next=>{current=next;render();refreshDashboard()};root._experience={update};update(options);

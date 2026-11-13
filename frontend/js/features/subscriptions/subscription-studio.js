@@ -378,7 +378,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<p class="subscription-preview-caption">Адаптивный вид · демоданные. Изменения темы и размера здесь не меняют сохранённые настройки.</p>',
       '<div class="subscription-studio-preview subscription-public" data-subscription-preview-frame="">',
       '<main class="subscription-public-shell">',
-      '<div class="subscription-preview" data-subscription-preview="">',
+      '<div class="subscription-preview" data-subscription-preview="" data-subscription-owner="demo_user" data-subscription-plan="">',
       '<header class="subscription-preview-brand">',
       '<div class="subscription-public-brand-identity">',
       '<span data-subscription-logo-symbol="">✦</span>',

@@ -30,7 +30,7 @@ function fixture(url){
  const state=url.searchParams.get('state')||'ACTIVE';
  const en=url.searchParams.get('lang')==='en',active=url.searchParams.get('active')!=='0'&&!['EXPIRED','LIMITED','DISABLED'].includes(state),unlimited=url.searchParams.get('limit')==='0',light=url.searchParams.get('theme')==='light';
  const text=(ru,enText)=>en?enText:ru;
- const data={PUBLIC_CSS:embeddedCss,PUBLIC_SCRIPTS:embeddedScripts,LANG:en?'en':'ru',BRAND:process.env.XMESH_TEST_BRAND||'Private VPN',LOGO:'<span aria-hidden="true">S</span>',
+ const data={PUBLIC_CSS:embeddedCss,PUBLIC_SCRIPTS:embeddedScripts,LANG:en?'en':'ru',OWNER:'demo_user',PLAN:'VPN Access',BRAND:process.env.XMESH_TEST_BRAND||'Private VPN',LOGO:'<span aria-hidden="true">S</span>',
  ACCENT:url.searchParams.get('accent')==='dark'?'#2549bf':light?'#86e0b6':'#ff9788',SECONDARY_ACCENT:'#a3bffa',BACKGROUND:light?'#f6f8fa':'#0d1218',CARD_COLOR:light?'#ffffff':'#151c25',TEXT_COLOR:light?'#1c2938':'#edf2f7',RADIUS:'20',THEME:light?'light':'dark',LAYOUT:'standard',FONT:'system',CARD_STYLE:url.searchParams.get('material')||'soft',
  RU_SELECTED:en?'':'on',EN_SELECTED:en?'on':'',RU_CURRENT:en?'false':'page',EN_CURRENT:en?'page':'false',
  STATUS_DOT:'<span class="subscription-preview-ok">● '+text(active?'Активна':'Неактивна',active?'Active':'Inactive')+'</span>',
@@ -65,6 +65,11 @@ async function dismissDialog(page,dialog,opener){
    assert.equal(await page.locator('#subscription-link-card,#toggle-link').count(),0,'No link reveal UI');
    const g=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth,body:innerWidth,title:parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),minTap:Math.min(...[...document.querySelectorAll('.subscription-cabinet-tab:not([hidden]),.subscription-preview-languages a,.subscription-preview-cta')].map(el=>el.getBoundingClientRect().height))}));
    assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=30,'Readable heading');assert(g.minTap>=44,'Touch target too small');
+   assert.equal(await page.locator('.experience-owner-name').innerText(),'demo_user','The bearer page shows the scoped subscription owner');
+   assert.equal(await page.locator('.experience-plan-name').innerText(),'VPN Access','A configured plan is shown without fabricated marketing benefits');
+   assert.equal(await page.locator('.experience-connect-steps').count(),0,'Remove redundant three-step onboarding');
+   assert.equal(await page.locator('.experience-owner [data-subscription-expiry]').count(),1,'Expiry belongs to the owner card');
+   assert.equal(await page.locator('.experience-account [data-subscription-traffic]').count(),1,'Traffic remains in the usage summary');
    assert.equal(await page.locator('.experience-shortcuts strong').count(),4,'Available shortcuts have visible labels');assert.equal(await page.locator('.experience-quick-platforms button').count(),6);assert.equal(await page.locator('.experience-server-panel h2').innerText(),lang==='en'?'Usage by server':'Трафик по серверам');
    assert.equal(await page.locator('[role="tab"]').count(),0,'No tab navigation');assert(await page.locator('.experience-start').isVisible());assert(await page.locator('[data-setup-section="connect"]').isVisible());assert.equal(await page.locator('#copy-link').count(),0,'Only one copy button');
    assert.equal(await page.locator('.portal-donut-server').count(),2);
