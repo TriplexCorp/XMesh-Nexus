@@ -63,7 +63,10 @@ fn valid_token(value: &str) -> bool {
             .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
-#[expect(clippy::too_many_lines, reason = "Credential issuance performs immutable policy checks, MFA and transactional key storage")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Credential issuance performs immutable policy checks, MFA and transactional key storage"
+)]
 pub async fn create_token(
     State(state): State<AppState>,
     Extension(admin): Extension<AuthUser>,
@@ -260,7 +263,10 @@ pub(super) async fn require_service(
     }
 }
 
-#[expect(clippy::too_many_lines, reason = "Authentication enforces bearer, browser isolation, rate limits, authorization and token revocation")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Authentication enforces bearer, browser isolation, rate limits, authorization and token revocation"
+)]
 async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePrincipal, Problem> {
     // A browser cookie or Origin MUST NOT be enough to access this namespace,
     // nor can an integration token be mixed with an authenticated browser request.
