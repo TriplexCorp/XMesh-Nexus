@@ -485,7 +485,7 @@ mod tests {
 
     #[test]
     fn all_four_node_periods_are_valid_and_select_independent_meters() {
-        for (period,used) in [
+        for (period, used) in [
             ("daily", 100_000_000),
             ("weekly", 200_000_000),
             ("monthly", 300_000_000),
@@ -493,25 +493,28 @@ mod tests {
         ] {
             let user = json!({"nodeTrafficLimits":{"12":{"limitGb":1,"period":period}}});
             assert!(validate_user(&user).is_ok(), "{period}");
-            let usage = HashMap::from([(12, NodeUsage {
-                daily: 100_000_000,
-                weekly: 200_000_000,
-                monthly: 300_000_000,
-                lifetime: 400_000_000,
-            })]);
+            let usage = HashMap::from([(
+                12,
+                NodeUsage {
+                    daily: 100_000_000,
+                    weekly: 200_000_000,
+                    monthly: 300_000_000,
+                    lifetime: 400_000_000,
+                },
+            )]);
             assert_eq!(
                 remaining_for(&user, Some(12), &[12], Some(&usage)),
                 Remaining::Bytes(1_000_000_000 - used),
                 "{period}"
             );
-            assert_eq!(
-                bytes_for_period(usage[&12], period), used,
-                "{period}"
-            );
+            assert_eq!(bytes_for_period(usage[&12], period), used, "{period}");
         }
-        assert!(validate_user(&json!({"nodeTrafficLimits":{
-            "12":{"limitGb":1,"period":"hourly"}
-        }})).is_err());
+        assert!(
+            validate_user(&json!({"nodeTrafficLimits":{
+                "12":{"limitGb":1,"period":"hourly"}
+            }}))
+            .is_err()
+        );
     }
 
     #[test]
