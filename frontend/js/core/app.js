@@ -5038,7 +5038,13 @@ async function setP(){
     ['tropical','#4ed5bc','#f6c787','Тропики']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}" aria-pressed="${(C[key]||CDEFAULT[key])==v?'true':'false'}">${l}</button>`).join('')}</div>`;
-  const tk=`<section class="card" data-settings-group="integrations"><div class="hd"><div><h3>API-токены</h3><p>Выдача API-токенов для интеграций ещё не реализована.</p></div></div><p class="note">Не создавайте токены через этот раздел: безопасность доступа к API будет добавлена отдельным этапом.</p></section>`;
+  const tk=`<section class="card settings-notification-test" data-settings-group="integrations">
+    <div class="appearance-card-heading"><h3>Проверка уведомлений</h3><small>Здесь можно проверить настоящие всплывающие сообщения панели.</small></div>
+    <div class="settings-notification-example"><span class="settings-notification-icon">${ic('bell')}</span><div><b>Тестовое сообщение</b><small>Положение и длительность задаются в соседнем блоке.</small></div></div>
+    <button type="button" class="gh settings-notification-trigger" data-settings-test-toast>${ic('bell')} Показать уведомление</button>
+    <div class="settings-notification-summary"><span>Событий вебхуков включено</span><b data-hook-count>${Object.values(DB.set.hooks||{}).filter(Boolean).length} / ${Object.keys(DB.set.hooks||{}).length}</b></div>
+    <p class="note">Тест показывает сообщение в этом браузере и не отправляет запрос во внешний сервис. API-токены здесь не создаются.</p>
+  </section>`;
   const settingsPage=settingsPageFromHash();
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
   if(settingsPage==='system')try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
@@ -5083,6 +5089,11 @@ async function setP(){
   <section class="card sg" data-settings-group="general"><div class="appearance-card-heading"><h3>Поведение панели</h3><small>Персональные параметры текущего браузера — не меняют настройки других администраторов.</small></div>
     <div class="setting-row"><div class="setting-copy"><b>Стартовая страница</b><small>Куда переходить при открытии панели без выбранного раздела.</small></div><div class="setting-control"><select id="start-page" aria-label="Стартовая страница">${[['home','Дашборд'],['statistics','Статистика'],['users','Пользователи'],['nodes','Узлы'],['hosts','Хосты'],['profiles','XRAY STUDIO'],['subscription','SUBSCRIPTION STUDIO'],['last','Последний открытый раздел']].map(([v,l])=>`<option value="${v}" ${C.startPage===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Счётчик пользователей в меню</b><small>Показывать количество пользователей рядом с разделом навигации.</small></div><label class="sw"><input type="checkbox" id="nav-counter" ${C.navCounter?'checked':''} aria-label="Счётчик пользователей в меню"><span></span></label></div>
+    <div class="settings-feature-links"><div class="settings-mini-heading"><b>Связанные настройки</b><small>Откройте редактор нужной функции без поиска по меню</small></div>
+      <a href="#subscription">${ic('globe')}<span><b>Страница подписки</b><small>Публичный портал, клиенты и внешний вид</small></span>${ic('chevron-right')}</a>
+      <a href="#profiles">${ic('code')}<span><b>XRAY STUDIO</b><small>Конфигурации и протоколы</small></span>${ic('chevron-right')}</a>
+      <a href="#nodes">${ic('server')}<span><b>Узлы</b><small>Инфраструктура, лимиты и агенты</small></span>${ic('chevron-right')}</a>
+    </div>
   </section>
   <div class="card" data-settings-group="integrations"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
   <section class="card sg" data-settings-group="integrations"><div class="appearance-card-heading"><h3>Уведомления интерфейса</h3><small>Всплывающие сообщения панели. Персональные настройки этого браузера.</small></div>
@@ -5104,12 +5115,22 @@ async function setP(){
     <div class="setting-row"><div class="setting-copy"><b>Точность ползунков</b><small>Шаг 1 или 10 для остальных ползунков. Скругление всегда настраивается по 1 px.</small></div><div class="setting-control"><select id="range-precision" aria-label="Точность ползунков"><option value="1" ${C.rangePrecision===1?'selected':''}>Точно · 1</option><option value="10" ${C.rangePrecision===10?'selected':''}>С привязкой · 10</option></select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области до 3000 px. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><label class="precision-number"><input type="number" id="content-width-value" data-appearance-value="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Точная ширина содержимого"><span>px</span></label></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.01" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><label class="precision-number"><input type="number" id="gap-scale-value" data-appearance-value="gap-scale" min="80" max="140" step="1" value="${Math.round((C.gapScale||1)*100)}" aria-label="Точный интервал между карточками"><span>%</span></label></div></div>
+    <div class="settings-mini-heading"><b>Предпросмотр композиции</b><small>Плотность, скругление и оформление карточек меняются в реальном интерфейсе.</small></div>
+    <div class="settings-layout-specimen" aria-label="Пример расположения карточек" role="img"><div class="settings-layout-hero"><i></i><span><b>Рабочее пространство</b><small>Единый вид разделов</small></span></div>
+      <div class="settings-layout-samples"><div><b>Карточка A</b><span></span><span></span></div><div><b>Карточка B</b><span></span><span></span></div><div><b>Карточка C</b><span></span><span></span></div></div>
+    </div>
   </section>
     <section class="card sg" data-settings-group="typography"><div class="appearance-card-heading"><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсветка фона</b><small>Мягкое цветное свечение за панелью</small></div><div class="setting-control">${choices('glow',[['off','Выкл.'],['subtle','Мягкая'],['normal','Средняя'],['rich','Яркая']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Анимации</b><small>Отключите движение и переходы, если они отвлекают</small></div><label class="sw"><input type="checkbox" id="mo" ${C.motion?'checked':''} aria-label="Анимации"><span></span></label></div>
       <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления сохраняются в localStorage этого браузера</small></div><button class="gh sm" id="rs">Сбросить оформление</button></div>
       <div class="setting-row"><div class="setting-copy"><b>Учитывать настройки ОС</b><small>Если в системе включено уменьшение движения, анимации автоматически отключатся.</small></div><label class="sw"><input type="checkbox" id="follow-reduced-motion" ${C.followReducedMotion?'checked':''} aria-label="Учитывать уменьшение движения в ОС"><span></span></label></div>
+      <div class="settings-type-specimen"><div class="settings-mini-heading"><b>Как выглядит текст</b><small>Шрифт, масштаб, интервал и цифры берутся из текущих настроек.</small></div>
+        <div class="settings-type-sample"><strong>Заголовок интерфейса</strong><p>Параметры читаются и меняются вместе с оформлением. Все элементы используют единый стиль.</p>
+          <div><span>1 024</span><span>28 500</span><span>99,8%</span></div>
+          <span class="settings-type-link">Пример текстовой ссылки</span>
+        </div>
+      </div>
     </section>
 
   <div class="card" id="core-panel" data-settings-group="system"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
@@ -5266,6 +5287,7 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
+  if(b=g('[data-settings-test-toast]')){e.preventDefault();toast('Тестовое уведомление: настройки отображения работают.');return;}
   if(b=g('[data-cdn-tags-save]')){
     e.preventDefault();
     if(sessionUser?.role!=='owner')return;
@@ -6135,7 +6157,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   }
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
-  else if(t.dataset.hk){const old=DB.set.hooks[t.dataset.hk];DB.set.hooks[t.dataset.hk]=t.checked?1:0;try{await api.saveSettings({hooks:{...DB.set.hooks}});toast(t.checked?'Событие включено':'Событие отключено')}catch(err){DB.set.hooks[t.dataset.hk]=old;t.checked=!!old;toast(err.message)}}
+  else if(t.dataset.hk){const old=DB.set.hooks[t.dataset.hk];DB.set.hooks[t.dataset.hk]=t.checked?1:0;try{await api.saveSettings({hooks:{...DB.set.hooks}});toast(t.checked?'Событие включено':'Событие отключено')}catch(err){DB.set.hooks[t.dataset.hk]=old;t.checked=!!old;toast(err.message)}finally{const count=$('[data-hook-count]');if(count)count.textContent=Object.values(DB.set.hooks||{}).filter(Boolean).length+' / '+Object.keys(DB.set.hooks||{}).length}}
   else if(t.matches('select[data-psz]')){
     // data-psz is a value-less HTML attribute: its dataset value is an empty string.
     const size=Number(t.value);
