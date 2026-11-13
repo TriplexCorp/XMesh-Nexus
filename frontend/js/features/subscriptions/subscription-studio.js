@@ -763,7 +763,7 @@ window.XMeshSubscriptionStudio = (() => {
       }
 
       const profileCard=card('Личный кабинет в VPN-приложениях',
-        'Кнопка личной страницы в Happ и других совместимых VPN-клиентах.','↗');
+        'Ссылка на личную страницу в поддерживаемых VPN-приложениях.','↗');
       profileCard.classList.add('subscription-content-card','subscription-content-profile');
       content.append(profileCard);
       const profileToggle=appearanceCard.querySelector('.subscription-profile-page-toggle');
