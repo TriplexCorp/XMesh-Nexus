@@ -236,9 +236,31 @@ for(const setting of [
  'subscriptionBackground','subscriptionCardColor','subscriptionTextColor','subscriptionSecondaryAccent',
  'subscriptionLayout','subscriptionCardStyle','subscriptionFont','subscriptionRadius',
  'subscriptionHero','subscriptionCta','subscriptionLogoUrl','subscriptionSupportLabel',
- 'subscriptionSupportUrl','subscriptionClientLayout','subscriptionShowApps','subscriptionShowQr',
+ 'subscriptionSupportUrl','subscriptionProfileWebPageUrl','subscriptionProfileWebPageEnabled','subscriptionClientLayout','subscriptionShowApps','subscriptionShowQr',
  'subscriptionShowCopy','subscriptionShowDevices','subscriptionShowStatus','subscriptionShowSupport'
 ])assert(view.includes('name="'+setting+'"'),'Missing studio setting '+setting);
+assert.equal(studio.defaults.subscriptionProfileWebPageEnabled,true,
+ 'A new installation must expose the existing personal portal by default');
+assert.equal(studio.defaults.subscriptionProfileWebPageUrl,'',
+ 'Custom webpage URL must be opt-in');
+assert.match(view,/Личный кабинет в VPN-приложениях/);
+assert.match(src,/subscriptionProfileWebPageEnabled:input\(form,'subscriptionProfileWebPageEnabled'\)\.checked/);
+assert.match(src,/subscriptionProfileWebPageUrl:input\(form,'subscriptionProfileWebPageUrl'\)\.value\.trim\(\)/);
+assert.match(src,/data-subscription-profile-page-preview/);
+assert.match(src,/subscriptionProfileWebPageUrl'\]\)/,
+ 'Custom portal URL must receive the same HTTPS validation as support links');
+assert.match(rust,/"subscriptionProfileWebPageEnabled"/);
+assert.match(rust,/"subscriptionProfileWebPageUrl"/);
+const subscriptionBackend=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
+const subscriptionAgent=fs.readFileSync('backend/src/subscription_user_agent.rs','utf8');
+assert.match(subscriptionBackend,/profile-web-page-url/);
+assert.match(subscriptionBackend,/\?view=portal/);
+assert.match(subscriptionBackend,/subscription_profile_page_url/);
+assert.match(subscriptionBackend,/safe_https_url\(&url\)/);
+assert.match(subscriptionAgent,/options\.get\("view"\)\.is_some_and\(\|value\| value == "portal"\)/,
+ 'A VPN embedded browser must always get the personal HTML portal');
+assert.doesNotMatch(subscriptionAgent,/options\.get\("view"\).*format=base64/,
+ 'Personal page must not alter feed format');
 assert.equal(studio.clientCatalog.length,16,'Built-in client catalog must remain intact');
 assert.equal(studio.maxCustomClients,32,'Custom client limit must be bounded');
 
