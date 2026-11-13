@@ -766,7 +766,7 @@ window.XMeshSubscriptionStudio = (() => {
         'Кнопка личной страницы в Happ и других совместимых VPN-клиентах.','↗');
       profileCard.classList.add('subscription-content-card','subscription-content-profile');
       content.append(profileCard);
-      const profileToggle=portalCard.querySelector('.subscription-profile-page-toggle');
+      const profileToggle=appearanceCard.querySelector('.subscription-profile-page-toggle');
       if(profileToggle)profileCard.append(profileToggle);
       profileCard.insertAdjacentHTML('beforeend',
         studioToggle('subscriptionUseEmbeddedPortal','Использовать встроенный портал XMesh',
@@ -776,7 +776,7 @@ window.XMeshSubscriptionStudio = (() => {
       profileAddress.className='subscription-content-profile-address';
       profileCard.append(profileAddress);
       moveFields(profileAddress,['subscriptionProfileWebPageUrl']);
-      const profilePreview=portalCard.querySelector('[data-subscription-profile-page-preview]');
+      const profilePreview=appearanceCard.querySelector('[data-subscription-profile-page-preview]');
       if(profilePreview)profileCard.append(profilePreview);
 
       portalCard.querySelector('h3').textContent='Клиентский портал';
