@@ -642,3 +642,392 @@ html[data-link-style=underline] .settings-workspace .settings-type-link{
   grid-template-columns:minmax(0,1fr)
  }
 }
+
+
+/* Follow-up to #456: one legible settings language across all categories.
+   Semantic groups and existing handlers remain unchanged. */
+.settings-workspace{
+ --nx-text-xs:.78rem;
+ --nx-text-sm:.86rem;
+}
+.settings-workspace .settings-center-rail{
+ padding:.28rem;
+ border-radius:var(--nx-control-radius);
+}
+.settings-workspace .settings-center-link{
+ min-height:2.55rem;
+ padding:.45rem .78rem;
+ gap:.48rem;
+ font-size:.87rem;
+ font-weight:680;
+}
+.settings-workspace .settings-center-link-copy strong{
+ font-size:inherit;
+ font-weight:680;
+}
+.settings-workspace .settings-center-link-icon{
+ width:1.2rem;
+ height:1.2rem;
+ border:0;
+ border-radius:0;
+ background:transparent;
+}
+.settings-workspace .settings-center-link-icon .ic{
+ width:1.08rem;
+ height:1.08rem;
+}
+.settings-workspace .settings-center-link.is-active .settings-center-link-icon{
+ color:var(--a);
+ transform:none;
+}
+.settings-workspace .settings-focus-bar{
+ padding:.24rem;
+ gap:.22rem;
+}
+.settings-workspace .settings-focus-bar>button{
+ min-height:2.35rem;
+ padding:.42rem .82rem;
+ font-size:.84rem;
+ font-weight:680;
+}
+.settings-workspace .settings-center-grid,
+.settings-workspace .settings-center-grid .appearance-column{
+ gap:.8rem;
+}
+.settings-workspace .settings-center-grid .card{
+ padding:var(--nx-card-pad);
+}
+.settings-workspace .settings-center-grid .card :is(.hd h3,.appearance-card-heading h3,.settings-appearance-header h3){
+ font-size:1rem;
+ line-height:1.35;
+}
+.settings-workspace .settings-center-grid .card :is(.hd p,.appearance-card-heading small,.settings-appearance-header small){
+ font-size:.81rem;
+ line-height:1.48;
+}
+.settings-workspace .settings-center-grid .setting-row{
+ padding:.68rem 0;
+ gap:.7rem;
+}
+.settings-workspace .settings-center-grid .setting-copy b,
+.settings-workspace .settings-center-grid .rowi b{
+ font-size:.88rem;
+ line-height:1.4;
+}
+.settings-workspace .settings-center-grid :is(.setting-copy small,.rowi small,.note){
+ font-size:.8rem;
+ line-height:1.5;
+}
+.settings-workspace .settings-center-grid .setting-control select,
+.settings-workspace .settings-center-grid .f :is(input,select){
+ min-height:2.45rem;
+ font-size:.85rem;
+}
+.settings-workspace .settings-center-grid .font-choice>.choice button{
+ min-height:2.4rem;
+ padding:.42rem .5rem;
+ font-size:.83rem;
+}
+.settings-workspace .setting-actions,
+.settings-workspace .palette-draft-actions{
+ justify-content:flex-start;
+}
+.settings-workspace .settings-palette-gallery .palette-preset-grid{
+ grid-template-columns:repeat(4,minmax(0,1fr));
+ gap:.48rem;
+}
+.settings-workspace .settings-palette-gallery .palette-preset-foot{
+ font-size:.83rem;
+}
+.settings-workspace .settings-palette-gallery .palette-preset-demo{
+ height:1.42rem;
+}
+.settings-workspace .settings-feature-links{
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:.45rem;
+}
+.settings-workspace .settings-feature-links>.settings-mini-heading{
+ grid-column:1/-1;
+}
+.settings-workspace .settings-feature-links a{
+ padding:.58rem .65rem;
+ min-width:0;
+}
+.settings-workspace .settings-feature-links a small{
+ display:none;
+}
+.settings-workspace .settings-feature-links a b{
+ font-size:.83rem;
+}
+.settings-workspace .settings-theme-specimen,
+.settings-workspace .settings-layout-specimen,
+.settings-workspace .settings-type-specimen .settings-type-sample{
+ padding:.8rem;
+}
+.settings-workspace .settings-hook-list{
+ display:grid;
+ margin-top:.35rem;
+}
+.settings-workspace .settings-hooks-heading{
+ display:flex;
+ flex-wrap:wrap;
+ align-items:center;
+ justify-content:space-between;
+ gap:.65rem;
+}
+.settings-workspace .settings-hooks-heading>div{
+ display:grid;
+ gap:.2rem;
+ min-width:0;
+}
+.settings-workspace .settings-hooks-count{
+ display:inline-flex;
+ align-items:center;
+ gap:.38rem;
+ flex:none;
+ padding:.35rem .58rem;
+ border:1px solid var(--nx-border);
+ border-radius:999px;
+ background:var(--nx-section-bg);
+ color:var(--mu);
+ font-size:.79rem;
+ white-space:nowrap;
+}
+.settings-workspace .settings-hooks-count b{
+ color:var(--tx);
+ font-variant-numeric:tabular-nums;
+}
+.settings-workspace .settings-hook-item{
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:1rem;
+ min-height:4.2rem;
+ padding:.65rem .15rem;
+}
+.settings-workspace .settings-hook-copy{
+ display:grid;
+ gap:.12rem;
+ min-width:0;
+ flex:1 1 auto;
+ overflow-wrap:anywhere;
+}
+.settings-workspace .settings-hook-copy b{
+ color:var(--tx);
+}
+.settings-workspace .settings-hook-copy small{
+ color:var(--mu);
+}
+.settings-workspace .settings-hook-copy code{
+ font-size:.72rem;
+ line-height:1.35;
+ color:var(--mu);
+ overflow-wrap:anywhere;
+ white-space:normal;
+}
+.settings-workspace .settings-hook-item>.sw{
+ flex:0 0 auto;
+ margin-left:auto;
+}
+.settings-workspace .settings-hook-hint{
+ margin:.55rem 0 0;
+ padding-top:.7rem;
+ border-top:1px solid var(--nx-separator);
+}
+.settings-workspace .settings-notification-example{
+ padding:.7rem;
+}
+.settings-workspace .settings-notification-icon{
+ flex-basis:2.2rem;
+ width:2.2rem;
+ height:2.2rem;
+}
+.settings-workspace .settings-notification-trigger{
+ margin-top:.15rem;
+}
+.settings-workspace .settings-system-footer{
+ grid-column:1/-1;
+}
+.settings-workspace .settings-system-footer .f{
+ max-width:45rem;
+}
+.settings-workspace .settings-system-footer :is(.bypass-legacy-rules,.act){
+ max-width:52rem;
+}
+.settings-workspace .settings-system-footer .act{
+ justify-content:flex-start;
+}
+/* Security was the only subpage using a giant title and full-width tab grid. */
+.settings-workspace .settings-center-embedded>.security-center{
+ gap:.72rem;
+}
+.settings-workspace .settings-center-embedded .security-overview{
+ padding:0 .1rem;
+}
+.settings-workspace .settings-center-embedded .security-overview h2{
+ margin:0 0 .15rem;
+ font-size:1.16rem;
+ line-height:1.4;
+}
+.settings-workspace .settings-center-embedded .security-overview p:last-child{
+ font-size:.84rem;
+ line-height:1.45;
+}
+.settings-workspace .settings-center-embedded .security-center-tabs{
+ display:flex;
+ grid-template-columns:none;
+ align-items:center;
+ width:max-content;
+ max-width:100%;
+ gap:.22rem;
+ padding:.25rem;
+ overflow-x:auto;
+ overflow-y:hidden;
+ scrollbar-width:thin;
+ border-radius:var(--nx-control-radius);
+}
+.settings-workspace .settings-center-embedded .security-center-tabs button{
+ display:inline-flex;
+ flex:0 0 auto;
+ width:auto;
+ min-height:2.45rem;
+ padding:.48rem .82rem;
+ gap:.5rem;
+ font-size:.85rem;
+ white-space:nowrap;
+}
+.settings-workspace .settings-center-embedded .security-center-tabs button>.ic{
+ width:1rem;
+ height:1rem;
+ flex:none;
+}
+.settings-workspace .settings-center-embedded .security-center-information{
+ padding:var(--nx-card-pad);
+}
+.settings-workspace .settings-center-embedded .mfa-panel .mfa-security-content{
+ max-width:62rem;
+}
+.settings-workspace .settings-center-embedded #mfa-start .btn{
+ width:fit-content;
+ min-width:12rem;
+}
+.settings-workspace .settings-center-embedded .security-audit-event strong{
+ font-size:.86rem;
+}
+.settings-workspace .settings-center-embedded .security-audit-event :is(small,time){
+ font-size:.79rem;
+}
+.settings-workspace .settings-security-routes{
+ margin:.75rem 0;
+ gap:.5rem;
+}
+.settings-workspace .settings-security-routes a{
+ display:flex;
+ flex-direction:row;
+ align-items:center;
+ gap:.65rem;
+ padding:.75rem;
+}
+.settings-workspace .settings-security-routes a>.ic:first-child{
+ flex:none;
+ width:1.5rem;
+ height:1.5rem;
+ color:var(--a);
+}
+.settings-workspace .settings-security-routes a>span{
+ display:grid;
+ place-items:initial;
+ grid-row:auto;
+ flex:1 1 auto;
+ width:auto;
+ height:auto;
+ gap:.12rem;
+ border:0;
+ background:transparent;
+ color:var(--tx);
+ text-align:left;
+}
+.settings-workspace .settings-security-routes a>.ic:last-child{
+ width:1rem;
+ height:1rem;
+ margin-left:auto;
+ color:var(--mu);
+ flex:none;
+}
+.settings-workspace .settings-security-routes b{
+ font-size:.88rem;
+}
+.settings-workspace .settings-security-routes small{
+ font-size:.8rem;
+ line-height:1.4;
+}
+.settings-workspace .settings-security-limitations{
+ margin-top:.3rem;
+ font-size:.82rem;
+ color:var(--mu);
+}
+.settings-workspace .settings-security-limitations summary{
+ color:var(--tx);
+ cursor:pointer;
+ font-weight:680;
+}
+.settings-workspace .settings-security-limitations p{
+ margin:.5rem 0 0;
+ line-height:1.55;
+ max-width:75ch;
+}
+.settings-workspace .settings-admin-role-guide{
+ display:block;
+ padding:.8rem 1rem;
+}
+.settings-workspace .settings-admin-role-guide>summary{
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ flex-wrap:wrap;
+ gap:.45rem;
+ font-size:.87rem;
+ cursor:pointer;
+}
+.settings-workspace .settings-admin-role-guide>summary small{
+ font-size:.8rem;
+ font-weight:400;
+ color:var(--mu);
+}
+.settings-workspace .settings-admin-role-grid{
+ margin-top:.7rem;
+}
+.settings-workspace .settings-admin-role-grid>div{
+ padding:.75rem;
+}
+@container settings-workspace (max-width:65rem){
+ .settings-workspace .settings-feature-links{
+  grid-template-columns:minmax(0,1fr);
+ }
+ .settings-workspace .settings-palette-gallery .palette-preset-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+ }
+}
+@container settings-workspace (max-width:44rem){
+ .settings-workspace .settings-center-link{
+  min-height:2.3rem;
+  padding:.38rem .6rem;
+ }
+ .settings-workspace .settings-center-grid .card{
+  padding:var(--nx-card-pad);
+ }
+ .settings-workspace .settings-center-embedded .security-center-tabs{
+  width:100%;
+ }
+ .settings-workspace .settings-security-routes{
+  grid-template-columns:minmax(0,1fr);
+ }
+ .settings-workspace .settings-hooks-heading{
+  align-items:flex-start;
+ }
+}
+@container settings-workspace (max-width:35rem){
+ .settings-workspace .settings-palette-gallery .palette-preset-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+}
