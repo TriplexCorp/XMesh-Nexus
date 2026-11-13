@@ -541,7 +541,7 @@ v1 are additive; breaking field/behavior changes require a new version.
   sessions as service principals or bypass CSRF checks for cookies.
 - Allow least-privilege scopes: `users:read`, `users:write`,
   `subscriptions:read`, `subscriptions:manage`, `traffic:read`,
-  `entitlements:grant`, `identities:write`, `events:read`. No wildcard
+  `entitlements:grant`, `identities:read`, `identities:write`, `events:read`. No wildcard
   privilege by default, no inherited admin/owner credentials, no Xray
   private-key access.
 - IP allowlisting and per-key rate limiting may be added as additional
