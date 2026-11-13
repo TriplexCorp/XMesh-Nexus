@@ -12,7 +12,7 @@ window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
     subscriptionFlood:{enabled:true,mode:'monitor',ipPerMinute:120,tokenPerMinute:12},
-    subscriptionBrand:'', subscriptionAnnouncement:'', subscriptionAnnouncementRotationHours:24, subscriptionUpdateInterval:24, subscriptionDescription:'Настройки подключения и информация о подписке.',
+    subscriptionBrand:'', subscriptionAnnouncement:'', subscriptionAnnouncementRotationHours:24,subscriptionAnnouncementEnabled:true, subscriptionUpdateInterval:24, subscriptionDescription:'Настройки подключения и информация о подписке.',
     subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78',subscriptionSecondaryAccent:'#c6e985', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
     subscriptionStatusEmojis:{ACTIVE:'✅',ON_HOLD:'⌛️',LIMITED:'🪫',EXPIRED:'❌',DISABLED:'🔌'},
@@ -177,6 +177,13 @@ window.XMeshSubscriptionStudio = (() => {
      '<input name="'+name+'" type="'+(opts && opts.color?'color':opts && opts.type==='number'?'number':'text')+'" '+(opts&&opts.max?'maxlength="'+opts.max+'"':'')+
       ' value="'+esc(value)+'" placeholder="'+esc((opts&&opts.placeholder)||'')+'" autocomplete="off" spellcheck="false">')+
     (help?'<small>'+help+'</small>':'')+'</label>';
+  // A native checkbox styled as an animated switch keeps keyboard, touch and
+  // accessibility behaviour, instead of introducing a second state machine.
+  const studioToggle=(name,title,description,checked,extraClass='')=>
+    '<label class="subscription-content-toggle '+extraClass+'">'+
+    '<span class="subscription-content-toggle-text"><b>'+esc(title)+'</b><small>'+esc(description)+'</small></span>'+
+    '<input type="checkbox" class="subscription-content-switch" role="switch" name="'+name+'"'+
+      (checked?' checked':'')+' aria-label="'+esc(title)+'"></label>';
   const choice = (name,selected,choices) => '<label class="f subscription-field"><span>'+
     'Язык портала по умолчанию'+'</span><select name="'+name+'">'+
     choices.map(x=>'<option value="'+x[0]+'"'+(selected===x[0]?' selected':'')+'>'+x[1]+'</option>').join('')+
@@ -303,7 +310,9 @@ window.XMeshSubscriptionStudio = (() => {
       field('subscriptionSupportLabelEn','Название поддержки (EN)',data.subscriptionSupportLabelEn,'Английское название поддержки.',{max:80}),
       field('subscriptionSupportUrl','Ссылка поддержки',data.subscriptionSupportUrl,'HTTPS-ссылка на сайт или чат.',{placeholder:'https://example.com/help',max:512}),
       '</div>',
-      '<label class="subscription-theme-sync subscription-profile-page-toggle"><input type="checkbox" name="subscriptionProfileWebPageEnabled"'+(data.subscriptionProfileWebPageEnabled!==false?' checked':'')+'> <span><b>Личный кабинет в VPN-приложениях</b><small>Показывать кнопку сайта подписки в поддерживающих клиентах.</small></span></label>',
+      studioToggle('subscriptionProfileWebPageEnabled','Показывать кнопку личного кабинета',
+        'Добавляет переход на сайт подписки в поддерживающих VPN-приложениях.',
+        data.subscriptionProfileWebPageEnabled!==false,'subscription-profile-page-toggle'),
       field('subscriptionProfileWebPageUrl','Свой адрес кабинета (необязательно)',data.subscriptionProfileWebPageUrl,'Оставьте пустым — приложение откроет персональный портал XMesh. Если указать свой HTTPS-адрес, он будет общим для всех подписчиков.',{placeholder:'Автоматически: личная страница XMesh',max:512}),
       '<p class="note subscription-profile-page-preview" data-subscription-profile-page-preview role="status">Будет доступен после настройки домена подписок.</p>',
       '<div class="subscription-studio-heading subscription-studio-subheading"><span>◈</span><div><h3>Блоки страницы</h3><p>Каждый элемент включается независимо.</p></div></div>',
@@ -657,13 +666,13 @@ window.XMeshSubscriptionStudio = (() => {
       serverPanel.append(servers);
       security.append(flood,scope);
 
-      const card=(title,description)=>{
+      const card=(title,description,symbolText='✦')=>{
         const section=document.createElement('section');
         section.className='card subscription-studio-section';
         const heading=document.createElement('div');
         heading.className='subscription-studio-heading';
         const symbol=document.createElement('span');
-        symbol.textContent='✦';
+        symbol.textContent=symbolText;
         const copy=document.createElement('div');
         const h=document.createElement('h3');
         h.textContent=title;
@@ -690,27 +699,85 @@ window.XMeshSubscriptionStudio = (() => {
           pair.append(label);
         }
       };
-      const announceCard=card('Анонсы и переменные','Сообщения в подписке и персональные значения для каждого пользователя.');
+      // Content workspace: three focused panels. Reparenting the existing
+      // controls retains the original validation, server keys and preview.
+      const announceCard=card('Анонсы и переменные',
+        'Персональные сообщения для VPN-приложений и подстановка значений.','{}');
+      announceCard.classList.add('subscription-content-card','subscription-content-announcements');
       content.append(announceCard);
-      moveFields(announceCard,['subscriptionAnnouncement']);
-      const tools=portalCard.querySelector('.subscription-announcement-tools');
-      if(tools)announceCard.append(tools);
-      moveFields(announceCard,['subscriptionAnnouncementRotationHours']);
+      announceCard.querySelector('.subscription-studio-heading').insertAdjacentHTML('beforeend',
+        studioToggle('subscriptionAnnouncementEnabled','Использовать анонсы',
+          'Отключение убирает announce из ответа подписки, но сохраняет текст черновика.',
+          data.subscriptionAnnouncementEnabled!==false,'subscription-content-heading-toggle'));
+      const announcementGrid=document.createElement('div');
+      announcementGrid.className='subscription-content-announcement-grid';
+      announceCard.append(announcementGrid);
+      moveFields(announcementGrid,['subscriptionAnnouncement']);
+      const announceTools=portalCard.querySelector('.subscription-announcement-tools');
+      if(announceTools){
+        announcementGrid.append(announceTools);
+        announceTools.querySelector('details')?.setAttribute('open','');
+      }
+      const announceOptions=document.createElement('div');
+      announceOptions.className='subscription-content-announcement-options';
+      announceCard.append(announceOptions);
+      moveFields(announceOptions,['subscriptionAnnouncementRotationHours']);
       const emojis=portalCard.querySelector('.subscription-status-emojis');
-      if(emojis)announceCard.append(emojis);
+      if(emojis)announceOptions.append(emojis);
 
-      const copyCard=card('Тексты и контакты','Заголовки, кнопки и подписи для русского и английского языков.');
+      const copyCard=card('Тексты и контакты',
+        'Подписи и кнопки для русского и английского языков.','T');
+      copyCard.classList.add('subscription-content-card','subscription-content-copy');
       content.append(copyCard);
-      moveFields(copyCard,[
-        'subscriptionHero','subscriptionHeroEn','subscriptionCta','subscriptionCtaEn',
-        'subscriptionSupportLabel','subscriptionSupportLabelEn','subscriptionSupportUrl',
-        'subscriptionFooter','subscriptionFooterEn'
+      const languageGrid=document.createElement('div');
+      languageGrid.className='subscription-content-languages';
+      copyCard.append(languageGrid);
+      const languageColumn=(lang,name,keys)=>{
+        const column=document.createElement('div');
+        column.className='subscription-content-language';
+        column.lang=lang;
+        column.innerHTML='<div class="subscription-content-language-heading">'+
+          '<span>'+lang.toUpperCase()+'</span><b>'+name+'</b></div>';
+        for(const key of keys){
+          const label=input(form,key)?.closest('.subscription-field');
+          if(!label)throw Error('Subscription Studio translation field missing: '+key);
+          column.append(label);
+        }
+        languageGrid.append(column);
+      };
+      languageColumn('ru','Русский язык',[
+        'subscriptionHero','subscriptionCta','subscriptionSupportLabel',
+        'subscriptionSupportUrl','subscriptionFooter'
       ]);
+      languageColumn('en','Английский язык',[
+        'subscriptionHeroEn','subscriptionCtaEn','subscriptionSupportLabelEn',
+        'subscriptionFooterEn'
+      ]);
+      const oldSupportToggle=input(form,'subscriptionShowSupport')?.closest('label');
+      if(oldSupportToggle){
+        oldSupportToggle.remove();
+        copyCard.insertAdjacentHTML('beforeend',
+          studioToggle('subscriptionShowSupport','Показывать поддержку',
+            'Отображает ссылку поддержки в личном кабинете подписчика.',
+            data.subscriptionShowSupport,'subscription-content-support-toggle'));
+      }
+
+      const profileCard=card('Личный кабинет в VPN-приложениях',
+        'Кнопка личной страницы в Happ и других совместимых VPN-клиентах.','↗');
+      profileCard.classList.add('subscription-content-card','subscription-content-profile');
+      content.append(profileCard);
       const profileToggle=portalCard.querySelector('.subscription-profile-page-toggle');
-      if(profileToggle)copyCard.append(profileToggle);
-      moveFields(copyCard,['subscriptionProfileWebPageUrl']);
+      if(profileToggle)profileCard.append(profileToggle);
+      profileCard.insertAdjacentHTML('beforeend',
+        studioToggle('subscriptionUseEmbeddedPortal','Использовать встроенный портал XMesh',
+          'Если выключено, укажите собственный HTTPS-адрес ниже.',
+          !data.subscriptionProfileWebPageUrl,'subscription-content-embedded-toggle'));
+      const profileAddress=document.createElement('div');
+      profileAddress.className='subscription-content-profile-address';
+      profileCard.append(profileAddress);
+      moveFields(profileAddress,['subscriptionProfileWebPageUrl']);
       const profilePreview=portalCard.querySelector('[data-subscription-profile-page-preview]');
-      if(profilePreview)copyCard.append(profilePreview);
+      if(profilePreview)profileCard.append(profilePreview);
 
       portalCard.querySelector('h3').textContent='Клиентский портал';
       portalCard.querySelector('.subscription-studio-heading p').textContent='Название, описание и язык публичной страницы подписки.';
@@ -815,6 +882,7 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionBrand:input(form,'subscriptionBrand').value.trim(),
         subscriptionAnnouncement:input(form,'subscriptionAnnouncement').value.trim(),
         subscriptionAnnouncementRotationHours:Number(input(form,'subscriptionAnnouncementRotationHours').value),
+        subscriptionAnnouncementEnabled:input(form,'subscriptionAnnouncementEnabled').checked,
         subscriptionUpdateInterval:Number(input(form,'subscriptionUpdateInterval').value),
         subscriptionDescription:input(form,'subscriptionDescription').value.trim(),
         subscriptionDescriptionEn:input(form,'subscriptionDescriptionEn').value.trim(),
@@ -1106,10 +1174,27 @@ window.XMeshSubscriptionStudio = (() => {
         }
         return managedCommand;
       };
+      const refreshPortalMode=()=>{
+        const buttonEnabled=input(form,'subscriptionProfileWebPageEnabled').checked;
+        const embedded=input(form,'subscriptionUseEmbeddedPortal');
+        const address=input(form,'subscriptionProfileWebPageUrl');
+        embedded.disabled=!buttonEnabled;
+        address.disabled=!buttonEnabled||embedded.checked;
+        profileCard.dataset.portalMode=embedded.checked?'embedded':'custom';
+        profileCard.dataset.portalEnabled=String(buttonEnabled);
+      };
+      const embeddedSwitch=input(form,'subscriptionUseEmbeddedPortal');
+      embeddedSwitch.addEventListener('change',()=>{
+        if(embeddedSwitch.checked)input(form,'subscriptionProfileWebPageUrl').value='';
+        else input(form,'subscriptionProfileWebPageUrl').focus();
+        refreshPortalMode();
+      });
       const draw = () => {
         applyPanelTheme();
         const d=read();
         updateInstall(d);
+        refreshPortalMode();
+        announceCard.dataset.announcementsEnabled=String(d.subscriptionAnnouncementEnabled);
         const profilePagePreview=root.querySelector('[data-subscription-profile-page-preview]');
         if(profilePagePreview){
           const pageUrl=d.subscriptionProfileWebPageUrl||
@@ -1117,10 +1202,12 @@ window.XMeshSubscriptionStudio = (() => {
               ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/<персональный-токен>?view=portal'
               : '');
           profilePagePreview.textContent=!d.subscriptionProfileWebPageEnabled
-            ? 'Кнопка личного кабинета скрыта в VPN-приложениях.'
-            : pageUrl
-              ? 'В VPN-приложениях: '+pageUrl
-              : 'Укажите домен подписок в разделе «Серверы подписок».';
+            ? 'Выключено: приложение не получит ссылку личного кабинета.'
+            : !input(form,'subscriptionUseEmbeddedPortal').checked&&!d.subscriptionProfileWebPageUrl
+              ? 'Введите собственный HTTPS-адрес кабинета.'
+              : pageUrl
+                ? 'Ссылка для VPN-приложений: '+pageUrl
+                : 'Укажите домен подписок в разделе «Серверы подписок».';
         }
         if(!['ru','en'].includes(previewLanguage))previewLanguage='ru';
         const lang=previewLanguage,english=lang==='en',copy=locale[lang];
@@ -1418,6 +1505,10 @@ window.XMeshSubscriptionStudio = (() => {
         }
         if(![draft.subscriptionJson.socksPort,draft.subscriptionJson.httpPort].every(p=>Number.isInteger(p)&&p>=1024&&p<=65535)||draft.subscriptionJson.socksPort===draft.subscriptionJson.httpPort){notify('Укажите разные локальные порты в диапазоне 1024–65535');return;}
         if(!Number.isInteger(draft.subscriptionUpdateInterval)||draft.subscriptionUpdateInterval<1||draft.subscriptionUpdateInterval>168){notify('Интервал обновления должен быть от 1 до 168 часов.');return;}
+        if(draft.subscriptionProfileWebPageEnabled&&
+          !input(form,'subscriptionUseEmbeddedPortal').checked&&!draft.subscriptionProfileWebPageUrl){
+          notify('Укажите собственный HTTPS-адрес кабинета или включите встроенный портал.');return;
+        }
         for(const key of ['subscriptionLogoUrl','subscriptionSupportUrl','subscriptionProfileWebPageUrl']){
           if(!validHttps(draft[key])){notify('Укажите корректную HTTPS-ссылку без логина и порта.');return;}
         }
