@@ -62,6 +62,32 @@ fn custom_dns_server(opts: &Value) -> Result<String, String> {
     }
 }
 
+fn selected_dns_server(opts: &Value) -> Result<String, String> {
+    let custom_address = opts
+        .get("customDnsAddress")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if custom_address.is_empty() {
+        // Retain historical preset values for existing saved configurations.
+        let dns_mode = option(
+            opts,
+            "dns",
+            &["cloudflare", "cloudflare_doh", "yandex", "system", "custom"],
+            "cloudflare",
+        );
+        match dns_mode {
+            "cloudflare_doh" => Ok("https://1.1.1.1/dns-query".to_owned()),
+            "yandex" => Ok("https://common.dot.dns.yandex.net/dns-query".to_owned()),
+            "system" => Ok("localhost".to_owned()),
+            "custom" => Err("Введите адрес своего DNS-сервера".into()),
+            _ => Ok("1.1.1.1".to_owned()),
+        }
+    } else {
+        custom_dns_server(opts)
+    }
+}
+
 fn enabled(config: &Value, key: &str, default: bool) -> bool {
     config.get(key).and_then(Value::as_bool).unwrap_or(default)
 }
@@ -372,33 +398,7 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
         return Err("Превышен лимит подключений в одной подписке".into());
     }
     let opts = setting.get("subscriptionJson").unwrap_or(&Value::Null);
-    let dns_mode = option(
-        opts,
-        "dns",
-        &["cloudflare", "cloudflare_doh", "yandex", "system", "custom"],
-        "cloudflare",
-    );
-    // Plain-IP Cloudflare DNS is the compatibility default: no DoH bootstrap
-    // hostname or TLS dependency during initial connectivity. Existing saved
-    // "cloudflare" selections also migrate to this reliable mode.
-    // IP-addressed DoH is a separate explicit opt-in, avoiding bootstrap loops.
-    let custom_address = opts
-        .get("customDnsAddress")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .trim();
-    let dns_server = if !custom_address.is_empty() {
-        // A typed resolver always takes precedence over the preset.
-        custom_dns_server(opts)?
-    } else {
-        match dns_mode {
-            "cloudflare_doh" => "https://1.1.1.1/dns-query".to_owned(),
-            "yandex" => "https://common.dot.dns.yandex.net/dns-query".to_owned(),
-            "system" => "localhost".to_owned(),
-            "custom" => return Err("Введите адрес своего DNS-сервера".into()),
-            _ => "1.1.1.1".to_owned(),
-        }
-    };
+    let dns_server = selected_dns_server(opts)?;
     let query_strategy = option(
         opts,
         "queryStrategy",
