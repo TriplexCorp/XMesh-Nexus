@@ -11,6 +11,83 @@ fn option<'a>(config: &'a Value, key: &str, values: &[&str], fallback: &'a str) 
         .filter(|s| values.contains(s))
         .unwrap_or(fallback)
 }
+/// Validate the chosen client DNS resolver before it is placed in the
+/// downloaded Xray JSON. Xray expects an IP[:port] for UDP and a complete
+/// HTTPS endpoint for `DoH`. Never silently substitute a different resolver.
+fn custom_dns_server(opts: &Value) -> Result<String, String> {
+    let raw = opts
+        .get("customDnsAddress")
+        .and_then(Value::as_str)
+        .ok_or("Введите адрес своего DNS-сервера")?
+        .trim();
+    if raw.is_empty()
+        || raw.len() > 512
+        || !raw.is_ascii()
+        || raw.bytes().any(|b| b <= 0x20 || b == 0x7f || b == b'\\')
+    {
+        return Err("Некорректный адрес DNS: не более 512 символов, без пробелов".into());
+    }
+    // The legacy "System DNS" preset used this Xray-reserved value.
+    // Preserve it when migrating from the old dropdown to the text field.
+    if raw == "localhost" {
+        return Ok("localhost".into());
+    }
+    if raw.starts_with("https://") {
+        let url =
+            reqwest::Url::parse(raw).map_err(|_| "DNS DoH: укажите корректную HTTPS-ссылку")?;
+        if url.scheme() != "https"
+            || url.host().is_none()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.fragment().is_some()
+            || url.path() == "/"
+            || url.port() == Some(0)
+        {
+            return Err("DNS DoH: нужен HTTPS-адрес с путём без логина и #фрагмента".into());
+        }
+        Ok(raw.to_owned())
+    } else {
+        // Accept udp:// as a friendly input spelling. A plain IP with an
+        // optional port implies UDP; all other schemes fail validation.
+        let address = raw.strip_prefix("udp://").unwrap_or(raw);
+        if address.parse::<std::net::IpAddr>().is_ok()
+            || address
+                .parse::<std::net::SocketAddr>()
+                .is_ok_and(|socket| socket.port() != 0)
+        {
+            Ok(address.to_owned())
+        } else {
+            Err("DNS UDP: укажите IP, IP:порт или [IPv6]:порт; для DoH — HTTPS-ссылку".into())
+        }
+    }
+}
+
+fn selected_dns_server(opts: &Value) -> Result<String, String> {
+    let custom_address = opts
+        .get("customDnsAddress")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if custom_address.is_empty() {
+        // Retain historical preset values for existing saved configurations.
+        let dns_mode = option(
+            opts,
+            "dns",
+            &["cloudflare", "cloudflare_doh", "yandex", "system", "custom"],
+            "cloudflare",
+        );
+        match dns_mode {
+            "cloudflare_doh" => Ok("https://1.1.1.1/dns-query".to_owned()),
+            "yandex" => Ok("https://common.dot.dns.yandex.net/dns-query".to_owned()),
+            "system" => Ok("localhost".to_owned()),
+            "custom" => Err("Введите адрес своего DNS-сервера".into()),
+            _ => Ok("1.1.1.1".to_owned()),
+        }
+    } else {
+        custom_dns_server(opts)
+    }
+}
+
 fn enabled(config: &Value, key: &str, default: bool) -> bool {
     config.get(key).and_then(Value::as_bool).unwrap_or(default)
 }
@@ -321,22 +398,7 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
         return Err("Превышен лимит подключений в одной подписке".into());
     }
     let opts = setting.get("subscriptionJson").unwrap_or(&Value::Null);
-    let dns_mode = option(
-        opts,
-        "dns",
-        &["cloudflare", "cloudflare_doh", "yandex", "system"],
-        "cloudflare",
-    );
-    // Plain-IP Cloudflare DNS is the compatibility default: no DoH bootstrap
-    // hostname or TLS dependency during initial connectivity. Existing saved
-    // "cloudflare" selections also migrate to this reliable mode.
-    // IP-addressed DoH is a separate explicit opt-in, avoiding bootstrap loops.
-    let dns_server = match dns_mode {
-        "cloudflare_doh" => "https://1.1.1.1/dns-query",
-        "yandex" => "https://common.dot.dns.yandex.net/dns-query",
-        "system" => "localhost",
-        _ => "1.1.1.1",
-    };
+    let dns_server = selected_dns_server(opts)?;
     let query_strategy = option(
         opts,
         "queryStrategy",
@@ -745,10 +807,23 @@ pub fn validate_settings(settings: &Value) -> Result<(), String> {
     for (key, value) in object {
         match key.as_str() {
             "dns" => {
-                if !["cloudflare", "cloudflare_doh", "yandex", "system"]
+                if !["cloudflare", "cloudflare_doh", "yandex", "system", "custom"]
                     .contains(&value.as_str().unwrap_or(""))
                 {
                     return Err("Unsupported DNS provider".into());
+                }
+            }
+            "customDnsProtocol" => {
+                // Tolerate saved settings produced by the earlier Studio
+                // prototype; protocol is now inferred from the address.
+                if !["udp", "doh"].contains(&value.as_str().unwrap_or("")) {
+                    return Err("Unsupported legacy custom DNS protocol".into());
+                }
+            }
+            "customDnsAddress" => {
+                let address = value.as_str().ok_or("Custom DNS address must be text")?;
+                if address.len() > 512 || address.chars().any(char::is_control) {
+                    return Err("Invalid custom DNS address".into());
                 }
             }
             "queryStrategy" => {
@@ -781,6 +856,14 @@ pub fn validate_settings(settings: &Value) -> Result<(), String> {
             }
             _ => return Err(format!("Unknown JSON Engine setting: {key}")),
         }
+    }
+    if object.get("dns").and_then(Value::as_str) == Some("custom")
+        || object
+            .get("customDnsAddress")
+            .and_then(Value::as_str)
+            .is_some_and(|s| !s.trim().is_empty())
+    {
+        custom_dns_server(settings)?;
     }
     if object.get("socksPort").and_then(Value::as_u64)
         == object.get("httpPort").and_then(Value::as_u64)
@@ -1228,6 +1311,96 @@ mod tests {
             json!("mlkem768x25519plus.native.1rtt.key");
         assert!(build(vec![x], &json!({})).is_ok());
     }
+    #[test]
+    fn typed_dns_address_overrides_existing_preset_without_mode_selector() {
+        for (submitted, expected) in [
+            ("9.9.9.9", "9.9.9.9"),
+            ("8.8.8.8:5353", "8.8.8.8:5353"),
+            ("udp://1.1.1.1:53", "1.1.1.1:53"),
+            ("2606:4700:4700::1111", "2606:4700:4700::1111"),
+            ("[2606:4700:4700::1111]:5353", "[2606:4700:4700::1111]:5353"),
+            ("localhost", "localhost"),
+            (
+                "https://dns.google/dns-query",
+                "https://dns.google/dns-query",
+            ),
+            ("https://1.1.1.1/dns-query", "https://1.1.1.1/dns-query"),
+            (
+                "https://dns.example.org:8443/custom-query?profile=1",
+                "https://dns.example.org:8443/custom-query?profile=1",
+            ),
+        ] {
+            let settings = json!({"subscriptionJson":{
+                "dns":"cloudflare","customDnsAddress":submitted
+            }});
+            assert!(
+                validate_settings(&settings["subscriptionJson"]).is_ok(),
+                "{submitted}"
+            );
+            let built = build(vec![outbound("DE")], &settings).unwrap();
+            assert_eq!(built["dns"]["servers"][0], expected);
+            assert!(
+                !built["outbounds"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|v| v["tag"] == "dns-out")
+            );
+        }
+    }
+
+    #[test]
+    fn empty_custom_field_restores_selected_dns_preset() {
+        for (dns, expected) in [
+            ("cloudflare", "1.1.1.1"),
+            ("cloudflare_doh", "https://1.1.1.1/dns-query"),
+            ("yandex", "https://common.dot.dns.yandex.net/dns-query"),
+            ("system", "localhost"),
+        ] {
+            let settings = json!({"subscriptionJson":{
+                "dns":dns,"customDnsAddress":""
+            }});
+            assert!(validate_settings(&settings["subscriptionJson"]).is_ok());
+            let built = build(vec![outbound("DE")], &settings).unwrap();
+            assert_eq!(built["dns"]["servers"][0], expected);
+        }
+    }
+
+    #[test]
+    fn malformed_custom_dns_is_never_silently_replaced_with_preset() {
+        for address in [
+            "hostname.example",
+            "8.8.8.8:65536",
+            "8.8.8.8:0",
+            "udp://1.1.1.1:0",
+            "http://dns.google/dns-query",
+            "https://user:pass@dns.google/dns-query",
+            "https://dns.google/dns-query#fragment",
+            "https://dns.google",
+            "https://dns.google/dns-query test",
+            "tls://dns.google",
+        ] {
+            let settings = json!({"subscriptionJson":{
+                "dns":"cloudflare","customDnsAddress":address
+            }});
+            assert!(
+                validate_settings(&settings["subscriptionJson"]).is_err(),
+                "{address}"
+            );
+            assert!(build(vec![outbound("DE")], &settings).is_err(), "{address}");
+        }
+        assert!(validate_settings(&json!({"dns":"custom"})).is_err());
+        // Accept legacy configs that had a custom mode while upgrading Studio.
+        let old = json!({"subscriptionJson":{
+            "dns":"custom","customDnsProtocol":"doh",
+            "customDnsAddress":"https://dns.example.net/query"
+        }});
+        assert_eq!(
+            build(vec![outbound("DE")], &old).unwrap()["dns"]["servers"][0],
+            "https://dns.example.net/query"
+        );
+    }
+
     #[test]
     fn custom_dns_balancing_and_ports() {
         let c = build(

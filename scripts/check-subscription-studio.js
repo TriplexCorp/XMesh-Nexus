@@ -67,6 +67,39 @@ assert.match(view,/subscription-sub-scope/,'Security guidance must live in a ful
 assert.match(view,/data-sub-agent-version/,'Server card must expose real agent version');
 assert.match(view,/data-sub-agent-seen/,'Server card must expose live last-seen timestamp');
 assert.match(view,/data-sub-flood-card/,'Owner needs a compact flood protection card');
+
+assert.doesNotMatch(view,/name="json_dns"/,'DNS must not have a preset dropdown');
+assert.doesNotMatch(view,/name="json_customDnsProtocol"/,'DNS must not have a protocol selector');
+assert.match(view,/name="json_customDnsAddress"/,'DNS must have a single editable address');
+assert.equal((view.match(/name="json_customDnsAddress"/g)||[]).length,1,'Exactly one DNS input');
+assert.match(view,/name="json_customDnsAddress"[^>]*value="1\.1\.1\.1"/,
+ 'Default DNS should be visible and directly editable');
+assert.match(src,/dns:'cloudflare'/,'Single-input settings preserve default wire compatibility');
+assert.match(src,/customDnsAddress:input\(form,'json_customDnsAddress'\)\.value\.trim\(\)/,
+ 'Edited DNS address must be included in the save payload');
+const [dohDnsView]=studio.create({
+ subscriptionJson:{dns:'cloudflare',customDnsAddress:'https://dns.example.org:8443/my-dns'}
+},async()=>{},()=>{},{});
+assert.match(dohDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/dns\.example\.org:8443\/my-dns"/,
+ 'DoH path and custom port must roundtrip');
+const [oldPresetDnsView]=studio.create({
+ subscriptionJson:{dns:'yandex'}
+},async()=>{},()=>{},{});
+assert.match(oldPresetDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/common\.dot\.dns\.yandex\.net\/dns-query"/,
+ 'Existing Yandex DoH preset must populate the same input');
+const [oldSystemDnsView]=studio.create({
+ subscriptionJson:{dns:'system'}
+},async()=>{},()=>{},{});
+assert.match(oldSystemDnsView,/name="json_customDnsAddress"[^>]*value="localhost"/,
+ 'Existing system resolver must not be overwritten with Cloudflare');
+const [oldCustomDnsView]=studio.create({
+ subscriptionJson:{dns:'custom',customDnsProtocol:'doh',
+  customDnsAddress:'https://dns.example.net/query'}
+},async()=>{},()=>{},{});
+assert.match(oldCustomDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/dns\.example\.net\/query"/,
+ 'Previously saved custom DNS must migrate without data loss');
+assert.doesNotMatch(oldCustomDnsView,/name="json_dns"/,'No DNS switch even for legacy data');
+
 assert.match(view,/name="floodEnabled"/,'Flood protection must be togglable');
 assert.match(view,/name="floodMode" value="monitor"/,'Monitoring must be available');
 assert.match(view,/name="floodMode" value="protect"/,'Protection must be available');
