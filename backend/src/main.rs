@@ -2772,6 +2772,68 @@ async fn activate_waiting_users_on_traffic(
 
 /// Charge authenticated positive user/node deltas before updating the
 /// cumulative physical baseline. Inbound traffic is intentionally excluded.
+/// The daily and weekly windows share the same verified counter baseline
+/// and transaction as the preexisting lifetime/monthly windows.
+async fn persist_user_node_calendar_deltas(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    serialized: &Value,
+) -> Result<(), ApiError> {
+    // The same signed positive user delta is charged atomically to every
+    // independent window. Current UTC dates pick a fresh ledger at rollover.
+    sqlx::query(
+        "INSERT INTO user_node_quota_daily AS daily (
+            day_start,node_id,user_id,uplink_bytes,downlink_bytes,updated_at
+         )
+         SELECT (NOW() AT TIME ZONE 'UTC')::date,
+                $1, sample.user_id,
+                sample.uplink_bytes-previous.last_uplink_bytes,
+                sample.downlink_bytes-previous.last_downlink_bytes,
+                NOW()
+         FROM jsonb_to_recordset($2::jsonb)
+              AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+         JOIN panel_records AS u ON u.collection='users' AND u.id=sample.user_id
+         JOIN user_node_traffic_totals AS previous
+              ON previous.node_id=$1 AND previous.user_id=sample.user_id
+         WHERE sample.uplink_bytes>=previous.last_uplink_bytes
+           AND sample.downlink_bytes>=previous.last_downlink_bytes
+         ON CONFLICT (day_start,node_id,user_id) DO UPDATE SET
+             uplink_bytes=daily.uplink_bytes+EXCLUDED.uplink_bytes,
+             downlink_bytes=daily.downlink_bytes+EXCLUDED.downlink_bytes,
+             updated_at=NOW()",
+    )
+    .bind(node_id)
+    .bind(serialized)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "INSERT INTO user_node_quota_weekly AS weekly (
+            week_start,node_id,user_id,uplink_bytes,downlink_bytes,updated_at
+         )
+         SELECT date_trunc('week', NOW() AT TIME ZONE 'UTC')::date,
+                $1, sample.user_id,
+                sample.uplink_bytes-previous.last_uplink_bytes,
+                sample.downlink_bytes-previous.last_downlink_bytes,
+                NOW()
+         FROM jsonb_to_recordset($2::jsonb)
+              AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+         JOIN panel_records AS u ON u.collection='users' AND u.id=sample.user_id
+         JOIN user_node_traffic_totals AS previous
+              ON previous.node_id=$1 AND previous.user_id=sample.user_id
+         WHERE sample.uplink_bytes>=previous.last_uplink_bytes
+           AND sample.downlink_bytes>=previous.last_downlink_bytes
+         ON CONFLICT (week_start,node_id,user_id) DO UPDATE SET
+             uplink_bytes=weekly.uplink_bytes+EXCLUDED.uplink_bytes,
+             downlink_bytes=weekly.downlink_bytes+EXCLUDED.downlink_bytes,
+             updated_at=NOW()",
+    )
+    .bind(node_id)
+    .bind(serialized)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 async fn persist_user_node_quota_deltas(
     conn: &mut sqlx::PgConnection,
     node_id: i64,
@@ -2830,6 +2892,7 @@ async fn persist_user_node_quota_deltas(
     .bind(serialized)
     .execute(&mut *conn)
     .await?;
+    persist_user_node_calendar_deltas(conn, node_id, serialized).await?;
     Ok(())
 }
 

@@ -434,6 +434,39 @@ def main():
         metered=next(u for u in users["items"] if u["id"]==user_id)
         assert abs(metered["used"]-(120/(1000**3)))<1e-9
 
+        # Signed per-node counters now charge four independent UTC windows.
+        # Test both new periods on the real API and desired-config cutoff.
+        for period in ("daily", "weekly"):
+            code,updated,_=request("PATCH",f"/collections/users/{user_id}",
+                {"nodeTrafficLimits":{str(node):{
+                    "limitGb":100/(1000**3),"period":period
+                }}},cookie=cookie,origin=BASE)
+            assert_status(code,200,f"enable {period} signed node quota")
+            assert updated["nodeTrafficLimits"][str(node)]["period"]==period
+            code,report,_=request("GET",f"/users/{user_id}/node-quotas",cookie=cookie)
+            assert_status(code,200,f"read {period} signed quota meter")
+            entry=next(x for x in report["items"] if x["nodeId"]==node)
+            assert entry["period"]==period and entry["usedBytes"]==120,entry
+            assert entry["dailyBytes"]==120 and entry["weeklyBytes"]==120,entry
+            assert entry["exhausted"] is True and entry["remainingBytes"]==0,entry
+            code,desired,_=signed_post("/node/desired-config",{"node_id":node})
+            assert_status(code,200,f"apply exhausted {period} quota to runtime")
+            assert all(client["id"]!=new_user["xrayId"]
+                       for client in desired["config"]["inbounds"][0]["settings"]["clients"]),(
+                       f"Exhausted {period} node quota must exclude only that user's UUID")
+        code,_,_=request("PATCH",f"/collections/users/{user_id}",
+            {"nodeTrafficLimits":{str(node):{
+                "limitGb":200/(1000**3),"period":"weekly"
+            }}},cookie=cookie,origin=BASE)
+        assert_status(code,200,"increase weekly limit without resetting signed usage")
+        code,desired,_=signed_post("/node/desired-config",{"node_id":node})
+        assert_status(code,200,"weekly quota resumes after increasing limit")
+        assert any(client["id"]==new_user["xrayId"]
+                   for client in desired["config"]["inbounds"][0]["settings"]["clients"])
+        code,_,_=request("PATCH",f"/collections/users/{user_id}",
+            {"nodeTrafficLimits":{}},cookie=cookie,origin=BASE)
+        assert_status(code,200,"remove node quota without changing global limits")
+
         # CDN-specific quota: the CDN meter sums only selected signed inbound
         # counters and must never revoke access to an unselected main inbound.
         code,settings,_=request("PATCH","/settings",

@@ -284,6 +284,42 @@ matches(css,/#stats-dashboard #stats-period\s*\{[\s\S]*?grid-column:2[\s\S]*?gri
 matches(css,/\.stats-node-grid\s*\{/);
 matches(css,/@media \(max-width:700px\)[\s\S]*?\.stats-node-grid\s*\{[\s\S]*?grid-template-columns:1fr/);
 
+// Control Plane must render real system samples in readable, scoped cards.
+// In particular, do not manufacture points for the attractive trend strips.
+matches(app,/class="card stats-control-panel"/);
+matches(app,/class="hd stats-control-header"/);
+matches(app,/const appendControlSample=\(sys\)=>/);
+matches(app,/timestamp<=lastControlSampleAt/);
+matches(app,/controlMetricHistory\[key\]\.push\(Math\.max\(0,Math\.min\(100,Number\(field\)\)\)\)/);
+matches(app,/const controlTrend=\(key\)=>/);
+matches(app,/if\(samples\.length<2\)/);
+matches(app,/controlMetric\('cpu','CPU',sys\?\.cpu\?\.percent/);
+matches(app,/controlMetric\('ram','RAM',sys\?\.ram\?\.percent/);
+matches(app,/controlMetric\('disk',panelIsEnglish\(\)\?'Disk':'Диск',sys\?\.disk\?\.percent/);
+matches(app,/class="stats-control-kv-name"/);
+matches(app,/class="stats-control-details"/);
+matches(css,/#stats-dashboard \.stats-control-panel\s*\{[\s\S]*?container:control-plane \/ inline-size/);
+matches(css,/#stats-dashboard #stats-control\s*\{[\s\S]*?grid-template-columns:minmax\(0,1\.55fr\) minmax\(20rem,1fr\)/);
+matches(css,/#stats-dashboard #stats-control \.stats-ring\s*\{[\s\S]*?width:clamp\(7\.5rem/);
+matches(css,/#stats-dashboard #stats-control \.stats-ring strong\s*\{[\s\S]*?font-size:clamp\(1\.35rem/);
+matches(css,/@container control-plane \(max-width:1100px\)\{[\s\S]*?#stats-dashboard #stats-control\{grid-template-columns:minmax\(0,1fr\)/);
+matches(css,/@container control-plane \(max-width:490px\)\{[\s\S]*?#stats-dashboard #stats-control \.stats-control-rings\{grid-template-columns:minmax\(0,1fr\)/);
+const sampleSlice=app.slice(app.indexOf('  const appendControlSample=(sys)=>{'),app.indexOf('  const controlMetric=(key,'));
+const liveHistory={cpu:[],ram:[],disk:[]};
+const historyApi=new Function('panelIsEnglish','controlMetricHistory',
+  'let lastControlSampleAt=0;\n'+sampleSlice+'\nreturn {appendControlSample,controlTrend};'
+)(()=>false,liveHistory);
+assert.match(historyApi.controlTrend('cpu'),/Тренд появится после двух измерений/);
+historyApi.appendControlSample({sampledAt:100,cpu:{percent:9.1},ram:{percent:34},disk:{percent:38.1}});
+historyApi.appendControlSample({sampledAt:100,cpu:{percent:99},ram:{percent:99},disk:{percent:99}});
+assert.equal(liveHistory.cpu.length,1,'Cached sample cannot be replayed as new history');
+historyApi.appendControlSample({sampledAt:150,cpu:{percent:11},ram:{percent:35},disk:{percent:39}});
+assert.equal(liveHistory.cpu.length,2,'Two distinct API samples produce exactly two points');
+assert.match(historyApi.controlTrend('cpu'),/<svg/);
+assert(!historyApi.controlTrend('cpu').includes('NaN'),'Trend must produce finite point coordinates');
+for(let i=0;i<75;i++)historyApi.appendControlSample({sampledAt:200+i,cpu:{percent:i%100},ram:{percent:34},disk:{percent:38}});
+assert.equal(liveHistory.cpu.length,60,'Session history must be bounded');
+
 // Compact node cards must keep real telemetry, status fidelity and filtering.
 matches(app,/const renderStatsNodes=\(\)=>/);
 matches(app,/statsNodeRows=nodes;\s*renderStatsNodes\(\)/);
