@@ -624,6 +624,41 @@ pub async fn rotate_credentials(
         "warning":"Old VPN credentials may remain usable on disconnected nodes until their signed offline policies expire."
     })))
 }
+/// Service-controlled, read-only subscription URL access. Caller MUST have
+/// already enforced subscriptions:read AND the user's scope restriction.
+/// Never include the raw token in this response or silently rotate a link.
+pub(crate) async fn service_subscription_status(
+    state: &AppState,
+    id: i64,
+) -> Result<Value, ApiError> {
+    if id <= 0 {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found"));
+    }
+    let exists = sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM panel_records WHERE collection='users' AND id=$1"
+    ).bind(id).fetch_optional(&state.pool).await?;
+    if exists.is_none() {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found"));
+    }
+    let row = sqlx::query(
+        "SELECT token_hash,token_ciphertext FROM user_subscription_tokens WHERE user_id=$1"
+    ).bind(id).fetch_optional(&state.pool).await?;
+    let Some(row) = row else {
+        return Ok(json!({"enabled":false,"legacy":false,"url":null}));
+    };
+    let ciphertext: Option<String> = row.try_get("token_ciphertext")?;
+    let hash: String = row.try_get("token_hash")?;
+    let url = match ciphertext {
+        Some(value) => {
+            let token = decrypt_token(state,id,&value,&hash)?;
+            let settings = crate::read_settings(&state.pool).await?;
+            Some(studio_url(&settings,&token))
+        }
+        None => None,
+    };
+    Ok(json!({"enabled":true,"legacy":url.is_none(),"url":url}))
+}
+
 pub async fn status(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
