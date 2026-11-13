@@ -2,7 +2,8 @@
 use super::{Problem, ServicePrincipal, grants, now_ms, reply};
 use crate::{AppState, cdn_quota};
 use axum::{
-    Json, extract::{Extension, Path, Query, State},
+    Json,
+    extract::{Extension, Path, Query, State},
     http::{HeaderMap, StatusCode},
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -30,7 +31,13 @@ fn cursor_sign(state: &AppState, principal: &ServicePrincipal, id: i64) -> Strin
 }
 
 fn cursor_read(state: &AppState, principal: &ServicePrincipal, raw: &str) -> Result<i64, Problem> {
-    let invalid = || Problem::new(StatusCode::BAD_REQUEST, "validation_error", "Invalid cursor");
+    let invalid = || {
+        Problem::new(
+            StatusCode::BAD_REQUEST,
+            "validation_error",
+            "Invalid cursor",
+        )
+    };
     if raw.len() > 256 {
         return Err(invalid());
     }
@@ -77,10 +84,13 @@ fn safe_user(user: &Value) -> Value {
 
 async fn with_meter(state: &AppState, id: i64, mut user: Value) -> Result<Value, Problem> {
     user["id"] = json!(id);
-    let used = crate::user_metered_bytes(&state.pool, id).await.map_err(Problem::from)?;
+    let used = crate::user_metered_bytes(&state.pool, id)
+        .await
+        .map_err(Problem::from)?;
     crate::add_metered_usage(&mut user, used);
     cdn_quota::attach_usage(&state.pool, std::slice::from_mut(&mut user))
-        .await.map_err(Problem::from)?;
+        .await
+        .map_err(Problem::from)?;
     Ok(safe_user(&user))
 }
 
@@ -92,7 +102,11 @@ pub(super) async fn list(
     principal.allow_scope("users:read")?;
     let limit = query.limit.unwrap_or(50);
     if !(1..=100).contains(&limit) {
-        return Err(Problem::new(StatusCode::BAD_REQUEST, "validation_error", "Invalid limit"));
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "validation_error",
+            "Invalid limit",
+        ));
     }
     let start = match query.cursor {
         Some(cursor) => cursor_read(&state, &principal, &cursor)?,
@@ -102,12 +116,13 @@ pub(super) async fn list(
         "SELECT id,data FROM panel_records
          WHERE collection='users' AND id>$1
            AND ($2::bigint[] IS NULL OR id=ANY($2))
-         ORDER BY id LIMIT $3"
+         ORDER BY id LIMIT $3",
     )
     .bind(start)
     .bind(principal.allowed_user_ids.clone())
     .bind(limit + 1)
-    .fetch_all(&state.pool).await?;
+    .fetch_all(&state.pool)
+    .await?;
     let more = rows.len() > usize::try_from(limit).unwrap_or(100);
     let mut items = Vec::new();
     let mut last_id = start;
@@ -119,7 +134,11 @@ pub(super) async fn list(
     }
     let mut result = reply(json!(items));
     result.0["meta"]["limit"] = json!(limit);
-    result.0["meta"]["nextCursor"] = if more { json!(cursor_sign(&state, &principal, last_id)) } else { Value::Null };
+    result.0["meta"]["nextCursor"] = if more {
+        json!(cursor_sign(&state, &principal, last_id))
+    } else {
+        Value::Null
+    };
     Ok(result)
 }
 
@@ -131,9 +150,12 @@ pub(super) async fn get(
     principal.allow_scope("users:read")?;
     principal.allow_user(id)?;
     let user = sqlx::query_scalar::<_, Value>(
-        "SELECT data FROM panel_records WHERE collection='users' AND id=$1"
-    ).bind(id).fetch_optional(&state.pool).await?
-      .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))?;
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))?;
     Ok(reply(with_meter(&state, id, user).await?))
 }
 
@@ -144,7 +166,9 @@ pub(super) async fn traffic(
 ) -> Result<Json<Value>, Problem> {
     principal.allow_scope("traffic:read")?;
     principal.allow_user(id)?;
-    let data = crate::get_user_traffic(State(state), Path(id)).await.map_err(Problem::from)?;
+    let data = crate::get_user_traffic(State(state), Path(id))
+        .await
+        .map_err(Problem::from)?;
     Ok(reply(data.0))
 }
 
@@ -156,7 +180,8 @@ pub(super) async fn subscription(
     principal.allow_scope("subscriptions:read")?;
     principal.allow_user(id)?;
     let data = crate::user_subscriptions::service_subscription_status(&state, id)
-        .await.map_err(Problem::from)?;
+        .await
+        .map_err(Problem::from)?;
     Ok(reply(data))
 }
 
@@ -190,7 +215,7 @@ mod tests {
             "limit":0.0,"used":1.0,"expireAt":1800000000000_i64});
         let projected = safe_user(&user);
         assert_eq!(projected["username"], "alice");
-        for field in ["xrayId","password","tg","subscriptionUrl","note"] {
+        for field in ["xrayId", "password", "tg", "subscriptionUrl", "note"] {
             assert!(projected.get(field).is_none(), "{field} must remain hidden");
         }
     }
