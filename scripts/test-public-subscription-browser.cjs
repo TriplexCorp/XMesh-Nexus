@@ -216,7 +216,7 @@ async function dismissDialog(page,dialog,opener){
   await personal.check();
   assert(await embedded.isEnabled());
   await content.locator('[name="subscriptionShowSupport"]').uncheck();
-  assert(await studio.locator('[data-setup-section="support"]').isHidden());
+  assert(await studio.locator('[data-subscription-support]').isHidden());
   await content.locator('[name="subscriptionShowSupport"]').check();
   await page.setViewportSize({width:1600,height:900});
   const desktopContent=await page.evaluate(()=>({
