@@ -25,7 +25,7 @@ mod device_limits;
 pub use base::{migrate_legacy_ciphertexts, provision_new_user, revoke, rotate_credentials};
 
 /// Protected by Integration API middleware before this internal accessor is invoked.
-pub(crate) async fn service_subscription_status(
+pub async fn service_subscription_status(
     state: &AppState,
     id: i64,
 ) -> Result<Value, ApiError> {
