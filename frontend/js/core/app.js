@@ -5097,9 +5097,9 @@ async function setP(){
     <div class="setting-row"><div class="setting-copy"><b>Стартовая страница</b><small>Куда переходить при открытии панели без выбранного раздела.</small></div><div class="setting-control"><select id="start-page" aria-label="Стартовая страница">${[['home','Дашборд'],['statistics','Статистика'],['users','Пользователи'],['nodes','Узлы'],['hosts','Хосты'],['profiles','XRAY STUDIO'],['subscription','SUBSCRIPTION STUDIO'],['last','Последний открытый раздел']].map(([v,l])=>`<option value="${v}" ${C.startPage===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Счётчик пользователей в меню</b><small>Показывать количество пользователей рядом с разделом навигации.</small></div><label class="sw"><input type="checkbox" id="nav-counter" ${C.navCounter?'checked':''} aria-label="Счётчик пользователей в меню"><span></span></label></div>
     <div class="settings-feature-links"><div class="settings-mini-heading"><b>Связанные настройки</b><small>Откройте редактор нужной функции без поиска по меню</small></div>
-      <a href="#subscription">${ic('globe')}<span><b>Страница подписки</b><small>Публичный портал, клиенты и внешний вид</small></span>${ic('chevron-right')}</a>
-      <a href="#profiles">${ic('code')}<span><b>XRAY STUDIO</b><small>Конфигурации и протоколы</small></span>${ic('chevron-right')}</a>
-      <a href="#nodes">${ic('server')}<span><b>Узлы</b><small>Инфраструктура, лимиты и агенты</small></span>${ic('chevron-right')}</a>
+      <a href="#subscription">${ic('globe')}<span><b>Страница подписки</b><small>Публичный портал, клиенты и внешний вид</small></span>${ic('down')}</a>
+      <a href="#profiles">${ic('code')}<span><b>XRAY STUDIO</b><small>Конфигурации и протоколы</small></span>${ic('down')}</a>
+      <a href="#nodes">${ic('server')}<span><b>Узлы</b><small>Инфраструктура, лимиты и агенты</small></span>${ic('down')}</a>
     </div>
   </section>
   <div class="card" data-settings-group="integrations"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
@@ -5157,12 +5157,12 @@ async function setP(){
   </div>`:''}
   <div class="card" data-settings-group="data"><div class="hd"><div><h3>Экспорт данных панели</h3><p>JSON-снимок текущих коллекций. Это не дамп PostgreSQL и не механизм восстановления базы.</p></div><button class="gh" id="gx">${ic('dl')}Скачать JSON-снимок</button></div><p class="note">Экспорт может содержать конфиденциальные данные. Для полного восстановления используйте резервное копирование PostgreSQL на сервере.</p>
     <div class="settings-data-summary"><div><b>Коллекции и настройки</b><small>Входит в JSON-снимок интерфейса</small></div><div><b>PostgreSQL и журналы</b><small>Не входят: требуется отдельный серверный бэкап</small></div></div>
-    <a class="settings-inline-route" href="#tools">${ic('wrench')} Открыть диагностику ${ic('chevron-right')}</a></div>
+    <a class="settings-inline-route" href="#tools">${ic('tool')} Открыть диагностику ${ic('down')}</a></div>
   <section class="card sg" data-settings-group="data"><div class="appearance-card-heading"><h3>Перенос оформления</h3><small>Экспорт и импорт персональной темы, плотности и остальных параметров интерфейса.</small></div>
     <div class="settings-personal-data-actions"><button class="gh" type="button" data-appearance-export>Скачать оформление JSON</button><label class="f"><span>Импортировать оформление JSON</span><input type="file" id="appearance-import" accept=".json,application/json" aria-label="Импортировать оформление JSON"></label></div>
     <p class="note">Файл оформления не содержит пользователей, токенов и настроек сервера. При импорте текущие параметры браузера заменяются.</p>
     <div class="settings-data-summary"><div><b>Сохраняется</b><small>Цветовая тема, шрифты, плотность, ширина, эффекты</small></div><div><b>Не переносится</b><small>Учётные записи, трафик, ключи и серверные политики</small></div></div>
-    <a class="settings-inline-route" href="#set/appearance">${ic('sun')} Перейти к оформлению ${ic('chevron-right')}</a>
+    <a class="settings-inline-route" href="#set/appearance">${ic('sun')} Перейти к оформлению ${ic('down')}</a>
   </section>
 </div></div>`;
   // The HTML template is never mounted. Only the active page's original cards
