@@ -68,31 +68,37 @@ assert.match(view,/data-sub-agent-version/,'Server card must expose real agent v
 assert.match(view,/data-sub-agent-seen/,'Server card must expose live last-seen timestamp');
 assert.match(view,/data-sub-flood-card/,'Owner needs a compact flood protection card');
 
-assert.doesNotMatch(view,/option value="custom"/,'The DNS presets must not gain a fifth item');
-assert.doesNotMatch(view,/name="json_customDnsProtocol"/,'No extra protocol dropdown');
-assert.match(view,/name="json_customDnsAddress"/,'Exactly one optional custom DNS input');
-assert.equal((view.match(/name="json_customDnsAddress"/g)||[]).length,1,'Do not duplicate DNS editors');
-assert.match(view,/IP \/ IP:порт — UDP; HTTPS-ссылка — DoH/,'Explain automatic protocol detection');
-assert.match(src,/customDnsAddress:input\(form,'json_customDnsAddress'\)\.value\.trim\(\)/,'The single input must be included when saving');
-const [customDnsView]=studio.create({
-  subscriptionJson:{dns:'cloudflare',customDnsAddress:'https://dns.example.org:8443/my-dns'}
+assert.doesNotMatch(view,/name="json_dns"/,'DNS must not have a preset dropdown');
+assert.doesNotMatch(view,/name="json_customDnsProtocol"/,'DNS must not have a protocol selector');
+assert.match(view,/name="json_customDnsAddress"/,'DNS must have a single editable address');
+assert.equal((view.match(/name="json_customDnsAddress"/g)||[]).length,1,'Exactly one DNS input');
+assert.match(view,/name="json_customDnsAddress"[^>]*value="1\.1\.1\.1"/,
+ 'Default DNS should be visible and directly editable');
+assert.match(src,/dns:'cloudflare'/,'Single-input settings preserve default wire compatibility');
+assert.match(src,/customDnsAddress:input\(form,'json_customDnsAddress'\)\.value\.trim\(\)/,
+ 'Edited DNS address must be included in the save payload');
+const [dohDnsView]=studio.create({
+ subscriptionJson:{dns:'cloudflare',customDnsAddress:'https://dns.example.org:8443/my-dns'}
 },async()=>{},()=>{},{});
-assert.match(customDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/dns\.example\.org:8443\/my-dns"/,
- 'Restore the custom DoH URL, including custom port and path');
-assert.doesNotMatch(customDnsView,/option value="custom"/,
- 'Typing custom DNS must not add a new DNS preset');
-const [udpDnsView]=studio.create({
-  subscriptionJson:{dns:'yandex',customDnsAddress:'[2606:4700:4700::1111]:5353'}
+assert.match(dohDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/dns\.example\.org:8443\/my-dns"/,
+ 'DoH path and custom port must roundtrip');
+const [oldPresetDnsView]=studio.create({
+ subscriptionJson:{dns:'yandex'}
 },async()=>{},()=>{},{});
-assert.match(udpDnsView,/name="json_customDnsAddress"[^>]*value="\[2606:4700:4700::1111\]:5353"/,
- 'Custom IPv6 address must survive rerendering');
-const [legacyDnsView]=studio.create({
-  subscriptionJson:{dns:'custom',customDnsProtocol:'doh',customDnsAddress:'https://dns.example.net/query'}
+assert.match(oldPresetDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/common\.dot\.dns\.yandex\.net\/dns-query"/,
+ 'Existing Yandex DoH preset must populate the same input');
+const [oldSystemDnsView]=studio.create({
+ subscriptionJson:{dns:'system'}
 },async()=>{},()=>{},{});
-assert.match(legacyDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/dns\.example\.net\/query"/,
+assert.match(oldSystemDnsView,/name="json_customDnsAddress"[^>]*value="localhost"/,
+ 'Existing system resolver must not be overwritten with Cloudflare');
+const [oldCustomDnsView]=studio.create({
+ subscriptionJson:{dns:'custom',customDnsProtocol:'doh',
+  customDnsAddress:'https://dns.example.net/query'}
+},async()=>{},()=>{},{});
+assert.match(oldCustomDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/dns\.example\.net\/query"/,
  'Previously saved custom DNS must migrate without data loss');
-assert.match(legacyDnsView,/option value="cloudflare" selected/,
- 'Earlier prototype custom selection must be normalized to a valid preset');
+assert.doesNotMatch(oldCustomDnsView,/name="json_dns"/,'No DNS switch even for legacy data');
 
 assert.match(view,/name="floodEnabled"/,'Flood protection must be togglable');
 assert.match(view,/name="floodMode" value="monitor"/,'Monitoring must be available');
