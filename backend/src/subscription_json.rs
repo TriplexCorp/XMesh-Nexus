@@ -13,7 +13,7 @@ fn option<'a>(config: &'a Value, key: &str, values: &[&str], fallback: &'a str) 
 }
 /// Validate the chosen client DNS resolver before it is placed in the
 /// downloaded Xray JSON. Xray expects an IP[:port] for UDP and a complete
-/// HTTPS endpoint for DoH. Never silently substitute a different resolver.
+/// HTTPS endpoint for `DoH`. Never silently substitute a different resolver.
 fn custom_dns_server(opts: &Value) -> Result<String, String> {
     let protocol = opts
         .get("customDnsProtocol")
