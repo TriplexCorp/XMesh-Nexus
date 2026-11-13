@@ -800,7 +800,8 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
         && match path {
             // Explicit machine-only service namespace: token middleware enforces
             // credentials, scopes, revocation and fail-closed Redis rate limits.
-            p if p.starts_with("/api/v1/integrations/") => request.headers()
+            p if p.starts_with("/api/v1/integrations/") => request
+                .headers()
                 .get(header::AUTHORIZATION)
                 .and_then(|value| value.to_str().ok())
                 .is_some_and(|value| value.starts_with("Bearer xmni_v1_")),
