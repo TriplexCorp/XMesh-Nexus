@@ -185,6 +185,16 @@ assert.match(settingsCss,/\.settings-palette-gallery \.palette-preset-grid/,
  'Palette tiles must have readable column dimensions');
 assert.match(settingsCss,/\.settings-security-routes/,
  'Operational security links must be styled within the workspace');
+// Follow-up #456: sections should explain themselves without introducing
+// dummy controls or removing the original event and permission contracts.
+assert.match(app,/function settingsHookDetails\(key\)/,'Webhook events must have human-readable descriptions');
+assert.match(app,/rowi settings-hook-item/,'Webhook controls must remain accessible labelled rows');
+assert.match(app,/data-hook-count/,'Webhook enabled count must remain live');
+assert.match(app,/settings-system-footer/,'CDN policy must be reachable in its own full-width row');
+assert.match(settingsCss,/\.settings-system-footer\{\s*grid-column:1\/-1/,'CDN policy must span system columns');
+assert.match(app,/settings-security-limitations/,'Pending infrastructure protections must be explained, not faked');
+assert.match(app,/<details class="settings-admin-role-guide"/,'Role guidance must not crowd the admin list');
+assert.match(settingsCss,/\.settings-hook-copy/,'Webhook names must have readable wrapping styles');
 
 // Functional settings must affect real runtime behavior, persist, and be translated.
 for(const key of ['contrast','linkStyle','lineSpacing','tabularNums','followReducedMotion','stickyTopbar','navCounter','startPage','toastDuration','toastPosition']){
