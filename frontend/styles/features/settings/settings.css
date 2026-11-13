@@ -501,7 +501,8 @@ html[data-link-style=underline] .settings-workspace .settings-type-link{
  width:1.1rem;height:1.1rem;flex:none;color:var(--a)
 }
 .settings-workspace .settings-feature-links a>.ic:last-child{
- width:.95rem;height:.95rem;flex:none;margin-left:auto;color:var(--mu)
+ width:.95rem;height:.95rem;flex:none;margin-left:auto;color:var(--mu);
+ transform:rotate(-90deg)
 }
 .settings-workspace .settings-feature-links a>span{
  display:grid;gap:.1rem;min-width:0
@@ -569,6 +570,7 @@ html[data-link-style=underline] .settings-workspace .settings-type-link{
  text-decoration:none
 }
 .settings-workspace .settings-inline-route .ic{width:1rem;height:1rem}
+.settings-workspace .settings-inline-route .ic:last-child{transform:rotate(-90deg)}
 .settings-workspace .settings-inline-route:focus-visible{
  outline:2px solid var(--nx-focus);outline-offset:2px
 }
