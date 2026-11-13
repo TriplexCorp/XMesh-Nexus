@@ -68,27 +68,31 @@ assert.match(view,/data-sub-agent-version/,'Server card must expose real agent v
 assert.match(view,/data-sub-agent-seen/,'Server card must expose live last-seen timestamp');
 assert.match(view,/data-sub-flood-card/,'Owner needs a compact flood protection card');
 
-assert.match(view,/option value="custom"/,'Xray JSON DNS must support a custom resolver preset');
-assert.match(view,/name="json_customDnsProtocol"/,'Custom DNS must expose UDP/DoH protocol selector');
-assert.match(view,/name="json_customDnsAddress"/,'Custom DNS must expose editable resolver address');
-assert.match(view,/data-subscription-custom-dns hidden/,'Custom DNS fields are hidden while using default preset');
-assert.match(src,/customDnsProtocol:input\(form,'json_customDnsProtocol'\)\.value/,'Chosen DNS protocol must be saved');
-assert.match(src,/customDnsAddress:input\(form,'json_customDnsAddress'\)\.value\.trim\(\)/,'Custom DNS address must be saved');
-assert.match(src,/if\(\['json_dns','json_customDnsProtocol'\]\.includes\(event\.target\.name\)\)syncCustomDns\(\)/,
- 'DNS mode and protocol changes must update the editor');
+assert.doesNotMatch(view,/option value="custom"/,'The DNS presets must not gain a fifth item');
+assert.doesNotMatch(view,/name="json_customDnsProtocol"/,'No extra protocol dropdown');
+assert.match(view,/name="json_customDnsAddress"/,'Exactly one optional custom DNS input');
+assert.equal((view.match(/name="json_customDnsAddress"/g)||[]).length,1,'Do not duplicate DNS editors');
+assert.match(view,/IP \/ IP:порт — UDP; HTTPS-ссылка — DoH/,'Explain automatic protocol detection');
+assert.match(src,/customDnsAddress:input\(form,'json_customDnsAddress'\)\.value\.trim\(\)/,'The single input must be included when saving');
 const [customDnsView]=studio.create({
-  subscriptionJson:{dns:'custom',customDnsProtocol:'doh',
-    customDnsAddress:'https://dns.example.org:8443/my-dns'}
+  subscriptionJson:{dns:'cloudflare',customDnsAddress:'https://dns.example.org:8443/my-dns'}
 },async()=>{},()=>{},{});
-assert.match(customDnsView,/data-subscription-custom-dns>/,'Saved custom DNS must show the editor');
-assert.match(customDnsView,/option value="doh" selected/,'Saved DoH protocol must restore selection');
 assert.match(customDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/dns\.example\.org:8443\/my-dns"/,
- 'Saved custom DoH URL must restore without losing path or port');
+ 'Restore the custom DoH URL, including custom port and path');
+assert.doesNotMatch(customDnsView,/option value="custom"/,
+ 'Typing custom DNS must not add a new DNS preset');
 const [udpDnsView]=studio.create({
-  subscriptionJson:{dns:'custom',customDnsProtocol:'udp',customDnsAddress:'[2606:4700:4700::1111]:5353'}
+  subscriptionJson:{dns:'yandex',customDnsAddress:'[2606:4700:4700::1111]:5353'}
 },async()=>{},()=>{},{});
 assert.match(udpDnsView,/name="json_customDnsAddress"[^>]*value="\[2606:4700:4700::1111\]:5353"/,
- 'Custom IPv6 UDP endpoint must survive roundtrip rendering');
+ 'Custom IPv6 address must survive rerendering');
+const [legacyDnsView]=studio.create({
+  subscriptionJson:{dns:'custom',customDnsProtocol:'doh',customDnsAddress:'https://dns.example.net/query'}
+},async()=>{},()=>{},{});
+assert.match(legacyDnsView,/name="json_customDnsAddress"[^>]*value="https:\/\/dns\.example\.net\/query"/,
+ 'Previously saved custom DNS must migrate without data loss');
+assert.match(legacyDnsView,/option value="cloudflare" selected/,
+ 'Earlier prototype custom selection must be normalized to a valid preset');
 
 assert.match(view,/name="floodEnabled"/,'Flood protection must be togglable');
 assert.match(view,/name="floodMode" value="monitor"/,'Monitoring must be available');
