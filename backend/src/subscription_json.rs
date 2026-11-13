@@ -33,19 +33,19 @@ fn custom_dns_server(opts: &Value) -> Result<String, String> {
         return Ok("localhost".into());
     }
     if raw.starts_with("https://") {
-            let url =
-                reqwest::Url::parse(raw).map_err(|_| "DNS DoH: укажите корректную HTTPS-ссылку")?;
-            if url.scheme() != "https"
-                || url.host().is_none()
-                || !url.username().is_empty()
-                || url.password().is_some()
-                || url.fragment().is_some()
-                || url.path() == "/"
-                || url.port() == Some(0)
-            {
-                return Err("DNS DoH: нужен HTTPS-адрес с путём без логина и #фрагмента".into());
-            }
-            Ok(raw.to_owned())
+        let url =
+            reqwest::Url::parse(raw).map_err(|_| "DNS DoH: укажите корректную HTTPS-ссылку")?;
+        if url.scheme() != "https"
+            || url.host().is_none()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.fragment().is_some()
+            || url.path() == "/"
+            || url.port() == Some(0)
+        {
+            return Err("DNS DoH: нужен HTTPS-адрес с путём без логина и #фрагмента".into());
+        }
+        Ok(raw.to_owned())
     } else {
         // Accept udp:// as a friendly input spelling. A plain IP with an
         // optional port implies UDP; all other schemes fail validation.
@@ -382,17 +382,21 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
     // hostname or TLS dependency during initial connectivity. Existing saved
     // "cloudflare" selections also migrate to this reliable mode.
     // IP-addressed DoH is a separate explicit opt-in, avoiding bootstrap loops.
-    let custom_address = opts.get("customDnsAddress").and_then(Value::as_str).unwrap_or("").trim();
+    let custom_address = opts
+        .get("customDnsAddress")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
     let dns_server = if !custom_address.is_empty() {
         // A typed resolver always takes precedence over the preset.
         custom_dns_server(opts)?
     } else {
         match dns_mode {
-        "cloudflare_doh" => "https://1.1.1.1/dns-query".to_owned(),
-        "yandex" => "https://common.dot.dns.yandex.net/dns-query".to_owned(),
-        "system" => "localhost".to_owned(),
-        "custom" => return Err("Введите адрес своего DNS-сервера".into()),
-        _ => "1.1.1.1".to_owned(),
+            "cloudflare_doh" => "https://1.1.1.1/dns-query".to_owned(),
+            "yandex" => "https://common.dot.dns.yandex.net/dns-query".to_owned(),
+            "system" => "localhost".to_owned(),
+            "custom" => return Err("Введите адрес своего DNS-сервера".into()),
+            _ => "1.1.1.1".to_owned(),
         }
     };
     let query_strategy = option(
@@ -854,7 +858,10 @@ pub fn validate_settings(settings: &Value) -> Result<(), String> {
         }
     }
     if object.get("dns").and_then(Value::as_str) == Some("custom")
-        || object.get("customDnsAddress").and_then(Value::as_str).is_some_and(|s| !s.trim().is_empty())
+        || object
+            .get("customDnsAddress")
+            .and_then(Value::as_str)
+            .is_some_and(|s| !s.trim().is_empty())
     {
         custom_dns_server(settings)?;
     }
@@ -1313,27 +1320,42 @@ mod tests {
             ("2606:4700:4700::1111", "2606:4700:4700::1111"),
             ("[2606:4700:4700::1111]:5353", "[2606:4700:4700::1111]:5353"),
             ("localhost", "localhost"),
-            ("https://dns.google/dns-query", "https://dns.google/dns-query"),
+            (
+                "https://dns.google/dns-query",
+                "https://dns.google/dns-query",
+            ),
             ("https://1.1.1.1/dns-query", "https://1.1.1.1/dns-query"),
-            ("https://dns.example.org:8443/custom-query?profile=1", "https://dns.example.org:8443/custom-query?profile=1"),
+            (
+                "https://dns.example.org:8443/custom-query?profile=1",
+                "https://dns.example.org:8443/custom-query?profile=1",
+            ),
         ] {
             let settings = json!({"subscriptionJson":{
                 "dns":"cloudflare","customDnsAddress":submitted
             }});
-            assert!(validate_settings(&settings["subscriptionJson"]).is_ok(), "{submitted}");
+            assert!(
+                validate_settings(&settings["subscriptionJson"]).is_ok(),
+                "{submitted}"
+            );
             let built = build(vec![outbound("DE")], &settings).unwrap();
             assert_eq!(built["dns"]["servers"][0], expected);
-            assert!(!built["outbounds"].as_array().unwrap().iter().any(|v| v["tag"] == "dns-out"));
+            assert!(
+                !built["outbounds"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|v| v["tag"] == "dns-out")
+            );
         }
     }
 
     #[test]
     fn empty_custom_field_restores_selected_dns_preset() {
-        for (dns,expected) in [
-            ("cloudflare","1.1.1.1"),
-            ("cloudflare_doh","https://1.1.1.1/dns-query"),
-            ("yandex","https://common.dot.dns.yandex.net/dns-query"),
-            ("system","localhost"),
+        for (dns, expected) in [
+            ("cloudflare", "1.1.1.1"),
+            ("cloudflare_doh", "https://1.1.1.1/dns-query"),
+            ("yandex", "https://common.dot.dns.yandex.net/dns-query"),
+            ("system", "localhost"),
         ] {
             let settings = json!({"subscriptionJson":{
                 "dns":dns,"customDnsAddress":""
@@ -1347,17 +1369,24 @@ mod tests {
     #[test]
     fn malformed_custom_dns_is_never_silently_replaced_with_preset() {
         for address in [
-            "hostname.example", "8.8.8.8:65536", "8.8.8.8:0",
-            "udp://1.1.1.1:0", "http://dns.google/dns-query",
+            "hostname.example",
+            "8.8.8.8:65536",
+            "8.8.8.8:0",
+            "udp://1.1.1.1:0",
+            "http://dns.google/dns-query",
             "https://user:pass@dns.google/dns-query",
             "https://dns.google/dns-query#fragment",
-            "https://dns.google", "https://dns.google/dns-query test",
+            "https://dns.google",
+            "https://dns.google/dns-query test",
             "tls://dns.google",
         ] {
             let settings = json!({"subscriptionJson":{
                 "dns":"cloudflare","customDnsAddress":address
             }});
-            assert!(validate_settings(&settings["subscriptionJson"]).is_err(), "{address}");
+            assert!(
+                validate_settings(&settings["subscriptionJson"]).is_err(),
+                "{address}"
+            );
             assert!(build(vec![outbound("DE")], &settings).is_err(), "{address}");
         }
         assert!(validate_settings(&json!({"dns":"custom"})).is_err());
@@ -1366,8 +1395,10 @@ mod tests {
             "dns":"custom","customDnsProtocol":"doh",
             "customDnsAddress":"https://dns.example.net/query"
         }});
-        assert_eq!(build(vec![outbound("DE")], &old).unwrap()["dns"]["servers"][0],
-            "https://dns.example.net/query");
+        assert_eq!(
+            build(vec![outbound("DE")], &old).unwrap()["dns"]["servers"][0],
+            "https://dns.example.net/query"
+        );
     }
 
     #[test]
