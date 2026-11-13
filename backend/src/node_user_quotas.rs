@@ -26,6 +26,19 @@ pub struct QuotaRule {
 pub struct NodeUsage {
     pub lifetime: i64,
     pub monthly: i64,
+    pub weekly: i64,
+    pub daily: i64,
+}
+
+fn bytes_for_period(usage: NodeUsage, period: &str) -> i64 {
+    match period {
+        "daily" => usage.daily,
+        "weekly" => usage.weekly,
+        "monthly" => usage.monthly,
+        "lifetime" => usage.lifetime,
+        // A malformed stored policy is already rejected by parse_rule.
+        _ => i64::MAX,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,6 +79,8 @@ fn parse_rule(entry: &Value) -> Result<QuotaRule, ()> {
         return Err(());
     }
     let period = match object.get("period").and_then(Value::as_str) {
+        Some("daily") => "daily",
+        Some("weekly") => "weekly",
         Some("monthly") => "monthly",
         Some("lifetime") => "lifetime",
         _ => return Err(()),
@@ -110,7 +125,7 @@ pub fn validate_user(user: &Value) -> Result<(), ApiError> {
     for (key, entry) in policies {
         if valid_id(key).is_none() || parse_rule(entry).is_err() {
             return Err(bad(
-                "Некорректная квота ноды: ID, положительный лимит ГБ и период monthly/lifetime обязательны.",
+                "Некорректная квота ноды: ID, положительный лимит ГБ и период daily/weekly/monthly/lifetime обязательны.",
             ));
         }
     }
@@ -142,8 +157,8 @@ pub async fn require_existing_nodes(
     Ok(())
 }
 
-/// Authoritative per-user/node lifetime + UTC current-month readings in one
-/// bounded pair of queries. Physical counter baseline resets cannot erase them.
+/// Authoritative per-user/node lifetime + current UTC day/week/month readings.
+/// Physical counter baseline resets cannot erase these independent ledgers.
 pub async fn usage_for_user(
     pool: &PgPool,
     user_id: i64,
@@ -174,10 +189,36 @@ pub async fn usage_for_user(
         let bytes: i64 = row.try_get("bytes")?;
         usage.entry(id).or_default().monthly = bytes.max(0);
     }
+    let daily = sqlx::query(
+        "SELECT node_id,(uplink_bytes+downlink_bytes)::BIGINT AS bytes
+         FROM user_node_quota_daily
+         WHERE user_id=$1 AND day_start=(NOW() AT TIME ZONE 'UTC')::date",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+    for row in daily {
+        let id: i64 = row.try_get("node_id")?;
+        let bytes: i64 = row.try_get("bytes")?;
+        usage.entry(id).or_default().daily = bytes.max(0);
+    }
+    let weekly = sqlx::query(
+        "SELECT node_id,(uplink_bytes+downlink_bytes)::BIGINT AS bytes
+         FROM user_node_quota_weekly
+         WHERE user_id=$1 AND week_start=date_trunc('week',NOW() AT TIME ZONE 'UTC')::date",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+    for row in weekly {
+        let id: i64 = row.try_get("node_id")?;
+        let bytes: i64 = row.try_get("bytes")?;
+        usage.entry(id).or_default().weekly = bytes.max(0);
+    }
     Ok(usage)
 }
 
-/// Read the two node ledgers once each, not once per user. This function is
+/// Read all four node ledgers once each, not once per user. This function is
 /// called exclusively in authenticated desired-config/preview compilation.
 pub async fn attach_for_node(
     pool: &PgPool,
@@ -205,6 +246,22 @@ pub async fn attach_for_node(
     .bind(node_id)
     .fetch_all(pool)
     .await?;
+    let daily = sqlx::query(
+        "SELECT user_id,(uplink_bytes+downlink_bytes)::BIGINT AS bytes
+         FROM user_node_quota_daily
+         WHERE node_id=$1 AND day_start=(NOW() AT TIME ZONE 'UTC')::date",
+    )
+    .bind(node_id)
+    .fetch_all(pool)
+    .await?;
+    let weekly = sqlx::query(
+        "SELECT user_id,(uplink_bytes+downlink_bytes)::BIGINT AS bytes
+         FROM user_node_quota_weekly
+         WHERE node_id=$1 AND week_start=date_trunc('week',NOW() AT TIME ZONE 'UTC')::date",
+    )
+    .bind(node_id)
+    .fetch_all(pool)
+    .await?;
     let mut totals = HashMap::<i64, NodeUsage>::new();
     for row in lifetime {
         let id: i64 = row.try_get("user_id")?;
@@ -215,6 +272,16 @@ pub async fn attach_for_node(
         let id: i64 = row.try_get("user_id")?;
         let bytes: i64 = row.try_get("bytes")?;
         totals.entry(id).or_default().monthly = bytes.max(0);
+    }
+    for row in daily {
+        let id: i64 = row.try_get("user_id")?;
+        let bytes: i64 = row.try_get("bytes")?;
+        totals.entry(id).or_default().daily = bytes.max(0);
+    }
+    for row in weekly {
+        let id: i64 = row.try_get("user_id")?;
+        let bytes: i64 = row.try_get("bytes")?;
+        totals.entry(id).or_default().weekly = bytes.max(0);
     }
     for user in users {
         // Never reuse an untrusted historical/cached value.
@@ -228,11 +295,7 @@ pub async fn attach_for_node(
             continue;
         };
         let found = totals.get(&id).copied().unwrap_or_default();
-        let consumed = if rule.period == "monthly" {
-            found.monthly
-        } else {
-            found.lifetime
-        };
+        let consumed = bytes_for_period(found, rule.period);
         if let Some(object) = user.as_object_mut() {
             object.insert("nodeQuotaUsedBytes".into(), json!(consumed));
         }
@@ -297,11 +360,7 @@ pub fn remaining_for(
         return Remaining::Unavailable;
     };
     let found = meters.get(&id).copied().unwrap_or_default();
-    let spent = if rule.period == "monthly" {
-        found.monthly
-    } else {
-        found.lifetime
-    };
+    let spent = bytes_for_period(found, rule.period);
     Remaining::Bytes(rule.limit_bytes.saturating_sub(spent.max(0)).max(0))
 }
 
@@ -361,11 +420,7 @@ fn display_row(
     let rule = rule_for(user, node_id).ok().flatten();
     let sampled = usage.get(&node_id).copied().unwrap_or_default();
     let period = rule.map_or("monthly", |r| r.period);
-    let consumed_bytes = if period == "monthly" {
-        sampled.monthly
-    } else {
-        sampled.lifetime
-    };
+    let consumed_bytes = bytes_for_period(sampled, period);
     let remaining = rule.map(|r| r.limit_bytes.saturating_sub(consumed_bytes).max(0));
     json!({
         "nodeId":node_id,
@@ -375,6 +430,8 @@ fn display_row(
         "missing":missing,
         "limitGb":rule.map(|r| r.limit_gb),
         "period":period,
+        "dailyBytes":sampled.daily,
+        "weeklyBytes":sampled.weekly,
         "monthlyBytes":sampled.monthly,
         "lifetimeBytes":sampled.lifetime,
         "usedBytes":consumed_bytes,
@@ -404,7 +461,7 @@ mod tests {
             json!({"nodeTrafficLimits":{"-1":{"limitGb":5,"period":"monthly"}}}),
             json!({"nodeTrafficLimits":{"2":{"limitGb":0,"period":"monthly"}}}),
             json!({"nodeTrafficLimits":{"2":{"limitGb":-2,"period":"monthly"}}}),
-            json!({"nodeTrafficLimits":{"2":{"limitGb":5,"period":"weekly"}}}),
+            json!({"nodeTrafficLimits":{"2":{"limitGb":5,"period":"hourly"}}}),
             json!({"nodeTrafficLimits":{"2":{"limitGb":5}}}),
             json!({"nodeTrafficLimits":{"2":{"limitGb":5,"period":"monthly","used":0}}}),
             json!({"nodeQuotaUsedBytes":0}),
@@ -424,6 +481,37 @@ mod tests {
             }}))
             .is_err()
         );
+    }
+
+    #[test]
+    fn all_four_node_periods_are_valid_and_select_independent_meters() {
+        for (period,used) in [
+            ("daily", 100_000_000),
+            ("weekly", 200_000_000),
+            ("monthly", 300_000_000),
+            ("lifetime", 400_000_000),
+        ] {
+            let user = json!({"nodeTrafficLimits":{"12":{"limitGb":1,"period":period}}});
+            assert!(validate_user(&user).is_ok(), "{period}");
+            let usage = HashMap::from([(12, NodeUsage {
+                daily: 100_000_000,
+                weekly: 200_000_000,
+                monthly: 300_000_000,
+                lifetime: 400_000_000,
+            })]);
+            assert_eq!(
+                remaining_for(&user, Some(12), &[12], Some(&usage)),
+                Remaining::Bytes(1_000_000_000 - used),
+                "{period}"
+            );
+            assert_eq!(
+                bytes_for_period(usage[&12], period), used,
+                "{period}"
+            );
+        }
+        assert!(validate_user(&json!({"nodeTrafficLimits":{
+            "12":{"limitGb":1,"period":"hourly"}
+        }})).is_err());
     }
 
     #[test]
@@ -454,6 +542,8 @@ mod tests {
                 NodeUsage {
                     monthly: 1_750_000_000,
                     lifetime: 12_000_000_000,
+                    weekly: 600_000_000,
+                    daily: 200_000_000,
                 },
             ),
             (
@@ -461,6 +551,8 @@ mod tests {
                 NodeUsage {
                     monthly: 0,
                     lifetime: 1_000_000_000,
+                    weekly: 0,
+                    daily: 0,
                 },
             ),
         ]);
