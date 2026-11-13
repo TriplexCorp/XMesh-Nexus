@@ -241,7 +241,11 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
             }
         }
     }
-    for key in ["subscriptionLogoUrl", "subscriptionSupportUrl", "subscriptionProfileWebPageUrl"] {
+    for key in [
+        "subscriptionLogoUrl",
+        "subscriptionSupportUrl",
+        "subscriptionProfileWebPageUrl",
+    ] {
         if let Some(v) = object.get(key) {
             let url = v
                 .as_str()
