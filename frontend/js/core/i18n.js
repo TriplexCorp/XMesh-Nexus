@@ -15,6 +15,20 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Свой DNS · UDP / DoH": "Custom DNS · UDP / DoH",
+    "Протокол своего DNS": "Custom DNS protocol",
+    "Адрес своего DNS": "Custom DNS address",
+    "1.1.1.1 или 8.8.8.8:5353": "1.1.1.1 or 8.8.8.8:5353",
+    "UDP: IP-адрес с необязательным портом. Запросы идут через правила маршрутизации Xray.": "UDP: an IP address with an optional port. Queries follow Xray routing rules.",
+    "DoH: полный HTTPS-адрес с путём, включая свой порт. При использовании домена может потребоваться начальное DNS-разрешение.": "DoH: a full HTTPS URL with a path and optional custom port. A hostname may require bootstrap DNS resolution.",
+    "UDP: IPv4/IPv6 с необязательным портом, например 9.9.9.9 или [2606:4700:4700::1111]:53. Запросы следуют правилам Xray.": "UDP: IPv4/IPv6 with an optional port, e.g. 9.9.9.9 or [2606:4700:4700::1111]:53. Queries follow Xray routing.",
+    "Укажите свой DNS: адрес UDP (IP[:порт]) или полный HTTPS-адрес DoH.": "Enter a custom DNS: a UDP address (IP[:port]) or a full HTTPS DoH URL.",
+    "Некорректный адрес DNS: не более 512 символов, без пробелов": "Invalid DNS address: up to 512 characters, no whitespace",
+    "Выберите протокол своего DNS: UDP или DoH": "Choose custom DNS protocol: UDP or DoH",
+    "Введите адрес своего DNS-сервера": "Enter your custom DNS server address",
+    "DNS UDP: укажите IP, IP:порт или [IPv6]:порт": "DNS UDP: enter IP, IP:port or [IPv6]:port",
+    "DNS DoH: укажите корректную HTTPS-ссылку": "DNS DoH: enter a valid HTTPS URL",
+    "DNS DoH: нужен HTTPS-адрес с путём без логина и #фрагмента": "DNS DoH: provide an HTTPS URL with a path and without login credentials or a fragment",
     "Подписка выдаётся в подходящем для приложения формате, если поддерживается транспорт. Неподдерживаемые транспорты не подменяются. Проверьте версию приложения.": "The subscription is adapted for the app where its transport is supported. Unsupported transports are not silently replaced. Check the app version.",
     "· проверяйте транспорт": "· verify transport support",
     "Ни один сервер не поддерживает выбранный формат или транспорт. Выберите Xray JSON.": "No servers support this format or transport. Choose Xray JSON.",
