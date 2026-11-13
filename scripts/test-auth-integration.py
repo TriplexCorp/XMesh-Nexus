@@ -249,6 +249,18 @@ def main():
     assert_client_hosts(1, "enabled Host publishes one client server")
     # Same bearer URL, real API: HTML for browsers, native JSON for VPN apps.
     # Keep the request on the disposable local API, never the configured public domain.
+    # The same personal feed URL must also expose a forced HTML portal for the
+    # webpage button. Test real user-scoped headers, never print their token.
+    check(api("PATCH", "/settings", {
+        "subscriptionDomain": "sub.example.com",
+        "subscriptionPath": "/s",
+        "subscriptionProfileWebPageEnabled": True,
+        "subscriptionProfileWebPageUrl": "",
+        "subscriptionSupportUrl": "https://t.me/ci_support"
+    }, owner_cookie)[0], 200, "configure portal metadata for API smoke test")
+    status, new_sub, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
+    check(status, 200, "retrieve personal subscription URL after settings update")
+    personal_page = new_sub["url"] + "?view=portal"
     subscription_path = urlsplit(new_sub["url"]).path
     agents = [
         ("Happ/26.7.28 (iPhone; iOS 18)", "xray"),
@@ -275,6 +287,13 @@ def main():
         with urlopen(req, timeout=30) as response:
             check(response.status, 200, "subscription content negotiation")
             content_type = response.headers.get("Content-Type", "")
+            if not browser:
+                assert response.headers.get("profile-web-page-url") == personal_page, (
+                    "Authenticated subscription must advertise the correct personal portal")
+                assert response.headers.get("support-url") == "https://t.me/ci_support", (
+                    "Support URL must remain separate from the personal webpage")
+                assert response.headers.get("profile-title", "").startswith("base64:"), (
+                    "Existing profile-title metadata must not change")
             body = response.read()
             if browser:
                 assert content_type.startswith("text/html")
@@ -311,6 +330,40 @@ def main():
                 links = base64.b64decode(body) if wire == "base64" else body
                 assert links.startswith(b"vless://")
                 assert b"@ci-host.example.com:" in links
+    # Clicking the webpage icon in Happ must render HTML even if the embedded
+    # browser uses Happ/Windows or Happ/iOS User-Agent instead of Mozilla.
+    portal_request = Request(
+        BASE + subscription_path + "?view=portal",
+        headers={"User-Agent": "Happ/26.7.28 (Windows NT 10.0)", "Accept": "*/*"})
+    with urlopen(portal_request, timeout=30) as response:
+        check(response.status, 200, "Happ profile webpage opens HTML portal")
+        assert response.headers["Content-Type"].startswith("text/html")
+        assert b'id="subscription-public-assets"' in response.read()
+
+    # Settings affect metadata only; feed still works and the URL is unchanged.
+    check(api("PATCH", "/settings",
+              {"subscriptionProfileWebPageEnabled": False}, owner_cookie)[0],
+          200, "disable personal webpage metadata")
+    req = Request(BASE + subscription_path, headers={"User-Agent": "Happ/26.7.28"})
+    with urlopen(req, timeout=30) as response:
+        assert response.status == 200
+        assert response.headers.get("profile-web-page-url") is None
+        assert response.headers["Content-Type"].startswith("application/json")
+    check(api("PATCH", "/settings", {
+        "subscriptionProfileWebPageEnabled": True,
+        "subscriptionProfileWebPageUrl": "https://account.example.org/personal"
+    }, owner_cookie)[0], 200, "owner sets a custom HTTPS webpage")
+    with urlopen(req, timeout=30) as response:
+        assert response.headers.get("profile-web-page-url") == (
+            "https://account.example.org/personal")
+    check(api("PATCH", "/settings", {
+        "subscriptionProfileWebPageUrl": "https://account.example.org/\r\nx-inject: yes"
+    }, owner_cookie)[0], 400, "reject response header injection in personal webpage")
+    check(api("PATCH", "/settings", {
+        "subscriptionProfileWebPageUrl": "",
+        "subscriptionProfileWebPageEnabled": True
+    }, owner_cookie)[0], 200, "restore automatic personal webpage")
+
     # Explicit format override works even when the User-Agent is a browser.
     for fmt, expected_type in [("xray","application/json"),("links","text/plain"),
                                ("base64","text/plain"),("mihomo","application/yaml"),

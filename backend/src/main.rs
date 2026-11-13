@@ -1533,6 +1533,8 @@ fn validate_settings_keys(object: &serde_json::Map<String, Value>) -> Result<(),
                 | "subscriptionSupportLabelEn"
                 | "subscriptionLogoUrl"
                 | "subscriptionSupportUrl"
+                | "subscriptionProfileWebPageUrl"
+                | "subscriptionProfileWebPageEnabled"
                 | "subscriptionShowStatus"
                 | "subscriptionShowApps"
                 | "subscriptionShowQr"

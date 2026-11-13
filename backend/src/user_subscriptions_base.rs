@@ -1282,10 +1282,33 @@ async fn personalized_subscription_announcement(
     ))
 }
 
+/// Personal subscription URL rendered as HTML even if a VPN app opens the
+/// page with its own User-Agent. No user token is written to logs.
+fn subscription_profile_page_url(settings: &Value, token: &str) -> Option<String> {
+    if settings
+        .get("subscriptionProfileWebPageEnabled")
+        .and_then(Value::as_bool)
+        == Some(false)
+    {
+        return None;
+    }
+    let custom = settings
+        .get("subscriptionProfileWebPageUrl")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let url = if custom.is_empty() {
+        format!("{}?view=portal", studio_url(settings, token))
+    } else {
+        custom.to_owned()
+    };
+    crate::subscription_settings::safe_https_url(&url).then_some(url)
+}
+
 fn add_subscription_profile_headers(
     response: &mut Response,
     settings: &Value,
     announcement: Option<&str>,
+    subscription_token: Option<&str>,
 ) {
     // Client metadata: these are advisory headers and never change the native Xray JSON body.
     // Never reflect untrusted settings into HTTP headers without HeaderValue validation.
@@ -1309,6 +1332,14 @@ fn add_subscription_profile_headers(
     {
         response.headers_mut().insert("support-url", value);
     }
+    // Use the existing personal bearer URL with a forced browser view.
+    // XMesh Sub forwards query strings and response headers unchanged.
+    if let Some(url) =
+        subscription_token.and_then(|token| subscription_profile_page_url(settings, token))
+        && let Ok(value) = header::HeaderValue::from_str(&url)
+    {
+        response.headers_mut().insert("profile-web-page-url", value);
+    }
     // Selected and rendered after subscription-user authentication.
     // The header is base64 so multiline Unicode content stays compatible
     // with VPN clients without allowing raw CR/LF header injection.
@@ -1331,6 +1362,40 @@ fn add_subscription_profile_headers(
 
 fn subscription_gb_to_bytes(gb: f64) -> u64 {
     u64::try_from(crate::gb_to_bytes_i64(gb)).unwrap_or(0)
+}
+
+/// Attach conventional subscription-userinfo metadata without changing
+/// traffic accounting or the native feed. Existing limits are decimal GB.
+fn add_subscription_userinfo_header(response: &mut Response, user: &Value) {
+    // User limits are expressed in decimal GB in panel records; the conventional subscription-userinfo
+    // header expects bytes and Unix seconds.
+    let consumed_gb = user
+        .get("used")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0)
+        .max(0.0);
+    let limit = user
+        .get("limit")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0)
+        .max(0.0);
+    let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
+    let to_bytes = subscription_gb_to_bytes;
+    let info = format!(
+        "upload=0; download={}; total={}; expire={}",
+        to_bytes(consumed_gb),
+        to_bytes(limit),
+        if expiry > 1_000_000_000_000 {
+            expiry / 1000
+        } else {
+            expiry
+        }
+    );
+    if let Ok(value) = header::HeaderValue::from_str(&info) {
+        response
+            .headers_mut()
+            .insert("subscription-userinfo", value);
+    }
 }
 
 pub async fn serve(
@@ -1414,36 +1479,13 @@ pub async fn serve(
         .headers_mut()
         .insert(header::VARY, "User-Agent, Accept".parse().unwrap());
     let announcement = personalized_subscription_announcement(&state, &user, &settings, now).await;
-    add_subscription_profile_headers(&mut response, &settings, announcement.as_deref());
-    // User limits are expressed in decimal GB in panel records; the conventional subscription-userinfo
-    // header expects bytes and Unix seconds.
-    let consumed_gb = user
-        .get("used")
-        .and_then(Value::as_f64)
-        .unwrap_or(0.0)
-        .max(0.0);
-    let limit = user
-        .get("limit")
-        .and_then(Value::as_f64)
-        .unwrap_or(0.0)
-        .max(0.0);
-    let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
-    let to_bytes = subscription_gb_to_bytes;
-    let info = format!(
-        "upload=0; download={}; total={}; expire={}",
-        to_bytes(consumed_gb),
-        to_bytes(limit),
-        if expiry > 1_000_000_000_000 {
-            expiry / 1000
-        } else {
-            expiry
-        }
+    add_subscription_profile_headers(
+        &mut response,
+        &settings,
+        announcement.as_deref(),
+        Some(&token),
     );
-    if let Ok(value) = header::HeaderValue::from_str(&info) {
-        response
-            .headers_mut()
-            .insert("subscription-userinfo", value);
-    }
+    add_subscription_userinfo_header(&mut response, &user);
     Ok(response)
 }
 
@@ -2383,6 +2425,85 @@ mod tests {
     }
 
     #[test]
+    fn subscription_portal_header_is_personal_and_does_not_modify_feed() {
+        use axum::response::IntoResponse;
+        let token = "a".repeat(64);
+        let other = "b".repeat(64);
+        let settings = json!({
+            "subscriptionDomain": "uk.example.com",
+            "subscriptionPath": "/s",
+            "subscriptionSupportUrl": "https://t.me/example",
+        });
+        let mut first = Json(json!({"type": "feed"})).into_response();
+        add_subscription_profile_headers(&mut first, &settings, None, Some(&token));
+        let webpage = first
+            .headers()
+            .get("profile-web-page-url")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(
+            webpage,
+            format!("https://uk.example.com/s/{token}?view=portal")
+        );
+        assert_eq!(first.headers()["support-url"], "https://t.me/example");
+        assert_eq!(first.headers()["profile-update-interval"], "24");
+        let mut second = Json(json!({})).into_response();
+        add_subscription_profile_headers(&mut second, &settings, None, Some(&other));
+        assert_ne!(
+            second.headers().get("profile-web-page-url"),
+            first.headers().get("profile-web-page-url")
+        );
+
+        // No guessed personal URL without a public HTTPS hostname.
+        let mut missing = Json(json!({})).into_response();
+        add_subscription_profile_headers(
+            &mut missing,
+            &json!({"subscriptionDomain": "", "domain": ""}),
+            None,
+            Some(&token),
+        );
+        assert!(!missing.headers().contains_key("profile-web-page-url"));
+
+        let mut disabled = Json(json!({})).into_response();
+        add_subscription_profile_headers(
+            &mut disabled,
+            &json!({"subscriptionDomain": "uk.example.com",
+                    "subscriptionProfileWebPageEnabled": false}),
+            None,
+            Some(&token),
+        );
+        assert!(!disabled.headers().contains_key("profile-web-page-url"));
+
+        let mut custom = Json(json!({})).into_response();
+        add_subscription_profile_headers(
+            &mut custom,
+            &json!({"subscriptionProfileWebPageUrl": "https://account.example.com/my"}),
+            None,
+            Some(&token),
+        );
+        assert_eq!(
+            custom.headers()["profile-web-page-url"],
+            "https://account.example.com/my"
+        );
+
+        for url in [
+            "http://example.com",
+            "https://a.com\r\nx-secret: bad",
+            "https://user@host.example.com",
+            "https://host.example.com:8443/",
+        ] {
+            assert!(
+                subscription_profile_page_url(
+                    &json!({"subscriptionProfileWebPageUrl":url}),
+                    &token
+                )
+                .is_none()
+            );
+        }
+    }
+
+    #[test]
     fn personalized_announce_is_multiline_base64_and_not_cached_globally() {
         let settings = json!({"subscriptionAnnouncement":"{USERNAME}\nCDN: {CDN_DATA_LEFT}"});
         let first = crate::subscription_remark::render_announcement(
@@ -2406,7 +2527,7 @@ mod tests {
             "{USERNAME}\nCDN: {CDN_DATA_LEFT}"
         );
         let mut response = Json(json!({})).into_response();
-        add_subscription_profile_headers(&mut response, &settings, Some(&first));
+        add_subscription_profile_headers(&mut response, &settings, Some(&first), None);
         let raw = response
             .headers()
             .get("announce")

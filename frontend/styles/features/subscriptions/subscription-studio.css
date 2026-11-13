@@ -712,3 +712,20 @@
  .subscription-preview-toolbar-controls button{padding:.32rem .4rem}
 }
 @media(prefers-reduced-motion:reduce){.subscription-studio [data-substudio-panel]{animation:none}.subscription-studio-tabs button{transition:none}}
+
+
+/* Client application metadata: show an accurate readable portal URL preview. */
+.subscription-studio .subscription-profile-page-preview{
+ margin:0;
+ padding:.62rem .78rem;
+ border:1px solid var(--st-border);
+ border-radius:var(--nx-control-radius);
+ background:var(--nx-section-bg);
+ color:var(--mu);
+ font-size:.8rem;
+ line-height:1.55;
+ overflow-wrap:anywhere;
+}
+.subscription-studio .subscription-profile-page-toggle{
+ margin-top:.15rem;
+}
