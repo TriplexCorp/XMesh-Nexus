@@ -712,12 +712,3 @@
  .subscription-preview-toolbar-controls button{padding:.32rem .4rem}
 }
 @media(prefers-reduced-motion:reduce){.subscription-studio [data-substudio-panel]{animation:none}.subscription-studio-tabs button{transition:none}}
-
-/* Optional custom resolver, revealed only when selected in Xray JSON Engine. */
-.subscription-custom-dns{display:grid;gap:.65rem;min-width:0;padding:.75rem;
- border:1px solid var(--st-border);border-radius:var(--nx-control-radius);
- background:var(--nx-section-bg)}
-.subscription-custom-dns[hidden]{display:none!important}
-.subscription-custom-dns .note{margin:0;font-size:.71rem;line-height:1.5;color:var(--st-muted)}
-.subscription-custom-dns .subscription-studio-pair{gap:.7rem}
-@media(max-width:620px){.subscription-custom-dns .subscription-studio-pair{grid-template-columns:minmax(0,1fr)}}
