@@ -338,6 +338,9 @@ mod tests {
         assert!(!accepts(
             &json!({"subscriptionSupportUrl":"http://example.com"})
         ));
+        assert!(accepts(&json!({"subscriptionAnnouncementEnabled": true})));
+        assert!(accepts(&json!({"subscriptionAnnouncementEnabled": false})));
+        assert!(!accepts(&json!({"subscriptionAnnouncementEnabled": "on"})));
         assert!(accepts(&json!({"subscriptionProfileWebPageEnabled": true})));
         assert!(accepts(
             &json!({"subscriptionProfileWebPageEnabled": false})
