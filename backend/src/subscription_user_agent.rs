@@ -147,6 +147,12 @@ pub fn wants_feed(
     headers: &HeaderMap,
     options: &HashMap<String, String>,
 ) -> Result<bool, &'static str> {
+    // A profile webpage may be opened by the VPN app's own webview. Force
+    // the HTML portal when the subscriber follows its explicit metadata URL.
+    // This is only a presentation choice; the bearer token still authenticates.
+    if options.get("view").is_some_and(|value| value == "portal") {
+        return Ok(false);
+    }
     let app = negotiate(headers, options)?;
     let html = headers
         .get(header::ACCEPT)
@@ -298,6 +304,11 @@ mod tests {
             "text/html,application/xhtml+xml",
         );
         assert!(wants_feed(&client, &empty).unwrap());
+        let portal = HashMap::from([("view".to_owned(), "portal".to_owned())]);
+        assert!(!wants_feed(&client, &portal).unwrap());
+        assert!(!wants_feed(&headers("curl/8", "*/*"), &portal).unwrap());
+        let raw = HashMap::from([("raw".to_owned(), "1".to_owned())]);
+        assert!(wants_feed(&client, &raw).unwrap());
         assert!(wants_feed(&headers("v2rayNG/1.10 Android", "*/*"), &empty).unwrap());
         let mut options = HashMap::new();
         options.insert("device".to_string(), "ios".to_string());
