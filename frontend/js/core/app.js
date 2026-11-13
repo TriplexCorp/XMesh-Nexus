@@ -4929,7 +4929,14 @@ function securityP(){
       <section class="card security-center-information security-audit"><header class="security-audit-head"><div><h3>Журнал безопасности</h3><p>Последние 100 записей серверного аудита. Доступно только владельцу панели.</p></div><button class="gh" type="button" data-security-audit-refresh>Обновить</button></header><label class="security-audit-search">Поиск по действию и администратору <input type="search" data-security-audit-search placeholder="Например, security.session"></label><div class="security-audit-list" id="security-audit-list" role="status" aria-live="polite">Откройте вкладку, чтобы загрузить журнал.</div></section>
     </div>
     <div class="security-center-pane" id="security-pane-infra" role="tabpanel" aria-labelledby="security-tab-infra" data-security-pane="infra" hidden>
-      <section class="card security-center-information"><h3>Защита инфраструктуры</h3><p>Для безопасного управления токенами, сетевыми ограничениями и настройками TLS необходимы серверные проверки и контроль прав. Неактивные механизмы не показываются как включённые.</p><div class="security-future-list"><span>IP allowlist для админов <em>Требует API</em></span><span>Политика API-токенов <em>Требует API</em></span><span>Проверка HTTPS и заголовков <em>Требует API</em></span></div></section>
+      <section class="card security-center-information"><h3>Безопасность инфраструктуры</h3><p>Операционные проверки доступны в действующих разделах. Отключённые или ещё не реализованные механизмы не показываются как активные.</p>
+      <div class="settings-security-routes">
+        <a href="#nodes"><span>01</span><b>Узлы и агенты</b><small>Состояние узлов, версии и доверенные соединения</small></a>
+        <a href="#tools"><span>02</span><b>Диагностика</b><small>Проверка доступности и состояния служб</small></a>
+        <a href="#set/data"><span>03</span><b>Данные</b><small>Экспорт интерфейса и рекомендации по резервному копированию</small></a>
+      </div>
+      <p class="note">IP allowlist, управление API-токенами и автоматический аудит TLS пока требуют серверной реализации. Здесь нет неработающих переключателей.</p>
+    </section>
     </div>
   </div>`];
 }
