@@ -1,5 +1,5 @@
 //! Production service credentials: owner issuance, digest-only storage, strict Bearer middleware.
-use super::{Problem, ServicePrincipal, reply, now_ms};
+use super::{Problem, ServicePrincipal, now_ms};
 use crate::{ApiError, AppState, auth::AuthUser};
 use axum::{
     Json,
@@ -240,7 +240,8 @@ pub(super) async fn require_service(
     mut request: Request,
     next: Next,
 ) -> Response {
-    match authenticate(&state, &request).await {
+    let headers = request.headers().clone();
+    match authenticate(&state, &headers).await {
         Ok(principal) => {
             request.extensions_mut().insert(principal);
             let mut response = next.run(request).await;
@@ -258,24 +259,37 @@ pub(super) async fn require_service(
     }
 }
 
-async fn authenticate(state: &AppState, request: &Request) -> Result<ServicePrincipal, Problem> {
-    let headers = request.headers();
+async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePrincipal, Problem> {
     // A browser cookie or Origin MUST NOT be enough to access this namespace,
     // nor can an integration token be mixed with an authenticated browser request.
     if headers.contains_key(header::COOKIE)
         || headers.contains_key(header::ORIGIN)
         || headers.contains_key("sec-fetch-site")
     {
-        return Err(Problem::new(StatusCode::FORBIDDEN, "browser_request_forbidden",
-            "Integration requests must not use browser credentials"));
+        return Err(Problem::new(
+            StatusCode::FORBIDDEN,
+            "browser_request_forbidden",
+            "Integration requests must not use browser credentials",
+        ));
     }
     let mut values = headers.get_all(header::AUTHORIZATION).iter();
-    let raw = values.next()
+    let raw = values
+        .next()
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| Problem::new(StatusCode::UNAUTHORIZED, "unauthorized", "Bearer token required"))?;
+        .ok_or_else(|| {
+            Problem::new(
+                StatusCode::UNAUTHORIZED,
+                "unauthorized",
+                "Bearer token required",
+            )
+        })?;
     if values.next().is_some() || !valid_token(raw) {
-        return Err(Problem::new(StatusCode::UNAUTHORIZED, "unauthorized", "Invalid bearer token"));
+        return Err(Problem::new(
+            StatusCode::UNAUTHORIZED,
+            "unauthorized",
+            "Invalid bearer token",
+        ));
     }
     // Invalid tokens must also be rate-limited before any PostgreSQL work.
     // A per-token limiter alone would be bypassable by random credential spam.
