@@ -2426,6 +2426,16 @@ mod tests {
             Some("Привет {USERNAME}")
         );
         assert_eq!(
+            selected_subscription_announcement(
+                &json!({
+                    "subscriptionAnnouncement":"Hello {USERNAME}",
+                    "subscriptionAnnouncementEnabled":false
+                }),
+                0
+            ),
+            None
+        );
+        assert_eq!(
             selected_subscription_announcement(&json!({"subscriptionAnnouncement":"   "}), 0),
             None
         );
