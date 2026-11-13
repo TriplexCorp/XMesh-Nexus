@@ -239,11 +239,24 @@ for(const setting of [
  'subscriptionSupportUrl','subscriptionProfileWebPageUrl','subscriptionProfileWebPageEnabled','subscriptionClientLayout','subscriptionShowApps','subscriptionShowQr',
  'subscriptionShowCopy','subscriptionShowDevices','subscriptionShowStatus','subscriptionShowSupport'
 ])assert(view.includes('name="'+setting+'"'),'Missing studio setting '+setting);
+assert.equal(studio.defaults.subscriptionAnnouncementEnabled,true,
+ 'Announcement switch must default on for existing subscribers');
+assert.match(src,/subscriptionAnnouncementEnabled:input\(form,'subscriptionAnnouncementEnabled'\)\.checked/);
+assert.match(src,/studioToggle\('subscriptionAnnouncementEnabled'/);
+assert.match(src,/subscriptionUseEmbeddedPortal/);
+assert.match(src,/subscription-content-languages/);
+assert.match(src,/subscription-content-profile/);
+assert.match(css,/\.subscription-studio \.subscription-content-switch:checked/);
+assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
+assert.match(rust,/"subscriptionAnnouncementEnabled"/);
+const announcementBackend=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
+assert.match(announcementBackend,/get\("subscriptionAnnouncementEnabled"\)/,
+ 'Turning the announce switch off must actually suppress the server header');
 assert.equal(studio.defaults.subscriptionProfileWebPageEnabled,true,
  'A new installation must expose the existing personal portal by default');
 assert.equal(studio.defaults.subscriptionProfileWebPageUrl,'',
  'Custom webpage URL must be opt-in');
-assert.match(view,/Личный кабинет в VPN-приложениях/);
+assert.match(src,/Личный кабинет в VPN-приложениях/);
 assert.match(src,/subscriptionProfileWebPageEnabled:input\(form,'subscriptionProfileWebPageEnabled'\)\.checked/);
 assert.match(src,/subscriptionProfileWebPageUrl:input\(form,'subscriptionProfileWebPageUrl'\)\.value\.trim\(\)/);
 assert.match(src,/data-subscription-profile-page-preview/);

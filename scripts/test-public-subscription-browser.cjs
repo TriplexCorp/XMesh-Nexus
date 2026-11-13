@@ -177,6 +177,74 @@ async function dismissDialog(page,dialog,opener){
   assert(await studio.locator('.subscription-public-info-panel').isHidden());
   await page.locator('[name="subscriptionShowQr"]').uncheck();
   assert(await studio.locator('[data-subscription-qr]').isHidden());checks++;
+  // The Content redesign preserves real controls and shared save handling.
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  const contentTab=page.locator('[data-substudio-tab="content"]');
+  await contentTab.click();
+  const content=page.locator('#substudio-content');
+  assert(await content.isVisible());
+  assert.equal(await content.locator('.subscription-content-card').count(),3);
+  assert.equal(await content.locator('.subscription-content-language').count(),2);
+  assert.equal(await content.locator('[name="subscriptionSupportUrl"]').count(),1);
+  assert.equal(await content.locator('[name="subscriptionShowSupport"]').count(),1);
+  const announceToggle=content.locator('[name="subscriptionAnnouncementEnabled"]');
+  assert.equal(await announceToggle.getAttribute('role'),'switch');
+  assert(await announceToggle.isChecked(),'Announcements remain enabled by default');
+  const cssMotion=await announceToggle.evaluate(el=>getComputedStyle(el).transitionDuration);
+  assert.notEqual(cssMotion,'0s','The active switch has an animation');
+  await announceToggle.uncheck();
+  assert.equal(await content.locator('.subscription-content-announcements').getAttribute('data-announcements-enabled'),'false');
+  assert.equal(await page.locator('.subscription-studio').getAttribute('data-unsaved'),'true');
+  await announceToggle.focus();await page.keyboard.press('Space');
+  assert(await announceToggle.isChecked(),'Space toggles the switch with the keyboard');
+  const personal=content.locator('[name="subscriptionProfileWebPageEnabled"]');
+  const embedded=content.locator('[name="subscriptionUseEmbeddedPortal"]');
+  const url=content.locator('[name="subscriptionProfileWebPageUrl"]');
+  assert(await personal.isChecked()&&await embedded.isChecked());
+  assert(await url.isDisabled(),'Built-in portal mode disables external URL editing');
+  await embedded.uncheck();
+  assert(await url.isEnabled(),'Own website mode enables the URL input');
+  await url.fill('https://account.example.org/membership');
+  assert.match(await content.locator('[data-subscription-profile-page-preview]').innerText(),
+    /https:\/\/account\.example\.org\/membership/);
+  await embedded.check();
+  assert.equal(await url.inputValue(),'','Switching to embedded portal clears the override');
+  assert(await url.isDisabled());
+  await personal.uncheck();
+  assert.match(await content.locator('[data-subscription-profile-page-preview]').innerText(),/Выключено/);
+  assert(await embedded.isDisabled());
+  await personal.check();
+  assert(await embedded.isEnabled());
+  await content.locator('[name="subscriptionShowSupport"]').uncheck();
+  assert(await studio.locator('[data-subscription-support]').isHidden());
+  await content.locator('[name="subscriptionShowSupport"]').check();
+  await page.setViewportSize({width:1600,height:900});
+  const desktopContent=await page.evaluate(()=>({
+    overflow:document.documentElement.scrollWidth>innerWidth+1,
+    columns:[...document.querySelectorAll('#substudio-content .subscription-content-language')].map(el=>({
+      top:Math.round(el.getBoundingClientRect().top),
+      left:Math.round(el.getBoundingClientRect().left)
+    }))
+  }));
+  assert(!desktopContent.overflow,'Content workspace must not overflow at 1600px');
+  assert.equal(desktopContent.columns[0].top,desktopContent.columns[1].top,
+    'RU and EN inputs should align as two columns');
+  await page.screenshot({path:path.join(out,'studio-content-desktop.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:390,height:844});
+  const mobileContent=await page.evaluate(()=>({
+    overflow:document.documentElement.scrollWidth>innerWidth+1,
+    columns:[...document.querySelectorAll('#substudio-content .subscription-content-language')].map(el=>
+      Math.round(el.getBoundingClientRect().top))
+  }));
+  assert(!mobileContent.overflow,'Content workspace must not overflow at 390px');
+  assert(mobileContent.columns[1]>mobileContent.columns[0],
+    'RU and EN inputs should stack on mobile');
+  await page.screenshot({path:path.join(out,'studio-content-mobile.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:1600,height:900});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await announceToggle.evaluate(el=>getComputedStyle(el).transitionDuration),'0s',
+    'Respect reduced-motion preference for switches');
+  checks++;
   // Keep the live preview mounted across six Studio workspaces.
   const portalTab=page.locator('[data-substudio-tab="portal"]');
   const serversTab=page.locator('[data-substudio-tab="servers"]');

@@ -15,6 +15,23 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Использовать анонсы": "Enable announcements",
+    "Отключение убирает announce из ответа подписки, но сохраняет текст черновика.": "Turning this off omits the announce header but keeps your saved draft.",
+    "Персональные сообщения для VPN-приложений и подстановка значений.": "Personalized announcements and variables for VPN apps.",
+    "Подписи и кнопки для русского и английского языков.": "Labels and buttons for Russian and English.",
+    "Русский язык": "Russian language",
+    "Английский язык": "English language",
+    "Показывать поддержку": "Show support link",
+    "Отображает ссылку поддержки в личном кабинете подписчика.": "Show the support link in the subscriber portal.",
+    "Ссылка на личную страницу в поддерживаемых VPN-приложениях.": "Personal webpage link in compatible VPN apps.",
+    "Показывать кнопку личного кабинета": "Show personal webpage button",
+    "Добавляет переход на сайт подписки в поддерживающих VPN-приложениях.": "Adds a subscription webpage shortcut to compatible VPN apps.",
+    "Использовать встроенный портал XMesh": "Use the built-in XMesh portal",
+    "Если выключено, укажите собственный HTTPS-адрес ниже.": "When disabled, enter your own HTTPS URL below.",
+    "Выключено: приложение не получит ссылку личного кабинета.": "Disabled: VPN apps will not receive a personal webpage URL.",
+    "Введите собственный HTTPS-адрес кабинета.": "Enter a custom HTTPS account page URL.",
+    "Ссылка для VPN-приложений:": "URL for VPN apps:",
+    "Укажите собственный HTTPS-адрес кабинета или включите встроенный портал.": "Enter a custom HTTPS account page URL or enable the built-in portal.",
     "Личный кабинет в VPN-приложениях": "Personal webpage in VPN apps",
     "Показывать кнопку сайта подписки в поддерживающих клиентах.": "Show a subscription webpage button in compatible apps.",
     "Свой адрес кабинета (необязательно)": "Custom account webpage URL (optional)",

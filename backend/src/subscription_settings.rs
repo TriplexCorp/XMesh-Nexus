@@ -271,6 +271,7 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
         "subscriptionShowSupport",
         "subscriptionShowDevices",
         "subscriptionProfileWebPageEnabled",
+        "subscriptionAnnouncementEnabled",
     ] {
         if let Some(v) = object.get(key)
             && !v.is_boolean()
@@ -337,6 +338,9 @@ mod tests {
         assert!(!accepts(
             &json!({"subscriptionSupportUrl":"http://example.com"})
         ));
+        assert!(accepts(&json!({"subscriptionAnnouncementEnabled": true})));
+        assert!(accepts(&json!({"subscriptionAnnouncementEnabled": false})));
+        assert!(!accepts(&json!({"subscriptionAnnouncementEnabled": "on"})));
         assert!(accepts(&json!({"subscriptionProfileWebPageEnabled": true})));
         assert!(accepts(
             &json!({"subscriptionProfileWebPageEnabled": false})

@@ -1226,6 +1226,13 @@ pub async fn admin_client_json(
 /// Select the same global UTC rotation slot for every user, without
 /// retaining a rendered (user-specific) announcement in global settings.
 fn selected_subscription_announcement(settings: &Value, now_ms: i64) -> Option<&str> {
+    if settings
+        .get("subscriptionAnnouncementEnabled")
+        .and_then(Value::as_bool)
+        == Some(false)
+    {
+        return None;
+    }
     let raw = settings
         .get("subscriptionAnnouncement")
         .and_then(Value::as_str)?;
@@ -2417,6 +2424,16 @@ mod tests {
         assert_eq!(
             selected_subscription_announcement(&settings, 10_800_000),
             Some("Привет {USERNAME}")
+        );
+        assert_eq!(
+            selected_subscription_announcement(
+                &json!({
+                    "subscriptionAnnouncement":"Hello {USERNAME}",
+                    "subscriptionAnnouncementEnabled":false
+                }),
+                0
+            ),
+            None
         );
         assert_eq!(
             selected_subscription_announcement(&json!({"subscriptionAnnouncement":"   "}), 0),
