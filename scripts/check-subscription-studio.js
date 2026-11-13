@@ -256,7 +256,7 @@ assert.equal(studio.defaults.subscriptionProfileWebPageEnabled,true,
  'A new installation must expose the existing personal portal by default');
 assert.equal(studio.defaults.subscriptionProfileWebPageUrl,'',
  'Custom webpage URL must be opt-in');
-assert.match(view,/Личный кабинет в VPN-приложениях/);
+assert.match(src,/Личный кабинет в VPN-приложениях/);
 assert.match(src,/subscriptionProfileWebPageEnabled:input\(form,'subscriptionProfileWebPageEnabled'\)\.checked/);
 assert.match(src,/subscriptionProfileWebPageUrl:input\(form,'subscriptionProfileWebPageUrl'\)\.value\.trim\(\)/);
 assert.match(src,/data-subscription-profile-page-preview/);
