@@ -4,7 +4,7 @@ use crate::{ApiError, AppState, auth::AuthUser};
 use axum::{
     Json,
     extract::{Extension, Path, Request, State},
-    http::{StatusCode, header, HeaderMap},
+    http::{HeaderMap, StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -15,13 +15,15 @@ use sha2::{Digest, Sha256};
 use sqlx::Row;
 
 const ENABLED_SCOPES: &[&str] = &[
-    "users:read", "traffic:read", "subscriptions:read",
-    "users:write", "entitlements:grant",
+    "users:read",
+    "traffic:read",
+    "subscriptions:read",
+    "users:write",
+    "entitlements:grant",
 ];
 const TOKEN_PREFIX: &str = "xmni_v1_";
 const REDIS_RATE_LIMIT_PER_MINUTE: i64 = 120;
-const RATE_SCRIPT: &str =
-    "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],90) end; return n";
+const RATE_SCRIPT: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],90) end; return n";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -36,22 +38,28 @@ pub(crate) struct IssueToken {
     all_users: bool,
     allowed_user_ids: Option<Vec<i64>>,
 }
-const fn default_expires() -> i32 { 30 }
+const fn default_expires() -> i32 {
+    30
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct RevokeToken { mfa_code: String }
+pub(crate) struct RevokeToken {
+    mfa_code: String,
+}
 
 fn valid_name(value: &str, max: usize) -> bool {
-    (3..=max).contains(&value.len()) && value
-        .bytes()
-        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+    (3..=max).contains(&value.len())
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
 fn valid_token(value: &str) -> bool {
     value.len() == TOKEN_PREFIX.len() + 64
         && value.starts_with(TOKEN_PREFIX)
-        && value[TOKEN_PREFIX.len()..].bytes()
+        && value[TOKEN_PREFIX.len()..]
+            .bytes()
             .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
@@ -64,28 +72,42 @@ pub(crate) async fn create_token(
     crate::require_owner(&admin)?;
     crate::mfa::verify_integrations_step_up(&state, &admin, &headers, &body.mfa_code).await?;
     if !valid_name(&body.client_name, 64) || !valid_name(&body.label, 128) {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST,
-            "Client and token names must use 3-64/128 alphanumeric, ._- characters"));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Client and token names must use 3-64/128 alphanumeric, ._- characters",
+        ));
     }
     if !(1..=90).contains(&body.expires_in_days)
-        || body.scopes.is_empty() || body.scopes.len() > ENABLED_SCOPES.len()
-        || body.scopes.iter().any(|scope| !ENABLED_SCOPES.contains(&scope.as_str()))
+        || body.scopes.is_empty()
+        || body.scopes.len() > ENABLED_SCOPES.len()
+        || body
+            .scopes
+            .iter()
+            .any(|scope| !ENABLED_SCOPES.contains(&scope.as_str()))
     {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid expiry or scopes"));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid expiry or scopes",
+        ));
     }
     let mut scopes = body.scopes;
     scopes.sort_unstable();
     scopes.dedup();
     let mut allowed = body.allowed_user_ids;
     if body.all_users == allowed.is_some() {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST,
-            "Choose either allUsers=true or explicit allowedUserIds, never both"));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Choose either allUsers=true or explicit allowedUserIds, never both",
+        ));
     }
     if let Some(ids) = allowed.as_mut() {
         ids.sort_unstable();
         ids.dedup();
         if ids.is_empty() || ids.len() > 10_000 || ids.iter().any(|id| *id <= 0) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid user access list"));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid user access list",
+            ));
         }
     }
     let mut raw = [0u8; 32];
@@ -96,7 +118,7 @@ pub(crate) async fn create_token(
     let row = sqlx::query(
         "INSERT INTO integration_clients(name) VALUES($1)
          ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name
-         RETURNING id, disabled"
+         RETURNING id, disabled",
     )
     .bind(&body.client_name)
     .fetch_one(&mut *tx)
@@ -109,7 +131,7 @@ pub(crate) async fn create_token(
         "INSERT INTO integration_tokens
          (client_id,label,token_hash,scopes,allowed_user_ids,created_by,expires_at)
          VALUES($1,$2,$3,$4,$5,$6,NOW()+$7::integer * INTERVAL '1 day')
-         RETURNING id,expires_at"
+         RETURNING id,expires_at",
     )
     .bind(client_id)
     .bind(body.label)
@@ -123,10 +145,14 @@ pub(crate) async fn create_token(
     let token_id: i64 = issued.try_get("id")?;
     tx.commit().await?;
     crate::audit(
-        &state.pool, &admin.username, "integration.token_issued",
-        None, Some(token_id),
+        &state.pool,
+        &admin.username,
+        "integration.token_issued",
+        None,
+        Some(token_id),
         json!({"clientId":client_id,"scopes":scopes,"allUsers":body.all_users}),
-    ).await;
+    )
+    .await;
     let mut response = Json(json!({
         "token": plaintext,
         "tokenId": token_id,
@@ -135,7 +161,8 @@ pub(crate) async fn create_token(
         "expiresInDays": body.expires_in_days,
         "shownOnce": true,
         "warning": "Store securely: this credential cannot be displayed again."
-    })).into_response();
+    }))
+    .into_response();
     response.headers_mut().insert(
         header::CACHE_CONTROL,
         axum::http::HeaderValue::from_static("no-store, private"),
@@ -158,8 +185,10 @@ pub(crate) async fn list_tokens(
                 (t.revoked_at IS NOT NULL) AS revoked
          FROM integration_tokens AS t
          JOIN integration_clients AS c ON c.id=t.client_id
-         ORDER BY t.id DESC LIMIT 500"
-    ).fetch_all(&state.pool).await?;
+         ORDER BY t.id DESC LIMIT 500",
+    )
+    .fetch_all(&state.pool)
+    .await?;
     let entries = rows.iter().map(|r| json!({
         "id": r.try_get::<i64,_>("id").unwrap_or(0),
         "clientId": r.try_get::<i64,_>("client_id").unwrap_or(0),
@@ -187,13 +216,22 @@ pub(crate) async fn revoke_token(
     }
     let result = sqlx::query(
         "UPDATE integration_tokens SET revoked_at=COALESCE(revoked_at,NOW())
-         WHERE id=$1 RETURNING client_id"
-    ).bind(id).fetch_optional(&state.pool).await?
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Token not found"))?;
+         WHERE id=$1 RETURNING client_id",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Token not found"))?;
     let client_id: i64 = result.try_get("client_id")?;
-    crate::audit(&state.pool, &admin.username,
-        "integration.token_revoked", None, Some(id),
-        json!({"clientId":client_id})).await;
+    crate::audit(
+        &state.pool,
+        &admin.username,
+        "integration.token_revoked",
+        None,
+        Some(id),
+        json!({"clientId":client_id}),
+    )
+    .await;
     Ok(Json(json!({"revoked":true,"tokenId":id})))
 }
 
@@ -243,13 +281,19 @@ async fn authenticate(state: &AppState, request: &Request) -> Result<ServicePrin
     // A per-token limiter alone would be bypassable by random credential spam.
     let minute = now_ms().div_euclid(60_000);
     let mut preflight_redis = state.redis.clone();
-    let global = redis::cmd("EVAL").arg(RATE_SCRIPT).arg(1)
+    let global = redis::cmd("EVAL")
+        .arg(RATE_SCRIPT)
+        .arg(1)
         .arg(format!("xmesh:int:rl:global:{minute}"))
-        .query_async::<i64>(&mut preflight_redis).await
+        .query_async::<i64>(&mut preflight_redis)
+        .await
         .map_err(|_| Problem::unavailable())?;
     if global > 4_000 {
-        return Err(Problem::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited",
-            "Integration authentication rate limit exceeded"));
+        return Err(Problem::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "rate_limited",
+            "Integration authentication rate limit exceeded",
+        ));
     }
     let digest = hex::encode(Sha256::digest(raw.as_bytes()));
     let row = sqlx::query(
@@ -257,34 +301,55 @@ async fn authenticate(state: &AppState, request: &Request) -> Result<ServicePrin
          FROM integration_tokens AS t
          JOIN integration_clients AS c ON c.id=t.client_id
          WHERE t.token_hash=$1 AND t.revoked_at IS NULL
-           AND t.expires_at > NOW() AND NOT c.disabled"
+           AND t.expires_at > NOW() AND NOT c.disabled",
     )
     .bind(digest)
     .fetch_optional(&state.pool)
     .await
     .map_err(|_| Problem::unavailable())?
-    .ok_or_else(|| Problem::new(StatusCode::UNAUTHORIZED, "unauthorized", "Invalid bearer token"))?;
+    .ok_or_else(|| {
+        Problem::new(
+            StatusCode::UNAUTHORIZED,
+            "unauthorized",
+            "Invalid bearer token",
+        )
+    })?;
     let token_id: i64 = row.try_get("id").map_err(|_| Problem::unavailable())?;
-    let client_id: i64 = row.try_get("client_id").map_err(|_| Problem::unavailable())?;
+    let client_id: i64 = row
+        .try_get("client_id")
+        .map_err(|_| Problem::unavailable())?;
     let now_minute = now_ms().div_euclid(60_000);
     let key = format!("xmesh:int:rl:v1:{token_id}:{now_minute}");
     let mut redis = state.redis.clone();
-    let requests = redis::cmd("EVAL").arg(RATE_SCRIPT).arg(1).arg(key)
-        .query_async::<i64>(&mut redis).await.map_err(|_| Problem::unavailable())?;
+    let requests = redis::cmd("EVAL")
+        .arg(RATE_SCRIPT)
+        .arg(1)
+        .arg(key)
+        .query_async::<i64>(&mut redis)
+        .await
+        .map_err(|_| Problem::unavailable())?;
     if requests > REDIS_RATE_LIMIT_PER_MINUTE {
-        return Err(Problem::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited",
-            "Rate limit exceeded"));
+        return Err(Problem::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "rate_limited",
+            "Rate limit exceeded",
+        ));
     }
     let _ = sqlx::query(
         "UPDATE integration_tokens SET last_used_at=NOW()
-         WHERE id=$1 AND (last_used_at IS NULL OR last_used_at<NOW()-INTERVAL '5 minutes')"
-    ).bind(token_id).execute(&state.pool).await;
+         WHERE id=$1 AND (last_used_at IS NULL OR last_used_at<NOW()-INTERVAL '5 minutes')",
+    )
+    .bind(token_id)
+    .execute(&state.pool)
+    .await;
     Ok(ServicePrincipal {
         token_id,
         client_id,
         name: row.try_get("name").map_err(|_| Problem::unavailable())?,
         scopes: row.try_get("scopes").map_err(|_| Problem::unavailable())?,
-        allowed_user_ids: row.try_get("allowed_user_ids").map_err(|_| Problem::unavailable())?,
+        allowed_user_ids: row
+            .try_get("allowed_user_ids")
+            .map_err(|_| Problem::unavailable())?,
     })
 }
 
