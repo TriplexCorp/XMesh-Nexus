@@ -15,6 +15,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "1.1.1.1 или https://dns.example.org/dns-query": "1.1.1.1 or https://dns.example.org/dns-query",
     "DNS-сервер": "DNS server",
     "Укажи IP (UDP) или HTTPS-адрес (DoH). Протокол определяется по адресу. Если поле пустое — используется 1.1.1.1.": "Enter an IP (UDP) or HTTPS address (DoH). The protocol is detected automatically. An empty field uses 1.1.1.1.",
     "Свой DNS (необязательно)": "Custom DNS (optional)",
