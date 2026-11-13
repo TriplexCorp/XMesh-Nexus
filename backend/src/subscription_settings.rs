@@ -203,7 +203,22 @@ fn validate_portal_appearance(object: &Map<String, Value>) -> Result<(), ApiErro
 }
 
 fn validate_external_urls(object: &Map<String, Value>) -> Result<(), ApiError> {
-    validate_external_urls(object)?;
+    for key in [
+        "subscriptionLogoUrl",
+        "subscriptionSupportUrl",
+        "subscriptionProfileWebPageUrl",
+    ] {
+        if let Some(v) = object.get(key) {
+            let url = v
+                .as_str()
+                .ok_or_else(|| bad("Ссылка должна быть строкой."))?;
+            if !safe_https_url(url) {
+                return Err(bad(
+                    "Допустима только корректная HTTPS-ссылка без логина и нестандартного порта.",
+                ));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -246,22 +261,7 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
             }
         }
     }
-    for key in [
-        "subscriptionLogoUrl",
-        "subscriptionSupportUrl",
-        "subscriptionProfileWebPageUrl",
-    ] {
-        if let Some(v) = object.get(key) {
-            let url = v
-                .as_str()
-                .ok_or_else(|| bad("Ссылка должна быть строкой."))?;
-            if !safe_https_url(url) {
-                return Err(bad(
-                    "Допустима только корректная HTTPS-ссылка без логина и нестандартного порта.",
-                ));
-            }
-        }
-    }
+    validate_external_urls(object)?;
     for key in [
         "subscriptionSyncPanelTheme",
         "subscriptionShowStatus",
