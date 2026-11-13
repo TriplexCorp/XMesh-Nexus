@@ -1,4 +1,18 @@
-# Public subscription experience 2.0
+# Public subscription experience 3.0
+
+The public page now prioritizes actual subscription status, the scoped user name,
+an optional plan label, expiration, usage, and a single prominent connection action.
+When no plan name exists in the user record, the title is neutral ("VPN access"),
+not an invented paid tier. Personal identity is read from the bearer-scoped user
+record, HTML-escaped and bounded to 80 characters; the public page does not use
+a new unauthenticated data API. Subscription Studio shows a clearly synthetic
+sample owner. Both use the same runtime experience component and theme tokens.
+
+The previous decorative three-step checklist is removed. The connection dialog
+still contains setup guidance, platform selection, approved download links,
+manual subscription import, and QR/copy alternatives. A subtle CSS-only ambient
+animation honors reduced-motion preferences. Desktop and mobile present the same
+identity and usage facts; all status states retain their server-derived semantics.
 
 The primary task is connecting a device. A broad connection card sits beside a
 combined expiry and traffic rail. Below it, real shortcuts open instructions and
