@@ -246,7 +246,7 @@ pub async fn new_challenge_in_transaction(
 /// Step-up MFA for issuance/revocation of external Integration API credentials.
 /// Owner-only sessions are necessary but NOT sufficient: require a new,
 /// one-time TOTP step with replay prevention, locking and rate limits.
-pub(crate) async fn verify_integrations_step_up(
+pub async fn verify_integrations_step_up(
     state: &AppState,
     actor: &AuthUser,
     headers: &HeaderMap,
