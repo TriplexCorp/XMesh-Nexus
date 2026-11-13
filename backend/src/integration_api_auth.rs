@@ -27,7 +27,7 @@ const RATE_SCRIPT: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redi
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct IssueToken {
+pub struct IssueToken {
     client_name: String,
     label: String,
     mfa_code: String,
@@ -44,7 +44,7 @@ const fn default_expires() -> i32 {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct RevokeToken {
+pub struct RevokeToken {
     mfa_code: String,
 }
 
@@ -63,7 +63,8 @@ fn valid_token(value: &str) -> bool {
             .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
-pub(crate) async fn create_token(
+#[expect(clippy::too_many_lines, reason = "Credential issuance performs immutable policy checks, MFA and transactional key storage")]
+pub async fn create_token(
     State(state): State<AppState>,
     Extension(admin): Extension<AuthUser>,
     headers: HeaderMap,
@@ -174,7 +175,7 @@ pub(crate) async fn create_token(
     Ok(response)
 }
 
-pub(crate) async fn list_tokens(
+pub async fn list_tokens(
     State(state): State<AppState>,
     Extension(admin): Extension<AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
@@ -202,7 +203,7 @@ pub(crate) async fn list_tokens(
     Ok(Json(json!({"items":entries,"total":entries.len()})))
 }
 
-pub(crate) async fn revoke_token(
+pub async fn revoke_token(
     State(state): State<AppState>,
     Extension(admin): Extension<AuthUser>,
     Path(id): Path<i64>,
@@ -259,6 +260,7 @@ pub(super) async fn require_service(
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "Authentication enforces bearer, browser isolation, rate limits, authorization and token revocation")]
 async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePrincipal, Problem> {
     // A browser cookie or Origin MUST NOT be enough to access this namespace,
     // nor can an integration token be mixed with an authenticated browser request.
