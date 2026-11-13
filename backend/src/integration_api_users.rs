@@ -1,4 +1,4 @@
-//! Bounded per-client user views. Never serialize raw panel_records user JSON.
+//! Bounded per-client user views. Never serialize raw `panel_records` user JSON.
 use super::{Problem, ServicePrincipal, grants, now_ms, reply};
 use crate::{AppState, cdn_quota};
 use axum::{
@@ -77,17 +77,16 @@ fn safe_user(user: &Value) -> Value {
         "cdnUsedBytes": pick("cdnUsedBytes"),
         "onlineAtMs": pick("onlineAt"),
         "squadIds": user.get("squads").and_then(Value::as_array)
-            .map(|items| items.iter().filter(|v| v.is_i64() || v.is_u64()).cloned().collect::<Vec<_>>())
-            .unwrap_or_default()
+            .map_or_else(Vec::new, |items| items.iter().filter(|v| v.is_i64() || v.is_u64()).cloned().collect::<Vec<_>>())
     })
 }
 
 async fn with_meter(state: &AppState, id: i64, mut user: Value) -> Result<Value, Problem> {
     user["id"] = json!(id);
-    let used = crate::user_metered_bytes(&state.pool, id)
+    let metered_bytes = crate::user_metered_bytes(&state.pool, id)
         .await
         .map_err(Problem::from)?;
-    crate::add_metered_usage(&mut user, used);
+    crate::add_metered_usage(&mut user, metered_bytes);
     cdn_quota::attach_usage(&state.pool, std::slice::from_mut(&mut user))
         .await
         .map_err(Problem::from)?;
@@ -212,7 +211,7 @@ mod tests {
     fn projection_never_exposes_xray_credentials_or_telegram_contact() {
         let user = json!({"id":42,"username":"alice","xrayId":"SECRET",
             "password":"SECRET","tg":"123","subscriptionUrl":"https://secret","note":"private",
-            "limit":0.0,"used":1.0,"expireAt":1800000000000_i64});
+            "limit":0.0,"used":1.0,"expireAt":1_800_000_000_000_i64});
         let projected = safe_user(&user);
         assert_eq!(projected["username"], "alice");
         for field in ["xrayId", "password", "tg", "subscriptionUrl", "note"] {
