@@ -15,6 +15,17 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Создан пользователь": "User created",
+    "Достигнут лимит": "Limit reached",
+    "Исчерпан лимит трафика пользователя": "User traffic limit exceeded",
+    "Срок действия пользователя завершился": "User subscription expired",
+    "До окончания 24 часа": "Expires within 24 hours",
+    "Подписка заканчивается в течение суток": "Subscription expires within a day",
+    "Первое подключение": "First connection",
+    "Первое успешное подключение пользователя": "User connected for the first time",
+    "Порог расхода трафика": "Traffic usage threshold",
+    "Достигнута заданная граница расхода": "Configured usage threshold reached",
+    "Дополнительное событие": "Custom event",
     "Безопасность и доступ": "Security and access",
     "Двухфакторная защита, сессии и журнал действий администраторов.": "Two-factor protection, sessions and administrator activity.",
     "Вход и 2FA": "Sign-in and 2FA",
