@@ -23,7 +23,7 @@ window.XMeshI18n=(()=>{
     "Английский язык": "English language",
     "Показывать поддержку": "Show support link",
     "Отображает ссылку поддержки в личном кабинете подписчика.": "Show the support link in the subscriber portal.",
-    "Кнопка личной страницы в Happ и других совместимых VPN-клиентах.": "Personal webpage button in Happ and compatible VPN clients.",
+    "Ссылка на личную страницу в поддерживаемых VPN-приложениях.": "Personal webpage link in compatible VPN apps.",
     "Показывать кнопку личного кабинета": "Show personal webpage button",
     "Добавляет переход на сайт подписки в поддерживающих VPN-приложениях.": "Adds a subscription webpage shortcut to compatible VPN apps.",
     "Использовать встроенный портал XMesh": "Use the built-in XMesh portal",
