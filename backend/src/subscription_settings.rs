@@ -32,7 +32,7 @@ fn is_hex_color(value: &str) -> bool {
         && value.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
 }
 
-fn safe_https_url(value: &str) -> bool {
+pub(crate) fn safe_https_url(value: &str) -> bool {
     if value.is_empty() {
         return true;
     }
@@ -241,7 +241,7 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
             }
         }
     }
-    for key in ["subscriptionLogoUrl", "subscriptionSupportUrl"] {
+    for key in ["subscriptionLogoUrl", "subscriptionSupportUrl", "subscriptionProfileWebPageUrl"] {
         if let Some(v) = object.get(key) {
             let url = v
                 .as_str()
@@ -261,6 +261,7 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
         "subscriptionShowCopy",
         "subscriptionShowSupport",
         "subscriptionShowDevices",
+        "subscriptionProfileWebPageEnabled",
     ] {
         if let Some(v) = object.get(key)
             && !v.is_boolean()
@@ -327,6 +328,16 @@ mod tests {
         assert!(!accepts(
             &json!({"subscriptionSupportUrl":"http://example.com"})
         ));
+        assert!(accepts(&json!({"subscriptionProfileWebPageEnabled": true})));
+        assert!(accepts(&json!({"subscriptionProfileWebPageEnabled": false})));
+        assert!(!accepts(&json!({"subscriptionProfileWebPageEnabled": "on"})));
+        assert!(accepts(&json!({"subscriptionProfileWebPageUrl": ""})));
+        assert!(accepts(&json!({"subscriptionProfileWebPageUrl": "https://account.example.org/me"})));
+        for url in ["http://example.org", "javascript:alert(1)",
+            "https://user:pass@host.example.org", "https://host.example.org:444/",
+            "https://host.example.org/abc\r\nx-bad: value"] {
+            assert!(!accepts(&json!({"subscriptionProfileWebPageUrl":url})));
+        }
         assert!(accepts(&json!({"subscriptionRadius":29})));
         assert!(accepts(&json!({"subscriptionRadius":36})));
         assert!(!accepts(&json!({"subscriptionRadius":0})));
