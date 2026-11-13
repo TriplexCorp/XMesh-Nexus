@@ -1260,28 +1260,57 @@ async function main() {
         await navigate(route);
         const g = await geometry(page);
         if(route==='statistics'){
+          // Navigation only confirms the view shell. Node metrics arrive from an
+          // independent asynchronous request; do not measure its counter while
+          // it is still empty rather than reporting a real filtered/total count.
+          await page.waitForFunction(()=>{
+            const nodeCount=document.querySelector('#stats-node-count');
+            return nodeCount && /^\d+ (?:из|of) \d+$/.test(nodeCount.textContent.trim());
+          },null,{timeout:15000});
           const toolbar=await page.locator('.stats-nodes-toolbar').evaluate(root=>{
             const rect=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,centerY:r.y+r.height/2}};
             const search=root.querySelector('.stats-node-search'),input=root.querySelector('#stats-node-search');
             const filter=root.querySelector('.xm-select-shell')||root.querySelector('#stats-node-filter');
             const toggle=root.querySelector('.stats-node-view-toggle'),count=root.querySelector('#stats-node-count');
+            const actions=root.querySelector('.stats-node-toolbar-actions');
             return {outer:rect(root),search:rect(search),filter:rect(filter),toggle:rect(toggle),count:rect(count),
-              toggleButtons:[...toggle.querySelectorAll('button')].map(rect),
+              actions:rect(actions),toggleButtons:[...toggle.querySelectorAll('button')].map(rect),
+              outerBorder:getComputedStyle(root).borderTopWidth,
+              toggleBorder:getComputedStyle(toggle).borderTopWidth,
+              countBorder:getComputedStyle(count).borderTopWidth,
+              countText:count.textContent.trim(),
               wrap:getComputedStyle(root).flexWrap,inputBorder:getComputedStyle(input).borderTopWidth,
               inputShadow:getComputedStyle(input).boxShadow};
           });
           assert.equal(toolbar.inputBorder,'0px','Statistics search must not draw a second pill border');
           assert.equal(toolbar.inputShadow,'none','Statistics search must not have a second shadow');
+          assert.equal(toolbar.outerBorder,'0px','Statistics toolbar must not draw an enclosing capsule');
+          assert.equal(toolbar.toggleBorder,'0px','Statistics segmented switch must not have a thick outer border');
+          assert.equal(toolbar.countBorder,'0px','Statistics node count must remain unboxed');
+          assert(/^\d+ (?:из|of) \d+$/.test(toolbar.countText),
+            'Node count must be a compact number, e.g. 3 из 3');
           assert.equal(toolbar.toggleButtons.length,2,'Statistics must offer both grid and list views');
           for(const button of toolbar.toggleButtons){
             assert(button.x>=toolbar.toggle.x-1&&button.right<=toolbar.toggle.right+1&&
               button.y>=toolbar.toggle.y-1&&button.bottom<=toolbar.toggle.bottom+1,
               'Statistics grid/list button escapes its segmented track at '+width+'px');
           }
-          for(const part of ['search','filter','toggle','count']){
+          for(const part of ['search','filter','toggle','count','actions']){
             const r=toolbar[part],outer=toolbar.outer;
             assert(r.x>=outer.x-2&&r.right<=outer.right+2,
               'Statistics toolbar '+part+' escapes horizontal bounds at '+width+'px');
+          }
+          const statusPlacement=await page.locator('.stats-node').evaluateAll(cards=>cards.map(card=>{
+            const state=card.querySelector('.stats-node-state');
+            const head=card.querySelector('.stats-node-head');
+            const time=card.querySelector('.stats-node-time');
+            const bounds=el=>{const r=el.getBoundingClientRect();return {x:r.x,right:r.right,y:r.y,bottom:r.bottom}};
+            return {card:bounds(card),head:bounds(head),state:bounds(state),time:bounds(time)};
+          }));
+          for(const entry of statusPlacement){
+            assert(entry.state.x>=entry.head.x-1&&entry.state.right<=entry.head.right+1&&
+              entry.state.y>=entry.head.y-1&&entry.state.bottom<=entry.head.bottom+1,
+              'Freshness belongs inside its node card header, not under the statistics toolbar');
           }
           if(width>=1366){
             assert.equal(toolbar.wrap,'nowrap','Desktop Statistics toolbar must be a single row');

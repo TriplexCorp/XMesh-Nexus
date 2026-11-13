@@ -306,6 +306,23 @@ rejects(app,/\['CPU',statsValue\(ok\?v\.cpuPercent:null,'%'/,'Do not repeat CPU 
 // Node controls share ONE toolbar (including the count), with enhanced-select geometry.
 matches(app,/class="stats-nodes-toolbar" role="toolbar"/);
 matches(app,/id="stats-node-count" class="stats-node-count" role="status"/);
+
+matches(app,/class="stats-node-toolbar-actions"/);
+matches(app,/count\.textContent=visible\.length\+\(panelIsEnglish\(\)\?' of ':' из '\)\+statsNodeRows\.length/,
+ 'Compact node counter must read N of M, without the decorative "Shown:" label');
+matches(css,/\.stats-nodes-section \.stats-nodes-toolbar\s*\{[^}]*border:0;border-radius:0;background:transparent/,
+ 'Statistics toolbar must not have its own bordered capsule');
+matches(css,/\.stats-nodes-section \.stats-node-toolbar-actions\s*\{[^}]*justify-content:flex-end/,
+ 'Filter, segmented switch and count must form one right-side action group');
+matches(css,/\.stats-nodes-section \.stats-node-view-toggle\s*\{[^}]*border:0/,
+ 'View toggle rail must not have a thick outline');
+matches(css,/\.stats-nodes-section \.stats-node-count\s*\{[^}]*border:0;background:transparent/,
+ 'Displayed/total count must be muted plain text, not another box');
+matches(css,/\.stats-nodes-section \.stats-node-head\s*\{[^}]*display:grid/,
+ 'Each node header has its own compact status grid');
+matches(css,/\.stats-node-state\s*\{[^}]*grid-row:1 \/ 3/,
+ 'Freshness remains pinned inside its own node header');
+
 assert(app.indexOf('id="stats-node-count"')<app.indexOf('id="stats-nodes"'), 'Count must precede the node grid');
 rejects(app,/class="stats-nodes-summary"/, 'Count must not create a second row');
 matches(css,/\.stats-nodes-section \.stats-nodes-toolbar\s*\{[\s\S]*?flex-wrap:nowrap/);
