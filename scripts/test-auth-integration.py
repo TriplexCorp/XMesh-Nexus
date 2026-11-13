@@ -141,8 +141,8 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
         "allUsers": False,
         "allowedUserIds": [user_id],
     }
-    check(api("POST", "/integration-tokens", dict(issuance), owner_cookie)[0],
-          401, "token issuance needs one-time owner factor")
+    check(api("POST", "/integration-tokens", {**issuance, "mfaCode": ""}, owner_cookie)[0],
+          401, "token issuance needs a valid one-time owner factor")
     factor, step1 = next_unused_totp(secret, int(time.time() // 30))
     first = {**issuance, "mfaCode": factor}
     status, issued, _ = api("POST", "/integration-tokens", first, owner_cookie)
