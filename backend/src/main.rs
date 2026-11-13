@@ -1,9 +1,9 @@
 mod admin_accounts;
 mod auth;
-mod integration_api;
 mod cdn_quota;
 mod client_routing;
 mod core;
+mod integration_api;
 mod mfa;
 mod node_address_unique;
 mod node_auth;
