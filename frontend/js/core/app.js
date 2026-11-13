@@ -5197,6 +5197,14 @@ async function setP(){
   // rules and the original per-feature lifecycle/mounting logic.
   const embedded=settingsPage==='security'?securityP():
     settingsPage==='admins'?await simple(['admins']):null;
+  const adminRoleGuide=settingsPage==='admins'?`<aside class="settings-admin-role-guide" aria-label="Роли и уровни доступа">
+    <div class="appearance-card-heading"><h3>Роли доступа</h3><small>Подсказка к действующим ролям администраторов</small></div>
+    <div class="settings-admin-role-grid">
+      <div><b>Владелец</b><p>Управление настройками панели, обновлениями и другими администраторами.</p></div>
+      <div><b>Администратор</b><p>Работа с разрешёнными разделами управления без полномочий владельца.</p></div>
+      <div><b>Наблюдатель</b><p>Просмотр доступных данных без права изменять конфигурацию.</p></div>
+    </div>
+  </aside>`:'';
   const focusItems=SETTINGS_FOCUS_GROUPS[settingsPage]||[];
   const focusGroup=focusItems.length?settingsFocusForPage(settingsPage):null;
   const activeCards=selected.filter(card=>!focusGroup||card.dataset.settingsGroup===focusGroup);
@@ -5231,7 +5239,7 @@ async function setP(){
     </div>
     <div class="settings-center-main" id="settings-subpage" role="region" aria-label="${title}" data-settings-section="${settingsPage}" data-single="${activeCards.length<=1}">
       ${focusMarkup}
-      ${embedded?`<div class="settings-center-embedded" data-settings-group="${settingsPage}">${embedded[0]}</div>`:`
+      ${embedded?`<div class="settings-center-embedded" data-settings-group="${settingsPage}">${embedded[0]}${adminRoleGuide}</div>`:`
       <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${activeCards.length<=1}">
         <div class="appearance-column workspace-stack" ${activeColumns[0]?'':'hidden'}>${columns[0].join('')}</div>
         ${columns[1].length?'<div class="appearance-column workspace-stack" '+(activeColumns[1]?'':'hidden')+'>'+columns[1].join('')+'</div>':''}
