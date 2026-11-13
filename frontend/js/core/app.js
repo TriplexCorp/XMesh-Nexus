@@ -5071,7 +5071,7 @@ async function setP(){
       <div class="palette-draft-actions"><button class="gh sm" type="button" id="palette-cancel">Отмена</button><button class="btn" type="button" id="palette-apply">Применить палитру</button></div>
     </section>
     <section class="card sg settings-palette-gallery" data-settings-group="colors">
-      <div class="appearance-card-heading"><h3>Готовые палитры</h3><small>Выбор сразу применяется ко всей панели. Свой вариант — слева.</small></div>
+      <div class="appearance-card-heading"><h3>Готовые палитры</h3><small>Выбор сразу применяется ко всей панели. Свой вариант — в редакторе.</small></div>
       <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
       <div class="settings-theme-specimen" aria-label="Пример компонентов интерфейса" role="img">
         <div class="settings-specimen-head"><span class="settings-specimen-mark"></span><span><b>Предпросмотр интерфейса</b><small>Действующая тема и выбранный акцент</small></span><span class="settings-specimen-chip">Активно</span></div>
@@ -5144,13 +5144,18 @@ async function setP(){
   ${ownerUpdates?`<div class="card" id="panel-update-card" data-settings-group="system">
     <div class="hd"><div><h3>Обновление XMesh Nexus</h3><p>Обновление панели из GitHub main с резервной копией PostgreSQL и пересборкой Docker.</p></div><span class="chip">Owner</span></div>
     <p class="note">Во время обновления панель будет временно недоступна.</p>
+    <div class="settings-update-outline"><span><b>1</b> Резервная копия PostgreSQL</span><span><b>2</b> Получение и проверка кода</span><span><b>3</b> Пересборка Docker и перезапуск</span></div>
     <div class="update-action-row"><button type="button" class="gh" data-panel-update-status>Проверить состояние</button><button type="button" class="btn" data-panel-update>Обновить панель</button></div>
     <div class="history-placeholder" id="panel-update-message" role="status" aria-live="polite">${esc(panelUpdateView.error||panelUpdateStatusText(panelUpdateView.status))}</div>
   </div>`:''}
-  <div class="card" data-settings-group="data"><div class="hd"><div><h3>Экспорт данных панели</h3><p>JSON-снимок текущих коллекций. Это не дамп PostgreSQL и не механизм восстановления базы.</p></div><button class="gh" id="gx">${ic('dl')}Скачать JSON-снимок</button></div><p class="note">Экспорт может содержать конфиденциальные данные. Для полного восстановления используйте резервное копирование PostgreSQL на сервере.</p></div>
+  <div class="card" data-settings-group="data"><div class="hd"><div><h3>Экспорт данных панели</h3><p>JSON-снимок текущих коллекций. Это не дамп PostgreSQL и не механизм восстановления базы.</p></div><button class="gh" id="gx">${ic('dl')}Скачать JSON-снимок</button></div><p class="note">Экспорт может содержать конфиденциальные данные. Для полного восстановления используйте резервное копирование PostgreSQL на сервере.</p>
+    <div class="settings-data-summary"><div><b>Коллекции и настройки</b><small>Входит в JSON-снимок интерфейса</small></div><div><b>PostgreSQL и журналы</b><small>Не входят: требуется отдельный серверный бэкап</small></div></div>
+    <a class="settings-inline-route" href="#tools">${ic('wrench')} Открыть диагностику ${ic('chevron-right')}</a></div>
   <section class="card sg" data-settings-group="data"><div class="appearance-card-heading"><h3>Перенос оформления</h3><small>Экспорт и импорт персональной темы, плотности и остальных параметров интерфейса.</small></div>
     <div class="settings-personal-data-actions"><button class="gh" type="button" data-appearance-export>Скачать оформление JSON</button><label class="f"><span>Импортировать оформление JSON</span><input type="file" id="appearance-import" accept=".json,application/json" aria-label="Импортировать оформление JSON"></label></div>
     <p class="note">Файл оформления не содержит пользователей, токенов и настроек сервера. При импорте текущие параметры браузера заменяются.</p>
+    <div class="settings-data-summary"><div><b>Сохраняется</b><small>Цветовая тема, шрифты, плотность, ширина, эффекты</small></div><div><b>Не переносится</b><small>Учётные записи, трафик, ключи и серверные политики</small></div></div>
+    <a class="settings-inline-route" href="#set/appearance">${ic('sun')} Перейти к оформлению ${ic('chevron-right')}</a>
   </section>
 </div></div>`;
   // The HTML template is never mounted. Only the active page's original cards
@@ -5188,13 +5193,16 @@ async function setP(){
   const focusItems=SETTINGS_FOCUS_GROUPS[settingsPage]||[];
   const focusGroup=focusItems.length?settingsFocusForPage(settingsPage):null;
   const activeCards=selected.filter(card=>!focusGroup||card.dataset.settingsGroup===focusGroup);
-  const columns=[[],[]];
+  const columns=[[],[]],activeColumns=[false,false];
   selected.forEach((card,index)=>{
-    if(focusGroup&&card.dataset.settingsGroup!==focusGroup)card.hidden=true;
-    columns[index%2].push(card.outerHTML);
+    const visible=!focusGroup||card.dataset.settingsGroup===focusGroup;
+    if(!visible)card.hidden=true;
+    // The traffic policy belongs below the compact panel update controls,
+    // not below the already taller Xray-core form. Keep both columns useful.
+    const column=settingsPage==='system'&&card.dataset.settingsGroup==='traffic'&&selected.length>1?1:index%2;
+    columns[column].push(card.outerHTML);
+    if(visible)activeColumns[column]=true;
   });
-  const activeColumns=columns.map((_,index)=>selected.some((card,cardIndex)=>
-    cardIndex%2===index&&(!focusGroup||card.dataset.settingsGroup===focusGroup)));
   const focusMarkup=focusItems.length>1?
     `<div class="settings-focus-bar" role="group" aria-label="${panelIsEnglish()?'Settings groups':'Группы настроек'}">
       ${focusItems.map(([key,ru,en])=>`<button type="button" data-settings-focus="${key}" class="${key===focusGroup?'is-active':''}" aria-pressed="${key===focusGroup?'true':'false'}">${panelIsEnglish()?en:ru}</button>`).join('')}
