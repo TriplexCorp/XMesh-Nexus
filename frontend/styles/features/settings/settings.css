@@ -342,3 +342,303 @@ html[data-toast-position=right] #xmesh-feedback-toast[popover]:not(.toast-below-
 #view .settings-workspace .settings-center-rail{max-width:100%;overflow-x:auto;overflow-y:hidden}
 #view .settings-workspace .settings-center-nav{display:flex;flex-flow:row nowrap;white-space:nowrap;width:max-content;min-width:max-content;align-items:center}
 #view .settings-workspace .settings-center-nav>.settings-center-link{flex:0 0 auto;white-space:nowrap}
+
+
+/* Settings composition audit: replace mismatched half-empty columns with
+   useful functional guidance and component specimens. No duplicate controls,
+   invented telemetry, permanent sidebar, or forced equal-height cards. */
+.settings-workspace .settings-center-grid .card{min-width:0}
+.settings-workspace .settings-center-grid .settings-mini-heading{
+ display:grid;gap:.2rem;min-width:0;margin:.7rem 0 .4rem;padding-top:.7rem;
+ border-top:1px solid var(--nx-separator)
+}
+.settings-workspace .settings-center-grid .settings-mini-heading b{
+ font-size:.91rem;line-height:1.35;font-weight:730;color:var(--tx)
+}
+.settings-workspace .settings-center-grid .settings-mini-heading small{
+ font-size:.79rem;line-height:1.45;color:var(--mu)
+}
+/* Make color tiles readable rather than four miniature columns. */
+.settings-workspace .settings-center-grid .settings-palette-gallery .appearance-preset-row{
+ display:block;min-width:0
+}
+.settings-workspace .settings-center-grid .settings-palette-gallery .appearance-preset-row>.setting-copy{
+ margin:.45rem 0 .7rem
+}
+.settings-workspace .settings-palette-gallery .palette-preset-grid{
+ grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem
+}
+.settings-workspace .settings-center-grid .settings-palette-gallery .palette-preset{
+ display:grid;min-height:3.6rem;gap:.4rem;padding:.48rem;
+ border:1px solid var(--nx-border);background:var(--nx-control-bg);
+ text-align:left;transition:background-color var(--nx-duration),border-color var(--nx-duration)
+}
+.settings-workspace .settings-center-grid .settings-palette-gallery .palette-preset:focus-visible{
+ outline:2px solid var(--nx-focus);outline-offset:2px
+}
+.settings-workspace .settings-center-grid .settings-palette-gallery .palette-preset.on{
+ border-color:var(--nx-selected-border);background:var(--nx-selected-bg)
+}
+.settings-workspace .settings-center-grid .settings-palette-gallery .palette-preset-demo{
+ height:1.55rem;border-radius:calc(var(--nx-control-radius)*.65)
+}
+.settings-workspace .settings-palette-gallery .palette-preset-foot{
+ font-size:.78rem;line-height:1.3;font-weight:670
+}
+.settings-workspace .settings-palette-gallery .palette-preset-tick{
+ width:1rem;height:1rem
+}
+/* Actual theme specimen: structural chips, fields, and accents, not dummy
+   buttons suggesting unsaved actions. CSS variables follow applied theme. */
+.settings-workspace .settings-theme-specimen{
+ display:grid;gap:.75rem;min-width:0;margin-top:.85rem;padding:.95rem;
+ border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);
+ background:var(--nx-section-bg)
+}
+.settings-workspace .settings-specimen-head{
+ display:flex;align-items:center;gap:.7rem;min-width:0
+}
+.settings-workspace .settings-specimen-head>span:nth-child(2){
+ display:grid;gap:.15rem;min-width:0;flex:1 1 auto
+}
+.settings-workspace .settings-specimen-head b{font-size:.89rem;line-height:1.3}
+.settings-workspace .settings-specimen-head small{font-size:.74rem;color:var(--mu);line-height:1.35}
+.settings-workspace .settings-specimen-mark{
+ display:block;flex:none;width:2.2rem;height:2.2rem;
+ border:1px solid color-mix(in srgb,var(--a) 38%,var(--nx-border));
+ border-radius:.65rem;background:color-mix(in srgb,var(--a) 18%,var(--nx-panel-bg))
+}
+.settings-workspace .settings-specimen-chip{
+ padding:.28rem .55rem;border:1px solid color-mix(in srgb,var(--a) 45%,var(--nx-border));
+ border-radius:999px;background:color-mix(in srgb,var(--a) 11%,var(--nx-panel-bg));
+ font-size:.72rem;font-weight:700;color:var(--a);white-space:nowrap
+}
+.settings-workspace .settings-specimen-content{
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.92fr);
+ gap:.5rem;min-width:0
+}
+.settings-workspace .settings-specimen-content>span{
+ display:flex;align-items:center;justify-content:center;min-width:0;min-height:2.45rem;
+ padding:.48rem .6rem;border-radius:var(--ui-control-radius);
+ font-size:.79rem;line-height:1.3;font-weight:650;text-align:center
+}
+.settings-workspace .settings-specimen-field{
+ grid-column:1/-1;justify-content:flex-start!important;
+ border:1px solid var(--nx-border);background:var(--nx-control-bg);
+ color:var(--mu)
+}
+.settings-workspace .settings-specimen-primary{background:var(--a);color:var(--bg)}
+.settings-workspace .settings-specimen-secondary{border:1px solid var(--nx-border);color:var(--tx)}
+.settings-workspace .settings-specimen-foot{display:flex;gap:.5rem;align-items:center;color:var(--mu);font-size:.75rem;line-height:1.4}
+.settings-workspace .settings-specimen-foot i{display:block;width:.6rem;height:.6rem;border-radius:50%;background:var(--a);flex:none}
+/* Live layout example inherits density, corner radius, surfaces and gaps. */
+.settings-workspace .settings-layout-specimen{
+ display:grid;gap:clamp(.5rem,var(--view-gap),1.3rem);
+ padding:.85rem;min-width:0;border:1px solid var(--nx-border);
+ border-radius:var(--nx-card-radius);background:var(--nx-section-bg)
+}
+.settings-workspace .settings-layout-hero{
+ display:flex;align-items:center;gap:.6rem;padding:.6rem;
+ border:1px solid var(--nx-border);background:var(--nx-panel-bg);
+ border-radius:var(--ui-radius);min-width:0
+}
+.settings-workspace .settings-layout-hero>i{
+ display:block;flex:none;width:2rem;height:2rem;border-radius:var(--ui-control-radius);
+ background:color-mix(in srgb,var(--a) 18%,var(--nx-panel-bg));
+ border:1px solid color-mix(in srgb,var(--a) 28%,var(--nx-border))
+}
+.settings-workspace .settings-layout-hero>span{display:grid;gap:.2rem;min-width:0}
+.settings-workspace .settings-layout-hero b,.settings-workspace .settings-layout-samples b{
+ color:var(--tx);font-size:.82rem;line-height:1.3
+}
+.settings-workspace .settings-layout-hero small{font-size:.73rem;line-height:1.3;color:var(--mu)}
+.settings-workspace .settings-layout-samples{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:clamp(.4rem,calc(var(--view-gap)*.6),.95rem);min-width:0
+}
+.settings-workspace .settings-layout-samples>div{
+ display:grid;align-content:start;gap:.48rem;min-width:0;min-height:5.3rem;
+ padding:.75rem .6rem;background:var(--nx-panel-bg);
+ border:1px solid var(--nx-border);border-radius:var(--ui-radius)
+}
+.settings-workspace .settings-layout-samples span{
+ display:block;width:100%;height:.3rem;background:var(--nx-border);
+ border-radius:999px
+}
+.settings-workspace .settings-layout-samples span:last-child{width:67%;background:var(--a)}
+/* Typographic specimen uses the real font, scale and numerical preferences. */
+.settings-workspace .settings-type-specimen .settings-type-sample{
+ display:grid;gap:.62rem;padding:1rem;border:1px solid var(--nx-border);
+ border-radius:var(--nx-card-radius);background:var(--nx-section-bg);min-width:0
+}
+.settings-workspace .settings-type-sample strong{font-size:1.24rem;letter-spacing:-.025em;line-height:1.3}
+.settings-workspace .settings-type-sample p{margin:0;color:var(--mu);font-size:.89rem}
+.settings-workspace .settings-type-sample>div{display:flex;flex-wrap:wrap;gap:.5rem}
+.settings-workspace .settings-type-sample>div>span{
+ display:inline-flex;align-items:center;padding:.4rem .65rem;
+ border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);
+ background:var(--nx-panel-bg);font-variant-numeric:tabular-nums;font-size:.91rem;font-weight:730
+}
+.settings-workspace .settings-type-link{color:var(--a);font-size:.86rem;font-weight:650}
+html[data-link-style=underline] .settings-workspace .settings-type-link{
+ text-decoration:underline;text-underline-offset:.15em
+}
+/* Contextual links lead to real existing editors. No duplicate forms. */
+.settings-workspace .settings-feature-links{
+ display:grid;gap:.3rem;min-width:0;margin-top:.25rem
+}
+.settings-workspace .settings-feature-links a{
+ display:flex;align-items:center;gap:.7rem;min-width:0;
+ padding:.68rem .75rem;color:var(--tx);text-decoration:none;
+ border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);
+ background:var(--nx-section-bg);transition:background-color var(--nx-duration)
+}
+.settings-workspace .settings-feature-links a:hover{background:var(--nx-hover-bg)}
+.settings-workspace .settings-feature-links a:focus-visible{
+ outline:2px solid var(--nx-focus);outline-offset:2px
+}
+.settings-workspace .settings-feature-links a>.ic:first-child{
+ width:1.1rem;height:1.1rem;flex:none;color:var(--a)
+}
+.settings-workspace .settings-feature-links a>.ic:last-child{
+ width:.95rem;height:.95rem;flex:none;margin-left:auto;color:var(--mu);
+ transform:rotate(-90deg)
+}
+.settings-workspace .settings-feature-links a>span{
+ display:grid;gap:.1rem;min-width:0
+}
+.settings-workspace .settings-feature-links a b{font-size:.84rem;line-height:1.3}
+.settings-workspace .settings-feature-links a small{font-size:.75rem;line-height:1.4;color:var(--mu)}
+/* Live notification sample and backend-derived webhook enabled count. */
+.settings-workspace .settings-notification-test{align-content:start}
+.settings-workspace .settings-notification-example{
+ display:flex;align-items:center;gap:.7rem;margin-top:.3rem;padding:1rem;
+ border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);
+ background:var(--nx-section-bg);min-width:0
+}
+.settings-workspace .settings-notification-icon{
+ display:grid;place-items:center;flex:0 0 2.65rem;width:2.65rem;height:2.65rem;
+ border-radius:var(--ui-control-radius);
+ background:color-mix(in srgb,var(--a) 15%,var(--nx-panel-bg));color:var(--a)
+}
+.settings-workspace .settings-notification-example>div{display:grid;gap:.3rem;min-width:0}
+.settings-workspace .settings-notification-example b{font-size:.93rem}
+.settings-workspace .settings-notification-example small{font-size:.79rem;color:var(--mu);line-height:1.4}
+.settings-workspace .settings-notification-trigger{
+ justify-self:start;min-height:2.55rem
+}
+.settings-workspace .settings-notification-summary{
+ display:flex;justify-content:space-between;align-items:center;gap:.75rem;
+ min-width:0;padding:.75rem 0;border-top:1px solid var(--nx-separator);
+ font-size:.83rem;color:var(--mu)
+}
+.settings-workspace .settings-notification-summary b{
+ padding:.27rem .55rem;border:1px solid var(--nx-border);
+ border-radius:999px;font-variant-numeric:tabular-nums;color:var(--tx);white-space:nowrap
+}
+.settings-workspace .settings-update-outline{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:.5rem;padding:.4rem 0
+}
+.settings-workspace .settings-update-outline>span{
+ display:flex;align-items:center;gap:.5rem;min-width:0;
+ padding:.65rem .55rem;border:1px solid var(--nx-border);
+ border-radius:var(--nx-control-radius);background:var(--nx-section-bg);
+ font-size:.77rem;line-height:1.35
+}
+.settings-workspace .settings-update-outline b{
+ display:grid;place-items:center;flex:none;width:1.45rem;height:1.45rem;
+ border-radius:.45rem;color:var(--a);
+ background:color-mix(in srgb,var(--a) 13%,var(--nx-panel-bg))
+}
+.settings-workspace .settings-data-summary{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:.65rem;margin-top:.65rem;padding-top:.75rem;border-top:1px solid var(--nx-separator)
+}
+.settings-workspace .settings-data-summary>div{
+ display:grid;align-content:start;gap:.28rem;min-width:0;padding:.85rem;
+ border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);
+ background:var(--nx-section-bg)
+}
+.settings-workspace .settings-data-summary b{font-size:.88rem;line-height:1.3}
+.settings-workspace .settings-data-summary small{
+ color:var(--mu);font-size:.78rem;line-height:1.45
+}
+.settings-workspace .settings-inline-route{
+ display:inline-flex;align-items:center;gap:.5rem;justify-self:start;
+ padding:.6rem .1rem;color:var(--a);font-size:.83rem;font-weight:700;
+ text-decoration:none
+}
+.settings-workspace .settings-inline-route .ic{width:1rem;height:1rem}
+.settings-workspace .settings-inline-route .ic:last-child{transform:rotate(-90deg)}
+.settings-workspace .settings-inline-route:focus-visible{
+ outline:2px solid var(--nx-focus);outline-offset:2px
+}
+/* Don't require any comparison card to stretch unnaturally to screen height. */
+@container appearance-card (max-width:30rem){
+ .settings-workspace .settings-palette-gallery .palette-preset-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr))
+ }
+ .settings-workspace .settings-update-outline{grid-template-columns:minmax(0,1fr)}
+}
+@container appearance-card (max-width:24rem){
+ .settings-workspace .settings-layout-samples{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .settings-workspace .settings-data-summary{grid-template-columns:minmax(0,1fr)}
+}
+@media(prefers-reduced-motion:reduce){
+ .settings-workspace .settings-feature-links a,
+ .settings-workspace .settings-palette-gallery .palette-preset{transition:none}
+}
+
+
+/* Security and Administrators keep their existing API owners and permissions:
+   the workspace provides useful navigation/context, not simulated toggles. */
+.settings-workspace .settings-security-routes{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:.7rem;margin:1rem 0;min-width:0
+}
+.settings-workspace .settings-security-routes a{
+ display:grid;grid-template-columns:auto minmax(0,1fr);gap:.25rem .65rem;
+ align-content:start;min-width:0;padding:.9rem;color:var(--tx);
+ text-decoration:none;border:1px solid var(--nx-border);
+ border-radius:var(--nx-card-radius);background:var(--nx-section-bg)
+}
+.settings-workspace .settings-security-routes a:hover{background:var(--nx-hover-bg)}
+.settings-workspace .settings-security-routes a:focus-visible{
+ outline:2px solid var(--nx-focus);outline-offset:2px
+}
+.settings-workspace .settings-security-routes a>span{
+ display:grid;place-items:center;grid-row:1/3;
+ width:2rem;height:2rem;border-radius:.6rem;
+ background:color-mix(in srgb,var(--a) 12%,var(--nx-panel-bg));
+ color:var(--a);font-size:.82rem;font-weight:750
+}
+.settings-workspace .settings-security-routes b{
+ font-size:.89rem;line-height:1.3
+}
+.settings-workspace .settings-security-routes small{
+ color:var(--mu);font-size:.79rem;line-height:1.45
+}
+.settings-workspace .settings-admin-role-guide{
+ display:grid;gap:.85rem;min-width:0;padding:var(--nx-card-pad);
+ border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);
+ background:var(--nx-panel-bg)
+}
+.settings-workspace .settings-admin-role-grid{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem
+}
+.settings-workspace .settings-admin-role-grid>div{
+ display:grid;align-content:start;gap:.35rem;min-width:0;
+ padding:1rem;border:1px solid var(--nx-border);
+ border-radius:var(--nx-control-radius);background:var(--nx-section-bg)
+}
+.settings-workspace .settings-admin-role-grid b{font-size:.9rem}
+.settings-workspace .settings-admin-role-grid p{
+ margin:0;font-size:.79rem;line-height:1.55;color:var(--mu)
+}
+@container settings-workspace (max-width:56rem){
+ .settings-workspace .settings-security-routes,
+ .settings-workspace .settings-admin-role-grid{
+  grid-template-columns:minmax(0,1fr)
+ }
+}

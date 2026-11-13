@@ -410,6 +410,51 @@ async function main() {
       await screenshot(page,'settings-composition-compact-mobile');
     });
 
+    await checked('Settings audit: palette columns, real previews, links and notification testing',async()=>{
+      await page.setViewportSize({width:1440,height:900});
+      await navigate('set/colors');
+      assert.equal(await page.locator('.settings-palette-gallery [data-ac]').count(),24,
+        'All 24 working accent presets must stay accessible after redistribution');
+      assert.equal(await page.locator('#custom-a').count(),1);
+      assert.equal(await page.locator('#hue').count(),1);
+      assert.equal(await page.locator('#palette-apply').count(),1);
+      const result=await page.evaluate(()=>{
+        const root=document.querySelector('#settings-subpage');
+        const visible=node=>node.getClientRects().length>0;
+        const columns=[...root.querySelectorAll('.appearance-column')].filter(visible);
+        return {columns:columns.length,heights:columns.map(node=>node.getBoundingClientRect().height),
+          specimen:visible(root.querySelector('.settings-theme-specimen')),
+          scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth};
+      });
+      assert.equal(result.columns,2,'Colors need two useful real columns');
+      assert(result.specimen,'The selected theme should have a specimen inside the gallery');
+      assert(result.scrollWidth<=result.viewport+1,'Palette gallery must not overflow horizontally');
+      assert(Math.min(...result.heights)>=Math.max(...result.heights)*.44,
+        'Color cards must no longer leave a mostly empty companion column');
+      await screenshot(page,'settings-colors-rebalanced-desktop');
+      await navigate('set/layout');
+      assert(await page.locator('.settings-layout-specimen').isVisible());
+      await navigate('set/typography');
+      assert(await page.locator('.settings-type-specimen').isVisible());
+      await navigate('set/integrations');
+      await page.locator('[data-settings-test-toast]').click();
+      assert.match(await page.locator('#xmesh-feedback-toast').innerText(),/Тестовое уведомление|Test notification/);
+      assert(await page.locator('[data-hook-count]').isVisible());
+      await navigate('set/general');
+      assert.equal(await page.locator('.settings-feature-links a[href="#subscription"]').count(),1);
+      await navigate('set/data');
+      assert.equal(await page.locator('.settings-data-summary').count(),2);
+      await navigate('set/system');
+      assert(await page.locator('.settings-update-outline').count()>0);
+      await page.setViewportSize({width:390,height:844});
+      await navigate('set/colors');
+      const mobile=await page.evaluate(()=>({viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,
+        presetWidth:document.querySelector('.settings-palette-gallery')?.getBoundingClientRect().width||0}));
+      assert(mobile.documentWidth<=mobile.viewport+1,'Narrow palette page must not horizontally scroll');
+      assert(mobile.presetWidth>200,'Preset gallery must remain usable on phone width');
+      await screenshot(page,'settings-colors-rebalanced-mobile');
+    });
+
     await checked('Settings compact groups: no blank column, real controls and retained drafts',async()=>{
       await page.setViewportSize({width:1920,height:1080});
       const grouped={

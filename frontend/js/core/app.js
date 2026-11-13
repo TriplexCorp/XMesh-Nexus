@@ -4978,7 +4978,14 @@ function securityP(){
       <section class="card security-center-information security-audit"><header class="security-audit-head"><div><h3>Журнал безопасности</h3><p>Последние 100 записей серверного аудита. Доступно только владельцу панели.</p></div><button class="gh" type="button" data-security-audit-refresh>Обновить</button></header><label class="security-audit-search">Поиск по действию и администратору <input type="search" data-security-audit-search placeholder="Например, security.session"></label><div class="security-audit-list" id="security-audit-list" role="status" aria-live="polite">Откройте вкладку, чтобы загрузить журнал.</div></section>
     </div>
     <div class="security-center-pane" id="security-pane-infra" role="tabpanel" aria-labelledby="security-tab-infra" data-security-pane="infra" hidden>
-      <section class="card security-center-information"><h3>Защита инфраструктуры</h3><p>Для безопасного управления токенами, сетевыми ограничениями и настройками TLS необходимы серверные проверки и контроль прав. Неактивные механизмы не показываются как включённые.</p><div class="security-future-list"><span>IP allowlist для админов <em>Требует API</em></span><span>Политика API-токенов <em>Требует API</em></span><span>Проверка HTTPS и заголовков <em>Требует API</em></span></div></section>
+      <section class="card security-center-information"><h3>Безопасность инфраструктуры</h3><p>Операционные проверки доступны в действующих разделах. Отключённые или ещё не реализованные механизмы не показываются как активные.</p>
+      <div class="settings-security-routes">
+        <a href="#nodes"><span>01</span><b>Узлы и агенты</b><small>Состояние узлов, версии и доверенные соединения</small></a>
+        <a href="#tools"><span>02</span><b>Диагностика</b><small>Проверка доступности и состояния служб</small></a>
+        <a href="#set/data"><span>03</span><b>Данные</b><small>Экспорт интерфейса и рекомендации по резервному копированию</small></a>
+      </div>
+      <p class="note">IP allowlist, управление API-токенами и автоматический аудит TLS пока требуют серверной реализации. Здесь нет неработающих переключателей.</p>
+    </section>
     </div>
   </div>`];
 }
@@ -5087,7 +5094,13 @@ async function setP(){
     ['tropical','#4ed5bc','#f6c787','Тропики']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}" aria-pressed="${(C[key]||CDEFAULT[key])==v?'true':'false'}">${l}</button>`).join('')}</div>`;
-  const tk=`<section class="card" data-settings-group="integrations"><div class="hd"><div><h3>API-токены</h3><p>Выдача API-токенов для интеграций ещё не реализована.</p></div></div><p class="note">Не создавайте токены через этот раздел: безопасность доступа к API будет добавлена отдельным этапом.</p></section>`;
+  const tk=`<section class="card settings-notification-test" data-settings-group="integrations">
+    <div class="appearance-card-heading"><h3>Проверка уведомлений</h3><small>Здесь можно проверить настоящие всплывающие сообщения панели.</small></div>
+    <div class="settings-notification-example"><span class="settings-notification-icon">${ic('bell')}</span><div><b>Тестовое сообщение</b><small>Положение и длительность задаются в соседнем блоке.</small></div></div>
+    <button type="button" class="gh settings-notification-trigger" data-settings-test-toast>${ic('bell')} Показать уведомление</button>
+    <div class="settings-notification-summary"><span>Событий вебхуков включено</span><b data-hook-count>${Object.values(DB.set.hooks||{}).filter(Boolean).length} / ${Object.keys(DB.set.hooks||{}).length}</b></div>
+    <p class="note">Тест показывает сообщение в этом браузере и не отправляет запрос во внешний сервис. API-токены здесь не создаются.</p>
+  </section>`;
   const settingsPage=settingsPageFromHash();
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
   if(settingsPage==='system')try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
@@ -5107,13 +5120,20 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Контраст интерфейса</b><small>Повышенный контраст делает подписи и границы заметнее во всей панели.</small></div><div class="setting-control">${choices('contrast',[['standard','Стандарт'],['high','Повышенный']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Подчёркивание ссылок</b><small>Текстовые ссылки можно выделять не только цветом.</small></div><div class="setting-control">${choices('linkStyle',[['standard','Обычное'],['underline','Подчёркнутое']])}</div></div>
-      <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Введите HEX или настройте цвет ползунками. Палитра изменится только после подтверждения.</small></div><div class="setting-control"><div class="palette-hex-fields"><label class="palette-hex-field"><span>Основной</span><span class="palette-hex-editor"><i id="palette-preview-a" aria-hidden="true" style="--picked:${paletteDraft.a}"></i><input type="text" id="custom-a" value="${paletteDraft.a}" autocomplete="off" spellcheck="false" maxlength="7" aria-label="HEX основного цвета" placeholder="#74DDB1"></span></label><label class="palette-hex-field"><span>Вторичный</span><span class="palette-hex-editor"><i id="palette-preview-b" aria-hidden="true" style="--picked:${paletteDraft.b}"></i><input type="text" id="custom-b" value="${paletteDraft.b}" autocomplete="off" spellcheck="false" maxlength="7" aria-label="HEX вторичного цвета" placeholder="#C6E985"></span></label></div></div></div>
-    </section>
-    <section class="card sg" data-settings-group="colors"><div class="appearance-card-heading"><h3>Точная настройка цвета</h3><small>Оттенок, насыщенность и яркость собственной палитры</small></div>
+      <div class="settings-mini-heading"><b>Точная настройка цвета</b><small>Ползунки изменяют черновик палитры до нажатия «Применить».</small></div>
       <div class="color-slider-grid"><label for="hue">Оттенок</label><input type="range" id="hue" min="0" max="360" step="1" value="${paletteDraft.h}"><output id="huev">${paletteDraft.h}°</output></div><div class="color-slider-grid"><label for="sat">Насыщенность</label><input type="range" id="sat" min="0" max="100" step="1" value="${paletteDraft.s}"><output id="satv">${paletteDraft.s}%</output></div><div class="color-slider-grid"><label for="lum">Яркость</label><input type="range" id="lum" min="15" max="85" step="1" value="${paletteDraft.l}"><output id="lumv">${paletteDraft.l}%</output></div>
       <div class="palette-draft-preview" id="palette-draft-preview" style="--x:${paletteDraft.a};--y:${paletteDraft.b}"><span class="palette-draft-samples"><i></i><i></i></span><span><b>Предпросмотр своей палитры</b><small>Цвета не изменятся до подтверждения</small></span></div>
       <div class="palette-draft-actions"><button class="gh sm" type="button" id="palette-cancel">Отмена</button><button class="btn" type="button" id="palette-apply">Применить палитру</button></div>
+    </section>
+    <section class="card sg settings-palette-gallery" data-settings-group="colors">
+      <div class="appearance-card-heading"><h3>Готовые палитры</h3><small>Выбор сразу применяется ко всей панели. Свой вариант — в редакторе.</small></div>
+      <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
+      <div class="settings-theme-specimen" aria-label="Пример компонентов интерфейса" role="img">
+        <div class="settings-specimen-head"><span class="settings-specimen-mark"></span><span><b>Предпросмотр интерфейса</b><small>Действующая тема и выбранный акцент</small></span><span class="settings-specimen-chip">Активно</span></div>
+        <div class="settings-specimen-content"><span class="settings-specimen-field">Название параметра</span><span class="settings-specimen-primary">Основное действие</span><span class="settings-specimen-secondary">Вторичное действие</span></div>
+        <div class="settings-specimen-foot"><i></i><span>Цвета, кнопки и границы в действующем оформлении</span></div>
+      </div>
     </section>
     <section class="card sg" data-settings-group="typography"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Масштаб интерфейса</b><small>Масштаб текста и элементов вместе: 90–200% с шагом 1%. Для стандартного размера установите 100%.</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="2" step="0.01" value="${C.ts}" aria-label="Масштаб интерфейса"><label class="precision-number"><input type="number" id="tsv" data-appearance-value="ts" min="90" max="200" step="1" value="${Math.round(C.ts*100)}" aria-label="Точный масштаб интерфейса"><span>%</span></label></div></div>
@@ -5125,6 +5145,11 @@ async function setP(){
   <section class="card sg" data-settings-group="general"><div class="appearance-card-heading"><h3>Поведение панели</h3><small>Персональные параметры текущего браузера — не меняют настройки других администраторов.</small></div>
     <div class="setting-row"><div class="setting-copy"><b>Стартовая страница</b><small>Куда переходить при открытии панели без выбранного раздела.</small></div><div class="setting-control"><select id="start-page" aria-label="Стартовая страница">${[['home','Дашборд'],['statistics','Статистика'],['users','Пользователи'],['nodes','Узлы'],['hosts','Хосты'],['profiles','XRAY STUDIO'],['subscription','SUBSCRIPTION STUDIO'],['last','Последний открытый раздел']].map(([v,l])=>`<option value="${v}" ${C.startPage===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Счётчик пользователей в меню</b><small>Показывать количество пользователей рядом с разделом навигации.</small></div><label class="sw"><input type="checkbox" id="nav-counter" ${C.navCounter?'checked':''} aria-label="Счётчик пользователей в меню"><span></span></label></div>
+    <div class="settings-feature-links"><div class="settings-mini-heading"><b>Связанные настройки</b><small>Откройте редактор нужной функции без поиска по меню</small></div>
+      <a href="#subscription">${ic('globe')}<span><b>Страница подписки</b><small>Публичный портал, клиенты и внешний вид</small></span>${ic('down')}</a>
+      <a href="#profiles">${ic('code')}<span><b>XRAY STUDIO</b><small>Конфигурации и протоколы</small></span>${ic('down')}</a>
+      <a href="#nodes">${ic('server')}<span><b>Узлы</b><small>Инфраструктура, лимиты и агенты</small></span>${ic('down')}</a>
+    </div>
   </section>
   <div class="card" data-settings-group="integrations"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
   <section class="card sg" data-settings-group="integrations"><div class="appearance-card-heading"><h3>Уведомления интерфейса</h3><small>Всплывающие сообщения панели. Персональные настройки этого браузера.</small></div>
@@ -5146,12 +5171,22 @@ async function setP(){
     <div class="setting-row"><div class="setting-copy"><b>Точность ползунков</b><small>Шаг 1 или 10 для остальных ползунков. Скругление всегда настраивается по 1 px.</small></div><div class="setting-control"><select id="range-precision" aria-label="Точность ползунков"><option value="1" ${C.rangePrecision===1?'selected':''}>Точно · 1</option><option value="10" ${C.rangePrecision===10?'selected':''}>С привязкой · 10</option></select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области до 3000 px. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><label class="precision-number"><input type="number" id="content-width-value" data-appearance-value="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Точная ширина содержимого"><span>px</span></label></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.01" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><label class="precision-number"><input type="number" id="gap-scale-value" data-appearance-value="gap-scale" min="80" max="140" step="1" value="${Math.round((C.gapScale||1)*100)}" aria-label="Точный интервал между карточками"><span>%</span></label></div></div>
+    <div class="settings-mini-heading"><b>Предпросмотр композиции</b><small>Плотность, скругление и оформление карточек меняются в реальном интерфейсе.</small></div>
+    <div class="settings-layout-specimen" aria-label="Пример расположения карточек" role="img"><div class="settings-layout-hero"><i></i><span><b>Рабочее пространство</b><small>Единый вид разделов</small></span></div>
+      <div class="settings-layout-samples"><div><b>Карточка A</b><span></span><span></span></div><div><b>Карточка B</b><span></span><span></span></div><div><b>Карточка C</b><span></span><span></span></div></div>
+    </div>
   </section>
     <section class="card sg" data-settings-group="typography"><div class="appearance-card-heading"><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсветка фона</b><small>Мягкое цветное свечение за панелью</small></div><div class="setting-control">${choices('glow',[['off','Выкл.'],['subtle','Мягкая'],['normal','Средняя'],['rich','Яркая']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Анимации</b><small>Отключите движение и переходы, если они отвлекают</small></div><label class="sw"><input type="checkbox" id="mo" ${C.motion?'checked':''} aria-label="Анимации"><span></span></label></div>
       <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления сохраняются в localStorage этого браузера</small></div><button class="gh sm" id="rs">Сбросить оформление</button></div>
       <div class="setting-row"><div class="setting-copy"><b>Учитывать настройки ОС</b><small>Если в системе включено уменьшение движения, анимации автоматически отключатся.</small></div><label class="sw"><input type="checkbox" id="follow-reduced-motion" ${C.followReducedMotion?'checked':''} aria-label="Учитывать уменьшение движения в ОС"><span></span></label></div>
+      <div class="settings-type-specimen"><div class="settings-mini-heading"><b>Как выглядит текст</b><small>Шрифт, масштаб, интервал и цифры берутся из текущих настроек.</small></div>
+        <div class="settings-type-sample"><strong>Заголовок интерфейса</strong><p>Параметры читаются и меняются вместе с оформлением. Все элементы используют единый стиль.</p>
+          <div><span>1 024</span><span>28 500</span><span>99,8%</span></div>
+          <span class="settings-type-link">Пример текстовой ссылки</span>
+        </div>
+      </div>
     </section>
 
   <div class="card" id="core-panel" data-settings-group="system"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
@@ -5165,13 +5200,18 @@ async function setP(){
   ${ownerUpdates?`<div class="card" id="panel-update-card" data-settings-group="system">
     <div class="hd"><div><h3>Обновление XMesh Nexus</h3><p>Обновление панели из GitHub main с резервной копией PostgreSQL и пересборкой Docker.</p></div><span class="chip">Owner</span></div>
     <p class="note">Во время обновления панель будет временно недоступна.</p>
+    <div class="settings-update-outline"><span><b>1</b> Резервная копия PostgreSQL</span><span><b>2</b> Получение и проверка кода</span><span><b>3</b> Пересборка Docker и перезапуск</span></div>
     <div class="update-action-row"><button type="button" class="gh" data-panel-update-status>Проверить состояние</button><button type="button" class="btn" data-panel-update>Обновить панель</button></div>
     <div class="history-placeholder" id="panel-update-message" role="status" aria-live="polite">${esc(panelUpdateView.error||panelUpdateStatusText(panelUpdateView.status))}</div>
   </div>`:''}
-  <div class="card" data-settings-group="data"><div class="hd"><div><h3>Экспорт данных панели</h3><p>JSON-снимок текущих коллекций. Это не дамп PostgreSQL и не механизм восстановления базы.</p></div><button class="gh" id="gx">${ic('dl')}Скачать JSON-снимок</button></div><p class="note">Экспорт может содержать конфиденциальные данные. Для полного восстановления используйте резервное копирование PostgreSQL на сервере.</p></div>
+  <div class="card" data-settings-group="data"><div class="hd"><div><h3>Экспорт данных панели</h3><p>JSON-снимок текущих коллекций. Это не дамп PostgreSQL и не механизм восстановления базы.</p></div><button class="gh" id="gx">${ic('dl')}Скачать JSON-снимок</button></div><p class="note">Экспорт может содержать конфиденциальные данные. Для полного восстановления используйте резервное копирование PostgreSQL на сервере.</p>
+    <div class="settings-data-summary"><div><b>Коллекции и настройки</b><small>Входит в JSON-снимок интерфейса</small></div><div><b>PostgreSQL и журналы</b><small>Не входят: требуется отдельный серверный бэкап</small></div></div>
+    <a class="settings-inline-route" href="#tools">${ic('tool')} Открыть диагностику ${ic('down')}</a></div>
   <section class="card sg" data-settings-group="data"><div class="appearance-card-heading"><h3>Перенос оформления</h3><small>Экспорт и импорт персональной темы, плотности и остальных параметров интерфейса.</small></div>
     <div class="settings-personal-data-actions"><button class="gh" type="button" data-appearance-export>Скачать оформление JSON</button><label class="f"><span>Импортировать оформление JSON</span><input type="file" id="appearance-import" accept=".json,application/json" aria-label="Импортировать оформление JSON"></label></div>
     <p class="note">Файл оформления не содержит пользователей, токенов и настроек сервера. При импорте текущие параметры браузера заменяются.</p>
+    <div class="settings-data-summary"><div><b>Сохраняется</b><small>Цветовая тема, шрифты, плотность, ширина, эффекты</small></div><div><b>Не переносится</b><small>Учётные записи, трафик, ключи и серверные политики</small></div></div>
+    <a class="settings-inline-route" href="#set/appearance">${ic('sun')} Перейти к оформлению ${ic('down')}</a>
   </section>
 </div></div>`;
   // The HTML template is never mounted. Only the active page's original cards
@@ -5206,16 +5246,27 @@ async function setP(){
   // rules and the original per-feature lifecycle/mounting logic.
   const embedded=settingsPage==='security'?securityP():
     settingsPage==='admins'?await simple(['admins']):null;
+  const adminRoleGuide=settingsPage==='admins'?`<aside class="settings-admin-role-guide" aria-label="Роли и уровни доступа">
+    <div class="appearance-card-heading"><h3>Роли доступа</h3><small>Подсказка к действующим ролям администраторов</small></div>
+    <div class="settings-admin-role-grid">
+      <div><b>Владелец</b><p>Управление настройками панели, обновлениями и другими администраторами.</p></div>
+      <div><b>Администратор</b><p>Работа с разрешёнными разделами управления без полномочий владельца.</p></div>
+      <div><b>Наблюдатель</b><p>Просмотр доступных данных без права изменять конфигурацию.</p></div>
+    </div>
+  </aside>`:'';
   const focusItems=SETTINGS_FOCUS_GROUPS[settingsPage]||[];
   const focusGroup=focusItems.length?settingsFocusForPage(settingsPage):null;
   const activeCards=selected.filter(card=>!focusGroup||card.dataset.settingsGroup===focusGroup);
-  const columns=[[],[]];
+  const columns=[[],[]],activeColumns=[false,false];
   selected.forEach((card,index)=>{
-    if(focusGroup&&card.dataset.settingsGroup!==focusGroup)card.hidden=true;
-    columns[index%2].push(card.outerHTML);
+    const visible=!focusGroup||card.dataset.settingsGroup===focusGroup;
+    if(!visible)card.hidden=true;
+    // The traffic policy belongs below the compact panel update controls,
+    // not below the already taller Xray-core form. Keep both columns useful.
+    const column=settingsPage==='system'&&card.dataset.settingsGroup==='traffic'&&selected.length>1?1:index%2;
+    columns[column].push(card.outerHTML);
+    if(visible)activeColumns[column]=true;
   });
-  const activeColumns=columns.map((_,index)=>selected.some((card,cardIndex)=>
-    cardIndex%2===index&&(!focusGroup||card.dataset.settingsGroup===focusGroup)));
   const focusMarkup=focusItems.length>1?
     `<div class="settings-focus-bar" role="group" aria-label="${panelIsEnglish()?'Settings groups':'Группы настроек'}">
       ${focusItems.map(([key,ru,en])=>`<button type="button" data-settings-focus="${key}" class="${key===focusGroup?'is-active':''}" aria-pressed="${key===focusGroup?'true':'false'}">${panelIsEnglish()?en:ru}</button>`).join('')}
@@ -5237,7 +5288,7 @@ async function setP(){
     </div>
     <div class="settings-center-main" id="settings-subpage" role="region" aria-label="${title}" data-settings-section="${settingsPage}" data-single="${activeCards.length<=1}">
       ${focusMarkup}
-      ${embedded?`<div class="settings-center-embedded" data-settings-group="${settingsPage}">${embedded[0]}</div>`:`
+      ${embedded?`<div class="settings-center-embedded" data-settings-group="${settingsPage}">${embedded[0]}${adminRoleGuide}</div>`:`
       <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${activeCards.length<=1}">
         <div class="appearance-column workspace-stack" ${activeColumns[0]?'':'hidden'}>${columns[0].join('')}</div>
         ${columns[1].length?'<div class="appearance-column workspace-stack" '+(activeColumns[1]?'':'hidden')+'>'+columns[1].join('')+'</div>':''}
@@ -5308,6 +5359,7 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
+  if(b=g('[data-settings-test-toast]')){e.preventDefault();toast('Тестовое уведомление: настройки отображения работают.');return;}
   if(b=g('[data-cdn-tags-save]')){
     e.preventDefault();
     if(sessionUser?.role!=='owner')return;
@@ -6177,7 +6229,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   }
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
-  else if(t.dataset.hk){const old=DB.set.hooks[t.dataset.hk];DB.set.hooks[t.dataset.hk]=t.checked?1:0;try{await api.saveSettings({hooks:{...DB.set.hooks}});toast(t.checked?'Событие включено':'Событие отключено')}catch(err){DB.set.hooks[t.dataset.hk]=old;t.checked=!!old;toast(err.message)}}
+  else if(t.dataset.hk){const old=DB.set.hooks[t.dataset.hk];DB.set.hooks[t.dataset.hk]=t.checked?1:0;try{await api.saveSettings({hooks:{...DB.set.hooks}});toast(t.checked?'Событие включено':'Событие отключено')}catch(err){DB.set.hooks[t.dataset.hk]=old;t.checked=!!old;toast(err.message)}finally{const count=$('[data-hook-count]');if(count)count.textContent=Object.values(DB.set.hooks||{}).filter(Boolean).length+' / '+Object.keys(DB.set.hooks||{}).length}}
   else if(t.matches('select[data-psz]')){
     // data-psz is a value-less HTML attribute: its dataset value is an empty string.
     const size=Number(t.value);
