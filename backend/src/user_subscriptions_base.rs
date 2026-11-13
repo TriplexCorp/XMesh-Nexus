@@ -2138,7 +2138,6 @@ fn portal_html(
     settings: &Value,
     user: &Value,
     lang: &str,
-    en: bool,
     metrics: String,
     controls: PortalControls,
     decoration: PortalDecoration<'_>,
@@ -2159,6 +2158,7 @@ fn portal_html(
         footer,
         logo_brand,
     } = decoration;
+    let en = lang == "en";
     let theme_changes = portal_theme_changes(settings);
     // Keep identity information scoped to the bearer page. Display fields are
     // HTML-escaped and never reused as URLs or executable attributes.
@@ -2171,8 +2171,9 @@ fn portal_html(
                     .map(str::trim)
                     .filter(|value| !value.is_empty())
             })
-            .map(|value| escape_html(&value.chars().take(80).collect::<String>()))
-            .unwrap_or_default()
+            .map_or_else(String::new, |value| {
+                escape_html(&value.chars().take(80).collect::<String>())
+            })
     };
     let owner_label = public_label(&["username"]);
     let plan_label = public_label(&["subscriptionPlan", "plan", "tariff"]);
@@ -2376,10 +2377,8 @@ async fn portal_browser(
     let mut nonce_bytes = [0_u8; 16];
     OsRng.fill_bytes(&mut nonce_bytes);
     let nonce = base64::engine::general_purpose::STANDARD_NO_PAD.encode(nonce_bytes);
-    let html = portal_html(
-        &settings, &user, lang, en, metrics, controls, decoration, &nonce,
-    )
-    .replacen(
+    let html = portal_html(&settings, &user, lang, metrics, controls, decoration, &nonce)
+        .replacen(
         "class=\"subscription-preview\"",
         &format!(
             "class=\"subscription-preview\" data-subscription-state=\"{}\"",
