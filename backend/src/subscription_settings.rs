@@ -32,7 +32,7 @@ fn is_hex_color(value: &str) -> bool {
         && value.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
 }
 
-pub(crate) fn safe_https_url(value: &str) -> bool {
+pub fn safe_https_url(value: &str) -> bool {
     if value.is_empty() {
         return true;
     }
@@ -199,6 +199,11 @@ fn validate_portal_appearance(object: &Map<String, Value>) -> Result<(), ApiErro
             return Err(bad("Скругление должно быть от 1 до 36 пикселей."));
         }
     }
+    Ok(())
+}
+
+fn validate_external_urls(object: &Map<String, Value>) -> Result<(), ApiError> {
+    validate_external_urls(object)?;
     Ok(())
 }
 
