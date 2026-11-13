@@ -88,12 +88,19 @@ window.XMeshSubscriptionExperience={mount(root,options){
     const distribution=metric?.querySelector('.experience-server-details');if(distribution){serverPanel.replaceChildren();const h=el('h2','',t('Трафик по серверам','Usage by server')),note=el('p','',t('Распределение учтённого расхода.','Distribution of measured data usage.'));serverPanel.append(h,note);distribution.open=true;distribution.querySelector('summary').hidden=true;serverPanel.append(distribution)}
     serverPanel.hidden=!metric||metric.hidden||!serverPanel.querySelector('.experience-server-details');dashboard.hidden=quick.hidden&&serverPanel.hidden;
     const device=root.querySelector('#subscription-devices,[data-preview-devices]')||root.querySelector('[data-setup-section=devices] .subscription-public-devices');
-    const support=root.querySelector('.subscription-preview-support');nav.setAttribute('aria-label',t('Быстрые действия','Quick actions'));nav.replaceChildren();
+    const support=root.querySelector('.subscription-preview-support');
+    const directSupport=available&&!!support?.matches('a[href^="https://"]');
+    support?.closest('[data-setup-section=support]')?.classList.toggle('experience-support-shortcut-only',directSupport);
+    nav.setAttribute('aria-label',t('Быстрые действия','Quick actions'));nav.replaceChildren();
     const addShortcut=(glyph,title,note,handler)=>{const b=el('button');b.type='button';b.append(icon(glyph));const text=el('span');text.append(el('strong','',title),el('small','',note));b.append(text,el('span','experience-chevron','›'));b.addEventListener('click',()=>handler(b));nav.append(b)};
     if(available)addShortcut('guide',t('Инструкции','Instructions'),t('Для ваших устройств','For your devices'),showGuide);
     if(device&&!device.hidden&&!device.closest('[data-setup-section=devices]')?.hidden){deviceDialog.title.textContent=t('Ваши устройства','Your devices');deviceDialog.close.setAttribute('aria-label',t('Закрыть','Close'));deviceNote.textContent=t('Это зарегистрированные устройства, а не число активных VPN-соединений.','This is the number of registered devices, not live VPN connections.');let value=deviceDialog.node.querySelector('.experience-device-value');if(!value){value=el('p','experience-device-value');deviceDialog.node.append(value)}value.textContent=device.textContent;addShortcut('device',t('Устройства','Devices'),device.textContent,b=>deviceDialog.open(b))}
     if(!serverPanel.hidden)addShortcut('server',t('По серверам','By server'),t('Распределение трафика','Data usage breakdown'),()=>{serverPanel.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});serverPanel.setAttribute('tabindex','-1');serverPanel.focus({preventScroll:true})});
-    if(support&&!support.hidden)addShortcut('help',t('Поддержка','Support'),t('Помощь с подключением','Connection help'),()=>{support.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});support.focus({preventScroll:true})});
+    if(support&&!support.hidden)addShortcut('help',t('Поддержка','Support'),t('Помощь с подключением','Connection help'),()=>{
+      if(directSupport){support.click();return}
+      support.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});
+      support.focus({preventScroll:true});
+    });
     if(workspace){const devices=workspace.querySelector('[data-setup-section=devices]');if(devices)devices.classList.add('experience-devices-source')}
   };
   const update=next=>{current=next;render();refreshDashboard()};root._experience={update};update(options);
