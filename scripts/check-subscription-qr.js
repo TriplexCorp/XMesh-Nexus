@@ -12,7 +12,9 @@ assert.match(portal,/window\.qrcodegen\?\.QrCode/,'Subscription portal must use 
 assert.doesNotMatch(portal,/window\.qrgen\?\.QrCode/,'Broken qrgen alias must not return');
 assert.match(portal,/new URL\(raw, window\.location\.origin\)/,'Relative subscription paths must resolve against the visitor origin');
 assert.match(portal,/input\.value = subscriptionUrl/,'All subscription actions must share the canonical absolute URL');
-assert.match(portal,/navigator\.clipboard\.writeText\(subscriptionUrl\)/,'Copy must use the canonical absolute subscription URL');
+assert.match(portal,/const value=linkForApp\(clientId\)/,'Copy uses the selected app format without changing the token');
+assert.match(portal,/const url=new URL\(subscriptionUrl\)/,'Format override originates from the canonical absolute subscription URL');
+assert.match(portal,/navigator\.clipboard\.writeText\(value\)/,'Copy uses the canonical token with optional allowlisted format');
 assert.doesNotMatch(portal,/navigator\.clipboard\.writeText\(input\.value\)/,'Copy must not regress to the raw backend path');
 assert.match(portal,/Qr\.encodeText\(subscriptionUrl, Qr\.Ecc\.MEDIUM\)/,'QR must encode the same canonical absolute URL as copy');
 assert.match(portal,/const quiet = 4/,'Subscription QR must include a four-module quiet zone');

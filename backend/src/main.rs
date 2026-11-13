@@ -24,6 +24,7 @@ mod security;
 mod sub_server;
 mod subscription_finalmask;
 mod subscription_flood;
+mod subscription_formats;
 mod subscription_json;
 mod subscription_remark;
 mod subscription_settings;

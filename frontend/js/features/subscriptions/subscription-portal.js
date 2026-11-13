@@ -287,14 +287,32 @@
     }, 1800);
   }
 
-  async function copySubscription(button) {
+  // One bearer token; only a stable, allowlisted format query differs.
+  // The server chooses automatically from User-Agent when no override exists.
+  const formatByApp=Object.freeze({
+    happ:'xray',incy:'links',v2raytun:'links',v2rayn:'base64',
+    v2rayng:'base64',streisand:'links',hiddify:'base64',
+    nekobox:'links',shadowrocket:'base64',flclash:'mihomo',
+    stash:'mihomo',singbox:'singbox',v2box:'base64',
+    loon:'links',mihomo:'mihomo',clashverge:'mihomo'
+  });
+  function linkForApp(clientId) {
+    const format=Object.hasOwn(formatByApp,clientId)?formatByApp[clientId]:null;
+    if(!format)return subscriptionUrl;
+    const url=new URL(subscriptionUrl);
+    if(format==='xray')url.searchParams.set('format','xray');
+    else url.searchParams.set('format',format);
+    return url.href;
+  }
+  async function copySubscription(button,clientId) {
+    const value=linkForApp(clientId);
     let copied = false;
     try {
-      await navigator.clipboard.writeText(subscriptionUrl);
+      await navigator.clipboard.writeText(value);
       copied = true;
     } catch {
       const temporary = document.createElement('textarea');
-      temporary.value = subscriptionUrl;
+      temporary.value = value;
       temporary.style.position = 'fixed';
       temporary.style.opacity = '0';
       temporary.setAttribute('aria-hidden', 'true');
@@ -377,5 +395,5 @@
     document.querySelector('[data-setup-section="devices"]')?.scrollIntoView({block:'nearest'});
     event.currentTarget.setAttribute('aria-expanded','true');
   });
-  window.XMeshSubscriptionExperience?.mount(previewRoot,{language,url:subscriptionUrl,startLabel:['Copy','Копировать','Скопировать ссылку','Copy subscription link'].includes(primaryCopy?.textContent.trim())?'':primaryCopy?.textContent,copyButton:primaryCopy,copy:()=>copySubscription(primaryCopy)});
+  window.XMeshSubscriptionExperience?.mount(previewRoot,{language,url:subscriptionUrl,startLabel:['Copy','Копировать','Скопировать ссылку','Copy subscription link'].includes(primaryCopy?.textContent.trim())?'':primaryCopy?.textContent,copyButton:primaryCopy,copy:clientId=>copySubscription(primaryCopy,clientId)});
 })();

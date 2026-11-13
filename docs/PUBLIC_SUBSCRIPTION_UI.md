@@ -21,11 +21,12 @@ shows its installation/import actions before detailed instructions. Platform
 instructions explain the relevant system permission, without claiming that the
 website can establish or detect the VPN connection itself.
 
-Only the documented Happ `happ://add/<url>` action is offered for the current native
-Xray feed. Other applications keep a manual import route and an explicit format
-compatibility note. Configured install URLs take precedence; verified publisher
-pages are fallbacks for built-in Happ, v2rayN, v2rayNG and Hiddify. Custom names do
-not acquire a built-in URI scheme merely by resembling a known app name.
+Only the documented Happ `happ://add/<url>` action is offered for native app
+launch. Other applications use manual import with one existing bearer token and an
+allowlisted `?format=` override in the copied URL. Configured install URLs
+take precedence; verified publisher pages are fallbacks for built-in Happ,
+v2rayN, v2rayNG and Hiddify. Custom names do not acquire an app URI scheme merely
+by resembling a known app name.
 
 The browser cannot reliably detect whether an application is installed. The page
 therefore never reports a successful app launch: install and copy alternatives
@@ -58,13 +59,24 @@ delay or client fetch requiring a decorative skeleton.
 
 ## Content negotiation and security
 
-`subscription_user_agent.rs` still determines HTML versus native Xray JSON. Feed
-serialization, content types, signed credentials, device enforcement, transport
-projection and subscription URLs are unchanged. No Clash/sing-box/link exporter
-is added or implied. Browser and app User-Agent matrices are exercised in Rust and
-against the real disposable API. The native client supports only what the existing
-exporters and selected app versions support; an import URI is not compatibility
-proof for every mobile app version.
+`subscription_user_agent.rs` determines HTML or a client feed from User-Agent
+and the explicit `?format=` override. The unchanged canonical link and bearer token
+can deliver Xray JSON (`xray`, native Happ default), plaintext VLESS/VMess/Trojan/classic Shadowsocks URI
+(`links`), standard Base64 encoded URI lines (`base64`), Mihomo YAML
+(`mihomo`), or upstream sing-box JSON (`singbox`). Invalid formats fail with
+HTTP 400. Unsupported credentials/transports in alternate representations are
+never downgraded: they are skipped with `X-Subscription-Skipped` or yield 422 when
+none can be exported, rather than silently route through DIRECT. In particular
+upstream sing-box cannot use Xray XHTTP, and Xray-specific VLESS encryption
+may require the native feed.
+
+The original Xray feed builder still handles per-user routing and SMART
+balancers unchanged; the other formats provide a portable selector of
+independently publishable endpoints. Existing signed credentials, device
+enforcement, Host allowlisting, public subscriptions and accounting remain
+authoritative. Browser and User-Agent matrices are covered by Rust and
+disposable real-API tests, but physical application versions and exotic
+transports require live interoperability verification.
 
 Copy and QR use the same canonical bearer URL. No external QR or redirect service,
 analytics, link shortener or launch-detection tracking is used. Clipboard denial
