@@ -1914,23 +1914,23 @@ html[data-motion=off] :is(.stats-bucket-detail,.stats-bucket-content,.stats-deta
   background:color-mix(in srgb,var(--er) 10%,transparent);
 }
 @container control-plane (max-width:1100px){
-  #stats-control{grid-template-columns:minmax(0,1fr)}
-  #stats-control .stats-control-metric{min-height:19.5rem}
-  #stats-control .stats-control-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 1.25rem}
-  #stats-control .stats-control-kv:nth-last-child(-n+2){border-bottom:0}
+  #stats-dashboard #stats-control{grid-template-columns:minmax(0,1fr)}
+  #stats-dashboard #stats-control .stats-control-metric{min-height:19.5rem}
+  #stats-dashboard #stats-control .stats-control-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 1.25rem}
+  #stats-dashboard #stats-control .stats-control-kv:nth-last-child(-n+2){border-bottom:0}
 }
 @container control-plane (max-width:710px){
-  #stats-control .stats-control-rings{grid-template-columns:repeat(2,minmax(0,1fr))}
-  #stats-control .stats-control-metric{min-height:19rem}
-  #stats-control .stats-control-metric:last-child{grid-column:1/-1}
-  #stats-control .stats-control-details{grid-template-columns:minmax(0,1fr)}
-  #stats-control .stats-control-kv:nth-last-child(2){border-bottom:1px solid var(--nx-border)}
+  #stats-dashboard #stats-control .stats-control-rings{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #stats-dashboard #stats-control .stats-control-metric{min-height:19rem}
+  #stats-dashboard #stats-control .stats-control-metric:last-child{grid-column:1/-1}
+  #stats-dashboard #stats-control .stats-control-details{grid-template-columns:minmax(0,1fr)}
+  #stats-dashboard #stats-control .stats-control-kv:nth-last-child(2){border-bottom:1px solid var(--nx-border)}
 }
 @container control-plane (max-width:490px){
-  #stats-control .stats-control-rings{grid-template-columns:minmax(0,1fr)}
-  #stats-control .stats-control-metric:last-child{grid-column:auto}
-  #stats-control .stats-control-metric{min-height:16rem}
-  #stats-control .stats-ring{width:8.5rem}
+  #stats-dashboard #stats-control .stats-control-rings{grid-template-columns:minmax(0,1fr)}
+  #stats-dashboard #stats-control .stats-control-metric:last-child{grid-column:auto}
+  #stats-dashboard #stats-control .stats-control-metric{min-height:16rem}
+  #stats-dashboard #stats-control .stats-ring{width:8.5rem}
 }
 @media(prefers-reduced-motion:reduce){
   #stats-dashboard #stats-control .stats-control-trend-plot{animation:none}
