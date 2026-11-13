@@ -2136,6 +2136,7 @@ fn portal_assets(nonce: &str) -> (String, String) {
 
 fn portal_html(
     settings: &Value,
+    user: &Value,
     lang: &str,
     en: bool,
     metrics: String,
@@ -2159,6 +2160,22 @@ fn portal_html(
         logo_brand,
     } = decoration;
     let theme_changes = portal_theme_changes(settings);
+    // Keep identity information scoped to the bearer page. Display fields are
+    // HTML-escaped and never reused as URLs or executable attributes.
+    let public_label = |fields: &[&str]| -> String {
+        fields
+            .iter()
+            .find_map(|field| {
+                user.get(*field)
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+            })
+            .map(|value| escape_html(&value.chars().take(80).collect::<String>()))
+            .unwrap_or_default()
+    };
+    let owner_label = public_label(&["username"]);
+    let plan_label = public_label(&["subscriptionPlan", "plan", "tariff"]);
     let (styles, scripts) = portal_assets(nonce);
     let mut html = include_str!("subscription_template.html").to_owned();
     let changes = [
@@ -2166,6 +2183,8 @@ fn portal_html(
         ("{{PUBLIC_SCRIPTS}}", scripts),
         ("{{LANG}}", lang.to_owned()),
         ("{{BRAND}}", escape_html(logo_brand)),
+        ("{{OWNER}}", owner_label),
+        ("{{PLAN}}", plan_label),
         ("{{LOGO}}", logo_markup),
         (
             "{{RU_SELECTED}}",
@@ -2357,7 +2376,7 @@ async fn portal_browser(
     let mut nonce_bytes = [0_u8; 16];
     OsRng.fill_bytes(&mut nonce_bytes);
     let nonce = base64::engine::general_purpose::STANDARD_NO_PAD.encode(nonce_bytes);
-    let html = portal_html(&settings, lang, en, metrics, controls, decoration, &nonce).replacen(
+    let html = portal_html(&settings, &user, lang, en, metrics, controls, decoration, &nonce).replacen(
         "class=\"subscription-preview\"",
         &format!(
             "class=\"subscription-preview\" data-subscription-state=\"{}\"",
