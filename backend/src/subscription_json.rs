@@ -47,8 +47,8 @@ fn custom_dns_server(opts: &Value) -> Result<String, String> {
             }
         }
         "doh" => {
-            let url = reqwest::Url::parse(raw)
-                .map_err(|_| "DNS DoH: укажите корректную HTTPS-ссылку")?;
+            let url =
+                reqwest::Url::parse(raw).map_err(|_| "DNS DoH: укажите корректную HTTPS-ссылку")?;
             if url.scheme() != "https"
                 || url.host().is_none()
                 || !url.username().is_empty()
@@ -1299,21 +1299,29 @@ mod tests {
     }
     #[test]
     fn accepts_any_valid_custom_udp_resolver_and_canonicalizes_scheme() {
-        for (submitted,expected) in [
-            ("9.9.9.9","9.9.9.9"),
-            ("8.8.8.8:5353","8.8.8.8:5353"),
-            ("udp://1.1.1.1:53","1.1.1.1:53"),
-            ("2606:4700:4700::1111","2606:4700:4700::1111"),
-            ("[2606:4700:4700::1111]:5353","[2606:4700:4700::1111]:5353"),
+        for (submitted, expected) in [
+            ("9.9.9.9", "9.9.9.9"),
+            ("8.8.8.8:5353", "8.8.8.8:5353"),
+            ("udp://1.1.1.1:53", "1.1.1.1:53"),
+            ("2606:4700:4700::1111", "2606:4700:4700::1111"),
+            ("[2606:4700:4700::1111]:5353", "[2606:4700:4700::1111]:5353"),
         ] {
-            let settings=json!({"subscriptionJson":{
+            let settings = json!({"subscriptionJson":{
                 "dns":"custom","customDnsProtocol":"udp","customDnsAddress":submitted
             }});
-            assert!(validate_settings(&settings["subscriptionJson"]).is_ok(),"{submitted}");
-            let built=build(vec![outbound("DE")], &settings).unwrap();
-            assert_eq!(built["dns"]["servers"][0],expected);
-            assert!(built["outbounds"].as_array().unwrap().iter()
-                .all(|v| v["tag"]!="dns-out"));
+            assert!(
+                validate_settings(&settings["subscriptionJson"]).is_ok(),
+                "{submitted}"
+            );
+            let built = build(vec![outbound("DE")], &settings).unwrap();
+            assert_eq!(built["dns"]["servers"][0], expected);
+            assert!(
+                built["outbounds"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|v| v["tag"] != "dns-out")
+            );
         }
     }
     #[test]
@@ -1323,43 +1331,49 @@ mod tests {
             "https://1.1.1.1/dns-query",
             "https://dns.example.org:8443/custom-query?profile=1",
         ] {
-            let settings=json!({"subscriptionJson":{
+            let settings = json!({"subscriptionJson":{
                 "dns":"custom","customDnsProtocol":"doh","customDnsAddress":endpoint
             }});
-            assert!(validate_settings(&settings["subscriptionJson"]).is_ok(),"{endpoint}");
-            let config=build(vec![outbound("PL")],&settings).unwrap();
-            assert_eq!(config["dns"]["servers"][0],endpoint);
+            assert!(
+                validate_settings(&settings["subscriptionJson"]).is_ok(),
+                "{endpoint}"
+            );
+            let config = build(vec![outbound("PL")], &settings).unwrap();
+            assert_eq!(config["dns"]["servers"][0], endpoint);
         }
     }
     #[test]
     fn invalid_custom_dns_is_rejected_not_replaced_with_cloudflare() {
-        for (protocol,address) in [
-            ("udp","hostname.example"),
-            ("udp","8.8.8.8:65536"),
-            ("udp","8.8.8.8:0"),
-            ("udp","udp://1.1.1.1:0"),
-            ("udp","https://dns.google/dns-query"),
-            ("udp",""),
-            ("doh","http://dns.google/dns-query"),
-            ("doh","https://user:pass@dns.google/dns-query"),
-            ("doh","https://dns.google/dns-query#fragment"),
-            ("doh","https://dns.google"),
-            ("doh","https://dns.google/dns-query test"),
-            ("dot","tls://dns.google"),
+        for (protocol, address) in [
+            ("udp", "hostname.example"),
+            ("udp", "8.8.8.8:65536"),
+            ("udp", "8.8.8.8:0"),
+            ("udp", "udp://1.1.1.1:0"),
+            ("udp", "https://dns.google/dns-query"),
+            ("udp", ""),
+            ("doh", "http://dns.google/dns-query"),
+            ("doh", "https://user:pass@dns.google/dns-query"),
+            ("doh", "https://dns.google/dns-query#fragment"),
+            ("doh", "https://dns.google"),
+            ("doh", "https://dns.google/dns-query test"),
+            ("dot", "tls://dns.google"),
         ] {
-            let settings=json!({"subscriptionJson":{
+            let settings = json!({"subscriptionJson":{
                 "dns":"custom","customDnsProtocol":protocol,"customDnsAddress":address
             }});
-            assert!(validate_settings(&settings["subscriptionJson"]).is_err(),
-                "{protocol} {address}");
-            assert!(build(vec![outbound("DE")],&settings).is_err(),
-                "invalid address was silently replaced: {protocol} {address}");
+            assert!(
+                validate_settings(&settings["subscriptionJson"]).is_err(),
+                "{protocol} {address}"
+            );
+            assert!(
+                build(vec![outbound("DE")], &settings).is_err(),
+                "invalid address was silently replaced: {protocol} {address}"
+            );
         }
         assert!(validate_settings(&json!({"dns":"custom"})).is_err());
         // Existing saved presets work without supplying custom fields.
         assert!(validate_settings(&json!({"dns":"cloudflare"})).is_ok());
-        assert!(build(vec![outbound("DE")],&json!({}))
-            .is_ok());
+        assert!(build(vec![outbound("DE")], &json!({})).is_ok());
     }
     #[test]
     fn custom_dns_balancing_and_ports() {
