@@ -25,10 +25,12 @@ mod device_limits;
 pub use base::{migrate_legacy_ciphertexts, provision_new_user, revoke, rotate_credentials};
 
 /// Protected by Integration API middleware before this internal accessor is invoked.
-pub(crate) async fn service_subscription_status(state: &AppState, id: i64) -> Result<Value, ApiError> {
-    base::service_subscription_status(state,id).await
+pub(crate) async fn service_subscription_status(
+    state: &AppState,
+    id: i64,
+) -> Result<Value, ApiError> {
+    base::service_subscription_status(state, id).await
 }
-
 
 async fn user_fingerprint(state: &AppState, id: i64) -> Result<Option<String>, ApiError> {
     let row = sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
