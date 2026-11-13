@@ -13,7 +13,16 @@ window.XMeshNodeQuotas=(()=>{
     return (Math.max(0,number)/1e9).toLocaleString(window.XMeshI18n?.getLocale?.()||'ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' ГБ';
   };
   const txt=(ru,en)=>window.XMeshI18n?.getLanguage?.()==='en'?en:ru;
-  const periodLabel=p=>p==='lifetime'?txt('За всё время','Lifetime'):txt('Ежемесячно','Monthly');
+  const periodLabel=p=>({
+    daily:txt('Каждый день','Daily'),
+    weekly:txt('Каждую неделю','Weekly'),
+    monthly:txt('Ежемесячно','Monthly'),
+    lifetime:txt('За всё время','Lifetime')
+  })[p]||txt('Ежемесячно','Monthly');
+  const periods=['daily','weekly','monthly','lifetime'];
+  const periodOptions=(selected)=>periods.map(period=>
+    '<option value="'+period+'"'+(selected===period?' selected':'')+'>'+periodLabel(period)+'</option>'
+  ).join('');
   const isEditable=editor=>!editor.readOnly;
   function markup(editor){
     const data=editor.items,configured=data.filter(x=>x.limitGb!==null).length;
@@ -41,8 +50,7 @@ window.XMeshNodeQuotas=(()=>{
         (isEditable(editor)?'':' disabled')+'></label>'+
         '<label class="user-node-quota-select"><span>'+txt('Период','Period')+'</span>'+
         '<select data-node-quota-period'+(isEditable(editor)?'':' disabled')+'>'+
-        '<option value="monthly"'+(node.period==='monthly'?' selected':'')+'>'+periodLabel('monthly')+'</option>'+
-        '<option value="lifetime"'+(node.period==='lifetime'?' selected':'')+'>'+periodLabel('lifetime')+'</option>'+
+        periodOptions(node.period)+
         '</select></label></div>';
     }).join('');
     return '<section class="user-node-quota-editor" data-user-node-quota-editor>'+
@@ -55,8 +63,8 @@ window.XMeshNodeQuotas=(()=>{
       '<div class="user-node-quota-list" data-node-quota-list>'+rows+'</div>'+
       '<div class="user-node-quota-actions">'+(data.length>8?'<button type="button" class="gh sm" data-node-quota-expand>'+txt('Показать все','Show all')+'</button>':'')+
       '<span class="user-node-quota-message" data-node-quota-message role="status" aria-live="polite"></span></div>'+
-      '<p class="user-node-quota-note">'+txt('0 или пусто — без ограничения на этой ноде. Лимит действует только для данного пользователя. Доступ изменится после синхронизации ноды.',
-      'Zero or blank means unlimited on that node. This limit applies to this user only. Access updates after node synchronization.')+'</p>'+
+      '<p class="user-node-quota-note">'+txt('0 или пусто — без ограничения на этой ноде. Периоды обновляются по UTC: день в 00:00, неделя в понедельник 00:00. Доступ изменится после синхронизации ноды.',
+      'Zero or blank means unlimited on that node. UTC resets: daily at 00:00, weekly on Monday at 00:00. Access updates after node synchronization.')+'</p>'+
       '</section>';
   }
   function updateVisibility(editor){
@@ -98,7 +106,7 @@ window.XMeshNodeQuotas=(()=>{
       }
       const periodSelect=row.querySelector('[data-node-quota-period]');
       const period=periodSelect?.value;
-      if(!['monthly','lifetime'].includes(period)){
+      if(!periods.includes(period)){
         const error=Error(txt('Некорректный период.','Invalid period.'));
         error.field=periodSelect;throw error;
       }
@@ -188,8 +196,7 @@ window.XMeshNodeQuotas=(()=>{
         '<input type="number" data-user-create-quota-limit inputmode="decimal" min="0" max="1000000" step="any" placeholder="∞" aria-label="'+txt('Лимит для','Limit for')+' '+esc(name)+'"></label>'+
         '<label class="user-create-quota-field"><span>'+txt('Период','Period')+'</span>'+
         '<select data-user-create-quota-period aria-label="'+txt('Период для','Period for')+' '+esc(name)+'">'+
-        '<option value="monthly">'+txt('Ежемесячно','Monthly')+'</option>'+
-        '<option value="lifetime">'+txt('За всё время','Lifetime')+'</option></select></label></div></article>';
+        periodOptions('monthly')+'</select></label></div></article>';
     }).join('');
     return '<section class="user-create-section user-create-node-quotas" data-user-create-node-quotas aria-label="'+txt('Квоты по нодам','Per-node quotas')+'" data-has-limits="false" data-many="'+(items.length>6)+'">'+
       '<header class="user-create-node-quotas-head">'+
@@ -246,9 +253,9 @@ window.XMeshNodeQuotas=(()=>{
       const period=row.querySelector('[data-user-create-quota-period]')?.value;
       if(!/^[1-9][0-9]*$/.test(id)||!Number.isSafeInteger(Number(id))||
          !Number.isFinite(amount)||amount<=0||amount>1000000||amount*1e9<1||
-         !['monthly','lifetime'].includes(period)){
-        const error=new Error(txt('Проверьте лимит и период ноды: положительное число до 1 000 000 ГБ и ежемесячно/за всё время.',
-          'Check the node limit and period: a positive number up to 1,000,000 GB and monthly/lifetime.'));
+         !periods.includes(period)){
+        const error=new Error(txt('Проверьте лимит и период ноды: положительное число до 1 000 000 ГБ и ежедневный/еженедельный/ежемесячный/за всё время.',
+          'Check the node limit and period: a positive number up to 1,000,000 GB and daily/weekly/monthly/lifetime.'));
         error.field=input;throw error;
       }
       policies[id]={limitGb:amount,period};
