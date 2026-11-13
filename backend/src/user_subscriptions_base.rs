@@ -635,14 +635,20 @@ pub(crate) async fn service_subscription_status(
         return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found"));
     }
     let exists = sqlx::query_scalar::<_, i64>(
-        "SELECT id FROM panel_records WHERE collection='users' AND id=$1"
-    ).bind(id).fetch_optional(&state.pool).await?;
+        "SELECT id FROM panel_records WHERE collection='users' AND id=$1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?;
     if exists.is_none() {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found"));
     }
     let row = sqlx::query(
-        "SELECT token_hash,token_ciphertext FROM user_subscription_tokens WHERE user_id=$1"
-    ).bind(id).fetch_optional(&state.pool).await?;
+        "SELECT token_hash,token_ciphertext FROM user_subscription_tokens WHERE user_id=$1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?;
     let Some(row) = row else {
         return Ok(json!({"enabled":false,"legacy":false,"url":null}));
     };
@@ -650,9 +656,9 @@ pub(crate) async fn service_subscription_status(
     let hash: String = row.try_get("token_hash")?;
     let url = match ciphertext {
         Some(value) => {
-            let token = decrypt_token(state,id,&value,&hash)?;
+            let token = decrypt_token(state, id, &value, &hash)?;
             let settings = crate::read_settings(&state.pool).await?;
-            Some(studio_url(&settings,&token))
+            Some(studio_url(&settings, &token))
         }
         None => None,
     };
