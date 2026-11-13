@@ -737,8 +737,8 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
   .subscription-public .experience-dashboard .subscription-preview-hero{order:0}
   .subscription-public .experience-dashboard .experience-plan{order:1}
   .subscription-public .experience-dashboard .experience-owner{order:2}
-  .subscription-public .experience-dashboard .experience-account{order:3}
-  .subscription-public .experience-dashboard [data-setup-section=connect]{order:4}
+  .subscription-public .experience-dashboard [data-setup-section=connect]{order:3}
+  .subscription-public .experience-dashboard .experience-account{order:4}
   .subscription-public .experience-plan{min-height:150px}
   .subscription-public .experience-dashboard .subscription-public-access-panel{min-height:90px}
   .subscription-public .experience-dashboard-lower{grid-template-columns:minmax(0,1fr)}
