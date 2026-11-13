@@ -68,6 +68,6 @@ assert.match(renderer,/allow_newlines && ch == '\\n'/);
 assert.match(rust,/selected_subscription_announcement\(settings, now_ms\)/);
 assert.match(rust,/personalized_subscription_announcement\(&state, &user, &settings, now\)\.await/);
 assert.match(rust,/cdn_quota::usage_for_user\(&state\.pool, settings, user_id\)/);
-assert.match(rust,/add_subscription_profile_headers\(&mut response, &settings, announcement\.as_deref\(\)\)/);
+assert.match(rust,/add_subscription_profile_headers\(&mut response, &settings, announcement\.as_deref\(\), Some\(&token\)\)/);
 assert.match(rust,/CACHE_CONTROL, "no-store, private"/);
 console.log('Personalized multiline announcements, signed CDN balances, UI picker and safe header: PASS');
