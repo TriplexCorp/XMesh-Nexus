@@ -15,6 +15,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Свой DNS (необязательно)": "Custom DNS (optional)",
+    "IP / IP:порт — UDP; HTTPS-ссылка — DoH. Заполненное поле имеет приоритет над выбранным DNS. Очистите его, чтобы вернуть пресет.": "IP or IP:port uses UDP; HTTPS uses DoH. A filled field overrides the selected DNS preset. Clear it to restore the preset.",
+    "Адрес своего DNS не должен превышать 512 символов.": "Custom DNS address must be at most 512 characters.",
+    "DNS UDP: укажите IP, IP:порт или [IPv6]:порт; для DoH — HTTPS-ссылку": "DNS UDP: enter IP, IP:port or [IPv6]:port; for DoH use an HTTPS URL",
     "Свой DNS · UDP / DoH": "Custom DNS · UDP / DoH",
     "Протокол своего DNS": "Custom DNS protocol",
     "Адрес своего DNS": "Custom DNS address",
