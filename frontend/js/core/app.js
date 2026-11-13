@@ -4963,14 +4963,13 @@ function securityP(){
     '<section class="card" role="alert"><h3>Не удалось загрузить настройки 2FA</h3><p>Обновите панель и страницу браузера. Скрипт mfa-ui.js не загружен.</p></section>';
   return [`<div class="security-workspace security-center">
     <header class="security-overview">
-      <div><p class="note">XMESH NEXUS / SECURITY CENTER</p><h2>Центр безопасности</h2>
-      <p>Управление входом, защищёнными сессиями и доступом к панели.</p></div>
+      <div><h2>Безопасность и доступ</h2><p>Двухфакторная защита, сессии и журнал действий администраторов.</p></div>
     </header>
     <nav class="security-center-tabs" aria-label="Разделы безопасности" role="tablist">
-      <button type="button" role="tab" id="security-tab-auth" aria-selected="true" aria-controls="security-pane-auth" data-security-tab="auth"><span>◈</span> Авторизация и 2FA</button>
-      <button type="button" role="tab" id="security-tab-access" aria-selected="false" aria-controls="security-pane-access" data-security-tab="access" tabindex="-1"><span>▣</span> Сессии и доступ</button>
-      <button type="button" role="tab" id="security-tab-audit" aria-selected="false" aria-controls="security-pane-audit" data-security-tab="audit" tabindex="-1"><span>◎</span> Мониторинг</button>
-      <button type="button" role="tab" id="security-tab-infra" aria-selected="false" aria-controls="security-pane-infra" data-security-tab="infra" tabindex="-1"><span>◇</span> Инфраструктура</button>
+      <button type="button" role="tab" id="security-tab-auth" aria-selected="true" aria-controls="security-pane-auth" data-security-tab="auth">${ic('lock')} Вход и 2FA</button>
+      <button type="button" role="tab" id="security-tab-access" aria-selected="false" aria-controls="security-pane-access" data-security-tab="access" tabindex="-1">${ic('key')} Сессии</button>
+      <button type="button" role="tab" id="security-tab-audit" aria-selected="false" aria-controls="security-pane-audit" data-security-tab="audit" tabindex="-1">${ic('activity')} Журнал действий</button>
+      <button type="button" role="tab" id="security-tab-infra" aria-selected="false" aria-controls="security-pane-infra" data-security-tab="infra" tabindex="-1">${ic('server')} Инфраструктура</button>
     </nav>
     <div class="security-center-pane" id="security-pane-auth" role="tabpanel" aria-labelledby="security-tab-auth" data-security-pane="auth">${factor}</div>
     <div class="security-center-pane" id="security-pane-access" role="tabpanel" aria-labelledby="security-tab-access" data-security-pane="access" hidden>${window.XMeshSecurity?.panel()||''}</div>
@@ -4978,13 +4977,14 @@ function securityP(){
       <section class="card security-center-information security-audit"><header class="security-audit-head"><div><h3>Журнал безопасности</h3><p>Последние 100 записей серверного аудита. Доступно только владельцу панели.</p></div><button class="gh" type="button" data-security-audit-refresh>Обновить</button></header><label class="security-audit-search">Поиск по действию и администратору <input type="search" data-security-audit-search placeholder="Например, security.session"></label><div class="security-audit-list" id="security-audit-list" role="status" aria-live="polite">Откройте вкладку, чтобы загрузить журнал.</div></section>
     </div>
     <div class="security-center-pane" id="security-pane-infra" role="tabpanel" aria-labelledby="security-tab-infra" data-security-pane="infra" hidden>
-      <section class="card security-center-information"><h3>Безопасность инфраструктуры</h3><p>Операционные проверки доступны в действующих разделах. Отключённые или ещё не реализованные механизмы не показываются как активные.</p>
-      <div class="settings-security-routes">
-        <a href="#nodes"><span>01</span><b>Узлы и агенты</b><small>Состояние узлов, версии и доверенные соединения</small></a>
-        <a href="#tools"><span>02</span><b>Диагностика</b><small>Проверка доступности и состояния служб</small></a>
-        <a href="#set/data"><span>03</span><b>Данные</b><small>Экспорт интерфейса и рекомендации по резервному копированию</small></a>
-      </div>
-      <p class="note">IP allowlist, управление API-токенами и автоматический аудит TLS пока требуют серверной реализации. Здесь нет неработающих переключателей.</p>
+            <section class="card security-center-information settings-infrastructure">
+        <div class="appearance-card-heading"><h3>Проверки инфраструктуры</h3><small>Переходы к работающим инструментам. Настройки сервера не дублируются.</small></div>
+        <div class="settings-security-routes">
+          <a href="#nodes">${ic('server')}<span><b>Узлы и агенты</b><small>Состояние подключений, версии и ошибки</small></span>${ic('chevronRight')}</a>
+          <a href="#tools">${ic('activity')}<span><b>Диагностика</b><small>Доступность сервисов и проверка конфигурации</small></span>${ic('chevronRight')}</a>
+          <a href="#set/data">${ic('file')}<span><b>Резервное копирование</b><small>Экспорт данных и инструкции по бэкапу</small></span>${ic('chevronRight')}</a>
+        </div>
+        <details class="settings-security-limitations"><summary>Какие меры пока недоступны?</summary><p>Список разрешённых IP, управление API-токенами и автоматический аудит TLS требуют серверной реализации. Здесь нет неработающих переключателей.</p></details>
     </section>
     </div>
   </div>`];
@@ -4993,6 +4993,18 @@ function securityP(){
 /* ================= НАСТРОЙКИ ================= */
 // Each page is a meaningful workflow, not a page for every tiny preference.
 // Keep the original functional cards (and their owners/API handlers) intact.
+const SETTINGS_HOOK_DETAILS=Object.freeze({
+ 'user.created':['Создан пользователь','Новая учётная запись','User created','New account created'],
+ 'user.limited':['Достигнут лимит','Исчерпан лимит трафика пользователя','Traffic limit reached','User has reached a traffic limit'],
+ 'user.expired':['Подписка истекла','Срок действия пользователя завершился','Subscription expired','User subscription expired'],
+ 'user.expires_in_24_hours':['До окончания 24 часа','Подписка заканчивается в течение суток','Expires within 24 hours','Subscription expires within a day'],
+ 'user.first_connected':['Первое подключение','Первое успешное подключение пользователя','First connection','User connected for the first time'],
+ 'user.bandwidth_usage_threshold_reached':['Порог расхода трафика','Достигнута заданная граница расхода','Usage threshold reached','Configured usage threshold reached']
+});
+function settingsHookDetails(key){
+ const info=SETTINGS_HOOK_DETAILS[key];
+ return info?(panelIsEnglish()?[info[2],info[3]]:[info[0],info[1]]):[key,panelIsEnglish()?'Custom event':'Дополнительное событие'];
+}
 const SETTINGS_PAGES=Object.freeze([
  ['general','Панель','Брендинг, поведение, интеграции и уведомления','sliders',['general','integrations']],
  ['appearance','Оформление','Палитра, композиция, типографика и эффекты','sun',['colors','layout','typography']],
@@ -5098,8 +5110,8 @@ async function setP(){
     <div class="appearance-card-heading"><h3>Проверка уведомлений</h3><small>Здесь можно проверить настоящие всплывающие сообщения панели.</small></div>
     <div class="settings-notification-example"><span class="settings-notification-icon">${ic('bell')}</span><div><b>Тестовое сообщение</b><small>Положение и длительность задаются в соседнем блоке.</small></div></div>
     <button type="button" class="gh settings-notification-trigger" data-settings-test-toast>${ic('bell')} Показать уведомление</button>
-    <div class="settings-notification-summary"><span>Событий вебхуков включено</span><b data-hook-count>${Object.values(DB.set.hooks||{}).filter(Boolean).length} / ${Object.keys(DB.set.hooks||{}).length}</b></div>
-    <p class="note">Тест показывает сообщение в этом браузере и не отправляет запрос во внешний сервис. API-токены здесь не создаются.</p>
+    
+    <p class="note">Тест работает только в браузере: внешние сервисы не вызываются. API-токены здесь не создаются.</p>
   </section>`;
   const settingsPage=settingsPageFromHash();
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
@@ -5151,7 +5163,11 @@ async function setP(){
       <a href="#nodes">${ic('server')}<span><b>Узлы</b><small>Инфраструктура, лимиты и агенты</small></span>${ic('down')}</a>
     </div>
   </section>
-  <div class="card" data-settings-group="integrations"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
+  <section class="card settings-hooks-card" data-settings-group="integrations">
+  <div class="appearance-card-heading settings-hooks-heading"><div><h3>События вебхуков</h3><small>Выберите события для внешних интеграций. Каждый переключатель сохраняется сразу.</small></div><span class="settings-hooks-count"><b data-hook-count>${Object.values(DB.set.hooks||{}).filter(Boolean).length} / ${Object.keys(DB.set.hooks||{}).length}</b> включено</span></div>
+  <div class="settings-hook-list">${Object.entries(DB.set.hooks||{}).map(([k,v])=>{const [name,description]=settingsHookDetails(k);return `<div class="rowi settings-hook-item"><div class="settings-hook-copy"><b>${esc(name)}</b><small>${esc(description)}</small><code translate="no">${esc(k)}</code></div><label class="sw"><input type="checkbox" data-hk="${esc(k)}" ${v?'checked':''} aria-label="${esc(name)}"><span></span></label></div>`}).join('')}</div>
+  <p class="note settings-hook-hint">Здесь выбираются типы событий. Для доставки требуется настроенный внешний обработчик.</p>
+</section>${tk}
   <section class="card sg" data-settings-group="integrations"><div class="appearance-card-heading"><h3>Уведомления интерфейса</h3><small>Всплывающие сообщения панели. Персональные настройки этого браузера.</small></div>
     <div class="setting-row"><div class="setting-copy"><b>Длительность уведомлений</b><small>Время показа обычных сообщений. Действия с отменой остаются видимыми дольше.</small></div><div class="setting-control"><select id="toast-duration" aria-label="Длительность уведомлений">${[[3,'3 секунды'],[4,'4 секунды'],[6,'6 секунд'],[9,'9 секунд']].map(([v,l])=>`<option value="${v}" ${C.toastDuration===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Расположение уведомлений</b><small>Для обычных сообщений. Уведомления диалоговых окон остаются рядом с ними.</small></div><div class="setting-control">${choices('toastPosition',[['center','По центру'],['right','Справа']])}</div></div>
@@ -5246,24 +5262,24 @@ async function setP(){
   // rules and the original per-feature lifecycle/mounting logic.
   const embedded=settingsPage==='security'?securityP():
     settingsPage==='admins'?await simple(['admins']):null;
-  const adminRoleGuide=settingsPage==='admins'?`<aside class="settings-admin-role-guide" aria-label="Роли и уровни доступа">
-    <div class="appearance-card-heading"><h3>Роли доступа</h3><small>Подсказка к действующим ролям администраторов</small></div>
+  const adminRoleGuide=settingsPage==='admins'?`<details class="settings-admin-role-guide" aria-label="Роли и уровни доступа">
+    <summary><b>Что разрешают роли?</b><small>Владелец · Администратор · Наблюдатель</small></summary>
     <div class="settings-admin-role-grid">
-      <div><b>Владелец</b><p>Управление настройками панели, обновлениями и другими администраторами.</p></div>
-      <div><b>Администратор</b><p>Работа с разрешёнными разделами управления без полномочий владельца.</p></div>
-      <div><b>Наблюдатель</b><p>Просмотр доступных данных без права изменять конфигурацию.</p></div>
+      <div><b>Владелец</b><p>Настройки системы, обновления и управление администраторами.</p></div>
+      <div><b>Администратор</b><p>Управление доступными ему разделами без полномочий владельца.</p></div>
+      <div><b>Наблюдатель</b><p>Просмотр разрешённых данных без изменения конфигурации.</p></div>
     </div>
-  </aside>`:'';
+  </details>`:'';
   const focusItems=SETTINGS_FOCUS_GROUPS[settingsPage]||[];
   const focusGroup=focusItems.length?settingsFocusForPage(settingsPage):null;
   const activeCards=selected.filter(card=>!focusGroup||card.dataset.settingsGroup===focusGroup);
-  const columns=[[],[]],activeColumns=[false,false];
+  const columns=[[],[],[]],activeColumns=[false,false,false];
   selected.forEach((card,index)=>{
     const visible=!focusGroup||card.dataset.settingsGroup===focusGroup;
     if(!visible)card.hidden=true;
     // The traffic policy belongs below the compact panel update controls,
     // not below the already taller Xray-core form. Keep both columns useful.
-    const column=settingsPage==='system'&&card.dataset.settingsGroup==='traffic'&&selected.length>1?1:index%2;
+    const column=settingsPage==='system'&&card.dataset.settingsGroup==='traffic'&&selected.length>1?2:index%2;
     columns[column].push(card.outerHTML);
     if(visible)activeColumns[column]=true;
   });
@@ -5274,7 +5290,7 @@ async function setP(){
   const [,title]=SETTINGS_PAGES.find(([key])=>key===settingsPage);
   const navigation=settingsPagesForSession().map(([key,label,subtitle,iconName])=>{
     const active=key===settingsPage;
-    return `<a class="settings-center-link${active?' is-active':''}" href="#set/${key}" ${active?'aria-current="page"':''}>
+    return `<a class="settings-center-link${active?' is-active':''}" href="#set/${key}" title="${esc(subtitle)}" ${active?'aria-current="page"':''}>
       <span class="settings-center-link-icon" aria-hidden="true">${ic(iconName)}</span>
       <span class="settings-center-link-copy"><strong>${label}</strong><small>${subtitle}</small></span>
     </a>`;
@@ -5292,6 +5308,7 @@ async function setP(){
       <div class="appearance-layout settings-center-grid" data-ui-columns="paired" data-single="${activeCards.length<=1}">
         <div class="appearance-column workspace-stack" ${activeColumns[0]?'':'hidden'}>${columns[0].join('')}</div>
         ${columns[1].length?'<div class="appearance-column workspace-stack" '+(activeColumns[1]?'':'hidden')+'>'+columns[1].join('')+'</div>':''}
+        ${columns[2].length?'<div class="appearance-column settings-system-footer" '+(activeColumns[2]?'':'hidden')+'>'+columns[2].join('')+'</div>':''}
       </div>`}
     </div></div></div>`,embedded?.[1]];
 }
