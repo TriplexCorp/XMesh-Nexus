@@ -14,4 +14,17 @@ The backend packages `frontend/` at `/app/static/`; browser assets are served un
 
 The historical legacy stylesheet, `ui-builder.js`, fourth workspaces CSS module and temporary compatibility staging script have been removed. Do not restore them or add secondary panel styling entrypoints.
 
-See [Design System v3](../docs/UI_SYSTEM.md) for active ownership and layout contracts.
+Native dialog widths belong to the shared presentation/dialog geometry layer.
+A feature stylesheet must not apply selectors like `dialog:not(...)` to unrelated
+dialogs: an earlier global `30rem` width in `features/users/users.css` crushed
+the XRAY STUDIO TLS editor. The TLS dialog has its own desktop-width,
+viewport-bounded layout and mobile breakpoint; only its central body scrolls,
+so the footer remains accessible. Do not fix that regression with browser zoom
+or feature-wide `!important` overrides.
+
+Run `node scripts/update-ui-cache.cjs` whenever a CSS import changes and
+`node scripts/test-xray-tls-dialog-geometry.cjs` to verify the actual Chromium
+modal, layout and working Save flow across mobile and desktop sizes.
+
+See [Design System v3](../docs/UI_SYSTEM.md) and the
+[XRAY STUDIO guide](../docs/XRAY_STUDIO_GUIDE.md) for ownership and TLS behavior.
