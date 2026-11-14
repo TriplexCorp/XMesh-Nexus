@@ -11,6 +11,11 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use std::{fmt::Write as _, time::Duration};
 use uuid::Uuid;
+#[path = "telegram_admin_bot_locale.rs"]
+mod locale;
+#[path = "telegram_admin_bot_commands.rs"]
+mod commands;
+use locale::{Language,render};
 
 #[derive(Deserialize)]
 struct TelegramUpdate {
@@ -54,6 +59,7 @@ const RATE_SCRIPT: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redi
 struct BotApi {
     client: Client,
     token: String,
+    language: Language,
 }
 
 impl BotApi {
@@ -88,14 +94,27 @@ impl BotApi {
     }
 
     async fn send(&self, chat: i64, text: &str, buttons: Value) -> Result<(), &'static str> {
+        let mut keyboard=buttons;
+        if let Some(rows)=keyboard.as_array_mut(){
+            for row in rows {
+                if let Some(items)=row.as_array_mut(){
+                    for item in items {
+                        if let Some(raw)=item.get("text").and_then(Value::as_str){
+                            item["text"]=json!(render(self.language,raw));
+                        }
+                    }
+                }
+            }
+        }
+        let rendered=render(self.language,text);
         self.call(
             "sendMessage",
             json!({
                 "chat_id":chat,
-                "text":text,
+                "text":rendered,
                 "parse_mode":"HTML",
                 "disable_web_page_preview":true,
-                "reply_markup":{"inline_keyboard":buttons}
+                "reply_markup":{"inline_keyboard":keyboard}
             }),
         )
         .await
@@ -144,6 +163,7 @@ fn menu_buttons() -> Value {
             ("🖥 Узлы", "v:nodes".into()),
             ("🔎 Поиск", "v:search".into()),
         ],
+        vec![("🗂 Сквады", "v:squads".into()),("🌐 Язык", "v:language".into())],
         vec![("❔ Помощь", "v:help".into())],
     ])
 }
@@ -449,6 +469,30 @@ async fn consume_confirmation(
     };
     let user_id: i64 = row.try_get("user_id").map_err(|_| "database_unavailable")?;
     let action: String = row.try_get("action").map_err(|_| "database_unavailable")?;
+    if matches!(action.as_str(),"create"|"renew"|"quota") {
+        let result=commands::apply_extra(state,admin_id,nonce,&row,&mut tx).await;
+        let (record_id,message)=match result {
+            Ok(value)=>value,
+            Err(reason) if reason!="database_unavailable"=>{
+                drop(tx);
+                let message=match reason{
+                    "duplicate_username"=>"This username already exists.",
+                    "nonexpiring_user"=>"This account has unlimited duration or is waiting for first connection. Change it in the panel.",
+                    "user_not_found"=>"User not found.",
+                    _=>"This action is no longer valid. Check the user and try again.",
+                };
+                api.send(chat,message,buttons(vec![vec![("🏠 Меню","v:menu".into())]])).await?;
+                return Ok(());
+            }
+            Err(reason)=>return Err(reason),
+        };
+        tx.commit().await.map_err(|_|"database_unavailable")?;
+        api.send(chat,&format!("✅ {message}"),buttons(vec![
+            vec![("👤 Карточка",format!("v:user:{record_id}"))],
+            vec![("🏠 Меню","v:menu".into())]
+        ])).await?;
+        return Ok(());
+    }
     let record =
         sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
             .bind(user_id)
@@ -552,6 +596,9 @@ async fn handle_command(
         .split_once(' ')
         .map_or((raw, ""), |(a, b)| (a, b.trim()));
     let cmd = cmd.split('@').next().unwrap_or("");
+    if let Some(result)=commands::extra_command(api,state,chat,admin_id,cmd,arg).await {
+        return result;
+    }
     match cmd {
         "/start"|"/menu"|"/help" => home(api,chat).await,
         "/stats" => stats(api,state,chat).await,
@@ -598,6 +645,12 @@ async fn handle_callback(
     if data == "v:search" {
         return api.send(chat,"🔎 Чтобы найти пользователя, отправьте:\n<code>/find имя</code>\nили\n<code>/user 123</code>",menu_buttons()).await;
     }
+    if data == "v:squads" {
+        return commands::squads(api,state,chat).await;
+    }
+    if data == "v:language" {
+        return commands::choose_language(api,chat).await;
+    }
     if data == "v:help" {
         return handle_command(api, state, chat, admin_id, "/help").await;
     }
@@ -643,8 +696,13 @@ async fn dispatch(
         if !rate_limit(state, user.id).await {
             return Ok(());
         }
-        let text = message.text.unwrap_or_default();
-        return handle_command(api, state, message.chat.id, user.id, &text).await;
+        let preference=commands::language(state,user.id).await?;
+        let Some(language)=preference else {
+            return commands::choose_language(api,message.chat.id).await;
+        };
+        let localized=BotApi{language,..api.clone()};
+        let text=message.text.unwrap_or_default();
+        return handle_command(&localized, state, message.chat.id, user.id, &text).await;
     }
     if let Some(callback) = update.callback_query {
         let Some(message) = callback.message else {
@@ -661,8 +719,21 @@ async fn dispatch(
             return Ok(());
         }
         api.acknowledge(&callback.id).await;
-        if let Some(data) = callback.data.as_deref() {
-            return handle_callback(api, state, message.chat.id, callback.from.id, data).await;
+        if let Some(data)=callback.data.as_deref(){
+            if let Some(code)=data.strip_prefix("v:lang:"){
+                let Some(language)=Language::from_db(code) else {return Ok(())};
+                commands::set_language(state,callback.from.id,language).await?;
+                let localized=BotApi{language,..api.clone()};
+                return home(&localized,message.chat.id).await;
+            }
+        }
+        let preference=commands::language(state,callback.from.id).await?;
+        let Some(language)=preference else {
+            return commands::choose_language(api,message.chat.id).await;
+        };
+        let localized=BotApi{language,..api.clone()};
+        if let Some(data)=callback.data.as_deref(){
+            return handle_callback(&localized, state, message.chat.id, callback.from.id, data).await;
         }
     }
     Ok(())
@@ -707,6 +778,7 @@ async fn session(
     let api = BotApi {
         client: client.clone(),
         token,
+        language: Language::Ru,
     };
     let identity = api.call("getMe", json!({})).await?;
     let me: TelegramMe =
