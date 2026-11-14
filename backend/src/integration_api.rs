@@ -4,12 +4,12 @@
 mod auth;
 #[path = "integration_api_grants.rs"]
 mod grants;
-#[path = "integration_api_users.rs"]
-mod users;
-#[path = "integration_api_user_mutations.rs"]
-mod user_mutations;
 #[path = "integration_api_quotas.rs"]
 mod quotas;
+#[path = "integration_api_user_mutations.rs"]
+mod user_mutations;
+#[path = "integration_api_users.rs"]
+mod users;
 
 use crate::{ApiError, AppState};
 use axum::{
