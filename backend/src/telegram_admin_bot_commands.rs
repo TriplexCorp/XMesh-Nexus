@@ -224,6 +224,49 @@ async fn start_create_picker(
     create_squad_picker(api, state, chat, admin_id, nonce, 0).await
 }
 
+fn squad_picker_keyboard(
+    rows: Vec<sqlx::postgres::PgRow>,
+    nonce: Uuid,
+    page: i64,
+    language: Language,
+) -> Result<Vec<Vec<Value>>, &'static str> {
+    let count = usize::try_from(SQUADS_PER_PAGE).map_err(|_| "invalid_command")?;
+    let has_next = rows.len() > count;
+    let mut keyboard: Vec<Vec<Value>> = Vec::new();
+    for row in rows.into_iter().take(count) {
+        let id: i64 = row.try_get("id").map_err(|_| "database_unavailable")?;
+        let name: Option<String> = row.try_get("name").map_err(|_| "database_unavailable")?;
+        let label = name
+            .as_deref()
+            .filter(|x| !x.trim().is_empty())
+            .unwrap_or("Squad");
+        keyboard.push(vec![json!({
+            "text":format!("🗂 {} · #{id}",label.chars().take(34).collect::<String>()),
+            "callback_data":format!("v:cs:{nonce}:{id}")
+        })]);
+    }
+    let mut nav = Vec::new();
+    if page > 0 {
+        nav.push(json!({
+            "text":tr(language,"◀ Назад","◀ Previous"),
+            "callback_data":format!("v:cp:{nonce}:{}",page-1)
+        }));
+    }
+    if has_next {
+        nav.push(json!({
+            "text":tr(language,"Далее ▶","Next ▶"),
+            "callback_data":format!("v:cp:{nonce}:{}",page+1)
+        }));
+    }
+    if !nav.is_empty() {
+        keyboard.push(nav);
+    }
+    keyboard.push(vec![
+        json!({"text":tr(language,"Отмена","Cancel"),"callback_data":"v:menu"}),
+    ]);
+    Ok(keyboard)
+}
+
 pub(super) async fn create_squad_picker(
     api: &BotApi,
     state: &AppState,
@@ -294,39 +337,7 @@ pub(super) async fn create_squad_picker(
             )
             .await;
     }
-    let has_next = rows.len() > SQUADS_PER_PAGE as usize;
-    let mut keyboard: Vec<Vec<Value>> = Vec::new();
-    for row in rows.into_iter().take(SQUADS_PER_PAGE as usize) {
-        let id: i64 = row.try_get("id").map_err(|_| "database_unavailable")?;
-        let name: Option<String> = row.try_get("name").map_err(|_| "database_unavailable")?;
-        let label = name
-            .as_deref()
-            .filter(|x| !x.trim().is_empty())
-            .unwrap_or("Squad");
-        keyboard.push(vec![json!({
-            "text":format!("🗂 {} · #{id}",label.chars().take(34).collect::<String>()),
-            "callback_data":format!("v:cs:{nonce}:{id}")
-        })]);
-    }
-    let mut nav = Vec::new();
-    if page > 0 {
-        nav.push(json!({
-            "text":tr(api.language,"◀ Назад","◀ Previous"),
-            "callback_data":format!("v:cp:{nonce}:{}",page-1)
-        }));
-    }
-    if has_next {
-        nav.push(json!({
-            "text":tr(api.language,"Далее ▶","Next ▶"),
-            "callback_data":format!("v:cp:{nonce}:{}",page+1)
-        }));
-    }
-    if !nav.is_empty() {
-        keyboard.push(nav);
-    }
-    keyboard.push(vec![
-        json!({"text":tr(api.language,"Отмена","Cancel"),"callback_data":"v:menu"}),
-    ]);
+    let keyboard = squad_picker_keyboard(rows, nonce, page, api.language)?;
     let message = format!(
         "{} <b>{}</b> · {days} {}\n\n{}",
         tr(api.language, "👤 Новый пользователь:", "👤 New user:"),
@@ -430,6 +441,38 @@ pub(super) async fn select_create_squad(
         ]),
     )
     .await
+}
+
+pub(super) async fn create_picker_callback(
+    api: &BotApi,
+    state: &AppState,
+    chat: i64,
+    admin_id: i64,
+    data: &str,
+) -> Option<Result<(), &'static str>> {
+    // Telegram callback_data is limited to 64 bytes. The UUID is bound to
+    // this administrator and the unexpired DB proposal, not just to the ID.
+    let (kind, raw) = if let Some(raw) = data.strip_prefix("v:cp:") {
+        ("page", raw)
+    } else if let Some(raw) = data.strip_prefix("v:cs:") {
+        ("select", raw)
+    } else {
+        return None;
+    };
+    let Some((raw_nonce, raw_value)) = raw.rsplit_once(':') else {
+        return Some(Err("invalid_command"));
+    };
+    let (Ok(nonce), Ok(value)) = (
+        Uuid::parse_str(raw_nonce),
+        raw_value.parse::<i64>(),
+    ) else {
+        return Some(Err("invalid_command"));
+    };
+    Some(if kind == "page" {
+        create_squad_picker(api, state, chat, admin_id, nonce, value).await
+    } else {
+        select_create_squad(api, state, chat, admin_id, nonce, value).await
+    })
 }
 
 async fn propose(
