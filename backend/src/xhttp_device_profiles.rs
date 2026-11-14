@@ -105,6 +105,21 @@ pub(crate) fn validate(inbound: &Value) -> Result<(), &'static str> {
     }
     Ok(())
 }
+/// Client transport overlays are stored alongside XRAY STUDIO profiles but
+/// are never valid Xray-core inbound fields. Strip before signing node config.
+pub(crate) fn strip_from_node_config(config: &mut Value) {
+    if let Some(inbounds) = config.get_mut("inbounds").and_then(Value::as_array_mut) {
+        for inbound in inbounds {
+            if let Some(map) = inbound.as_object_mut() {
+                map.remove("xhttpDeviceProfiles");
+                if let Some(xmesh) = map.get_mut("xmesh").and_then(Value::as_object_mut) {
+                    xmesh.remove("xhttpDeviceProfiles");
+                    if xmesh.is_empty() { map.remove("xmesh"); }
+                }
+            }
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
