@@ -1,13 +1,23 @@
 //! RU / EN Telegram administrator UI. No remote machine translation or AI
 //! dependency: security-sensitive prompts have deterministic trusted copy.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(super) enum Language { Ru, En }
+pub(super) enum Language {
+    Ru,
+    En,
+}
 impl Language {
     pub(super) fn from_db(s: &str) -> Option<Self> {
-        match s {"ru"=>Some(Self::Ru),"en"=>Some(Self::En),_=>None}
+        match s {
+            "ru" => Some(Self::Ru),
+            "en" => Some(Self::En),
+            _ => None,
+        }
     }
     pub(super) const fn code(self) -> &'static str {
-        match self {Self::Ru=>"ru",Self::En=>"en"}
+        match self {
+            Self::Ru => "ru",
+            Self::En => "en",
+        }
     }
 }
 pub(super) fn tr(lang: Language, ru: &'static str, en: &'static str) -> &'static str {
