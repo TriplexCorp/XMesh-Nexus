@@ -14,24 +14,24 @@ const XMUX_FIELDS: &[&str] = &[
 const PLATFORMS: &[&str] = &["iOS","Android","Windows","macOS","Linux","Auto"];
 
 fn nonnegative_range(v: &Value) -> bool {
-    let bounds = match v {
-        Value::Number(n) => {
-            let Some(number) = n.as_i64() else {return false;};
-            return (0..=i64::from(i32::MAX)).contains(&number);
-        }
+    match v {
+        Value::Number(n) => n.as_i64()
+            .is_some_and(|number| (0..=i64::from(i32::MAX)).contains(&number)),
         Value::String(value) => {
-            let mut pieces=value.split('-');
-            let first=pieces.next().and_then(|s|s.parse::<i64>().ok());
-            let second=pieces.next().and_then(|s|s.parse::<i64>().ok());
-            if pieces.next().is_some() {return false;}
+            let mut pieces = value.split('-');
+            let first = pieces.next().and_then(|s| s.parse::<i64>().ok());
+            let second = pieces.next().map(|s| s.parse::<i64>().ok());
+            if pieces.next().is_some() { return false; }
             match (first, second) {
-                (Some(a),Some(b)) => (0..=i64::from(i32::MAX)).contains(&a) && (a..=i64::from(i32::MAX)).contains(&b),
+                (Some(from), None) => (0..=i64::from(i32::MAX)).contains(&from),
+                (Some(from), Some(Some(to))) =>
+                    (0..=i64::from(i32::MAX)).contains(&from)
+                    && (from..=i64::from(i32::MAX)).contains(&to),
                 _ => false,
             }
         }
         _ => false,
-    };
-    bounds
+    }
 }
 fn positive_max(value: Option<&Value>) -> bool {
     let Some(v) = value else {return false;};
