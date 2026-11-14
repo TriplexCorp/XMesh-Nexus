@@ -44,26 +44,57 @@ pub(super) async fn choose_language(api: &BotApi, chat: i64) -> Result<(), &'sta
         ])).await
 }
 
-pub(super) async fn squads(api:&BotApi,state:&AppState,chat:i64)->Result<(),&'static str>{
-    let rows=sqlx::query(
+pub(super) async fn squads(api: &BotApi, state: &AppState, chat: i64) -> Result<(), &'static str> {
+    let rows = sqlx::query(
         "SELECT id,data->>'name' AS name FROM panel_records
-         WHERE collection='squads' ORDER BY id DESC LIMIT 12"
-    ).fetch_all(&state.pool).await.map_err(|_|"database_unavailable")?;
-    let mut text=tr(api.language,"🗂 <b>Сквады XMesh</b>\n\n","🗂 <b>XMesh squads</b>\n\n").to_owned();
-    if rows.is_empty(){text.push_str(tr(api.language,"Сквадов пока нет.","No squads configured."));}
-    for row in rows {
-        let id:i64=row.try_get("id").map_err(|_|"database_unavailable")?;
-        let name:Option<String>=row.try_get("name").map_err(|_|"database_unavailable")?;
-        let label=escape(name.as_deref().unwrap_or("Squad"));
-        let _=writeln!(text,"• <b>{label}</b> · #{id}");
+         WHERE collection='squads' ORDER BY id DESC LIMIT 12",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    let mut text = tr(
+        api.language,
+        "🗂 <b>Сквады XMesh</b>\n\n",
+        "🗂 <b>XMesh squads</b>\n\n",
+    )
+    .to_owned();
+    if rows.is_empty() {
+        text.push_str(tr(
+            api.language,
+            "Сквадов пока нет.",
+            "No squads configured.",
+        ));
     }
-    api.send(chat,&text,buttons(vec![vec![(tr(api.language,"🏠 Меню","🏠 Menu"),"v:menu".into())]])).await
+    for row in rows {
+        let id: i64 = row.try_get("id").map_err(|_| "database_unavailable")?;
+        let name: Option<String> = row.try_get("name").map_err(|_| "database_unavailable")?;
+        let label = escape(name.as_deref().unwrap_or("Squad"));
+        let _ = writeln!(text, "• <b>{label}</b> · #{id}");
+    }
+    api.send(
+        chat,
+        &text,
+        buttons(vec![vec![(
+            tr(api.language, "🏠 Меню", "🏠 Menu"),
+            "v:menu".into(),
+        )]]),
+    )
+    .await
 }
 
-pub(super) async fn find_telegram(api:&BotApi,state:&AppState,chat:i64,raw:&str)->Result<(),&'static str>{
-    if raw.is_empty()||raw.len()>19||!raw.bytes().all(|b|b.is_ascii_digit())
-        ||raw.parse::<i64>().is_ok_and(|id|id<=0) || raw.parse::<i64>().is_err()
-        ||raw.starts_with('0'){
+pub(super) async fn find_telegram(
+    api: &BotApi,
+    state: &AppState,
+    chat: i64,
+    raw: &str,
+) -> Result<(), &'static str> {
+    if raw.is_empty()
+        || raw.len() > 19
+        || !raw.bytes().all(|b| b.is_ascii_digit())
+        || raw.parse::<i64>().is_ok_and(|id| id <= 0)
+        || raw.parse::<i64>().is_err()
+        || raw.starts_with('0')
+    {
         return api.send(chat,tr(api.language,
             "Используйте <code>/findtg 123456789</code> — числовой Telegram ID пользователя.",
             "Use <code>/findtg 123456789</code> — a numeric Telegram user ID."),
