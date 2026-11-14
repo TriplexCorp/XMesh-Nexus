@@ -167,6 +167,29 @@ dialog.xm-studio-modal.xm-studio-modal--cards{
   inline-size:min(var(--dialog-width),calc(100vw - 2rem));
   min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
 }
+/* TLS is a full editor, not a 30rem action dialog. The native top-layer
+ * owns the outer width; only .xm-tls-body scrolls on short viewports. */
+dialog.xm-tls-dialog{
+  --dialog-width:1180px;
+  box-sizing:border-box;
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  max-inline-size:calc(100vw - 2rem);
+}
+@media(min-width:1600px){
+  dialog.xm-tls-dialog{
+    --dialog-width:1380px;
+    inline-size:min(var(--dialog-width),calc(100vw - 4rem));
+    min-inline-size:min(var(--dialog-width),calc(100vw - 4rem));
+  }
+}
+@media(max-width:760px){
+  dialog.xm-tls-dialog{
+    inline-size:calc(100vw - .8rem);
+    min-inline-size:0;
+    max-inline-size:calc(100vw - .8rem);
+  }
+}
 dialog:is(.sv-overlay,.xm-studio-modal) :is(.sv-dialog,.xm-studio-modal-shell){min-width:0;max-width:100%}
 
 /* User intelligence is a workstation, not a small action dialog. Its header,
