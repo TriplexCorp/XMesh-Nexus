@@ -109,6 +109,8 @@ window.XMeshI18n=(()=>{
     "Ничего не найдено.": "Nothing found.",
     "Без срока": "No expiration",
     "{remain} дн.": "{remain} days",
+    "{traffic_used:.2} / {limit:.2} ГБ": "{traffic_used:.2} / {limit:.2} GB",
+    "{traffic_used:.2} ГБ / ∞": "{traffic_used:.2} GB / ∞",
     "{used:.2} / {limit:.2} ГБ": "{used:.2} / {limit:.2} GB",
     "{used:.2} ГБ / ∞": "{used:.2} GB / ∞",
     "Статус:": "Status:",
