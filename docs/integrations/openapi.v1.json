@@ -4,7 +4,7 @@
     "title": "XMesh Nexus Integration API",
     "version": "1.0.0-rfc",
     "summary": "Full VPN control-plane API for Telegram bots and independent integrations",
-    "description": "RFC CONTRACT ONLY. These operations are not yet registered in Rust. Payments, tariffs, checkouts and customer notifications are owned by the external application. VPN identity, subscriptions, quotas, nodes, credentials and access policies are owned by Nexus. This OpenAPI document is a proposed contract and must not be used to infer runtime capability."
+    "description": "Mixed shipped and proposed Integration API operations. Check the x-rollout-status of each method and the docs/integrations/README.md for the authoritative rollout status. Payments, tariffs, checkouts and customer notifications belong to external applications; VPN accounts, subscriptions and quotas belong to Nexus. Documentation does not itself establish production availability."
   },
   "servers": [
     {
@@ -354,6 +354,235 @@
         }
       }
     },
+    "/users/by-telegram/{telegramId}": {
+        "get": {
+          "tags": [
+            "Users",
+            "Identity"
+          ],
+          "operationId": "findUsersByTelegram",
+          "summary": "Find all visible VPN subscriptions for a Telegram user ID",
+          "description": "Matches legacy panel field data.tg. Supports multiple VPN accounts per Telegram ID; requires both telegram:read and users:read. Results are restricted by allowedUserIds, and the cursor is HMAC-bound to the integration client and this Telegram ID. No raw credentials are returned.",
+          "x-required-scopes": [
+            "telegram:read",
+            "users:read"
+          ],
+          "x-rollout-status": "implemented",
+          "security": [
+            {
+              "IntegrationBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "telegramId",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "schema": {
+                "type": "string",
+                "maxLength": 256
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 50
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successfully processed",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "data",
+                      "meta"
+                    ],
+                    "properties": {
+                      "data": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/User"
+                        }
+                      },
+                      "meta": {
+                        "$ref": "#/components/schemas/Meta"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "401": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "403": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "404": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "409": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "412": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "428": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "429": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "503": {
+              "$ref": "#/components/responses/Problem"
+            }
+          }
+        }
+      },
+      "/users/{userId}/telegram": {
+        "patch": {
+          "tags": [
+            "Users",
+            "Identity"
+          ],
+          "operationId": "assignTelegramIdToProvisionedUser",
+          "summary": "Assign Telegram ID to an account created by this integration client",
+          "description": "One-way assignment only: requires telegram:assign and object access, a current If-Match and Idempotency-Key. The account must have been provisioned by this exact integration client. A previously populated Telegram ID, or a panel-created account, cannot be reassigned by an integration token. Panel owner handles disputes and rebinds.",
+          "x-required-scopes": [
+            "telegram:assign"
+          ],
+          "x-rollout-status": "implemented",
+          "security": [
+            {
+              "IntegrationBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/userId"
+            },
+            {
+              "$ref": "#/components/parameters/IdempotencyKey"
+            },
+            {
+              "$ref": "#/components/parameters/IfMatch"
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "telegramId"
+                  ],
+                  "properties": {
+                    "telegramId": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]{0,18}$"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successfully processed",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "data",
+                      "meta"
+                    ],
+                    "properties": {
+                      "data": {
+                        "type": "object",
+                        "required": [
+                          "userId",
+                          "telegramId",
+                          "revision",
+                          "changed"
+                        ],
+                        "properties": {
+                          "userId": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "telegramId": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]{0,18}$"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "changed": {
+                            "type": "boolean"
+                          }
+                        }
+                      },
+                      "meta": {
+                        "$ref": "#/components/schemas/Meta"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "401": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "403": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "404": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "409": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "412": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "428": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "429": {
+              "$ref": "#/components/responses/Problem"
+            },
+            "503": {
+              "$ref": "#/components/responses/Problem"
+            }
+          }
+        }
+      },
     "/users/{userId}": {
       "get": {
         "tags": [
@@ -7357,6 +7586,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128
+          },
+          "telegramId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Trusted Telegram Bot API from.id as a canonical decimal string; requires telegram:assign in addition to users:create"
           },
           "hold": {
             "type": "boolean"
