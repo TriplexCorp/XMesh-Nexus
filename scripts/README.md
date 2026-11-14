@@ -6,11 +6,20 @@
 
 - `scripts/ci/` — CI-only adapters/fixtures. These helpers must never become production runtime dependencies.
 - `check-*.js` / `check-*.sh` — active source/contract gates. A new check belongs here only when it is wired into an active workflow or intentionally documented as an operator command.
-- `test-*.py` / `test-*.sh` — executable behavioral/integration tests used by CI or documented validation procedures.
+- `test-*.py` / `test-*.sh` / `test-*.cjs` — executable behavioral, browser and integration tests used by CI or documented validation procedures.
 - `xsp-v2-*`, `build-xsp-*`, `verify-xsp-*`, `assemble-xsp-*` — release/security evidence tooling. Their paths are stability-sensitive and should be moved only together with every workflow, document and evidence contract that references them.
 
 ## Hygiene rule
 
 Do not keep abandoned standalone checks, marker/version scratch files or one-off migration helpers indefinitely. If a script is not invoked by CI, not referenced by maintained documentation and not a supported operator/release command, remove it rather than archiving executable code in place.
+
+### XRAY STUDIO dialog regression
+
+`node scripts/test-xray-tls-dialog-geometry.cjs` uses the pinned
+Playwright Chromium installation in `scripts/browser/node_modules`.
+After `npm ci --prefix scripts/browser` and the Playwright Chromium install,
+it opens the real TLS editor at seven viewports, checks its width and input
+geometry, and verifies that saving SNI updates the source JSON. It runs in
+the `public-subscription-browser` GitHub Actions job.
 
 The repository-wide guard is `scripts/check-repo-layout.js`; browser source belongs under `frontend/`, not in the repository root.
