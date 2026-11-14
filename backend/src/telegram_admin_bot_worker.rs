@@ -11,6 +11,11 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use std::{fmt::Write as _, time::Duration};
 use uuid::Uuid;
+#[path = "telegram_admin_bot_commands.rs"]
+mod commands;
+#[path = "telegram_admin_bot_locale.rs"]
+mod locale;
+use locale::{Language, render};
 
 #[derive(Deserialize)]
 struct TelegramUpdate {
@@ -54,6 +59,7 @@ const RATE_SCRIPT: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redi
 struct BotApi {
     client: Client,
     token: String,
+    language: Language,
 }
 
 impl BotApi {
@@ -88,14 +94,27 @@ impl BotApi {
     }
 
     async fn send(&self, chat: i64, text: &str, buttons: Value) -> Result<(), &'static str> {
+        let mut keyboard = buttons;
+        if let Some(rows) = keyboard.as_array_mut() {
+            for row in rows {
+                if let Some(items) = row.as_array_mut() {
+                    for item in items {
+                        if let Some(raw) = item.get("text").and_then(Value::as_str) {
+                            item["text"] = json!(render(self.language, raw));
+                        }
+                    }
+                }
+            }
+        }
+        let rendered = render(self.language, text);
         self.call(
             "sendMessage",
             json!({
                 "chat_id":chat,
-                "text":text,
+                "text":rendered,
                 "parse_mode":"HTML",
                 "disable_web_page_preview":true,
-                "reply_markup":{"inline_keyboard":buttons}
+                "reply_markup":{"inline_keyboard":keyboard}
             }),
         )
         .await
@@ -143,6 +162,18 @@ fn menu_buttons() -> Value {
         vec![
             ("🖥 Узлы", "v:nodes".into()),
             ("🔎 Поиск", "v:search".into()),
+        ],
+        vec![
+            ("🗂 Сквады", "v:squads".into()),
+            ("🔎 TG ID", "v:findtg".into()),
+        ],
+        vec![
+            ("➕ Создать", "v:create".into()),
+            ("⏱ Продлить", "v:renew".into()),
+        ],
+        vec![
+            ("📦 Квота", "v:quota".into()),
+            ("🌐 Язык", "v:language".into()),
         ],
         vec![("❔ Помощь", "v:help".into())],
     ])
@@ -365,6 +396,10 @@ async fn user_card(api: &BotApi, state: &AppState, chat: i64, id: i64) -> Result
         buttons(vec![
             vec![(toggle.0, toggle.1)],
             vec![
+                ("⏱ Продлить", format!("v:guide:renew:{id}")),
+                ("📦 Квота", format!("v:guide:quota:{id}")),
+            ],
+            vec![
                 ("🔄 Обновить", format!("v:user:{id}")),
                 ("🏠 Меню", "v:menu".into()),
             ],
@@ -415,6 +450,110 @@ async fn create_confirmation(
     .await
 }
 
+async fn handle_extra_confirmation(
+    api: &BotApi,
+    state: &AppState,
+    chat: i64,
+    admin_id: i64,
+    nonce: Uuid,
+    row: sqlx::postgres::PgRow,
+    mut tx: sqlx::Transaction<'_, sqlx::Postgres>,
+) -> Result<(), &'static str> {
+    let result = commands::apply_extra(state, admin_id, nonce, &row, &mut tx, api.language).await;
+    let (record_id, message) = match result {
+        Ok(value) => value,
+        Err(reason) if reason != "database_unavailable" => {
+            drop(tx);
+            let message = match reason {
+                "duplicate_username" => "This username already exists.",
+                "nonexpiring_user" => {
+                    "This account has unlimited duration or is waiting for first connection. Change it in the panel."
+                }
+                "user_not_found" => "User not found.",
+                _ => "This action is no longer valid. Check the user and try again.",
+            };
+            api.send(
+                chat,
+                message,
+                buttons(vec![vec![("🏠 Меню", "v:menu".into())]]),
+            )
+            .await?;
+            return Ok(());
+        }
+        Err(reason) => return Err(reason),
+    };
+    tx.commit().await.map_err(|_| "database_unavailable")?;
+    api.send(
+        chat,
+        &format!("✅ {message}"),
+        buttons(vec![
+            vec![("👤 Карточка", format!("v:user:{record_id}"))],
+            vec![("🏠 Меню", "v:menu".into())],
+        ]),
+    )
+    .await?;
+    Ok(())
+}
+
+async fn apply_access_toggle(
+    api: &BotApi,
+    chat: i64,
+    admin_id: i64,
+    nonce: Uuid,
+    user_id: i64,
+    action: &str,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+) -> Result<Option<bool>, &'static str> {
+    let record =
+        sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
+            .bind(user_id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(|_| "database_unavailable")?;
+    let Some(record) = record else {
+        api.send(chat, "Пользователь больше не существует.", menu_buttons())
+            .await?;
+        return Ok(None);
+    };
+    let mut data: Value = record.try_get("data").map_err(|_| "database_unavailable")?;
+    let disabled = action == "disable";
+    let changed = data.get("disabled") != Some(&Value::Bool(disabled));
+    if changed {
+        data["disabled"] = json!(disabled);
+        crate::validate_record("users", &data).map_err(|_| "invalid_user")?;
+        sqlx::query(
+            "UPDATE panel_records SET data=$2,updated_at=NOW()
+             WHERE collection='users' AND id=$1",
+        )
+        .bind(user_id)
+        .bind(&data)
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| "database_unavailable")?;
+    }
+    sqlx::query("UPDATE telegram_admin_bot_actions SET consumed_at=NOW() WHERE nonce=$1::UUID")
+        .bind(nonce.to_string())
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| "database_unavailable")?;
+    sqlx::query(
+        "INSERT INTO panel_audit_log(actor,action,collection,record_id,detail)
+         VALUES($1,$2,'users',$3,$4)",
+    )
+    .bind(format!("telegram:{admin_id}"))
+    .bind(if disabled {
+        "telegram_bot.user_disabled"
+    } else {
+        "telegram_bot.user_enabled"
+    })
+    .bind(user_id)
+    .bind(json!({"telegramAdminId":admin_id,"changed":changed}))
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    Ok(Some(disabled))
+}
+
 async fn consume_confirmation(
     api: &BotApi,
     state: &AppState,
@@ -429,7 +568,7 @@ async fn consume_confirmation(
         .await
         .map_err(|_| "database_unavailable")?;
     let row = sqlx::query(
-        "SELECT user_id,action FROM telegram_admin_bot_actions
+        "SELECT user_id,action,amount,username FROM telegram_admin_bot_actions
          WHERE nonce=$1::UUID AND admin_id=$2 AND consumed_at IS NULL
            AND expires_at>NOW() FOR UPDATE",
     )
@@ -447,55 +586,29 @@ async fn consume_confirmation(
             )
             .await;
     };
-    let user_id: i64 = row.try_get("user_id").map_err(|_| "database_unavailable")?;
-    let action: String = row.try_get("action").map_err(|_| "database_unavailable")?;
-    let record =
-        sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
-            .bind(user_id)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|_| "database_unavailable")?;
-    let Some(record) = record else {
-        return api
-            .send(chat, "Пользователь больше не существует.", menu_buttons())
-            .await;
-    };
-    let mut data: Value = record.try_get("data").map_err(|_| "database_unavailable")?;
-    let disabled = action == "disable";
-    let changed = data.get("disabled") != Some(&Value::Bool(disabled));
-    if changed {
-        data["disabled"] = json!(disabled);
-        crate::validate_record("users", &data).map_err(|_| "invalid_user")?;
-        sqlx::query(
-            "UPDATE panel_records SET data=$2,updated_at=NOW()
-             WHERE collection='users' AND id=$1",
-        )
-        .bind(user_id)
-        .bind(&data)
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| "database_unavailable")?;
-    }
-    sqlx::query("UPDATE telegram_admin_bot_actions SET consumed_at=NOW() WHERE nonce=$1::UUID")
-        .bind(nonce.to_string())
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| "database_unavailable")?;
-    sqlx::query(
-        "INSERT INTO panel_audit_log(actor,action,collection,record_id,detail)
-         VALUES($1,$2,'users',$3,$4)",
+    // The allowlist can change while a confirmation is displayed. Hold a
+    // shared lock through commit so removed administrators cannot race writes.
+    let still_authorized: bool = sqlx::query_scalar(
+        "SELECT enabled AND $1=ANY(admin_ids) FROM telegram_admin_bot
+         WHERE singleton=TRUE FOR SHARE",
     )
-    .bind(format!("telegram:{admin_id}"))
-    .bind(if disabled {
-        "telegram_bot.user_disabled"
-    } else {
-        "telegram_bot.user_enabled"
-    })
-    .bind(user_id)
-    .bind(json!({"telegramAdminId":admin_id,"changed":changed}))
-    .execute(&mut *tx)
+    .bind(admin_id)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|_| "database_unavailable")?;
+    if !still_authorized {
+        return Err("permission_revoked");
+    }
+    let user_id: i64 = row.try_get("user_id").map_err(|_| "database_unavailable")?;
+    let action: String = row.try_get("action").map_err(|_| "database_unavailable")?;
+    if matches!(action.as_str(), "create" | "renew" | "quota") {
+        return handle_extra_confirmation(api, state, chat, admin_id, nonce, row, tx).await;
+    }
+    let Some(disabled) =
+        apply_access_toggle(api, chat, admin_id, nonce, user_id, &action, &mut tx).await?
+    else {
+        return Ok(());
+    };
     tx.commit().await.map_err(|_| "database_unavailable")?;
     let text = if disabled {
         "🔴 Пользователь отключён."
@@ -552,8 +665,15 @@ async fn handle_command(
         .split_once(' ')
         .map_or((raw, ""), |(a, b)| (a, b.trim()));
     let cmd = cmd.split('@').next().unwrap_or("");
+    if let Some(result) = commands::extra_command(api, state, chat, admin_id, cmd, arg).await {
+        return result;
+    }
     match cmd {
-        "/start"|"/menu"|"/help" => home(api,chat).await,
+        "/start"|"/menu" => home(api,chat).await,
+        "/help" => api.send(chat,locale::tr(api.language,
+            "Команды:\n/start — меню\n/stats — сводка\n/users — пользователи\n/nodes — ноды\n/squads — сквады\n/find имя — поиск\n/findtg ID — поиск по Telegram ID\n/user ID — карточка\n/create имя 30 — создать на 30 дней\n/renew ID 30 — продлить на 30 дней\n/quota ID 50 — лимит 50 ГБ (0 — безлимит)\n/language — выбрать язык\n\nВсе изменения требуют подтверждения.",
+            "Commands:\n/start — menu\n/stats — overview\n/users — users\n/nodes — nodes\n/squads — squads\n/find username — search\n/findtg ID — Telegram ID lookup\n/user ID — user card\n/create username 30 — create for 30 days\n/renew ID 30 — extend by 30 days\n/quota ID 50 — 50 GB quota (0 = unlimited)\n/language — select language\n\nAll changes require explicit confirmation."),
+            menu_buttons()).await,
         "/stats" => stats(api,state,chat).await,
         "/users" => users(api,state,chat).await,
         "/nodes" => nodes(api,state,chat).await,
@@ -597,6 +717,56 @@ async fn handle_callback(
     }
     if data == "v:search" {
         return api.send(chat,"🔎 Чтобы найти пользователя, отправьте:\n<code>/find имя</code>\nили\n<code>/user 123</code>",menu_buttons()).await;
+    }
+    if data == "v:squads" {
+        return commands::squads(api, state, chat).await;
+    }
+    if data == "v:language" {
+        return commands::choose_language(api, chat).await;
+    }
+    for (name, usage_ru, usage_en) in [
+        ("create", "/create имя 30", "/create username 30"),
+        ("renew", "/renew 123 30", "/renew 123 30"),
+        ("quota", "/quota 123 50", "/quota 123 50"),
+        ("findtg", "/findtg 123456789", "/findtg 123456789"),
+    ] {
+        if data == format!("v:{name}") {
+            let example = locale::tr(api.language, usage_ru, usage_en);
+            return api
+                .send(
+                    chat,
+                    &format!(
+                        "{} <code>{example}</code>",
+                        locale::tr(api.language, "Введите команду:", "Send this command:")
+                    ),
+                    buttons(vec![vec![("🏠 Меню", "v:menu".into())]]),
+                )
+                .await;
+        }
+    }
+    if let Some(other) = data.strip_prefix("v:guide:") {
+        let mut parts = other.split(':');
+        if let (Some(action), Some(raw_id), None) = (parts.next(), parts.next(), parts.next())
+            && matches!(action, "renew" | "quota")
+            && let Ok(id) = raw_id.parse::<i64>()
+            && id > 0
+        {
+            let usage = if action == "renew" {
+                format!("/renew {id} 30")
+            } else {
+                format!("/quota {id} 50")
+            };
+            return api
+                .send(
+                    chat,
+                    &format!(
+                        "{} <code>{usage}</code>",
+                        locale::tr(api.language, "Введите команду:", "Send this command:")
+                    ),
+                    buttons(vec![vec![("👤 Карточка", format!("v:user:{id}"))]]),
+                )
+                .await;
+        }
     }
     if data == "v:help" {
         return handle_command(api, state, chat, admin_id, "/help").await;
@@ -643,8 +813,16 @@ async fn dispatch(
         if !rate_limit(state, user.id).await {
             return Ok(());
         }
+        let preference = commands::language(state, user.id).await?;
+        let Some(language) = preference else {
+            return commands::choose_language(api, message.chat.id).await;
+        };
+        let localized = BotApi {
+            language,
+            ..api.clone()
+        };
         let text = message.text.unwrap_or_default();
-        return handle_command(api, state, message.chat.id, user.id, &text).await;
+        return handle_command(&localized, state, message.chat.id, user.id, &text).await;
     }
     if let Some(callback) = update.callback_query {
         let Some(message) = callback.message else {
@@ -661,8 +839,30 @@ async fn dispatch(
             return Ok(());
         }
         api.acknowledge(&callback.id).await;
+        if let Some(data) = callback.data.as_deref()
+            && let Some(code) = data.strip_prefix("v:lang:")
+        {
+            let Some(language) = Language::from_db(code) else {
+                return Ok(());
+            };
+            commands::set_language(state, callback.from.id, language).await?;
+            let localized = BotApi {
+                language,
+                ..api.clone()
+            };
+            return home(&localized, message.chat.id).await;
+        }
+        let preference = commands::language(state, callback.from.id).await?;
+        let Some(language) = preference else {
+            return commands::choose_language(api, message.chat.id).await;
+        };
+        let localized = BotApi {
+            language,
+            ..api.clone()
+        };
         if let Some(data) = callback.data.as_deref() {
-            return handle_callback(api, state, message.chat.id, callback.from.id, data).await;
+            return handle_callback(&localized, state, message.chat.id, callback.from.id, data)
+                .await;
         }
     }
     Ok(())
@@ -707,6 +907,7 @@ async fn session(
     let api = BotApi {
         client: client.clone(),
         token,
+        language: Language::Ru,
     };
     let identity = api.call("getMe", json!({})).await?;
     let me: TelegramMe =
