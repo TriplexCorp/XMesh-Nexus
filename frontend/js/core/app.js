@@ -28,6 +28,7 @@ const P={
   home:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
   users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  send:'<path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4Z"/>',
   layers:'<path d="m12 2 8 4.5v11L12 22l-8-4.5v-11L12 2Z"/><path d="m12 12 8-5.5M12 12 4 6.5M12 12v10"/>',
   link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   server:'<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/>',
@@ -226,7 +227,7 @@ const STM={ACTIVE:['Активен','--ok'],DISABLED:['Отключён','--mu']
 const NS={ONLINE:['Онлайн','--ok'],OFFLINE:['Не отвечает','--er'],CONNECTING:['Подключение','--wr'],DISABLED:['Отключён','--mu']};
 const STRAT=[['NO_RESET','Не сбрасывать'],['DAY','Каждый день'],['WEEK','Каждую неделю'],['MONTH','Каждый месяц']];
 const nstat=n=>n.disabled?'DISABLED':n.state;
-const NAV=[['Обзор',[['home','home','Дашборд',1],['statistics','chart-no-axes-combined','Статистика',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','globe-2','Хосты'],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO'],['balancers','network','Балансировщики'],['clientrouting','git-branch','Маршрутизация клиентов']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['set','sliders','Настройки']]]];
+const NAV=[['Обзор',[['home','home','Дашборд',1],['statistics','chart-no-axes-combined','Статистика',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','globe-2','Хосты'],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO'],['balancers','network','Балансировщики'],['clientrouting','git-branch','Маршрутизация клиентов']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['telegrambot','send','Telegram-бот'],['set','sliders','Настройки']]]];
 const FLAT=NAV.flatMap(g=>g[1]);
 const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}" ${r.disabled?'':'checked'} aria-label="Включено"><span></span></label>`;
 const nodeTrafficFactor=n=>{const factor=Number(n?.mult??1);return Number.isFinite(factor)&&factor>0&&factor<=1000?factor:1};
@@ -1237,9 +1238,18 @@ const pages={home:['Дашборд',homeP],statistics:['Статистика',st
       DB.set.clientRoutingProfiles=result.profiles;
       return result;
     },toast);
-  }],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
+  }],tools:['Диагностика',toolsP],telegrambot:['Telegram-бот',async()=>{
+  if(typeof window.XMeshTelegramBot?.page!=='function')throw Error('Модуль Telegram-бота не загружен. Перезагрузите страницу.');
+  return window.XMeshTelegramBot.page({
+    owner:sessionUser?.role==='owner',
+    request:backendRequest,
+    toast,
+    confirm:panelConfirm,
+    schedule:timer=>T.push(timer)
+  });
+}],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
 // Explicit page intent determines available space; DOM shape never selects a layout.
-const PAGE_WORKSPACES=Object.freeze({home:'data',statistics:'data',users:'data',squads:'management',hosts:'data',nodes:'management',templates:'management',profiles:'canvas',subscription:'canvas',balancers:'management',clientrouting:'canvas',tools:'data',admins:'management',security:'management',set:'management'});
+const PAGE_WORKSPACES=Object.freeze({home:'data',statistics:'data',users:'data',squads:'management',hosts:'data',nodes:'management',templates:'management',profiles:'canvas',subscription:'canvas',balancers:'management',clientrouting:'canvas',tools:'data',telegrambot:'management',admins:'management',security:'management',set:'management'});
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 const NAV_SHORT={home:'Главная',users:'Клиенты',nodes:'Узлы',subscription:'Подписка'};
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}" aria-label="${l}" data-rail-tip="${l}">${ic(i)}<span class="lbl"><span class="nav-label-full">${l}</span><span class="nav-label-short" aria-hidden="true">${NAV_SHORT[k]||l}</span></span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more" aria-label="Ещё разделы" data-rail-tip="Ещё разделы">${ic('more')}<span class="lbl">Ещё</span></button>`;

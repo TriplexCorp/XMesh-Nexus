@@ -574,6 +574,48 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
 
     print("Scoped Integration API: RBAC, MFA, rotation, idempotency and BOLA passed.")
 
+def test_builtin_telegram_admin_bot(owner_cookie, viewer_cookie):
+    """Credential storage, least-privilege config, CSRF and no secret disclosure."""
+    initial, status_body, _ = api("GET", "/telegram-bot", cookie=owner_cookie)
+    check(initial, 200, "owner reads dedicated Telegram configuration")
+    assert status_body["enabled"] is False and not status_body["tokenConfigured"]
+    check(api("GET", "/telegram-bot", cookie=viewer_cookie)[0], 403,
+          "viewer cannot enumerate Telegram admins")
+    config = {"enabled":False,"adminIds":[123456789,987654321]}
+    check(api("PUT", "/telegram-bot", config, owner_cookie, origin=None)[0], 403,
+          "owner Telegram configuration requires same-origin request")
+    check(api("PUT", "/telegram-bot", {**config, "token":"bad"}, owner_cookie)[0],
+          400, "invalid BotFather token rejected")
+    check(api("PUT", "/telegram-bot", {**config,"enabled":True}, owner_cookie)[0],
+          400, "cannot enable bot without a token")
+    check(api("PUT", "/telegram-bot", {**config,"adminIds":[123456789,123456789]}, owner_cookie)[0],
+          400, "duplicate Telegram administrator IDs rejected")
+    check(api("PUT", "/telegram-bot", {**config,"adminIds":[-1001234]}, owner_cookie)[0],
+          400, "group chat ID cannot be administrator")
+    secret = "123456789:" + "A" * 35
+    check(api("PUT", "/telegram-bot", {**config,"token":secret}, viewer_cookie)[0],
+          403, "viewer cannot install a Telegram bot")
+    saved, saved_body, _ = api("PUT","/telegram-bot",{**config,"token":secret},owner_cookie)
+    check(saved,200,"owner saves Telegram token with encrypted persistence while disabled")
+    assert saved_body["tokenConfigured"] and not saved_body["enabled"]
+    status, redacted, _ = api("GET","/telegram-bot",cookie=owner_cookie)
+    check(status,200,"owner can read redacted bot status")
+    assert redacted["adminIds"] == [123456789,987654321]
+    assert redacted["tokenConfigured"] is True
+    assert secret not in json.dumps(redacted) and "tokenCiphertext" not in json.dumps(redacted)
+    check(api("PUT","/telegram-bot",{"enabled":False,"adminIds":[123456789]},owner_cookie)[0],
+          200,"owner may update admin allowlist without re-entering bot token")
+    status, still_secret, _ = api("GET","/telegram-bot",cookie=owner_cookie)
+    check(status,200,"check credential persistence after allowlist edit")
+    assert still_secret["tokenConfigured"] and still_secret["adminIds"] == [123456789]
+    check(api("PUT","/telegram-bot",{"enabled":False,"adminIds":[123456789],
+                                      "clearToken":True},owner_cookie)[0],
+          200,"owner revokes bot credential explicitly")
+    _, cleared, _ = api("GET","/telegram-bot",cookie=owner_cookie)
+    assert cleared["enabled"] is False and cleared["tokenConfigured"] is False
+    print("Built-in Telegram bot owner-only configuration, encryption boundary and CSRF passed.")
+
+
 def main():
     owner, owner_cookie = login(USER, PASSWORD)
     owner_id = owner["user"]["id"]
@@ -586,6 +628,7 @@ def main():
     check(status, 201, "owner creates viewer")
     viewer_id = viewer["id"]
     _, viewer_cookie = login("ci_viewer", VIEWER_PASSWORD)
+    test_builtin_telegram_admin_bot(owner_cookie, viewer_cookie)
     check(api("GET", "/collections/hosts", cookie=viewer_cookie)[0], 403, "viewer denied host configuration")
     check(api("GET", "/collections/users", cookie=viewer_cookie)[0], 200, "viewer can read user overview")
     check(api("GET", "/security/policy", cookie=viewer_cookie)[0], 403, "viewer denied security policy")
