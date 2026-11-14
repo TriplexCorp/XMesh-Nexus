@@ -1,5 +1,5 @@
 //! Owner-configured built-in Telegram administrator bot.
-//! The BotFather credential is encrypted at rest and never serialized or logged.
+//! The `BotFather` credential is encrypted at rest and never serialized or logged.
 //! Telegram long polling needs no externally accessible webhook/extra container.
 use crate::{ApiError, AppState, auth::AuthUser};
 use aes_gcm::{
@@ -18,7 +18,7 @@ use sqlx::Row;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const AAD: &[u8] = b"xmesh-nexus:telegram-admin-bot:credential:v1";
-pub(crate) const LEADER_LOCK_ID: i64 = 0x584d_4553_4854_4742;
+pub const LEADER_LOCK_ID: i64 = 0x584d_4553_4854_4742;
 
 fn bad(message: &'static str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, message)
@@ -55,7 +55,7 @@ fn encrypt(state: &AppState, token: &str) -> Result<Vec<u8>, ApiError> {
     Ok(bytes)
 }
 
-pub(crate) fn decrypt(state: &AppState, ciphertext: &[u8]) -> Result<String, ApiError> {
+pub fn decrypt(state: &AppState, ciphertext: &[u8]) -> Result<String, ApiError> {
     if ciphertext.len() < 29 {
         return Err(ApiError::new(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -84,7 +84,7 @@ pub(crate) fn decrypt(state: &AppState, ciphertext: &[u8]) -> Result<String, Api
     })
 }
 
-pub(crate) fn validate_token(token: &str) -> bool {
+pub fn validate_token(token: &str) -> bool {
     let Some((id, secret)) = token.split_once(':') else {
         return false;
     };
@@ -112,7 +112,7 @@ fn validate_ids(ids: &[i64], enabled: bool) -> Result<(), ApiError> {
 }
 
 #[derive(Clone)]
-pub(crate) struct BotConfig {
+pub struct BotConfig {
     pub enabled: bool,
     pub admins: Vec<i64>,
     pub ciphertext: Option<Vec<u8>>,
@@ -120,7 +120,7 @@ pub(crate) struct BotConfig {
     pub last_update_id: i64,
 }
 
-pub(crate) async fn load(state: &AppState) -> Result<BotConfig, ApiError> {
+pub async fn load(state: &AppState) -> Result<BotConfig, ApiError> {
     let row = sqlx::query(
         "SELECT enabled,admin_ids,token_ciphertext,revision,last_update_id
          FROM telegram_admin_bot WHERE singleton=TRUE",
@@ -138,7 +138,7 @@ pub(crate) async fn load(state: &AppState) -> Result<BotConfig, ApiError> {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct BotSave {
+pub struct BotSave {
     enabled: bool,
     admin_ids: Vec<i64>,
     #[serde(default)]
@@ -147,7 +147,7 @@ pub(crate) struct BotSave {
     clear_token: bool,
 }
 
-pub(crate) async fn status(
+pub async fn status(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
@@ -178,7 +178,7 @@ pub(crate) async fn status(
     })))
 }
 
-pub(crate) async fn save(
+pub async fn save(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
     Json(body): Json<BotSave>,
@@ -209,10 +209,10 @@ pub(crate) async fn save(
     let next_token = if body.clear_token {
         None
     } else if let Some(token) = requested_token {
-        if !rotated {
-            original.clone()
-        } else {
+        if rotated {
             Some(encrypt(&state, token)?)
+        } else {
+            original.clone()
         }
     } else {
         original.clone()
@@ -260,13 +260,13 @@ pub(crate) async fn save(
     ))
 }
 
-pub(crate) fn spawn_worker(state: AppState) {
+pub fn spawn_worker(state: AppState) {
     tokio::spawn(async move {
         crate::telegram_admin_bot_worker::run(state).await;
     });
 }
 
-pub(crate) fn now_ms() -> i64 {
+pub fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
