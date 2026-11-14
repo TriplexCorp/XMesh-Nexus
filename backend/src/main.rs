@@ -29,6 +29,8 @@ mod subscription_formats;
 mod subscription_json;
 mod subscription_remark;
 mod subscription_settings;
+mod telegram_admin_bot;
+mod telegram_admin_bot_worker;
 mod subscription_transport;
 mod subscription_user_agent;
 mod user_subscriptions;
@@ -339,6 +341,7 @@ fn protected_management_routes() -> Router<AppState> {
             "/integration-tokens/{id}",
             axum::routing::delete(integration_api::revoke_token),
         )
+        .route("/telegram-bot", get(telegram_admin_bot::status).put(telegram_admin_bot::save))
         .route("/security/audit", get(security::audit_events))
         .route("/security/sessions", get(security::sessions))
         .route(
@@ -772,6 +775,7 @@ async fn main() -> anyhow::Result<()> {
     // rewrapped. Keep the old TOTP key until this migration finishes.
     user_subscriptions::migrate_legacy_ciphertexts(&state).await?;
     state.core.launch_startup_update();
+    telegram_admin_bot::spawn_worker(state.clone());
 
     let app = application_router(state);
 
