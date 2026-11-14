@@ -60,7 +60,95 @@ fn positive_max(value: Option<&Value>) -> bool {
         .and_then(|n| n.parse::<i64>().ok())
         .is_some_and(|n| n > 0)
 }
-pub(crate) fn validate(inbound: &Value) -> Result<(), &'static str> {
+fn validate_device_fields(fields: &serde_json::Map<String,Value>) -> Result<(), &'static str> {
+    if fields.len() > CLIENT_FIELDS.len() {
+        return Err("Too many XHTTP device options.");
+    }
+    for (name, v) in fields {
+        if !CLIENT_FIELDS.contains(&name.as_str()) {
+            return Err("Unsupported client XHTTP device field.");
+        }
+        match name.as_str() {
+            "mode"
+                if !matches!(
+                    v.as_str(),
+                    Some("auto" | "packet-up" | "stream-up" | "stream-one")
+                ) =>
+            {
+                return Err("Invalid XHTTP device mode.");
+            }
+            "uplinkHTTPMethod" if !matches!(v.as_str(), Some("POST" | "GET")) => {
+                return Err("Invalid XHTTP HTTP method.");
+            }
+            "uplinkDataPlacement"
+                if !matches!(v.as_str(), Some("auto" | "body" | "cookie" | "header")) =>
+            {
+                return Err("Invalid XHTTP uplink placement.");
+            }
+            "uplinkDataKey" if !v.as_str().is_some_and(|s| s.is_ascii() && s.len() <= 128) => {
+                return Err("Invalid XHTTP uplink data key.");
+            }
+            "headers" => {
+                let Some(map) = v.as_object() else {
+                    return Err("XHTTP headers must be a map.");
+                };
+                if map.len() > 16 {
+                    return Err("Too many XHTTP headers.");
+                }
+                for (key, value) in map {
+                    if key.eq_ignore_ascii_case("host")
+                        || key.len() > 100
+                        || !key.is_ascii()
+                        || value
+                            .as_str()
+                            .is_none_or(|s| s.len() > 512 || s.chars().any(char::is_control))
+                    {
+                        return Err("Invalid XHTTP device header.");
+                    }
+                }
+            }
+            "xPaddingBytes"
+            | "uplinkChunkSize"
+            | "scMaxEachPostBytes"
+            | "scMinPostsIntervalMs"
+                if !nonnegative_range(v) =>
+            {
+                return Err("Invalid XHTTP numeric range.");
+            }
+            "xmux" => {
+                let Some(map) = v.as_object() else {
+                    return Err("XHTTP xmux must be an object.");
+                };
+                if map.len() > XMUX_FIELDS.len() {
+                    return Err("Too many xmux options.");
+                }
+                for (key, val) in map {
+                    if !XMUX_FIELDS.contains(&key.as_str()) {
+                        return Err("Invalid xmux field.");
+                    }
+                    if key == "hKeepAlivePeriod" {
+                        if !val
+                            .as_i64()
+                            .is_some_and(|n| (-1..=i64::from(i32::MAX)).contains(&n))
+                        {
+                            return Err("Invalid xmux keepalive.");
+                        }
+                    } else if !nonnegative_range(val) {
+                        return Err("Invalid xmux range.");
+                    }
+                }
+                if positive_max(map.get("maxConcurrency"))
+                    && positive_max(map.get("maxConnections"))
+                {
+                    return Err("maxConnections conflicts with maxConcurrency.");
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+pub fn validate(inbound: &Value) -> Result<(), &'static str> {
     let Some(profiles) = inbound
         .get("xmesh")
         .and_then(|v| v.get("xhttpDeviceProfiles"))
@@ -89,91 +177,7 @@ pub(crate) fn validate(inbound: &Value) -> Result<(), &'static str> {
         let fields = fields
             .as_object()
             .ok_or("Device profile must be an object.")?;
-        if fields.len() > CLIENT_FIELDS.len() {
-            return Err("Too many XHTTP device options.");
-        }
-        for (name, v) in fields {
-            if !CLIENT_FIELDS.contains(&name.as_str()) {
-                return Err("Unsupported client XHTTP device field.");
-            }
-            match name.as_str() {
-                "mode"
-                    if !matches!(
-                        v.as_str(),
-                        Some("auto" | "packet-up" | "stream-up" | "stream-one")
-                    ) =>
-                {
-                    return Err("Invalid XHTTP device mode.");
-                }
-                "uplinkHTTPMethod" if !matches!(v.as_str(), Some("POST" | "GET")) => {
-                    return Err("Invalid XHTTP HTTP method.");
-                }
-                "uplinkDataPlacement"
-                    if !matches!(v.as_str(), Some("auto" | "body" | "cookie" | "header")) =>
-                {
-                    return Err("Invalid XHTTP uplink placement.");
-                }
-                "uplinkDataKey" if !v.as_str().is_some_and(|s| s.is_ascii() && s.len() <= 128) => {
-                    return Err("Invalid XHTTP uplink data key.");
-                }
-                "headers" => {
-                    let Some(map) = v.as_object() else {
-                        return Err("XHTTP headers must be a map.");
-                    };
-                    if map.len() > 16 {
-                        return Err("Too many XHTTP headers.");
-                    }
-                    for (key, value) in map {
-                        if key.eq_ignore_ascii_case("host")
-                            || key.len() > 100
-                            || !key.is_ascii()
-                            || value
-                                .as_str()
-                                .is_none_or(|s| s.len() > 512 || s.chars().any(char::is_control))
-                        {
-                            return Err("Invalid XHTTP device header.");
-                        }
-                    }
-                }
-                "xPaddingBytes"
-                | "uplinkChunkSize"
-                | "scMaxEachPostBytes"
-                | "scMinPostsIntervalMs"
-                    if !nonnegative_range(v) =>
-                {
-                    return Err("Invalid XHTTP numeric range.");
-                }
-                "xmux" => {
-                    let Some(map) = v.as_object() else {
-                        return Err("XHTTP xmux must be an object.");
-                    };
-                    if map.len() > XMUX_FIELDS.len() {
-                        return Err("Too many xmux options.");
-                    }
-                    for (key, val) in map {
-                        if !XMUX_FIELDS.contains(&key.as_str()) {
-                            return Err("Invalid xmux field.");
-                        }
-                        if key == "hKeepAlivePeriod" {
-                            if !val
-                                .as_i64()
-                                .is_some_and(|n| (-1..=i64::from(i32::MAX)).contains(&n))
-                            {
-                                return Err("Invalid xmux keepalive.");
-                            }
-                        } else if !nonnegative_range(val) {
-                            return Err("Invalid xmux range.");
-                        }
-                    }
-                    if positive_max(map.get("maxConcurrency"))
-                        && positive_max(map.get("maxConnections"))
-                    {
-                        return Err("maxConnections conflicts with maxConcurrency.");
-                    }
-                }
-                _ => {}
-            }
-        }
+        validate_device_fields(fields)?;
         let mode = fields.get("mode").and_then(Value::as_str).unwrap_or("auto");
         if fields.get("uplinkHTTPMethod").and_then(Value::as_str) == Some("GET")
             && mode != "packet-up"
@@ -199,7 +203,7 @@ pub(crate) fn validate(inbound: &Value) -> Result<(), &'static str> {
 }
 /// Client transport overlays are stored alongside XRAY STUDIO profiles but
 /// are never valid Xray-core inbound fields. Strip before signing node config.
-pub(crate) fn strip_from_node_config(config: &mut Value) {
+pub fn strip_from_node_config(config: &mut Value) {
     if let Some(inbounds) = config.get_mut("inbounds").and_then(Value::as_array_mut) {
         for inbound in inbounds {
             if let Some(map) = inbound.as_object_mut() {
@@ -236,7 +240,7 @@ mod tests {
         invalid = inbound.clone();
         invalid["xmesh"]["xhttpDeviceProfiles"]["Android"]["scMinPostsIntervalMs"] = json!("10-50");
         assert!(validate(&invalid).is_err());
-        invalid = inbound.clone();
+        invalid = inbound;
         invalid["xmesh"]["xhttpDeviceProfiles"]["Windows"] = json!({"mode":"stream-up"});
         invalid["streamSettings"]["network"] = json!("tcp");
         assert!(validate(&invalid).is_err());
