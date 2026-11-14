@@ -128,8 +128,11 @@ fn effective_xhttp(config: &Value) -> Value {
 fn device_xhttp<'a>(inbound: &'a Value, device: &str) -> Option<&'a Value> {
     let name = match device {
         "ios" => "iOS",
+        "android" => "Android",
         "windows" => "Windows",
-        _ => return None,
+        "macos" => "macOS",
+        "linux" => "Linux",
+        _ => "Auto",
     };
     inbound
         .get("xmesh")
