@@ -1,6 +1,6 @@
 //! Explicitly whitelisted service user mutations.
 //! No browser cookies, raw credential input, implicit unlimited accounts or arbitrary JSON patches.
-use super::{Problem, ServicePrincipal, grants, now_ms, reply, users};
+use super::{Problem, ServicePrincipal, grants, now_ms, reply, telegram, users};
 use crate::{AppState, protocol_credentials, user_subscriptions};
 use axum::{
     Json,
@@ -119,6 +119,7 @@ fn build_create(body: &Value, now: i64) -> Result<Value, Problem> {
             "cdnLimitGb",
             "squadIds",
             "templateId",
+            "telegramId",
         ],
     )?;
     let username = name(
@@ -167,6 +168,10 @@ fn build_create(body: &Value, now: i64) -> Result<Value, Problem> {
             return Err(invalid("Invalid template ID"));
         }
         data.insert("templateId".into(), template.clone());
+    }
+    if let Some(raw) = fields.get("telegramId") {
+        let input = raw.as_str().ok_or_else(|| invalid("Invalid Telegram ID"))?;
+        data.insert("tg".into(), json!(telegram::canonical_id(input)?));
     }
     protocol_credentials::provision(&mut data);
     let value = Value::Object(data);
@@ -270,6 +275,9 @@ pub(super) async fn create(
             "Creating users requires an explicitly approved allUsers token",
         ));
     }
+    if body.get("telegramId").is_some() {
+        principal.allow_scope("telegram:assign")?;
+    }
     let data = build_create(&body, now_ms())?;
     let key = grants::key(&headers)?;
     let hash = grants::request_hash("user.create", 0, &body)?;
@@ -310,6 +318,7 @@ pub(super) async fn create(
                 "cdnLimitGb",
                 "squadIds",
                 "templateId",
+                "telegramId",
             ],
         )?,
     )
@@ -323,6 +332,15 @@ pub(super) async fn create(
     .await?;
     let id: i64 = row.try_get("id")?;
     let revision: i64 = row.try_get("revision")?;
+    // Immutable provenance prevents a later service request from claiming a
+    // manually created account, even when issued an allUsers token.
+    sqlx::query(
+        "INSERT INTO integration_user_provisioners(user_id,client_id) VALUES($1,$2)"
+    )
+    .bind(id)
+    .bind(principal.client_id)
+    .execute(&mut *tx)
+    .await?;
     user_subscriptions::provision_new_user(&state, id, &mut tx)
         .await
         .map_err(Problem::from)?;
