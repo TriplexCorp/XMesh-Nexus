@@ -60,6 +60,22 @@ Dormant `tlsSettings` can remain in the JSON when TLS is not selected. Keeping t
 
 ## TLS configuration
 
+### Guided TLS editor
+
+Choose an inbound in XRAY STUDIO and open **TLS / Защита транспорта**.
+The dialog edits `streamSettings.tlsSettings` for the selected inbound:
+TLS version policy (`auto`, `1.2–1.3` or `1.3`), ALPN (`h3`, `h2`,
+`http/1.1`), serverName (SNI), and rejectUnknownSni. **Advanced JSON**
+preserves unknown TLS fields and existing certificate configuration.
+For Hysteria2, TLS 1.3 and `h3` are enforced by the guided editor.
+
+The dialog is a wide, readable two-column workspace on desktop and
+stacks controls on narrow screens. Its central content scrolls on
+short screens without hiding the header or Save/Cancel footer.
+A cross-feature CSS selector must not shrink it to the generic action
+dialog width. Browser regression: `scripts/test-xray-tls-dialog-geometry.cjs`.
+
+
 When TLS is selected, the Studio exposes/preserves TLS-specific configuration including certificate material paths and ALPN-related settings where applicable.
 
 Certificate paths are paths **inside the Xray runtime environment on the node**, not paths on the administrator's desktop browser.
