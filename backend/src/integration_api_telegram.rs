@@ -26,7 +26,7 @@ const fn invalid() -> Problem {
     Problem::new(StatusCode::BAD_REQUEST, "invalid_telegram_id", "Invalid Telegram user ID")
 }
 
-fn canonical_id(raw: &str) -> Result<String, Problem> {
+pub(super) fn canonical_id(raw: &str) -> Result<String, Problem> {
     if raw.is_empty() || raw.len() > 19 || raw.as_bytes().iter().any(|byte| !byte.is_ascii_digit()) {
         return Err(invalid());
     }
@@ -206,7 +206,7 @@ pub(super) async fn assign(
     }
     let changed = previous.is_empty();
     let new_revision = if changed {
-        user["tg"] = json!(tg);
+        user["tg"] = json!(tg.clone());
         crate::validate_record("users", &user).map_err(Problem::from)?;
         let result = sqlx::query(
             "UPDATE panel_records SET data=$2,updated_at=NOW()
