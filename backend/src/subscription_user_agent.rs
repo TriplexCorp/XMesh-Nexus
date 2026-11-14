@@ -234,7 +234,7 @@ mod tests {
         let windows = detect(&headers("v2rayN/7.7", "*/*"));
         assert_eq!(windows.device, Device::Windows);
         let linux = detect(&headers("v2rayN/7.7 (Linux)", "*/*"));
-        assert_eq!(linux.device, Device::Auto);
+        assert_eq!(linux.device, Device::Linux);
     }
     #[test]
     fn additional_platforms_are_detected_without_guessing_unknown_agents() {
