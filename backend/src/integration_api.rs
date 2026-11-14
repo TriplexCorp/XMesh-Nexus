@@ -4,6 +4,10 @@
 mod auth;
 #[path = "integration_api_grants.rs"]
 mod grants;
+#[path = "integration_api_quotas.rs"]
+mod quotas;
+#[path = "integration_api_user_mutations.rs"]
+mod user_mutations;
 #[path = "integration_api_users.rs"]
 mod users;
 
@@ -180,7 +184,11 @@ async fn capabilities(
             "trafficRead": true,
             "subscriptionsRead": true,
             "entitlementsGrant": true,
-            "accessControl": true
+            "accessControl": true,
+            "usersCreate": client.scopes.iter().any(|s| s == "users:create"),
+            "usersUpdate": client.scopes.iter().any(|s| s == "users:update"),
+            "quotasRead": client.scopes.iter().any(|s| s == "quotas:read"),
+            "quotasWrite": client.scopes.iter().any(|s| s == "quotas:write")
         }
     })))
 }
@@ -188,9 +196,10 @@ async fn capabilities(
 pub fn service_router(state: &AppState) -> Router<AppState> {
     Router::new()
         .route("/capabilities", get(capabilities))
-        .route("/users", get(users::list))
-        .route("/users/{id}", get(users::get))
+        .route("/users", get(users::list).post(user_mutations::create))
+        .route("/users/{id}", get(users::get).patch(user_mutations::patch))
         .route("/users/{id}/traffic", get(users::traffic))
+        .route("/users/{id}/quotas", get(quotas::get).patch(quotas::patch))
         .route("/users/{id}/subscription", get(users::subscription))
         .route("/users/{id}/enable", post(users::enable))
         .route("/users/{id}/disable", post(users::disable))

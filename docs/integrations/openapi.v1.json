@@ -7332,8 +7332,25 @@
       "UserCreate": {
         "type": "object",
         "additionalProperties": false,
+        "description": "Every new account requires either hold=true with holdDays or an explicit future expireAtMs. Credentials and usage cannot be supplied.",
         "required": [
           "username"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {"hold": {"const": true}},
+              "required": ["hold"]
+            },
+            "then": {
+              "required": ["holdDays"],
+              "not": {"required": ["expireAtMs"]}
+            },
+            "else": {
+              "required": ["expireAtMs"],
+              "not": {"required": ["holdDays"]}
+            }
+          }
         ],
         "properties": {
           "username": {
