@@ -481,7 +481,7 @@ async fn consume_confirmation(
     let user_id: i64 = row.try_get("user_id").map_err(|_| "database_unavailable")?;
     let action: String = row.try_get("action").map_err(|_| "database_unavailable")?;
     if matches!(action.as_str(),"create"|"renew"|"quota") {
-        let result=commands::apply_extra(state,admin_id,nonce,&row,&mut tx).await;
+        let result=commands::apply_extra(state,admin_id,nonce,&row,&mut tx,api.language).await;
         let (record_id,message)=match result {
             Ok(value)=>value,
             Err(reason) if reason!="database_unavailable"=>{
