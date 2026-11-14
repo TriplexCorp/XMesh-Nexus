@@ -255,7 +255,8 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
         "clientName": "ci_subscription_manager",
         "label": "ci_user_management",
         "scopes": ["users:create", "users:update", "users:read",
-                   "quotas:read", "quotas:write", "subscriptions:read"],
+                   "quotas:read", "quotas:write", "subscriptions:read",
+                   "squads:read", "squads:members:write", "nodes:read"],
         "expiresInDays": 2,
         "allUsers": True,
         "mfaCode": factor4,
@@ -344,6 +345,112 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
                                               if_match=quota_headers.get("ETag"))
     check(status, 200, "quota policy operation survives duplicate delivery")
     assert duplicate_headers.get("X-Idempotency-Replayed") == "true"
+    # Catalog reads never expose raw node addresses, enrollment secrets or Xray config.
+    check(service_api("GET", "/squads", token2)[0], 403,
+          "legacy scoped token cannot enumerate squad catalog")
+    check(service_api("GET", "/nodes", token2)[0], 403,
+          "user-only token cannot enumerate node catalog")
+    squad_ids = []
+    node_ids = []
+    for number in range(2):
+        status, squad, _ = api("POST", "/collections/squads",
+                               {"name": f"ci integration squad {number}", "inb": []},
+                               owner_cookie)
+        check(status, 201, "owner creates test squad")
+        squad_ids.append(squad["id"])
+        status, node, _ = api("POST", "/collections/nodes",
+                              {"name": f"ci integration node {number}",
+                               "addr": f"192.0.2.{211+number}"},
+                              owner_cookie)
+        check(status, 201, "owner creates test node")
+        node_ids.append(node["id"])
+    for item in ["/squads", "/nodes"]:
+        status, page, _ = service_api("GET", item + "?limit=1", manager)
+        check(status, 200, "service catalog cursor first page")
+        assert len(page["data"]) == 1 and page["meta"]["nextCursor"], page
+        cursor = page["meta"]["nextCursor"]
+        status, second, _ = service_api("GET", item + "?limit=1&cursor=" + cursor, manager)
+        check(status, 200, "service catalog cursor second page")
+        assert len(second["data"]) == 1 and second["data"][0]["id"] != page["data"][0]["id"]
+        check(service_api("GET", item + "?cursor=" + cursor + "evil", manager)[0],
+              400, "tampered catalog cursor denied")
+        other = "/nodes" if item == "/squads" else "/squads"
+        check(service_api("GET", other + "?cursor=" + cursor, manager)[0],
+              400, "catalog cursor cannot be reused for another resource")
+
+    status, catalog_squad, _ = service_api("GET", f"/squads/{squad_ids[0]}", manager)
+    check(status, 200, "service reads a safe squad projection")
+    assert catalog_squad["data"]["name"] == "ci integration squad 0"
+    assert catalog_squad["data"]["memberCount"] == 0
+    assert "inb" not in catalog_squad["data"]
+    status, catalog_node, _ = service_api("GET", f"/nodes/{node_ids[0]}", manager)
+    check(status, 200, "service reads a safe node projection")
+    assert catalog_node["data"]["name"] == "ci integration node 0"
+    for forbidden in ["addr", "metricsKey", "profileId", "enrollmentToken",
+                      "privateKey", "routing"]:
+        assert forbidden not in json.dumps(catalog_node), f"Node detail leaks {forbidden}"
+
+    membership_body = {"userIds":[created_id]}
+    membership_path = f"/squads/{squad_ids[0]}/members"
+    check(service_api("POST", membership_path, token2, membership_body,
+                      str(uuid.uuid4()))[0], 403,
+          "token without squads:members:write cannot assign a squad")
+    check(service_api("POST", membership_path, manager,
+                      {"userIds":[created_id,created_id]},str(uuid.uuid4()))[0], 400,
+          "duplicate batch target is rejected")
+    check(service_api("POST", membership_path, manager, membership_body)[0], 400,
+          "squad membership requires idempotency key")
+    add_key = str(uuid.uuid4())
+    status, added, _ = service_api("POST", membership_path, manager, membership_body, add_key)
+    check(status, 200, "scoped squad assignment succeeds")
+    assert added["data"]["changedUserIds"] == [created_id]
+    status, replayed, _ = service_api("POST", membership_path, manager, membership_body, add_key)
+    check(status, 200, "squad membership replay does not mutate user twice")
+    assert replayed["meta"]["replayed"] is True
+    check(service_api("POST", membership_path, manager,
+                      {"userIds":[other_id]}, add_key)[0], 409,
+          "membership idempotency key cannot be reused for another user")
+    status, member_squad, _ = service_api("GET", f"/squads/{squad_ids[0]}", manager)
+    check(status, 200, "read member count after assignment")
+    assert member_squad["data"]["memberCount"] == 1
+    status, member_record, _ = service_api("GET", f"/users/{created_id}", manager)
+    check(status, 200, "verify squad assignment preserved account fields")
+    assert squad_ids[0] in member_record["data"]["squadIds"]
+    assert member_record["data"]["cdnLimitGb"] == 2.5
+
+    factor5, step5 = next_unused_totp(secret, step4)
+    scoped_issue = {
+        "clientName":"ci_squad_limited",
+        "label":"ci_squad_user_bound",
+        "scopes":["squads:read","squads:members:write"],
+        "allUsers":False,
+        "allowedUserIds":[created_id],
+        "expiresInDays":2,
+        "mfaCode":factor5,
+    }
+    status, limited, _ = api("POST", "/integration-tokens", scoped_issue, owner_cookie)
+    check(status, 200, "owner explicitly scopes membership token to one user")
+    limited_token = limited["token"]
+    check(service_api("POST", membership_path, limited_token,
+                      {"userIds":[other_id]}, str(uuid.uuid4()))[0], 404,
+          "member batch cannot touch another user's account")
+    status, scoped_squad, _ = service_api("GET", f"/squads/{squad_ids[0]}", limited_token)
+    check(status, 200, "member counts respect per-token user visibility")
+    assert scoped_squad["data"]["memberCount"] == 1
+
+    status, removed, _ = service_api("DELETE", membership_path, manager,
+                                    membership_body, str(uuid.uuid4()))
+    check(status, 200, "service removes a squad membership safely")
+    assert removed["data"]["changedUserIds"] == [created_id]
+    assert service_api("GET", f"/squads/{squad_ids[0]}", manager)[1]["data"]["memberCount"] == 0
+    for squad_id in squad_ids:
+        check(api("DELETE",f"/collections/squads/{squad_id}",cookie=owner_cookie)[0],
+              200, "clean up test squad")
+    for node_id in node_ids:
+        check(api("DELETE",f"/collections/nodes/{node_id}",cookie=owner_cookie)[0],
+              200, "clean up test node")
+    print("Integration API scoped squad/node catalogs and squad membership passed.")
+
     print("Integration API user creation, patch, ETags and exact quotas passed.")
 
     print("Scoped Integration API: RBAC, MFA, rotation, idempotency and BOLA passed.")
