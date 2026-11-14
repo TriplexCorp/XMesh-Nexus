@@ -49,7 +49,11 @@ pub(super) fn key(headers: &HeaderMap) -> Result<String, Problem> {
     Ok(uuid.to_string())
 }
 
-pub(super) fn request_hash(action: &str, user_id: i64, body: &impl Serialize) -> Result<String, Problem> {
+pub(super) fn request_hash(
+    action: &str,
+    user_id: i64,
+    body: &impl Serialize,
+) -> Result<String, Problem> {
     let body = serde_json::to_vec(body).map_err(|_| {
         Problem::new(
             StatusCode::BAD_REQUEST,
