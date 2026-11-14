@@ -171,7 +171,7 @@ pub async fn status(
         "adminIds":row.try_get::<Vec<i64>,_>("admin_ids")?,
         "botUsername":row.try_get::<Option<String>,_>("bot_username")?,
         "botId":row.try_get::<Option<i64>,_>("bot_id")?,
-        "connected":enabled && recently_connected == Some(true),
+        "connected":enabled && recently_connected == Some(true) && error.is_none(),
         "lastConnectedAtMs":row.try_get::<Option<i64>,_>("connected_at_ms")?,
         "lastError":error,
         "revision":row.try_get::<i64,_>("revision")?
