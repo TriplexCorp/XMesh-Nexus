@@ -334,13 +334,11 @@ pub(super) async fn create(
     let revision: i64 = row.try_get("revision")?;
     // Immutable provenance prevents a later service request from claiming a
     // manually created account, even when issued an allUsers token.
-    sqlx::query(
-        "INSERT INTO integration_user_provisioners(user_id,client_id) VALUES($1,$2)"
-    )
-    .bind(id)
-    .bind(principal.client_id)
-    .execute(&mut *tx)
-    .await?;
+    sqlx::query("INSERT INTO integration_user_provisioners(user_id,client_id) VALUES($1,$2)")
+        .bind(id)
+        .bind(principal.client_id)
+        .execute(&mut *tx)
+        .await?;
     user_subscriptions::provision_new_user(&state, id, &mut tx)
         .await
         .map_err(Problem::from)?;
