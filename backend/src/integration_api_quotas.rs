@@ -254,12 +254,11 @@ pub(super) async fn patch(
     let key = grants::key(&headers)?;
     let hash = grants::request_hash("user.quotas.patch", id, &body)?;
     let mut tx = state.pool.begin().await?;
-    let mut replayed = false;
-    if grants::claim(&mut tx, &principal, &key, "user.quotas.patch", &hash)
+    let replayed = if grants::claim(&mut tx, &principal, &key, "user.quotas.patch", &hash)
         .await?
         .is_some()
     {
-        replayed = true;
+        true
     } else {
         let revision = apply(&mut tx, id, &headers, &policy).await?;
         grants::complete(
@@ -271,7 +270,8 @@ pub(super) async fn patch(
             &json!({"userId":id,"revision":revision}),
         )
         .await?;
-    }
+        false
+    };
     tx.commit().await?;
     let (result, revision) = view(&state, id).await?;
     let mut response = with_etag(result, revision)?;
