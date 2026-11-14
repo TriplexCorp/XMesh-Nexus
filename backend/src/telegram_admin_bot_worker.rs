@@ -470,12 +470,16 @@ async fn handle_extra_confirmation(
                     "This account has unlimited duration or is waiting for first connection. Change it in the panel."
                 }
                 "user_not_found" => "User not found.",
-                "squad_not_found" => locale::tr(api.language,
+                "squad_not_found" => locale::tr(
+                    api.language,
                     "Сквад больше не существует. Запустите /create заново.",
-                    "The squad no longer exists. Run /create again."),
-                "squad_not_selected" => locale::tr(api.language,
+                    "The squad no longer exists. Run /create again.",
+                ),
+                "squad_not_selected" => locale::tr(
+                    api.language,
                     "Сначала выберите сквад, затем подтвердите создание.",
-                    "Select a squad before confirming user creation."),
+                    "Select a squad before confirming user creation.",
+                ),
                 _ => "This action is no longer valid. Check the user and try again.",
             };
             api.send(
@@ -797,16 +801,16 @@ async fn handle_callback(
     // is intentionally compact. Always bind it to the originating admin and
     // an unexpired PostgreSQL picker, never trust a raw callback squad ID.
     if let Some(raw) = data.strip_prefix("v:cp:")
-        && let Some((nonce,page)) = raw.rsplit_once(':')
-        && let (Ok(nonce),Ok(page)) = (Uuid::parse_str(nonce),page.parse::<i64>())
+        && let Some((nonce, page)) = raw.rsplit_once(':')
+        && let (Ok(nonce), Ok(page)) = (Uuid::parse_str(nonce), page.parse::<i64>())
     {
-        return commands::create_squad_picker(api,state,chat,admin_id,nonce,page).await;
+        return commands::create_squad_picker(api, state, chat, admin_id, nonce, page).await;
     }
     if let Some(raw) = data.strip_prefix("v:cs:")
-        && let Some((nonce,squad_id)) = raw.rsplit_once(':')
-        && let (Ok(nonce),Ok(squad_id)) = (Uuid::parse_str(nonce),squad_id.parse::<i64>())
+        && let Some((nonce, squad_id)) = raw.rsplit_once(':')
+        && let (Ok(nonce), Ok(squad_id)) = (Uuid::parse_str(nonce), squad_id.parse::<i64>())
     {
-        return commands::select_create_squad(api,state,chat,admin_id,nonce,squad_id).await;
+        return commands::select_create_squad(api, state, chat, admin_id, nonce, squad_id).await;
     }
     if let Some(nonce) = data.strip_prefix("x:") {
         return consume_confirmation(api, state, chat, admin_id, nonce).await;
