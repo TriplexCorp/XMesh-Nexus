@@ -221,7 +221,7 @@ mod tests {
         );
         assert_eq!(
             detect(&headers("v2raytun/3.0 (Android 15)", "*/*")).device,
-            Device::Auto
+            Device::Android
         );
     }
     #[test]
@@ -230,11 +230,18 @@ mod tests {
         assert_eq!(ios.device, Device::Ios);
         assert!(ios.known_app);
         let android = detect(&headers("v2rayNG/1.10 (Android 15)", "*/*"));
-        assert_eq!(android.device, Device::Auto);
+        assert_eq!(android.device, Device::Android);
         let windows = detect(&headers("v2rayN/7.7", "*/*"));
         assert_eq!(windows.device, Device::Windows);
         let linux = detect(&headers("v2rayN/7.7 (Linux)", "*/*"));
         assert_eq!(linux.device, Device::Auto);
+    }
+    #[test]
+    fn additional_platforms_are_detected_without_guessing_unknown_agents() {
+        assert_eq!(detect(&headers("Happ/4.0 (Macintosh; macOS 15)", "*/*")).device, Device::Macos);
+        assert_eq!(detect(&headers("Happ/4.0 (Linux x86_64)", "*/*")).device, Device::Linux);
+        assert_eq!(detect(&headers("Happ/4.0 (Android 15)", "*/*")).device, Device::Android);
+        assert_eq!(detect(&headers("Happ/4.0", "*/*")).device, Device::Auto);
     }
     #[test]
     fn browser_html_is_not_a_known_app() {
