@@ -23,11 +23,16 @@ pub(super) struct LookupQuery {
 }
 
 const fn invalid() -> Problem {
-    Problem::new(StatusCode::BAD_REQUEST, "invalid_telegram_id", "Invalid Telegram user ID")
+    Problem::new(
+        StatusCode::BAD_REQUEST,
+        "invalid_telegram_id",
+        "Invalid Telegram user ID",
+    )
 }
 
 pub(super) fn canonical_id(raw: &str) -> Result<String, Problem> {
-    if raw.is_empty() || raw.len() > 19 || raw.as_bytes().iter().any(|byte| !byte.is_ascii_digit()) {
+    if raw.is_empty() || raw.len() > 19 || raw.as_bytes().iter().any(|byte| !byte.is_ascii_digit())
+    {
         return Err(invalid());
     }
     let value: i64 = raw.parse().map_err(|_| invalid())?;
@@ -42,14 +47,19 @@ fn body_id(body: &Value) -> Result<String, Problem> {
     if object.len() != 1 {
         return Err(invalid());
     }
-    let raw = object.get("telegramId")
+    let raw = object
+        .get("telegramId")
         .and_then(Value::as_str)
         .ok_or_else(invalid)?;
     canonical_id(raw)
 }
 
 const fn invalid_cursor() -> Problem {
-    Problem::new(StatusCode::BAD_REQUEST, "invalid_cursor", "Invalid lookup cursor")
+    Problem::new(
+        StatusCode::BAD_REQUEST,
+        "invalid_cursor",
+        "Invalid lookup cursor",
+    )
 }
 
 fn cursor_sign(
@@ -58,7 +68,10 @@ fn cursor_sign(
     telegram_id: &str,
     id: i64,
 ) -> Result<String, Problem> {
-    let message = format!("integration-tg-v1:{}:{telegram_id}:{id}", principal.client_id);
+    let message = format!(
+        "integration-tg-v1:{}:{telegram_id}:{id}",
+        principal.client_id
+    );
     let mut mac = Hmac::<Sha256>::new_from_slice(&state.subscription_key)
         .map_err(|_| Problem::unavailable())?;
     mac.update(message.as_bytes());
@@ -85,7 +98,8 @@ fn cursor_read(
     if prefix != expected {
         return Err(invalid_cursor());
     }
-    let id = id.parse::<i64>()
+    let id = id
+        .parse::<i64>()
         .ok()
         .filter(|id| *id > 0)
         .ok_or_else(invalid_cursor)?;
@@ -108,7 +122,11 @@ pub(super) async fn lookup(
     let telegram_id = canonical_id(&raw_id)?;
     let limit = query.limit.unwrap_or(50);
     if !(1..=100).contains(&limit) {
-        return Err(Problem::new(StatusCode::BAD_REQUEST, "validation_error", "Invalid page limit"));
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "validation_error",
+            "Invalid page limit",
+        ));
     }
     let start = match query.cursor {
         Some(cursor) => cursor_read(&state, &principal, &telegram_id, &cursor)?,
@@ -133,17 +151,20 @@ pub(super) async fn lookup(
     let more = records.len() > usize::try_from(limit).unwrap_or(100);
     let mut matches = Vec::new();
     let mut last_id = start;
-    for row in records.into_iter().take(usize::try_from(limit).unwrap_or(100)) {
+    for row in records
+        .into_iter()
+        .take(usize::try_from(limit).unwrap_or(100))
+    {
         let id: i64 = row.try_get("id")?;
         let user: Value = row.try_get("data")?;
         let revision: i64 = row.try_get("revision")?;
         last_id = id;
-        matches.push(users::with_meter(&state,id,user,revision).await?);
+        matches.push(users::with_meter(&state, id, user, revision).await?);
     }
     let mut response = reply(json!(matches));
     response.0["meta"]["limit"] = json!(limit);
     response.0["meta"]["nextCursor"] = if more {
-        json!(cursor_sign(&state,&principal,&telegram_id,last_id)?)
+        json!(cursor_sign(&state, &principal, &telegram_id, last_id)?)
     } else {
         Value::Null
     };
@@ -161,11 +182,11 @@ pub(super) async fn assign(
     principal.allow_user(id)?;
     let tg = body_id(&body)?;
     let key = grants::key(&headers)?;
-    let hash = grants::request_hash("user.telegram.assign",id,&body)?;
+    let hash = grants::request_hash("user.telegram.assign", id, &body)?;
     let mut tx = state.pool.begin().await?;
-    if let Some(previous) = grants::claim(
-        &mut tx,&principal,&key,"user.telegram.assign",&hash
-    ).await? {
+    if let Some(previous) =
+        grants::claim(&mut tx, &principal, &key, "user.telegram.assign", &hash).await?
+    {
         tx.commit().await?;
         let mut replay = reply(previous);
         replay.0["meta"]["replayed"] = json!(true);
@@ -178,15 +199,14 @@ pub(super) async fn assign(
     .bind(id)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND,"not_found","User not found"))?;
+    .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))?;
     let revision: i64 = record.try_get("revision")?;
-    user_mutations::matches_revision(&headers,revision)?;
-    let provisioner: Option<i64> = sqlx::query_scalar(
-        "SELECT client_id FROM integration_user_provisioners WHERE user_id=$1",
-    )
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?;
+    user_mutations::matches_revision(&headers, revision)?;
+    let provisioner: Option<i64> =
+        sqlx::query_scalar("SELECT client_id FROM integration_user_provisioners WHERE user_id=$1")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
     // This gate is independent of allUsers: even an allUsers bot cannot
     // seize an account created manually or by a different integration.
     if provisioner != Some(principal.client_id) {
@@ -200,7 +220,8 @@ pub(super) async fn assign(
     let previous = user.get("tg").and_then(Value::as_str).unwrap_or("").trim();
     if !previous.is_empty() && previous != tg {
         return Err(Problem::new(
-            StatusCode::CONFLICT,"telegram_already_assigned",
+            StatusCode::CONFLICT,
+            "telegram_already_assigned",
             "An existing Telegram ID cannot be replaced by a service token",
         ));
     }
@@ -213,13 +234,24 @@ pub(super) async fn assign(
              WHERE collection='users' AND id=$1
              RETURNING (EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision",
         )
-        .bind(id).bind(user).fetch_one(&mut *tx).await?;
-        result.try_get::<i64,_>("revision")?
+        .bind(id)
+        .bind(user)
+        .fetch_one(&mut *tx)
+        .await?;
+        result.try_get::<i64, _>("revision")?
     } else {
         revision
     };
     let result = json!({"userId":id,"telegramId":tg,"revision":new_revision,"changed":changed});
-    grants::complete(&mut tx,&principal,&key,"user.telegram.assign",id,&result).await?;
+    grants::complete(
+        &mut tx,
+        &principal,
+        &key,
+        "user.telegram.assign",
+        id,
+        &result,
+    )
+    .await?;
     tx.commit().await?;
     Ok(reply(result))
 }
@@ -229,22 +261,35 @@ mod tests {
     use super::*;
     #[test]
     fn id_validation_is_canonical_and_excludes_chat_ids() {
-        for invalid_input in ["", "0","0001","-123", "+123","abc"," 123","123 ","1.1","9999999999999999999"] {
+        for invalid_input in [
+            "",
+            "0",
+            "0001",
+            "-123",
+            "+123",
+            "abc",
+            " 123",
+            "123 ",
+            "1.1",
+            "9999999999999999999",
+        ] {
             assert!(canonical_id(invalid_input).is_err(), "{invalid_input}");
         }
-        for valid in ["1","1855665674","9007199254740991"] {
-            assert_eq!(canonical_id(valid).unwrap(),valid);
+        for valid in ["1", "1855665674", "9007199254740991"] {
+            assert_eq!(canonical_id(valid).unwrap(), valid);
         }
     }
     #[test]
     fn assignment_rejects_unknown_fields_and_numeric_json() {
         for invalid_body in [
-            json!({"telegramId":123}),json!({"tg":"123"}),
+            json!({"telegramId":123}),
+            json!({"tg":"123"}),
             json!({"telegramId":"123","username":"forged"}),
-            json!({"telegramId":null}),json!({})
+            json!({"telegramId":null}),
+            json!({}),
         ] {
             assert!(body_id(&invalid_body).is_err(), "{invalid_body}");
         }
-        assert_eq!(body_id(&json!({"telegramId":"123"})).unwrap(),"123");
+        assert_eq!(body_id(&json!({"telegramId":"123"})).unwrap(), "123");
     }
 }
