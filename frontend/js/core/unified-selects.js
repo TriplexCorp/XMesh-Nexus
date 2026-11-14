@@ -42,8 +42,27 @@
  }
  function buildOptions(instance){
   const {select,popup}=instance;
+  const options=[...select.options];
+  const rendered=[...popup.children];
+  // Keep option elements stable during asynchronous UI refreshes. Replacing
+  // identical buttons on every sync detaches a pressed option before its
+  // click can finish, especially when the page-size selector is open.
+  const unchanged=rendered.length===options.length&&rendered.every((item,i)=>{
+   const option=options[i];
+   const group=option.parentElement instanceof HTMLOptGroupElement;
+   const label=group?option.parentElement.label+': '+textFor(option):null;
+   return item.classList.contains('xm-select-option')&&
+    item.dataset.optionIndex===String(i)&&item.textContent===textFor(option)&&
+    item.disabled===(option.disabled||!!option.closest('optgroup[disabled]'))&&
+    item.classList.contains('in-group')===group&&
+    item.getAttribute('aria-label')===label;
+  });
+  if(unchanged){
+   rendered.forEach((item,i)=>item.setAttribute('aria-selected',String(options[i].selected)));
+   return;
+  }
   const frag=document.createDocumentFragment();
-  [...select.options].forEach((option,i)=>{
+  options.forEach((option,i)=>{
    const item=document.createElement('button');
    item.type='button';item.className='xm-select-option';
    item.setAttribute('role','option');item.dataset.optionIndex=String(i);
