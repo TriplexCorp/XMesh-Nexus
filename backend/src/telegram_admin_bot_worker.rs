@@ -259,7 +259,7 @@ async fn create_confirmation(
     let nonce=Uuid::new_v4();
     sqlx::query(
         "INSERT INTO telegram_admin_bot_actions(nonce,admin_id,user_id,action,expires_at)
-         VALUES($1,$2,$3,$4,NOW()+INTERVAL '60 seconds')"
+         VALUES($1::UUID,$2,$3,$4,NOW()+INTERVAL '60 seconds')"
     ).bind(nonce.to_string()).bind(admin_id).bind(user_id).bind(action)
     .execute(&state.pool).await.map_err(|_|"database_unavailable")?;
     let verb=if action=="enable" {"включить"} else {"отключить"};
@@ -279,7 +279,7 @@ async fn consume_confirmation(
     let mut tx=state.pool.begin().await.map_err(|_|"database_unavailable")?;
     let row=sqlx::query(
         "SELECT user_id,action FROM telegram_admin_bot_actions
-         WHERE nonce=$1 AND admin_id=$2 AND consumed_at IS NULL
+         WHERE nonce=$1::UUID AND admin_id=$2 AND consumed_at IS NULL
            AND expires_at>NOW() FOR UPDATE"
     ).bind(nonce.to_string()).bind(admin_id)
     .fetch_optional(&mut *tx).await.map_err(|_|"database_unavailable")?;
@@ -306,7 +306,7 @@ async fn consume_confirmation(
         ).bind(user_id).bind(&data)
         .execute(&mut *tx).await.map_err(|_|"database_unavailable")?;
     }
-    sqlx::query("UPDATE telegram_admin_bot_actions SET consumed_at=NOW() WHERE nonce=$1")
+    sqlx::query("UPDATE telegram_admin_bot_actions SET consumed_at=NOW() WHERE nonce=$1::UUID")
         .bind(nonce.to_string()).execute(&mut *tx)
         .await.map_err(|_|"database_unavailable")?;
     sqlx::query(
@@ -506,7 +506,7 @@ pub(crate) async fn run(state:AppState){
                 let leader=sqlx::query_scalar::<_,bool>(
                     "SELECT pg_try_advisory_lock($1)"
                 ).bind(LEADER_LOCK_ID).fetch_one(&mut *lock).await;
-                if leader==Ok(true) {
+                if matches!(leader,Ok(true)) {
                     let result=session(&state,&client,&config).await;
                     if let Err(code)=result {
                         // Only bounded fixed status codes; never log Telegram API
@@ -518,7 +518,7 @@ pub(crate) async fn run(state:AppState){
                     let unlocked=sqlx::query_scalar::<_,bool>(
                         "SELECT pg_advisory_unlock($1)"
                     ).bind(LEADER_LOCK_ID).fetch_one(&mut *lock).await;
-                    if unlocked != Ok(true) {
+                    if !matches!(unlocked,Ok(true)) {
                         let _=lock.close().await;
                     }
                 }
