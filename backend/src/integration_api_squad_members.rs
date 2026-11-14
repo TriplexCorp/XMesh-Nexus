@@ -48,14 +48,16 @@ async fn change_locked(
     ids: &[i64],
     add: bool,
 ) -> Result<Vec<i64>, Problem> {
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM panel_records
-         WHERE collection='squads' AND id=$1)",
+    // Hold a shared lock until commit so a concurrent administrator cannot
+    // delete the squad between validation and the membership updates.
+    let exists: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM panel_records
+         WHERE collection='squads' AND id=$1 FOR SHARE",
     )
     .bind(squad_id)
-    .fetch_one(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await?;
-    if !exists {
+    if exists.is_none() {
         return Err(Problem::new(
             StatusCode::NOT_FOUND,
             "not_found",
