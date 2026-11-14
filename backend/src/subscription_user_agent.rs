@@ -238,9 +238,18 @@ mod tests {
     }
     #[test]
     fn additional_platforms_are_detected_without_guessing_unknown_agents() {
-        assert_eq!(detect(&headers("Happ/4.0 (Macintosh; macOS 15)", "*/*")).device, Device::Macos);
-        assert_eq!(detect(&headers("Happ/4.0 (Linux x86_64)", "*/*")).device, Device::Linux);
-        assert_eq!(detect(&headers("Happ/4.0 (Android 15)", "*/*")).device, Device::Android);
+        assert_eq!(
+            detect(&headers("Happ/4.0 (Macintosh; macOS 15)", "*/*")).device,
+            Device::Macos
+        );
+        assert_eq!(
+            detect(&headers("Happ/4.0 (Linux x86_64)", "*/*")).device,
+            Device::Linux
+        );
+        assert_eq!(
+            detect(&headers("Happ/4.0 (Android 15)", "*/*")).device,
+            Device::Android
+        );
         assert_eq!(detect(&headers("Happ/4.0", "*/*")).device, Device::Auto);
     }
     #[test]
