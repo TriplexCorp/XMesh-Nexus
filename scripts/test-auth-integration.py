@@ -256,7 +256,8 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
         "label": "ci_user_management",
         "scopes": ["users:create", "users:update", "users:read",
                    "quotas:read", "quotas:write", "subscriptions:read",
-                   "squads:read", "squads:members:write", "nodes:read"],
+                   "squads:read", "squads:members:write", "nodes:read",
+                   "telegram:read", "telegram:assign"],
         "expiresInDays": 2,
         "allUsers": True,
         "mfaCode": factor4,
@@ -271,6 +272,7 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
         "holdDays": 30,
         "limitGb": 1000,
         "cdnLimitGb": 5,
+        "telegramId": "1855665674",
     }
     check(service_api("POST", "/users", manager, create_body)[0], 400,
           "user creation must have an idempotency key")
@@ -422,7 +424,7 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
     scoped_issue = {
         "clientName":"ci_squad_limited",
         "label":"ci_squad_user_bound",
-        "scopes":["squads:read","squads:members:write"],
+        "scopes":["squads:read","squads:members:write","telegram:read","users:read"],
         "allUsers":False,
         "allowedUserIds":[created_id],
         "expiresInDays":2,
@@ -449,6 +451,103 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
     for node_id in node_ids:
         check(api("DELETE",f"/collections/nodes/{node_id}",cookie=owner_cookie)[0],
               200, "clean up test node")
+    # Telegram indexing works for manual panel records and multiple subscriptions
+    # owned by the same Telegram user, without leaking credentials or other users.
+    telegram_id = "1855665674"
+    lookup_path = f"/users/by-telegram/{telegram_id}"
+    check(service_api("GET", lookup_path, token2)[0], 403,
+          "Telegram lookup needs an explicit telegram:read scope")
+    check(service_api("GET", "/users/by-telegram/0001", manager)[0], 400,
+          "noncanonical Telegram ID is rejected")
+    check(service_api("GET", "/users/by-telegram/-10001", manager)[0], 400,
+          "chat ID is not accepted as a Telegram user ID")
+    check(service_api("POST", "/users", manager,
+                      {**create_body,"username":"ci_invalid_tg","telegramId":"0001"},
+                      str(uuid.uuid4()))[0], 400,
+          "Telegram ID must be canonical at creation")
+    second_body = {**create_body, "username":"ci_second_telegram_subscription"}
+    status, second_user, _ = service_api("POST", "/users", manager,
+                                        second_body, str(uuid.uuid4()))
+    check(status, 201, "multiple VPN accounts may belong to one Telegram ID")
+    second_id = second_user["data"]["id"]
+    check(api("PATCH", f"/collections/users/{user_id}",
+              {"tg":telegram_id}, owner_cookie)[0], 200,
+          "owner assigns a legacy user via the existing Telegram field")
+    status, telegram_users, _ = service_api("GET", lookup_path, manager)
+    check(status, 200, "Telegram lookup finds bot-created and legacy users")
+    expected_ids = {created_id, second_id, user_id}
+    assert {entry["id"] for entry in telegram_users["data"]} == expected_ids, telegram_users
+    assert all("tg" not in user and "xrayId" not in user for user in telegram_users["data"])
+    status, paged, _ = service_api("GET", lookup_path + "?limit=1", manager)
+    check(status, 200, "Telegram lookup supports bounded cursor paging")
+    assert len(paged["data"]) == 1 and paged["meta"]["nextCursor"]
+    tampered = paged["meta"]["nextCursor"] + "bad"
+    check(service_api("GET", lookup_path + "?cursor=" + tampered, manager)[0],
+          400, "Telegram cursor cannot be tampered with")
+    check(service_api("GET", "/users/by-telegram/1888555666?cursor=" +
+                      paged["meta"]["nextCursor"], manager)[0], 400,
+          "Telegram cursor cannot be used for a different Telegram account")
+    assert service_api("GET", "/users/by-telegram/123456789", manager)[1]["data"] == []
+    status, bounded, _ = service_api("GET", lookup_path, limited_token)
+    check(status, 200, "Telegram lookup respects allowedUserIds")
+    assert [user["id"] for user in bounded["data"]] == [created_id], bounded
+
+    # Only the exact provisioning integration client may first bind an unlinked
+    # account. Even an all-users bot token must not claim a panel-created account.
+    status, legacy, legacy_headers = service_api("GET",f"/users/{user_id}",manager)
+    check(status, 200, "legacy user revision available")
+    check(service_api("PATCH", f"/users/{user_id}/telegram", manager,
+                      {"telegramId":"123456789"}, str(uuid.uuid4()),
+                      if_match=legacy_headers.get("ETag"))[0],403,
+          "bot cannot hijack a manually created subscription")
+    status, linked, linked_headers = service_api("GET",f"/users/{created_id}",manager)
+    check(status,200,"get current revision before Telegram relink attempt")
+    check(service_api("PATCH",f"/users/{created_id}/telegram",manager,
+                      {"telegramId":"2222222222"},str(uuid.uuid4()),
+                      if_match=linked_headers.get("ETag"))[0],409,
+          "service may not overwrite an existing Telegram identity")
+
+    unbound_body = {"username":"ci_service_unbound_tg","hold":True,"holdDays":30}
+    status, unbound, _ = service_api("POST","/users",manager,unbound_body,str(uuid.uuid4()))
+    check(status,201,"service provisions an account without a Telegram binding")
+    unbound_id = unbound["data"]["id"]
+    status, account, account_headers = service_api("GET",f"/users/{unbound_id}",manager)
+    check(status,200,"read unbound user ETag")
+    binding = {"telegramId":"3000000003"}
+    binding_path = f"/users/{unbound_id}/telegram"
+    check(service_api("PATCH",binding_path,manager,binding,str(uuid.uuid4()))[0],428,
+          "Telegram assignment requires If-Match")
+    check(service_api("PATCH",binding_path,manager,
+                      {"telegramId":"00003"},str(uuid.uuid4()),
+                      if_match=account_headers.get("ETag"))[0],400,
+          "Telegram assignment validates canonical string ID")
+    check(service_api("PATCH",binding_path,limited_token,binding,str(uuid.uuid4()),
+                      if_match=account_headers.get("ETag"))[0],403,
+          "read-only Telegram scope cannot write bindings")
+    bind_key = str(uuid.uuid4())
+    status, bound, _ = service_api("PATCH",binding_path,manager,binding,bind_key,
+                                   if_match=account_headers.get("ETag"))
+    check(status,200,"provisioning client binds its own user to Telegram")
+    assert bound["data"]["changed"] is True
+    status, bound_replay, _ = service_api("PATCH",binding_path,manager,binding,bind_key,
+                                         if_match=account_headers.get("ETag"))
+    check(status,200,"binding is idempotent across retries")
+    assert bound_replay["meta"]["replayed"] is True
+    check(service_api("PATCH",binding_path,manager,
+                      {"telegramId":"4000000004"},bind_key,
+                      if_match=account_headers.get("ETag"))[0],409,
+          "idempotency key cannot be reused to change the Telegram ID")
+    status, queried, _ = service_api("GET","/users/by-telegram/3000000003",manager)
+    check(status,200,"new binding indexed for lookup")
+    assert [item["id"] for item in queried["data"]] == [unbound_id]
+    status, updated, updated_headers = service_api("GET", f"/users/{unbound_id}", manager)
+    check(status,200,"binding changed database record revision")
+    check(service_api("PATCH",binding_path,manager,
+                      {"telegramId":"4000000004"},str(uuid.uuid4()),
+                      if_match=updated_headers.get("ETag"))[0],409,
+          "previous binding cannot be silently replaced by bot")
+    print("Integration API Telegram ID lookup, multi-account indexing and safe assignment passed.")
+
     print("Integration API scoped squad/node catalogs and squad membership passed.")
 
     print("Integration API user creation, patch, ETags and exact quotas passed.")
