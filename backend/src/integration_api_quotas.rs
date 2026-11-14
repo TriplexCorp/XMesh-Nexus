@@ -12,20 +12,27 @@ use serde_json::{Map, Value, json};
 use sqlx::{Postgres, Row, Transaction};
 
 fn bad() -> Problem {
-    Problem::new(StatusCode::BAD_REQUEST, "validation_error", "Invalid quota policy")
+    Problem::new(
+        StatusCode::BAD_REQUEST,
+        "validation_error",
+        "Invalid quota policy",
+    )
 }
 
 fn amount(value: &Value) -> Result<f64, Problem> {
-    value.as_f64()
+    value
+        .as_f64()
         .filter(|v| v.is_finite() && (0.0..=1_000_000.0).contains(v))
         .ok_or_else(bad)
 }
 
 fn parse_policy(body: &Value) -> Result<Map<String, Value>, Problem> {
     let fields = body.as_object().ok_or_else(bad)?;
-    if fields.is_empty() || fields.keys().any(|field| {
-        !matches!(field.as_str(), "limitGb" | "cdnLimitGb" | "nodeRules")
-    }) {
+    if fields.is_empty()
+        || fields
+            .keys()
+            .any(|field| !matches!(field.as_str(), "limitGb" | "cdnLimitGb" | "nodeRules"))
+    {
         return Err(bad());
     }
     let mut patch = Map::new();
@@ -35,16 +42,25 @@ fn parse_policy(body: &Value) -> Result<Map<String, Value>, Problem> {
         }
     }
     if let Some(value) = fields.get("nodeRules") {
-        let entries = value.as_array().filter(|v| v.len() <= 256).ok_or_else(bad)?;
+        let entries = value
+            .as_array()
+            .filter(|v| v.len() <= 256)
+            .ok_or_else(bad)?;
         let mut policies = Map::new();
         for entry in entries {
             let rule = entry.as_object().ok_or_else(bad)?;
-            if rule.len() != 3 || !rule.contains_key("nodeId")
-                || !rule.contains_key("period") || !rule.contains_key("limitGb") {
+            if rule.len() != 3
+                || !rule.contains_key("nodeId")
+                || !rule.contains_key("period")
+                || !rule.contains_key("limitGb")
+            {
                 return Err(bad());
             }
-            let node_id = rule.get("nodeId").and_then(Value::as_i64)
-                .filter(|id| *id > 0).ok_or_else(bad)?;
+            let node_id = rule
+                .get("nodeId")
+                .and_then(Value::as_i64)
+                .filter(|id| *id > 0)
+                .ok_or_else(bad)?;
             let period = match rule.get("period").and_then(Value::as_str) {
                 Some("day") => "daily",
                 Some("week") => "weekly",
@@ -56,7 +72,10 @@ fn parse_policy(body: &Value) -> Result<Map<String, Value>, Problem> {
             if gb <= 0.0 || crate::gb_to_bytes_i64(gb) <= 0 {
                 return Err(bad());
             }
-            if policies.insert(node_id.to_string(), json!({"limitGb":gb,"period":period})).is_some() {
+            if policies
+                .insert(node_id.to_string(), json!({"limitGb":gb,"period":period}))
+                .is_some()
+            {
                 return Err(bad());
             }
         }
@@ -81,27 +100,51 @@ async fn view(state: &AppState, id: i64) -> Result<(Value, i64), Problem> {
         "SELECT data,(EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision
          FROM panel_records WHERE collection='users' AND id=$1",
     )
-    .bind(id).fetch_optional(&state.pool).await?
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
     .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))?;
     let user: Value = row.try_get("data")?;
     let revision: i64 = row.try_get("revision")?;
     let base_used_bytes = crate::gb_to_bytes_i64(
-        user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0)
+        user.get("used")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            .max(0.0),
     );
-    let signed_used_bytes = crate::user_metered_bytes(&state.pool, id).await.map_err(Problem::from)?;
+    let signed_used_bytes = crate::user_metered_bytes(&state.pool, id)
+        .await
+        .map_err(Problem::from)?;
     let used_bytes = base_used_bytes.saturating_add(signed_used_bytes.max(0));
     let main_limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
-    let main_bytes = if main_limit > 0.0 { Some(crate::gb_to_bytes_i64(main_limit)) } else { None };
-    let settings = crate::read_settings(&state.pool).await.map_err(Problem::from)?;
-    let cdn_used = cdn_quota::usage_for_user(&state.pool, &settings, id).await.map_err(Problem::from)?;
-    let cdn_limit = user.get("cdnLimitGb").and_then(Value::as_f64).unwrap_or(0.0);
-    let cdn_bytes = if cdn_limit > 0.0 { Some(crate::gb_to_bytes_i64(cdn_limit)) } else { None };
+    let main_bytes = if main_limit > 0.0 {
+        Some(crate::gb_to_bytes_i64(main_limit))
+    } else {
+        None
+    };
+    let settings = crate::read_settings(&state.pool)
+        .await
+        .map_err(Problem::from)?;
+    let cdn_used = cdn_quota::usage_for_user(&state.pool, &settings, id)
+        .await
+        .map_err(Problem::from)?;
+    let cdn_limit = user
+        .get("cdnLimitGb")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
+    let cdn_bytes = if cdn_limit > 0.0 {
+        Some(crate::gb_to_bytes_i64(cdn_limit))
+    } else {
+        None
+    };
     let cdn_period = if settings.get("cdnResetPeriod").and_then(Value::as_str) == Some("monthly") {
         "month"
     } else {
         "lifetime"
     };
-    let node_usage = node_user_quotas::usage_for_user(&state.pool, id).await.map_err(Problem::from)?;
+    let node_usage = node_user_quotas::usage_for_user(&state.pool, id)
+        .await
+        .map_err(Problem::from)?;
     let mut nodes = Vec::new();
     if let Some(policies) = user.get("nodeTrafficLimits").and_then(Value::as_object) {
         for key in policies.keys() {
@@ -130,17 +173,21 @@ async fn view(state: &AppState, id: i64) -> Result<(Value, i64), Problem> {
         // Never report "unlimited" if a persisted quota map is corrupt.
         return Err(Problem::unavailable());
     }
-    Ok((json!({
-        "userId": id,
-        "main": bucket("main", main_bytes, used_bytes, "lifetime"),
-        "cdn": bucket("cdn", cdn_bytes, cdn_used, cdn_period),
-        "nodes": nodes
-    }), revision))
+    Ok((
+        json!({
+            "userId": id,
+            "main": bucket("main", main_bytes, used_bytes, "lifetime"),
+            "cdn": bucket("cdn", cdn_bytes, cdn_used, cdn_period),
+            "nodes": nodes
+        }),
+        revision,
+    ))
 }
 
 fn with_etag(value: Value, revision: i64) -> Result<Response, Problem> {
     let mut response = reply(value).into_response();
-    let etag = HeaderValue::from_str(&format!("\"{revision}\"")).map_err(|_| Problem::unavailable())?;
+    let etag =
+        HeaderValue::from_str(&format!("\"{revision}\"")).map_err(|_| Problem::unavailable())?;
     response.headers_mut().insert(header::ETAG, etag);
     Ok(response)
 }
@@ -165,7 +212,10 @@ async fn apply(
     let row = sqlx::query(
         "SELECT data,(EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision
          FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE",
-    ).bind(id).fetch_optional(&mut **tx).await?
+    )
+    .bind(id)
+    .fetch_optional(&mut **tx)
+    .await?
     .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))?;
     user_mutations::matches_revision(headers, row.try_get("revision")?)?;
     let mut user: Value = row.try_get("data")?;
@@ -175,13 +225,19 @@ async fn apply(
     }
     crate::validate_record("users", &user).map_err(Problem::from)?;
     if policy.contains_key("nodeTrafficLimits") {
-        node_user_quotas::require_existing_nodes(tx, &user).await.map_err(Problem::from)?;
+        node_user_quotas::require_existing_nodes(tx, &user)
+            .await
+            .map_err(Problem::from)?;
     }
     let updated = sqlx::query(
         "UPDATE panel_records SET data=$2,updated_at=NOW()
          WHERE collection='users' AND id=$1
          RETURNING (EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision",
-    ).bind(id).bind(&user).fetch_one(&mut **tx).await?;
+    )
+    .bind(id)
+    .bind(&user)
+    .fetch_one(&mut **tx)
+    .await?;
     Ok(updated.try_get("revision")?)
 }
 
@@ -199,22 +255,31 @@ pub(super) async fn patch(
     let hash = grants::request_hash("user.quotas.patch", id, &body)?;
     let mut tx = state.pool.begin().await?;
     let mut replayed = false;
-    if grants::claim(&mut tx, &principal, &key, "user.quotas.patch", &hash).await?.is_some() {
+    if grants::claim(&mut tx, &principal, &key, "user.quotas.patch", &hash)
+        .await?
+        .is_some()
+    {
         replayed = true;
     } else {
         let revision = apply(&mut tx, id, &headers, &policy).await?;
-        grants::complete(&mut tx, &principal, &key, "user.quotas.patch", id,
-            &json!({"userId":id,"revision":revision})).await?;
+        grants::complete(
+            &mut tx,
+            &principal,
+            &key,
+            "user.quotas.patch",
+            id,
+            &json!({"userId":id,"revision":revision}),
+        )
+        .await?;
     }
     tx.commit().await?;
     let (result, revision) = view(&state, id).await?;
     let mut response = with_etag(result, revision)?;
     if replayed {
         // A replay never mutates the record, even when the ETag has changed.
-        response.headers_mut().insert(
-            "x-idempotency-replayed",
-            HeaderValue::from_static("true"),
-        );
+        response
+            .headers_mut()
+            .insert("x-idempotency-replayed", HeaderValue::from_static("true"));
     }
     Ok(response)
 }
@@ -236,16 +301,20 @@ mod tests {
         }
         let accepted = parse_policy(&json!({
             "limitGb":0,"cdnLimitGb":5,"nodeRules":[{"nodeId":123,"period":"week","limitGb":0.5}]
-        })).unwrap();
+        }))
+        .unwrap();
         assert_eq!(accepted["nodeTrafficLimits"]["123"]["period"], "weekly");
-        assert_eq!(accepted["cdnLimitGb"],5.0);
+        assert_eq!(accepted["cdnLimitGb"], 5.0);
     }
     #[test]
     fn exact_limits_do_not_change_signed_meters() {
         let limits = parse_policy(&json!({"limitGb":1000,"cdnLimitGb":5})).unwrap();
         assert!(!limits.contains_key("used"));
         assert!(!limits.contains_key("cdnUsedBytes"));
-        assert_eq!(bucket("main",Some(100),150,"lifetime")["remainingBytes"],0);
-        assert!(bucket("main",None,150,"lifetime")["remainingBytes"].is_null());
+        assert_eq!(
+            bucket("main", Some(100), 150, "lifetime")["remainingBytes"],
+            0
+        );
+        assert!(bucket("main", None, 150, "lifetime")["remainingBytes"].is_null());
     }
 }
