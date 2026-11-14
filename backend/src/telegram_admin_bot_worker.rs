@@ -509,7 +509,7 @@ async fn apply_access_toggle(
     let record =
         sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
             .bind(user_id)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut **tx)
             .await
             .map_err(|_| "database_unavailable")?;
     let Some(record) = record else {
@@ -528,13 +528,13 @@ async fn apply_access_toggle(
         )
         .bind(user_id)
         .bind(&data)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|_| "database_unavailable")?;
     }
     sqlx::query("UPDATE telegram_admin_bot_actions SET consumed_at=NOW() WHERE nonce=$1::UUID")
         .bind(nonce.to_string())
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await
         .map_err(|_| "database_unavailable")?;
     sqlx::query(
@@ -549,7 +549,7 @@ async fn apply_access_toggle(
     })
     .bind(user_id)
     .bind(json!({"telegramAdminId":admin_id,"changed":changed}))
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(|_| "database_unavailable")?;
     Ok(Some(disabled))
