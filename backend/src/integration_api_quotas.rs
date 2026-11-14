@@ -70,7 +70,7 @@ fn bucket(scope: &str, limit_bytes: Option<i64>, used_bytes: i64, period: &str) 
         "scope": scope,
         "limitBytes": limit_bytes,
         "usedBytes": used_bytes.max(0),
-        "remainingBytes": limit_bytes.map(|limit| limit.saturating_sub(used_bytes.max(0))),
+        "remainingBytes": limit_bytes.map(|limit| limit.saturating_sub(used_bytes.max(0)).max(0)),
         "period": period,
         "resetAt": null
     })
