@@ -176,7 +176,7 @@ pub(super) async fn extra_command(
 
 pub(super) async fn apply_extra(
     state:&AppState,admin_id:i64,nonce:Uuid,
-    row:&sqlx::postgres::PgRow,tx:&mut Transaction<'_,Postgres>
+    row:&sqlx::postgres::PgRow,tx:&mut Transaction<'_,Postgres>,language:Language
 )->Result<(i64,String),&'static str>{
     let action:String=row.try_get("action").map_err(|_|"database_unavailable")?;
     let id:i64=row.try_get("user_id").map_err(|_|"database_unavailable")?;
@@ -214,7 +214,7 @@ pub(super) async fn apply_extra(
         ).bind(data).fetch_one(&mut **tx).await.map_err(|_|"database_unavailable")?;
         crate::user_subscriptions::provision_new_user(state,result_id,tx)
             .await.map_err(|_|"database_unavailable")?;
-        summary=format!("User #{result_id} created.");
+        summary=format!("{} #{result_id} {}",tr(language,"Пользователь","User"),tr(language,"создан.","created."));
     }else {
         if !matches!(action.as_str(),"renew"|"quota") || id<=0 {return Err("invalid_command");}
         let db=sqlx::query(
@@ -233,11 +233,11 @@ pub(super) async fn apply_extra(
                 .checked_add(amount.checked_mul(86_400_000).ok_or("invalid_command")?)
                 .ok_or("invalid_command")?;
             data["expireAt"]=json!(new);
-            summary=format!("User #{id} renewed by {amount} days.");
+            summary=format!("{} #{id} {} {amount} {}",tr(language,"Пользователь","User"),tr(language,"продлён на","renewed by"),tr(language,"дней.","days."));
         } else {
             if !(0..=100000).contains(&amount){return Err("invalid_command");}
             data["limit"]=json!(amount);
-            summary=format!("User #{id} quota updated to {amount} GB.");
+            summary=format!("{} #{id}: {} {amount} GB.",tr(language,"Пользователь","User"),tr(language,"лимит установлен","quota set to"));
         }
         crate::validate_record("users",&data).map_err(|_|"invalid_command")?;
         sqlx::query(
