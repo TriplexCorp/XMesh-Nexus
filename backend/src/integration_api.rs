@@ -210,7 +210,10 @@ pub fn service_router(state: &AppState) -> Router<AppState> {
         .route("/users/{id}/subscription", get(users::subscription))
         .route("/squads", get(catalog::list_squads))
         .route("/squads/{id}", get(catalog::get_squad))
-        .route("/squads/{id}/members", post(squad_members::add).delete(squad_members::remove))
+        .route(
+            "/squads/{id}/members",
+            post(squad_members::add).delete(squad_members::remove),
+        )
         .route("/nodes", get(catalog::list_nodes))
         .route("/nodes/{id}", get(catalog::get_node))
         .route("/users/{id}/enable", post(users::enable))
