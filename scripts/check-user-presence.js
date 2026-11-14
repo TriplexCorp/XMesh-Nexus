@@ -52,7 +52,7 @@ assert.equal(active(a,{up:101,down:51},9,10),false,'out-of-order sample');
 const telegram=fs.readFileSync('backend/src/telegram_admin_bot_commands.rs','utf8');
 assert.match(telegram,/record\.insert\("squads"\.into\(\), json!\(\[squad_id\]\)\);/,
  'Telegram account creation must persist the confirmed squad');
-assert.match(telegram,/let selected=sqlx::query_scalar/,'Selected squad must be validated');
+assert.match(telegram,/let selected\s*=\s*sqlx::query_scalar/,'Selected squad must be validated');
 assert.match(telegram,/FOR SHARE/,'Squad must be locked during creation');
 assert.match(telegram,/selected_squad\.ok_or\("squad_not_selected"\)/,
  'Missing squad must block account creation');
