@@ -29,10 +29,10 @@ mod subscription_formats;
 mod subscription_json;
 mod subscription_remark;
 mod subscription_settings;
-mod telegram_admin_bot;
-mod telegram_admin_bot_worker;
 mod subscription_transport;
 mod subscription_user_agent;
+mod telegram_admin_bot;
+mod telegram_admin_bot_worker;
 mod user_subscriptions;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_ack_epoch_commit;
@@ -341,7 +341,10 @@ fn protected_management_routes() -> Router<AppState> {
             "/integration-tokens/{id}",
             axum::routing::delete(integration_api::revoke_token),
         )
-        .route("/telegram-bot", get(telegram_admin_bot::status).put(telegram_admin_bot::save))
+        .route(
+            "/telegram-bot",
+            get(telegram_admin_bot::status).put(telegram_admin_bot::save),
+        )
         .route("/security/audit", get(security::audit_events))
         .route("/security/sessions", get(security::sessions))
         .route(
