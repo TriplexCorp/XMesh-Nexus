@@ -2190,7 +2190,7 @@ async function refreshPanelUsers(){
   usersRefreshInFlight=(async()=>{
     const response=await fetch('/api/v1/collections/users',{credentials:'same-origin',cache:'no-store'});
     const payload=await response.json().catch(()=>({}));
-    if(!response.ok||!Array.isArray(payload.items))throw Error(payload.error||'Не удалось загрузить пользователей.');
+    if(!response.ok||!Array.isArray(payload.items))throw Error(payload.error||'Не удалось обновить пользователей.');
     DB.users=normalizeUserList(payload.items);
     for(const id of UQ.sel)if(!DB.users.some(user=>user.id===id))UQ.sel.delete(id);
     if(cur==='users'&&$('#ut'))await drawUsers();
