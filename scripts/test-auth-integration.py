@@ -546,6 +546,26 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
                       {"telegramId":"4000000004"},str(uuid.uuid4()),
                       if_match=updated_headers.get("ETag"))[0],409,
           "previous binding cannot be silently replaced by bot")
+    # The existing panel used a free-form field: legacy data may contain a
+    # JSON number, not a string. A service cannot overwrite that binding.
+    status, numeric_user, _ = service_api("POST", "/users", manager, {
+        "username":"ci_numeric_telegram_legacy", "hold":True,"holdDays":30
+    }, str(uuid.uuid4()))
+    check(status,201,"create user for numeric legacy binding regression")
+    numeric_id = numeric_user["data"]["id"]
+    check(api("PATCH",f"/collections/users/{numeric_id}",
+              {"tg":123456789},owner_cookie)[0],200,
+          "administrator records numeric legacy Telegram ID")
+    status, numeric_info, numeric_headers = service_api(
+        "GET",f"/users/{numeric_id}",manager)
+    check(status,200,"read legacy numeric user revision")
+    check(service_api("PATCH",f"/users/{numeric_id}/telegram",manager,
+                      {"telegramId":"999999999"},str(uuid.uuid4()),
+                      if_match=numeric_headers.get("ETag"))[0],409,
+          "numeric legacy Telegram ID cannot be silently overwritten")
+    check(service_api("GET", "/users/by-telegram/123456789", manager)[0],200,
+          "numeric legacy Telegram IDs remain searchable")
+
     print("Integration API Telegram ID lookup, multi-account indexing and safe assignment passed.")
 
     print("Integration API scoped squad/node catalogs and squad membership passed.")
