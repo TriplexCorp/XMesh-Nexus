@@ -497,6 +497,64 @@ async fn handle_extra_confirmation(
     Ok(())
 }
 
+async fn apply_access_toggle(
+    api: &BotApi,
+    chat: i64,
+    admin_id: i64,
+    nonce: Uuid,
+    user_id: i64,
+    action: &str,
+    tx: &mut sqlx::Transaction<'_,sqlx::Postgres>,
+) -> Result<Option<bool>, &'static str> {
+    let record =
+        sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
+            .bind(user_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|_| "database_unavailable")?;
+    let Some(record) = record else {
+        api.send(chat, "Пользователь больше не существует.", menu_buttons()).await?;
+        return Ok(None);
+    };
+    let mut data: Value = record.try_get("data").map_err(|_| "database_unavailable")?;
+    let disabled = action == "disable";
+    let changed = data.get("disabled") != Some(&Value::Bool(disabled));
+    if changed {
+        data["disabled"] = json!(disabled);
+        crate::validate_record("users", &data).map_err(|_| "invalid_user")?;
+        sqlx::query(
+            "UPDATE panel_records SET data=$2,updated_at=NOW()
+             WHERE collection='users' AND id=$1",
+        )
+        .bind(user_id)
+        .bind(&data)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| "database_unavailable")?;
+    }
+    sqlx::query("UPDATE telegram_admin_bot_actions SET consumed_at=NOW() WHERE nonce=$1::UUID")
+        .bind(nonce.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| "database_unavailable")?;
+    sqlx::query(
+        "INSERT INTO panel_audit_log(actor,action,collection,record_id,detail)
+         VALUES($1,$2,'users',$3,$4)",
+    )
+    .bind(format!("telegram:{admin_id}"))
+    .bind(if disabled {
+        "telegram_bot.user_disabled"
+    } else {
+        "telegram_bot.user_enabled"
+    })
+    .bind(user_id)
+    .bind(json!({"telegramAdminId":admin_id,"changed":changed}))
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    Ok(Some(disabled))
+}
+
 async fn consume_confirmation(
     api: &BotApi,
     state: &AppState,
@@ -547,53 +605,9 @@ async fn consume_confirmation(
     if matches!(action.as_str(), "create" | "renew" | "quota") {
         return handle_extra_confirmation(api, state, chat, admin_id, nonce, row, tx).await;
     }
-    let record =
-        sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
-            .bind(user_id)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|_| "database_unavailable")?;
-    let Some(record) = record else {
-        return api
-            .send(chat, "Пользователь больше не существует.", menu_buttons())
-            .await;
-    };
-    let mut data: Value = record.try_get("data").map_err(|_| "database_unavailable")?;
-    let disabled = action == "disable";
-    let changed = data.get("disabled") != Some(&Value::Bool(disabled));
-    if changed {
-        data["disabled"] = json!(disabled);
-        crate::validate_record("users", &data).map_err(|_| "invalid_user")?;
-        sqlx::query(
-            "UPDATE panel_records SET data=$2,updated_at=NOW()
-             WHERE collection='users' AND id=$1",
-        )
-        .bind(user_id)
-        .bind(&data)
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| "database_unavailable")?;
-    }
-    sqlx::query("UPDATE telegram_admin_bot_actions SET consumed_at=NOW() WHERE nonce=$1::UUID")
-        .bind(nonce.to_string())
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| "database_unavailable")?;
-    sqlx::query(
-        "INSERT INTO panel_audit_log(actor,action,collection,record_id,detail)
-         VALUES($1,$2,'users',$3,$4)",
-    )
-    .bind(format!("telegram:{admin_id}"))
-    .bind(if disabled {
-        "telegram_bot.user_disabled"
-    } else {
-        "telegram_bot.user_enabled"
-    })
-    .bind(user_id)
-    .bind(json!({"telegramAdminId":admin_id,"changed":changed}))
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| "database_unavailable")?;
+    let Some(disabled)=apply_access_toggle(
+        api, chat, admin_id, nonce, user_id, &action, &mut tx
+    ).await? else { return Ok(()); };
     tx.commit().await.map_err(|_| "database_unavailable")?;
     let text = if disabled {
         "🔴 Пользователь отключён."
