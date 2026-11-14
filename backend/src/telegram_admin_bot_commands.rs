@@ -462,10 +462,7 @@ pub(super) async fn create_picker_callback(
     let Some((raw_nonce, raw_value)) = raw.rsplit_once(':') else {
         return Some(Err("invalid_command"));
     };
-    let (Ok(nonce), Ok(value)) = (
-        Uuid::parse_str(raw_nonce),
-        raw_value.parse::<i64>(),
-    ) else {
+    let (Ok(nonce), Ok(value)) = (Uuid::parse_str(raw_nonce), raw_value.parse::<i64>()) else {
         return Some(Err("invalid_command"));
     };
     Some(if kind == "page" {
