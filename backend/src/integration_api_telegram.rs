@@ -217,7 +217,14 @@ pub(super) async fn assign(
         ));
     }
     let mut user: Value = record.try_get("data")?;
-    let previous = user.get("tg").and_then(Value::as_str).unwrap_or("").trim();
+    // Legacy panel edits may have stored a numeric JSON value. Never treat
+    // an existing non-string binding as "empty" and overwrite it.
+    let previous = match user.get("tg") {
+        None | Some(Value::Null) => String::new(),
+        Some(Value::String(value)) => value.trim().to_owned(),
+        Some(Value::Number(value)) => value.to_string(),
+        Some(_) => return Err(Problem::unavailable()),
+    };
     if !previous.is_empty() && previous != tg {
         return Err(Problem::new(
             StatusCode::CONFLICT,
