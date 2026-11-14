@@ -8,7 +8,7 @@ use crate::{
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::{Connection, Row};
+use sqlx::Row;
 use std::{fmt::Write as _, time::Duration};
 use uuid::Uuid;
 
@@ -204,8 +204,8 @@ async fn nodes(api: &BotApi, state: &AppState, chat: i64) -> Result<(), &'static
         let name: Option<String> = row.try_get("name").map_err(|_| "database_unavailable")?;
         let status: Option<String> = row.try_get("state").map_err(|_| "database_unavailable")?;
         let state_label = match status.as_deref() {
-            Some("ONLINE") | Some("online") => "🟢",
-            Some("OFFLINE") | Some("offline") => "🔴",
+            Some("ONLINE" | "online") => "🟢",
+            Some("OFFLINE" | "offline") => "🔴",
             _ => "⚪",
         };
         let label = escape(name.as_deref().unwrap_or("Без названия"));
@@ -323,7 +323,7 @@ async fn user_card(api: &BotApi, state: &AppState, chat: i64, id: i64) -> Result
     );
     let disabled = user.get("disabled") == Some(&Value::Bool(true));
     let status = crate::user_status(&user, telegram_admin_bot::now_ms());
-    let used = user
+    let traffic_used = user
         .get("used")
         .and_then(Value::as_f64)
         .unwrap_or(0.0)
@@ -347,9 +347,9 @@ async fn user_card(api: &BotApi, state: &AppState, chat: i64, id: i64) -> Result
         format!("{remain} дн.")
     };
     let traffic = if limit > 0.0 {
-        format!("{used:.2} / {limit:.2} ГБ")
+        format!("{traffic_used:.2} / {limit:.2} ГБ")
     } else {
-        format!("{used:.2} ГБ / ∞")
+        format!("{traffic_used:.2} ГБ / ∞")
     };
     let message = format!(
         "👤 <b>{username}</b>\n\nID: <code>{id}</code>\nСтатус: <b>{status}</b>\nТрафик: <b>{traffic}</b>\nОсталось: <b>{deadline}</b>\n\n<i>Изменения доступа выполняются только после подтверждения.</i>"
@@ -747,10 +747,10 @@ async fn session(
             let next_offset = update.update_id;
             // Permission is checked again against the latest config per update.
             // A failed send never repeats a successfully committed access mutation.
-            if let Err(code) = dispatch(&api, state, config.revision, update).await {
-                if code == "database_unavailable" {
-                    return Err(code);
-                }
+            if let Err(code) = dispatch(&api, state, config.revision, update).await
+                && code == "database_unavailable"
+            {
+                return Err(code);
             }
             sqlx::query(
                 "UPDATE telegram_admin_bot SET last_update_id=GREATEST(last_update_id,$2)
@@ -766,23 +766,21 @@ async fn session(
     }
 }
 
-pub(crate) async fn run(state: AppState) {
-    let client = match Client::builder()
+pub async fn run(state: AppState) {
+    let Ok(client) = Client::builder()
         .connect_timeout(Duration::from_secs(5))
         .timeout(Duration::from_secs(25))
         .redirect(reqwest::redirect::Policy::none())
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return,
-    };
+        .build() else {
+            return;
+        };
     loop {
         let config = telegram_admin_bot::load(&state).await;
         if let Ok(config) = config
             && config.enabled
             && !config.admins.is_empty()
+            && let Ok(mut lock) = state.pool.acquire().await
         {
-            if let Ok(mut lock) = state.pool.acquire().await {
                 let leader = sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock($1)")
                     .bind(LEADER_LOCK_ID)
                     .fetch_one(&mut *lock)
@@ -823,6 +821,6 @@ mod tests {
     #[test]
     fn callback_names_do_not_leak_secrets() {
         assert!(!format!("{:?}", menu_buttons()).contains("bot123:"));
-        assert_eq!(Uuid::parse_str(&Uuid::new_v4().to_string()).is_ok(), true);
+        assert!(Uuid::parse_str(&Uuid::new_v4().to_string()).is_ok());
     }
 }
