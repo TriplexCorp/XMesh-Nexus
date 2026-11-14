@@ -68,7 +68,7 @@ def totp(secret):
 
 
 
-def service_api(method, path, bearer=None, payload=None, idempotency=None, cookie=None, origin=None):
+def service_api(method, path, bearer=None, payload=None, idempotency=None, cookie=None, origin=None, if_match=None):
     """Machine-to-machine call: never implicitly send browser Origin or cookies."""
     headers = {"Accept": "application/json"}
     if payload is not None:
@@ -77,6 +77,8 @@ def service_api(method, path, bearer=None, payload=None, idempotency=None, cooki
         headers["Authorization"] = "Bearer " + bearer
     if idempotency is not None:
         headers["Idempotency-Key"] = idempotency
+    if if_match is not None:
+        headers["If-Match"] = if_match
     if cookie is not None:
         headers["Cookie"] = cookie
     if origin is not None:
@@ -240,6 +242,110 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
     status, tokens, _ = api("GET", "/integration-tokens", cookie=owner_cookie)
     check(status, 200, "owner sees token metadata")
     assert issued["token"] not in json.dumps(tokens), "Raw token persisted in list!"
+    # A scoped token cannot silently become a provisioning key.
+    check(service_api("POST", "/users", token2,
+                      {"username":"ci_forbidden_create","hold":True,"holdDays":30},
+                      str(uuid.uuid4()))[0], 403,
+          "bounded existing-user token cannot create users")
+
+    # Creation requires a separate owner-approved, all-users credential AND a
+    # dedicated users:create scope, not the broad legacy users:write permission.
+    factor4, step4 = next_unused_totp(secret, step3)
+    manager_issue = {
+        "clientName": "ci_subscription_manager",
+        "label": "ci_user_management",
+        "scopes": ["users:create", "users:update", "users:read",
+                   "quotas:read", "quotas:write", "subscriptions:read"],
+        "expiresInDays": 2,
+        "allUsers": True,
+        "mfaCode": factor4,
+    }
+    status, manager_issued, _ = api("POST", "/integration-tokens", manager_issue, owner_cookie)
+    check(status, 200, "owner issues explicit all-users manager key after MFA")
+    manager = manager_issued["token"]
+
+    create_body = {
+        "username": "ci_service_managed_user",
+        "hold": True,
+        "holdDays": 30,
+        "limitGb": 1000,
+        "cdnLimitGb": 5,
+    }
+    check(service_api("POST", "/users", manager, create_body)[0], 400,
+          "user creation must have an idempotency key")
+    check(service_api("POST", "/users", manager,
+                      {"username": "ci_no_expiry"}, str(uuid.uuid4()))[0], 400,
+          "service may not accidentally create an unlimited account")
+    check(service_api("POST", "/users", manager,
+                      {**create_body, "xrayId":"forged"},
+                      str(uuid.uuid4()))[0], 400,
+          "client cannot forge an Xray identity")
+    create_key = str(uuid.uuid4())
+    status, created, _ = service_api("POST", "/users", manager, create_body, create_key)
+    check(status, 201, "manager atomically creates held user and subscription")
+    created_id = created["data"]["id"]
+    assert created_id > 0 and created["data"]["status"] == "ON_HOLD", created
+    assert created["data"]["holdDays"] == 30
+    assert "xrayId" not in json.dumps(created)
+    status, repeated, _ = service_api("POST", "/users", manager, create_body, create_key)
+    check(status, 200, "user creation retry is an idempotent replay")
+    assert repeated["data"]["id"] == created_id
+    assert repeated["meta"]["replayed"] is True
+    check(service_api("POST", "/users", manager,
+                      {**create_body, "username":"ci_new_duplicate_payload"}, create_key)[0],
+          409, "same create key cannot be reused for another payload")
+    check(service_api("POST", "/users", manager, create_body, str(uuid.uuid4()))[0],
+          409, "different request cannot duplicate a username")
+
+    status, current, current_headers = service_api("GET", f"/users/{created_id}", manager)
+    check(status, 200, "new user is visible with database-backed revision")
+    rev = current_headers.get("ETag")
+    assert rev == f'"{current["data"]["revision"]}"', (rev, current)
+    patch_body = {"username": "ci_managed_renamed", "limitGb": 850}
+    check(service_api("PATCH", f"/users/{created_id}", manager, patch_body,
+                      str(uuid.uuid4()))[0], 428,
+          "user patch requires If-Match revision")
+    check(service_api("PATCH", f"/users/{created_id}", manager, patch_body,
+                      str(uuid.uuid4()), if_match='"1"')[0], 412,
+          "stale revision prevents lost updates")
+    check(service_api("PATCH", f"/users/{created_id}", manager,
+                      {"xrayId": "forged"}, str(uuid.uuid4()), if_match=rev)[0],
+          400, "user patch cannot change VPN credentials")
+    patch_key = str(uuid.uuid4())
+    status, edited, _ = service_api("PATCH", f"/users/{created_id}", manager,
+                                    patch_body, patch_key, if_match=rev)
+    check(status, 200, "user patch updates only allowed fields")
+    assert edited["data"]["username"] == "ci_managed_renamed"
+    assert edited["data"]["limitGb"] == 850
+    assert edited["data"]["revision"] >= current["data"]["revision"]
+    status, replayed_patch, _ = service_api("PATCH", f"/users/{created_id}", manager,
+                                            patch_body, patch_key, if_match=rev)
+    check(status, 200, "user patch retries are idempotent")
+    assert replayed_patch["meta"]["replayed"] is True
+
+    status, quotas, quota_headers = service_api("GET", f"/users/{created_id}/quotas", manager)
+    check(status, 200, "read authoritative main, CDN and node quotas")
+    assert quotas["data"]["main"]["limitBytes"] == 850_000_000_000
+    assert quotas["data"]["cdn"]["limitBytes"] == 5_000_000_000
+    assert quota_headers.get("ETag") == f'"{edited["data"]["revision"]}"'
+    check(service_api("PATCH", f"/users/{created_id}/quotas", manager,
+                      {"cdnUsedBytes":0}, str(uuid.uuid4()),
+                      if_match=quota_headers.get("ETag"))[0], 400,
+          "service cannot forge CDN traffic")
+    quota_key = str(uuid.uuid4())
+    quota_body = {"cdnLimitGb": 2.5}
+    status, quota_changed, _ = service_api("PATCH", f"/users/{created_id}/quotas",
+                                          manager, quota_body, quota_key,
+                                          if_match=quota_headers.get("ETag"))
+    check(status, 200, "quota policy changes without resetting counters")
+    assert quota_changed["data"]["cdn"]["limitBytes"] == 2_500_000_000
+    status, _, duplicate_headers = service_api("PATCH", f"/users/{created_id}/quotas",
+                                              manager, quota_body, quota_key,
+                                              if_match=quota_headers.get("ETag"))
+    check(status, 200, "quota policy operation survives duplicate delivery")
+    assert duplicate_headers.get("X-Idempotency-Replayed") == "true"
+    print("Integration API user creation, patch, ETags and exact quotas passed.")
+
     print("Scoped Integration API: RBAC, MFA, rotation, idempotency and BOLA passed.")
 
 def main():
