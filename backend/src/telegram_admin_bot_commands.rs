@@ -331,6 +331,11 @@ async fn create_account(
         .ok_or("invalid_command")?;
     let mut record = Map::new();
     record.insert("username".into(), json!(username));
+    // Keep the same shape as users created in the panel. A user without
+    // squads must be valid but must not implicitly gain access to an inbound.
+    record.insert("squads".into(), json!([]));
+    record.insert("devices".into(), json!([]));
+    record.insert("disabled".into(), json!(false));
     record.insert("hold".into(), json!(false));
     record.insert("expireAt".into(), json!(expire));
     record.insert("limit".into(), json!(0));
