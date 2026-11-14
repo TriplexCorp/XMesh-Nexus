@@ -454,10 +454,9 @@ pub(super) async fn create_picker_callback(
     // this administrator and the unexpired DB proposal, not just to the ID.
     let (kind, raw) = if let Some(raw) = data.strip_prefix("v:cp:") {
         ("page", raw)
-    } else if let Some(raw) = data.strip_prefix("v:cs:") {
-        ("select", raw)
     } else {
-        return None;
+        let raw = data.strip_prefix("v:cs:")?;
+        ("select", raw)
     };
     let Some((raw_nonce, raw_value)) = raw.rsplit_once(':') else {
         return Some(Err("invalid_command"));
