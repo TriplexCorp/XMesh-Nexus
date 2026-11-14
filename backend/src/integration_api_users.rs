@@ -82,7 +82,12 @@ pub(super) fn safe_user(user: &Value) -> Value {
     })
 }
 
-async fn with_meter(state: &AppState, id: i64, mut user: Value, revision: i64) -> Result<Value, Problem> {
+async fn with_meter(
+    state: &AppState,
+    id: i64,
+    mut user: Value,
+    revision: i64,
+) -> Result<Value, Problem> {
     user["id"] = json!(id);
     let metered_bytes = crate::user_metered_bytes(&state.pool, id)
         .await
@@ -163,8 +168,8 @@ pub(super) async fn get(
     let user: Value = row.try_get("data")?;
     let revision: i64 = row.try_get("revision")?;
     let mut response = reply(with_meter(&state, id, user, revision).await?).into_response();
-    let tag = HeaderValue::from_str(&format!("\"{revision}\""))
-        .map_err(|_| Problem::unavailable())?;
+    let tag =
+        HeaderValue::from_str(&format!("\"{revision}\"")).map_err(|_| Problem::unavailable())?;
     response.headers_mut().insert(header::ETAG, tag);
     Ok(response)
 }
