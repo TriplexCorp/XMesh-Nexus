@@ -29,7 +29,7 @@ pub(super) struct AccessRequest {
     reason: String,
 }
 
-fn key(headers: &HeaderMap) -> Result<String, Problem> {
+pub(super) fn key(headers: &HeaderMap) -> Result<String, Problem> {
     let invalid = || {
         Problem::new(
             StatusCode::BAD_REQUEST,
@@ -49,7 +49,7 @@ fn key(headers: &HeaderMap) -> Result<String, Problem> {
     Ok(uuid.to_string())
 }
 
-fn request_hash(action: &str, user_id: i64, body: &impl Serialize) -> Result<String, Problem> {
+pub(super) fn request_hash(action: &str, user_id: i64, body: &impl Serialize) -> Result<String, Problem> {
     let body = serde_json::to_vec(body).map_err(|_| {
         Problem::new(
             StatusCode::BAD_REQUEST,
@@ -66,7 +66,7 @@ fn request_hash(action: &str, user_id: i64, body: &impl Serialize) -> Result<Str
     Ok(hex::encode(hash.finalize()))
 }
 
-async fn claim(
+pub(super) async fn claim(
     tx: &mut Transaction<'_, Postgres>,
     principal: &ServicePrincipal,
     idempotency_key: &str,
@@ -105,7 +105,7 @@ async fn claim(
     Ok(response)
 }
 
-async fn complete(
+pub(super) async fn complete(
     tx: &mut Transaction<'_, Postgres>,
     principal: &ServicePrincipal,
     idempotency_key: &str,
