@@ -2184,14 +2184,21 @@ async function homeP(){
 /* ================= ПОЛЬЗОВАТЕЛИ ================= */
 const UQ={q:'',st:'all',sq:'',inbound:'',tag:'',fp:'',node:'',expiry:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
 let usersRefreshInFlight=null;
+let usersLastSyncedAt=0;
+// A background list refresh must never replace user records while a device
+// workspace is open: that dialog may have live device state and pending writes.
+const usersEditorBusy=()=>Boolean(document.querySelector('#xm-sharing-dialog[open]'));
 async function refreshPanelUsers(){
-  if(!backendReady)return;
+  if(!backendReady||usersEditorBusy())return;
   if(usersRefreshInFlight)return usersRefreshInFlight;
   usersRefreshInFlight=(async()=>{
     const response=await fetch('/api/v1/collections/users',{credentials:'same-origin',cache:'no-store'});
     const payload=await response.json().catch(()=>({}));
     if(!response.ok||!Array.isArray(payload.items))throw Error(payload.error||'Не удалось обновить пользователей.');
+    // The workspace might open while this request is in flight.
+    if(usersEditorBusy())return;
     DB.users=normalizeUserList(payload.items);
+    usersLastSyncedAt=Date.now();
     for(const id of UQ.sel)if(!DB.users.some(user=>user.id===id))UQ.sel.delete(id);
     if(cur==='users'&&$('#ut'))await drawUsers();
   })();
@@ -2210,7 +2217,9 @@ async function usersP(){
     <label>Срок <select data-user-filter="expiry"><option value="">Любой срок</option><option value="eternal"${UQ.expiry==='eternal'?' selected':''}>Бессрочно</option><option value="3"${UQ.expiry==='3'?' selected':''}>До 3 дней</option><option value="7"${UQ.expiry==='7'?' selected':''}>До 7 дней</option><option value="30"${UQ.expiry==='30'?' selected':''}>До 30 дней</option></select></label>
     <button type="button" class="gh sm" data-user-filter-reset>Сбросить фильтры</button>
   </div><div id="ut"></div></div>`,()=>{drawUsers();
-    void refreshPanelUsers().catch(error=>console.warn('XMesh users refresh failed:',error));
+    // Startup bootstrap already has the latest users; avoid a second request
+    // racing with newly opened device controls on the first render.
+    if(Date.now()-usersLastSyncedAt>15000)void refreshPanelUsers().catch(error=>console.warn('XMesh users refresh failed:',error));
     T.push(setInterval(()=>{if(cur==='users'&&!document.hidden)void refreshPanelUsers().catch(error=>console.warn('XMesh users refresh failed:',error))},30000));
     let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
     $$('[data-user-filter]').forEach(el=>el.onchange=()=>{UQ[el.dataset.userFilter]=el.value;UQ.page=1;drawUsers()});
@@ -6708,6 +6717,7 @@ async function initializePanel(){
   if(!response.ok)throw new Error(payload.error||'Не удалось загрузить данные backend.');
   const collections=payload.collections||{};
   for(const key of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh'])DB[key]=Array.isArray(collections[key])?(key==='users'?normalizeUserList(collections[key]):collections[key]):[];
+  usersLastSyncedAt=Date.now();
   DB.set={...DB.set,...(payload.settings||{}),hooks:{...DB.set.hooks,...(payload.settings?.hooks||{})}};
   backendReady=true;
   if(sessionUser?.role==='owner')syncSubscriptionTheme();
