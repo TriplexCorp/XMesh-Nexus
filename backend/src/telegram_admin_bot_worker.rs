@@ -470,6 +470,12 @@ async fn handle_extra_confirmation(
                     "This account has unlimited duration or is waiting for first connection. Change it in the panel."
                 }
                 "user_not_found" => "User not found.",
+                "squad_not_found" => locale::tr(api.language,
+                    "Сквад больше не существует. Запустите /create заново.",
+                    "The squad no longer exists. Run /create again."),
+                "squad_not_selected" => locale::tr(api.language,
+                    "Сначала выберите сквад, затем подтвердите создание.",
+                    "Select a squad before confirming user creation."),
                 _ => "This action is no longer valid. Check the user and try again.",
             };
             api.send(
@@ -568,7 +574,7 @@ async fn consume_confirmation(
         .await
         .map_err(|_| "database_unavailable")?;
     let row = sqlx::query(
-        "SELECT user_id,action,amount,username FROM telegram_admin_bot_actions
+        "SELECT user_id,action,amount,username,squad_id FROM telegram_admin_bot_actions
          WHERE nonce=$1::UUID AND admin_id=$2 AND consumed_at IS NULL
            AND expires_at>NOW() FOR UPDATE",
     )
@@ -786,6 +792,21 @@ async fn handle_callback(
         {
             return create_confirmation(api, state, chat, admin_id, action, id).await;
         }
+    }
+    // Telegram callback_data is limited to 64 bytes: UUID + page or squad ID
+    // is intentionally compact. Always bind it to the originating admin and
+    // an unexpired PostgreSQL picker, never trust a raw callback squad ID.
+    if let Some(raw) = data.strip_prefix("v:cp:")
+        && let Some((nonce,page)) = raw.rsplit_once(':')
+        && let (Ok(nonce),Ok(page)) = (Uuid::parse_str(nonce),page.parse::<i64>())
+    {
+        return commands::create_squad_picker(api,state,chat,admin_id,nonce,page).await;
+    }
+    if let Some(raw) = data.strip_prefix("v:cs:")
+        && let Some((nonce,squad_id)) = raw.rsplit_once(':')
+        && let (Ok(nonce),Ok(squad_id)) = (Uuid::parse_str(nonce),squad_id.parse::<i64>())
+    {
+        return commands::select_create_squad(api,state,chat,admin_id,nonce,squad_id).await;
     }
     if let Some(nonce) = data.strip_prefix("x:") {
         return consume_confirmation(api, state, chat, admin_id, nonce).await;
