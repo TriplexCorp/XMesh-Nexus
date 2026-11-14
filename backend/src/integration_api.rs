@@ -2,10 +2,14 @@
 //! An integration token never authenticates to legacy /api/v1/collections.
 #[path = "integration_api_auth.rs"]
 mod auth;
+#[path = "integration_api_catalog.rs"]
+mod catalog;
 #[path = "integration_api_grants.rs"]
 mod grants;
 #[path = "integration_api_quotas.rs"]
 mod quotas;
+#[path = "integration_api_squad_members.rs"]
+mod squad_members;
 #[path = "integration_api_user_mutations.rs"]
 mod user_mutations;
 #[path = "integration_api_users.rs"]
@@ -188,7 +192,10 @@ async fn capabilities(
             "usersCreate": client.scopes.iter().any(|s| s == "users:create"),
             "usersUpdate": client.scopes.iter().any(|s| s == "users:update"),
             "quotasRead": client.scopes.iter().any(|s| s == "quotas:read"),
-            "quotasWrite": client.scopes.iter().any(|s| s == "quotas:write")
+            "quotasWrite": client.scopes.iter().any(|s| s == "quotas:write"),
+            "squadsRead": client.scopes.iter().any(|s| s == "squads:read"),
+            "squadsMembersWrite": client.scopes.iter().any(|s| s == "squads:members:write"),
+            "nodesRead": client.scopes.iter().any(|s| s == "nodes:read")
         }
     })))
 }
@@ -201,6 +208,14 @@ pub fn service_router(state: &AppState) -> Router<AppState> {
         .route("/users/{id}/traffic", get(users::traffic))
         .route("/users/{id}/quotas", get(quotas::get).patch(quotas::patch))
         .route("/users/{id}/subscription", get(users::subscription))
+        .route("/squads", get(catalog::list_squads))
+        .route("/squads/{id}", get(catalog::get_squad))
+        .route(
+            "/squads/{id}/members",
+            post(squad_members::add).delete(squad_members::remove),
+        )
+        .route("/nodes", get(catalog::list_nodes))
+        .route("/nodes/{id}", get(catalog::get_node))
         .route("/users/{id}/enable", post(users::enable))
         .route("/users/{id}/disable", post(users::disable))
         .route("/users/{id}/entitlements/grant", post(grants::grant))

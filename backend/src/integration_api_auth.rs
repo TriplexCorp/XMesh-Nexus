@@ -23,6 +23,9 @@ const ENABLED_SCOPES: &[&str] = &[
     "users:update",
     "quotas:read",
     "quotas:write",
+    "squads:read",
+    "squads:members:write",
+    "nodes:read",
     "entitlements:grant",
 ];
 const TOKEN_PREFIX: &str = "xmni_v1_";
