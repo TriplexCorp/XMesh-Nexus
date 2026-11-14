@@ -802,7 +802,6 @@ pub async fn run(state: AppState) {
                         let _ = lock.close().await;
                     }
                 }
-            }
         }
         tokio::time::sleep(Duration::from_secs(4)).await;
     }
