@@ -348,7 +348,7 @@ async fn create_account(
     crate::user_subscriptions::provision_new_user(state, result_id, tx)
         .await
         .map_err(|_| "database_unavailable")?;
-    let summary = format(
+    let summary = format!(
         "{} #{result_id} {}",
         tr(language, "Пользователь", "User"),
         tr(language, "создан.", "created."),
@@ -364,7 +364,7 @@ async fn update_account(
     language: Language,
 ) -> Result<(i64, String), &'static str> {
     let summary;
-    if !matches!(action.as_str(), "renew" | "quota") || id <= 0 {
+    if !matches!(action, "renew" | "quota") || id <= 0 {
         return Err("invalid_command");
     }
     let db =
