@@ -125,12 +125,12 @@ async function page({owner,request,toast,confirm,schedule}){
    $('tb-token').placeholder=next.tokenConfigured?'Токен сохранён ••••••••':'Вставьте токен нового бота';
    if(!modified){
     $('tb-admins').value=(next.adminIds||[]).join('\n');
-    $('tb-enabled').checked=next.enabled===true;
+    $('tb-enabled').checked=next.enabled===true || !next.tokenConfigured;
    }
    return next;
   };
   $('tb-admins').value=(initial.adminIds||[]).join('\n');
-  $('tb-enabled').checked=initial.enabled===true;
+  $('tb-enabled').checked=initial.enabled===true || !initial.tokenConfigured;
   $('tb-admins').addEventListener('input',()=>{modified=true;});
   $('tb-enabled').addEventListener('change',()=>{modified=true;});
   $('tb-token').addEventListener('input',()=>{modified=true;});
