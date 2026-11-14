@@ -285,7 +285,14 @@ pub(super) async fn patch(
     references(&mut tx, object(&body, &[
         "username", "limitGb", "cdnLimitGb", "squadIds", "templateId", "note",
     ])?).await?;
-    if let Some(username) = body.get("username").and_then(Value::as_str) {
+    if body.get("username").is_some() {
+        // Coordinate service-side renames with service-side user creation.
+        // Compare the normalized saved name, not untrusted whitespace in input.
+        let username = user["username"].as_str().ok_or_else(Problem::unavailable)?;
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+            .bind(username.to_lowercase())
+            .execute(&mut *tx)
+            .await?;
         let exists: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users'
              AND id<>$1 AND LOWER(data->>'username')=LOWER($2))",
