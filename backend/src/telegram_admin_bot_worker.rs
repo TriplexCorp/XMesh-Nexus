@@ -464,7 +464,7 @@ async fn consume_confirmation(
         .await
         .map_err(|_| "database_unavailable")?;
     let row = sqlx::query(
-        "SELECT user_id,action FROM telegram_admin_bot_actions
+        "SELECT user_id,action,amount,username FROM telegram_admin_bot_actions
          WHERE nonce=$1::UUID AND admin_id=$2 AND consumed_at IS NULL
            AND expires_at>NOW() FOR UPDATE",
     )
@@ -811,18 +811,15 @@ async fn dispatch(
             return Ok(());
         }
         api.acknowledge(&callback.id).await;
-        if let Some(data) = callback.data.as_deref() {
-            if let Some(code) = data.strip_prefix("v:lang:") {
-                let Some(language) = Language::from_db(code) else {
-                    return Ok(());
-                };
-                commands::set_language(state, callback.from.id, language).await?;
-                let localized = BotApi {
-                    language,
-                    ..api.clone()
-                };
-                return home(&localized, message.chat.id).await;
-            }
+        if let Some(data) = callback.data.as_deref()
+            && let Some(code) = data.strip_prefix("v:lang:")
+        {
+            let Some(language) = Language::from_db(code) else {
+                return Ok(());
+            };
+            commands::set_language(state, callback.from.id, language).await?;
+            let localized = BotApi { language, ..api.clone() };
+            return home(&localized, message.chat.id).await;
         }
         let preference = commands::language(state, callback.from.id).await?;
         let Some(language) = preference else {
