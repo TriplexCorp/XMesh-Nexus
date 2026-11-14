@@ -82,7 +82,7 @@ pub(super) fn safe_user(user: &Value) -> Value {
     })
 }
 
-async fn with_meter(
+pub(super) async fn with_meter(
     state: &AppState,
     id: i64,
     mut user: Value,

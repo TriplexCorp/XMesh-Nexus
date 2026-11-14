@@ -10,6 +10,8 @@ mod grants;
 mod quotas;
 #[path = "integration_api_squad_members.rs"]
 mod squad_members;
+#[path = "integration_api_telegram.rs"]
+mod telegram;
 #[path = "integration_api_user_mutations.rs"]
 mod user_mutations;
 #[path = "integration_api_users.rs"]
@@ -195,7 +197,9 @@ async fn capabilities(
             "quotasWrite": client.scopes.iter().any(|s| s == "quotas:write"),
             "squadsRead": client.scopes.iter().any(|s| s == "squads:read"),
             "squadsMembersWrite": client.scopes.iter().any(|s| s == "squads:members:write"),
-            "nodesRead": client.scopes.iter().any(|s| s == "nodes:read")
+            "nodesRead": client.scopes.iter().any(|s| s == "nodes:read"),
+            "telegramRead": client.scopes.iter().any(|s| s == "telegram:read"),
+            "telegramAssign": client.scopes.iter().any(|s| s == "telegram:assign")
         }
     })))
 }
@@ -204,6 +208,11 @@ pub fn service_router(state: &AppState) -> Router<AppState> {
     Router::new()
         .route("/capabilities", get(capabilities))
         .route("/users", get(users::list).post(user_mutations::create))
+        .route("/users/by-telegram/{telegram_id}", get(telegram::lookup))
+        .route(
+            "/users/{id}/telegram",
+            axum::routing::patch(telegram::assign),
+        )
         .route("/users/{id}", get(users::get).patch(user_mutations::patch))
         .route("/users/{id}/traffic", get(users::traffic))
         .route("/users/{id}/quotas", get(quotas::get).patch(quotas::patch))
