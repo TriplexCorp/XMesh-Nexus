@@ -561,6 +561,24 @@ A feature stylesheet is suspicious if it defines any of the following without a 
 
 The current panel source contract rejects `display: contents` in panel CSS; keep real layout wrappers and their boxes.
 
+### Native dialog width ownership — XRAY STUDIO TLS regression
+
+Feature styles must not constrain arbitrary native dialogs with broad
+selectors such as `dialog:not(.side):not(.pop)` or a global `width:30rem`.
+That historical pattern in `features/users/users.css` overrode the TLS
+editor and compressed its three-option cards at desktop widths.
+
+The TLS editor is deliberately a **wide native dialog** on desktop
+(`dialog.xm-tls-dialog`, maximum 1180px or 1380px on wide workstations),
+bounded to the viewport with mobile responsive layout. Its body scrolls,
+while header and footer remain accessible. Feature CSS styles the TLS
+cards; the shared native modal layer protects outer dialog width.
+Do not fix this by browser zoom or feature-wide `!important`.
+
+The dedicated Chromium gate `node scripts/test-xray-tls-dialog-geometry.cjs`
+checks real computed geometry and Save at desktop/mobile viewports and runs
+in Backend CI's browser job.
+
 ## Review checklist
 
 Before merging UI work:
