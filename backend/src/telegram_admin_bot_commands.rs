@@ -363,7 +363,6 @@ async fn update_account(
     amount: i64,
     language: Language,
 ) -> Result<(i64, String), &'static str> {
-    let summary;
     if !matches!(action, "renew" | "quota") || id <= 0 {
         return Err("invalid_command");
     }
@@ -377,7 +376,7 @@ async fn update_account(
         return Err("user_not_found");
     };
     let mut data: Value = db.try_get("data").map_err(|_| "database_unavailable")?;
-    if action == "renew" {
+    let summary = if action == "renew" {
         if !(1..=3650).contains(&amount) || data.get("hold") == Some(&Value::Bool(true)) {
             return Err("invalid_command");
         }
@@ -392,7 +391,7 @@ async fn update_account(
             .checked_add(amount.checked_mul(86_400_000).ok_or("invalid_command")?)
             .ok_or("invalid_command")?;
         data["expireAt"] = json!(new);
-        summary = format!(
+        format!(
             "{} #{id} {} {amount} {}",
             tr(language, "Пользователь", "User"),
             tr(language, "продлён на", "renewed by"),
@@ -403,12 +402,12 @@ async fn update_account(
             return Err("invalid_command");
         }
         data["limit"] = json!(amount);
-        summary = format!(
+        format!(
             "{} #{id}: {} {amount} GB.",
             tr(language, "Пользователь", "User"),
             tr(language, "лимит установлен", "quota set to")
         );
-    }
+    };
     crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
     sqlx::query(
         "UPDATE panel_records SET data=$2,updated_at=NOW()
