@@ -889,6 +889,9 @@ async fn shutdown_signal() {
 }
 
 async fn security_headers(request: Request, next: Next) -> Response {
+    // Bearer-scoped integration responses also carry an explicit "private"
+    // directive. The outer security layer must not overwrite that contract.
+    let integration_request = request.uri().path().starts_with("/api/v1/integrations/");
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     headers.insert(
@@ -897,7 +900,11 @@ async fn security_headers(request: Request, next: Next) -> Response {
     );
     headers.insert(
         HeaderName::from_static("cache-control"),
-        HeaderValue::from_static("no-store"),
+        HeaderValue::from_static(if integration_request {
+            "no-store, private"
+        } else {
+            "no-store"
+        }),
     );
     headers.insert(
         HeaderName::from_static("x-frame-options"),
