@@ -11,7 +11,7 @@ use axum::{
 use serde_json::{Map, Value, json};
 use sqlx::{Postgres, Row, Transaction};
 
-fn bad() -> Problem {
+const fn bad() -> Problem {
     Problem::new(
         StatusCode::BAD_REQUEST,
         "validation_error",
@@ -150,10 +150,10 @@ async fn view(state: &AppState, id: i64) -> Result<(Value, i64), Problem> {
         for key in policies.keys() {
             let node_id = key.parse::<i64>().map_err(|_| Problem::unavailable())?;
             let rule = node_user_quotas::rule_for(&user, node_id)
-                .map_err(|_| Problem::unavailable())?
+                .map_err(|()| Problem::unavailable())?
                 .ok_or_else(Problem::unavailable)?;
             let usage = node_usage.get(&node_id).copied().unwrap_or_default();
-            let used = match rule.period {
+            let metered_node_bytes = match rule.period {
                 "daily" => usage.daily,
                 "weekly" => usage.weekly,
                 "monthly" => usage.monthly,
@@ -165,7 +165,7 @@ async fn view(state: &AppState, id: i64) -> Result<(Value, i64), Problem> {
                 "monthly" => "month",
                 _ => "lifetime",
             };
-            let mut value = bucket("node", Some(rule.limit_bytes), used, period);
+            let mut value = bucket("node", Some(rule.limit_bytes), metered_node_bytes, period);
             value["nodeId"] = json!(node_id);
             nodes.push(value);
         }
