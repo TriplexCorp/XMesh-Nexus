@@ -31,6 +31,7 @@ mod subscription_remark;
 mod subscription_settings;
 mod subscription_transport;
 mod subscription_user_agent;
+mod xhttp_device_profiles;
 mod telegram_admin_bot;
 mod telegram_admin_bot_worker;
 mod user_subscriptions;
@@ -4897,6 +4898,7 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
                 ));
             }
             validate_reality_settings(inbound)?;
+            xhttp_device_profiles::validate(inbound).map_err(|msg| ApiError::new(StatusCode::BAD_REQUEST,msg))?;
             // Syntax-only validation at save time. Physical certificate readiness
             // is evaluated by the assigned node, not by the panel host.
             if inbound
