@@ -11,7 +11,7 @@ use axum::{
 use serde_json::{Map, Value, json};
 use sqlx::Row;
 
-fn invalid(message: &'static str) -> Problem {
+const fn invalid(message: &'static str) -> Problem {
     Problem::new(StatusCode::BAD_REQUEST, "validation_error", message)
 }
 
@@ -163,7 +163,7 @@ fn build_create(body: &Value, now: i64) -> Result<Value, Problem> {
         data.insert("squads".into(), squads.clone());
     }
     if let Some(template) = fields.get("templateId") {
-        if template.as_i64().filter(|v| *v > 0).is_none() {
+        if template.as_i64().is_none_or(|v| v <= 0) {
             return Err(invalid("Invalid template ID"));
         }
         data.insert("templateId".into(), template.clone());
@@ -231,7 +231,7 @@ fn apply_patch(data: &mut Value, body: &Value) -> Result<(), Problem> {
     crate::validate_record("users", data).map_err(Problem::from)
 }
 
-/// ETag values use database updated_at microseconds, not a client-controlled JSON field.
+/// `ETag` values use database `updated_at` microseconds, not a client-controlled JSON field.
 /// Reads and writes share the same epoch-based revision, including legacy panel edits.
 pub(super) fn matches_revision(headers: &HeaderMap, revision: i64) -> Result<(), Problem> {
     let raw = headers
