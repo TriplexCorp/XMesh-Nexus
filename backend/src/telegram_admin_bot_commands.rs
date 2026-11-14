@@ -51,7 +51,7 @@ pub(super) async fn squads(api:&BotApi,state:&AppState,chat:i64)->Result<(),&'st
 
 pub(super) async fn find_telegram(api:&BotApi,state:&AppState,chat:i64,raw:&str)->Result<(),&'static str>{
     if raw.is_empty()||raw.len()>19||!raw.bytes().all(|b|b.is_ascii_digit())
-        ||raw.parse::<i64>().is_err_or(|id|id<=0)
+        ||raw.parse::<i64>().is_ok_and(|id|id<=0) || raw.parse::<i64>().is_err()
         ||raw.starts_with('0'){
         return api.send(chat,tr(api.language,
             "Используйте <code>/findtg 123456789</code> — числовой Telegram ID пользователя.",
