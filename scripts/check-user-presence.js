@@ -47,4 +47,25 @@ assert.equal(active(a,{up:90,down:51},11,10),false,'mixed counter reset');
 assert.equal(active(a,{up:101,down:49},11,10),false,'mixed counter reset other direction');
 assert.equal(active(a,{up:101,down:51},10,10),false,'duplicate sample');
 assert.equal(active(a,{up:101,down:51},9,10),false,'out-of-order sample');
+// A Telegram-created account without squads previously crashed both the
+// node access statistics and the user search/table; disabling it masked the bug.
+const telegram=fs.readFileSync('backend/src/telegram_admin_bot_commands.rs','utf8');
+assert.match(telegram,/record\.insert\("squads"\.into\(\), json!\(\[\]\)\);/,
+ 'Telegram account creation must persist an empty squad list');
+assert.match(telegram,/record\.insert\("devices"\.into\(\), json!\(\[\]\)\);/,
+ 'Telegram account creation must persist an empty device list');
+assert.match(app,/const userSquads=u=>Array\.isArray\(u\?\.squads\)\?u\.squads:\[\];/,
+ 'Legacy accounts without squads must not crash UI rendering');
+assert.match(app,/const uin=u=>\[\.\.\.new Set\(DB\.squads\.filter\(s=>userSquads\(u\)\.includes\(s\.id\)\)/,
+ 'Node statistics must handle accounts without squads');
+assert.match(app,/const uf=u=>[\s\S]*?userSquads\(u\)\.map\(/,
+ 'User search must handle accounts without squads');
+assert.match(app,/data-l="Доступ">\$\{userSquads\(u\)\.map\(/,
+ 'User list must display users even without squads');
+assert.match(app,/DB\.users=normalizeUserList\(payload\.items\)/,
+ 'User list should refresh from the authoritative database');
+assert.match(app,/DB\[key\]=Array\.isArray\(collections\[key\]\)\?\(key==='users'\?normalizeUserList\(collections\[key\]\)/,
+ 'Bootstrap must normalize legacy users before any rendering');
+assert.match(app,/setInterval\(\(\)=>\{if\(cur==='users'&&!document\.hidden\)void refreshPanelUsers\(\)/,
+ 'Visible user page should notice new accounts created through integrations');
 console.log('User presence guard and 45-second activity window: PASS');
