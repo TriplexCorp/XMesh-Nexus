@@ -43,7 +43,11 @@ impl Kind {
 }
 
 const fn invalid_cursor() -> Problem {
-    Problem::new(StatusCode::BAD_REQUEST, "validation_error", "Invalid catalog cursor")
+    Problem::new(
+        StatusCode::BAD_REQUEST,
+        "validation_error",
+        "Invalid catalog cursor",
+    )
 }
 
 fn signed_cursor(
@@ -54,7 +58,8 @@ fn signed_cursor(
 ) -> Result<String, Problem> {
     let msg = format!(
         "integration-catalog-v1:{}:{}:{id}",
-        principal.client_id, kind.collection()
+        principal.client_id,
+        kind.collection()
     );
     let mut mac = Hmac::<Sha256>::new_from_slice(&state.subscription_key)
         .map_err(|_| Problem::unavailable())?;
@@ -74,17 +79,26 @@ fn verify_cursor(
     if input.len() > 256 {
         return Err(invalid_cursor());
     }
-    let bytes = URL_SAFE_NO_PAD.decode(input).map_err(|_| invalid_cursor())?;
+    let bytes = URL_SAFE_NO_PAD
+        .decode(input)
+        .map_err(|_| invalid_cursor())?;
     let text = std::str::from_utf8(&bytes).map_err(|_| invalid_cursor())?;
     let (message, sig) = text.rsplit_once(':').ok_or_else(invalid_cursor)?;
     let (prefix, id) = message.rsplit_once(':').ok_or_else(invalid_cursor)?;
-    if prefix != format!(
-        "integration-catalog-v1:{}:{}",
-        principal.client_id, kind.collection()
-    ) {
+    if prefix
+        != format!(
+            "integration-catalog-v1:{}:{}",
+            principal.client_id,
+            kind.collection()
+        )
+    {
         return Err(invalid_cursor());
     }
-    let id = id.parse::<i64>().ok().filter(|v| *v > 0).ok_or_else(invalid_cursor)?;
+    let id = id
+        .parse::<i64>()
+        .ok()
+        .filter(|v| *v > 0)
+        .ok_or_else(invalid_cursor)?;
     let signature = hex::decode(sig).map_err(|_| invalid_cursor())?;
     let mut mac = Hmac::<Sha256>::new_from_slice(&state.subscription_key)
         .map_err(|_| Problem::unavailable())?;
@@ -94,7 +108,8 @@ fn verify_cursor(
 }
 
 fn safe_name(value: &Value, id: i64) -> String {
-    value.get("name")
+    value
+        .get("name")
         .and_then(Value::as_str)
         .filter(|s| !s.trim().is_empty())
         .map_or_else(|| format!("Record {id}"), str::to_owned)
@@ -166,11 +181,16 @@ async fn list_impl(
     principal.allow_scope(kind.scope())?;
     let limit = query.limit.unwrap_or(50);
     if !(1..=100).contains(&limit) {
-        return Err(Problem::new(StatusCode::BAD_REQUEST, "validation_error", "Invalid page limit"));
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "validation_error",
+            "Invalid page limit",
+        ));
     }
-    let start = query.cursor.as_deref().map_or(Ok(0), |raw| {
-        verify_cursor(state, principal, kind, raw)
-    })?;
+    let start = query
+        .cursor
+        .as_deref()
+        .map_or(Ok(0), |raw| verify_cursor(state, principal, kind, raw))?;
     let rows = sqlx::query(
         "SELECT id,data FROM panel_records
          WHERE collection=$1 AND id>$2 ORDER BY id LIMIT $3",
@@ -215,7 +235,11 @@ async fn get_impl(
 ) -> Result<Json<Value>, Problem> {
     principal.allow_scope(kind.scope())?;
     if id <= 0 {
-        return Err(Problem::new(StatusCode::NOT_FOUND, "not_found", "Record not found"));
+        return Err(Problem::new(
+            StatusCode::NOT_FOUND,
+            "not_found",
+            "Record not found",
+        ));
     }
     let record = sqlx::query_scalar::<_, Value>(
         "SELECT data FROM panel_records WHERE collection=$1 AND id=$2",
@@ -224,7 +248,7 @@ async fn get_impl(
     .bind(id)
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND,"not_found","Record not found"))?;
+    .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "Record not found"))?;
     let result = match kind {
         Kind::Squads => {
             let counts = member_counts(state, principal).await?;
@@ -278,14 +302,14 @@ mod tests {
             "profileId":3,"xrayVersion":"26.1","state":"unexpected",
             "routing":{"rules":[{"ip":"private"}]}
         });
-        let safe = node_view(&node,10);
-        assert_eq!(safe["state"],"unknown");
-        assert_eq!(safe["xrayVersion"],"26.1");
-        for key in ["addr","metricsKey","profileId","routing"] {
+        let safe = node_view(&node, 10);
+        assert_eq!(safe["state"], "unknown");
+        assert_eq!(safe["xrayVersion"], "26.1");
+        for key in ["addr", "metricsKey", "profileId", "routing"] {
             assert!(safe.get(key).is_none(), "{key}");
         }
-        let squad = squad_view(&json!({"name":"Germany","inb":["vless-private"]}),2,5);
-        assert_eq!(squad["memberCount"],5);
+        let squad = squad_view(&json!({"name":"Germany","inb":["vless-private"]}), 2, 5);
+        assert_eq!(squad["memberCount"], 5);
         assert!(squad.get("inb").is_none());
     }
 }
