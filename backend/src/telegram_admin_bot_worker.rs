@@ -771,9 +771,10 @@ pub async fn run(state: AppState) {
         .connect_timeout(Duration::from_secs(5))
         .timeout(Duration::from_secs(25))
         .redirect(reqwest::redirect::Policy::none())
-        .build() else {
-            return;
-        };
+        .build()
+    else {
+        return;
+    };
     loop {
         let config = telegram_admin_bot::load(&state).await;
         if let Ok(config) = config
@@ -781,27 +782,27 @@ pub async fn run(state: AppState) {
             && !config.admins.is_empty()
             && let Ok(mut lock) = state.pool.acquire().await
         {
-                let leader = sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock($1)")
+            let leader = sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock($1)")
+                .bind(LEADER_LOCK_ID)
+                .fetch_one(&mut *lock)
+                .await;
+            if matches!(leader, Ok(true)) {
+                let result = session(&state, &client, &config).await;
+                if let Err(code) = result {
+                    // Only bounded fixed status codes; never log Telegram API
+                    // responses, token-bearing URLs or remote error strings.
+                    set_status(&state, config.revision, None, Some(code)).await;
+                }
+                // Unlock on the same connection. On failed unlock the
+                // connection is CLOSED rather than returned to the pool.
+                let unlocked = sqlx::query_scalar::<_, bool>("SELECT pg_advisory_unlock($1)")
                     .bind(LEADER_LOCK_ID)
                     .fetch_one(&mut *lock)
                     .await;
-                if matches!(leader, Ok(true)) {
-                    let result = session(&state, &client, &config).await;
-                    if let Err(code) = result {
-                        // Only bounded fixed status codes; never log Telegram API
-                        // responses, token-bearing URLs or remote error strings.
-                        set_status(&state, config.revision, None, Some(code)).await;
-                    }
-                    // Unlock on the same connection. On failed unlock the
-                    // connection is CLOSED rather than returned to the pool.
-                    let unlocked = sqlx::query_scalar::<_, bool>("SELECT pg_advisory_unlock($1)")
-                        .bind(LEADER_LOCK_ID)
-                        .fetch_one(&mut *lock)
-                        .await;
-                    if !matches!(unlocked, Ok(true)) {
-                        let _ = lock.close().await;
-                    }
+                if !matches!(unlocked, Ok(true)) {
+                    let _ = lock.close().await;
                 }
+            }
         }
         tokio::time::sleep(Duration::from_secs(4)).await;
     }
