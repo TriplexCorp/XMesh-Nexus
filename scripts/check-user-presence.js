@@ -50,8 +50,21 @@ assert.equal(active(a,{up:101,down:51},9,10),false,'out-of-order sample');
 // A Telegram-created account without squads previously crashed both the
 // node access statistics and the user search/table; disabling it masked the bug.
 const telegram=fs.readFileSync('backend/src/telegram_admin_bot_commands.rs','utf8');
-assert.match(telegram,/record\.insert\("squads"\.into\(\), json!\(\[\]\)\);/,
- 'Telegram account creation must persist an empty squad list');
+assert.match(telegram,/record\.insert\("squads"\.into\(\), json!\(\[squad_id\]\)\);/,
+ 'Telegram account creation must persist the confirmed squad');
+assert.match(telegram,/let selected=sqlx::query_scalar/,'Selected squad must be validated');
+assert.match(telegram,/FOR SHARE/,'Squad must be locked during creation');
+assert.match(telegram,/selected_squad\.ok_or\("squad_not_selected"\)/,
+ 'Missing squad must block account creation');
+assert.match(telegram,/AND squad_id IS NULL AND consumed_at IS NULL AND expires_at>NOW\(\)/,
+ 'Squad selection must be single-use and unexpired');
+const telegramWorker=fs.readFileSync('backend/src/telegram_admin_bot_worker.rs','utf8');
+assert.match(telegramWorker,/strip_prefix\("v:cs:"\)/,'Picker callback must be handled');
+assert.match(telegramWorker,/strip_prefix\("v:cp:"\)/,'Picker pagination must be handled');
+assert.match(telegramWorker,/action,amount,username,squad_id FROM telegram_admin_bot_actions/,
+ 'Confirmation must retrieve the selected squad');
+const squadMigration=fs.readFileSync('backend/migrations/0121_telegram_admin_bot_create_squad.sql','utf8');
+assert.match(squadMigration,/ADD COLUMN squad_id BIGINT/,'Squad choice must be persisted');
 assert.match(telegram,/record\.insert\("devices"\.into\(\), json!\(\[\]\)\);/,
  'Telegram account creation must persist an empty device list');
 assert.match(app,/const userSquads=u=>Array\.isArray\(u\?\.squads\)\?u\.squads:\[\];/,
