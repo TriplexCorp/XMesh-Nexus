@@ -209,7 +209,10 @@ pub fn service_router(state: &AppState) -> Router<AppState> {
         .route("/capabilities", get(capabilities))
         .route("/users", get(users::list).post(user_mutations::create))
         .route("/users/by-telegram/{telegram_id}", get(telegram::lookup))
-        .route("/users/{id}/telegram", axum::routing::patch(telegram::assign))
+        .route(
+            "/users/{id}/telegram",
+            axum::routing::patch(telegram::assign),
+        )
         .route("/users/{id}", get(users::get).patch(user_mutations::patch))
         .route("/users/{id}/traffic", get(users::traffic))
         .route("/users/{id}/quotas", get(quotas::get).patch(quotas::patch))
