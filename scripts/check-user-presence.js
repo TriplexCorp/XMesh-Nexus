@@ -62,6 +62,8 @@ assert.match(app,/const uf=u=>[\s\S]*?userSquads\(u\)\.map\(/,
  'User search must handle accounts without squads');
 assert.match(app,/data-l="Доступ">\$\{userSquads\(u\)\.map\(/,
  'User list must display users even without squads');
+assert.match(app,/c==='users'&&k==='created'\?x\.id:x\[k\]/,
+ 'Default user sort must show newly created accounts, even without createdAt');
 assert.match(app,/DB\.users=normalizeUserList\(payload\.items\)/,
  'User list should refresh from the authoritative database');
 assert.match(app,/DB\[key\]=Array\.isArray\(collections\[key\]\)\?\(key==='users'\?normalizeUserList\(collections\[key\]\)/,
