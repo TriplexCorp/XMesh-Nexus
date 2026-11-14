@@ -3,6 +3,7 @@ mod auth;
 mod cdn_quota;
 mod client_routing;
 mod core;
+mod integration_api;
 mod mfa;
 mod node_address_unique;
 mod node_auth;
@@ -330,6 +331,14 @@ fn protected_management_routes() -> Router<AppState> {
             "/security/policy",
             get(security::get_settings).patch(security::update_settings),
         )
+        .route(
+            "/integration-tokens",
+            get(integration_api::list_tokens).post(integration_api::create_token),
+        )
+        .route(
+            "/integration-tokens/{id}",
+            axum::routing::delete(integration_api::revoke_token),
+        )
         .route("/security/audit", get(security::audit_events))
         .route("/security/sessions", get(security::sessions))
         .route(
@@ -570,6 +579,7 @@ fn application_router(state: AppState) -> Router {
             "/api/v1",
             public
                 .merge(protected)
+                .nest("/integrations", integration_api::service_router(&state))
                 .fallback(|| async { StatusCode::NOT_FOUND }),
         )
         .merge(experimental_v2_routes(&state))
@@ -788,6 +798,13 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
         && request.headers().get(header::COOKIE).is_none()
         && request.headers().get("sec-fetch-site").is_none()
         && match path {
+            // Explicit machine-only service namespace: token middleware enforces
+            // credentials, scopes, revocation and fail-closed Redis rate limits.
+            p if p.starts_with("/api/v1/integrations/") => request
+                .headers()
+                .get(header::AUTHORIZATION)
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.starts_with("Bearer xmni_v1_")),
             "/api/v1/metrics/ingest"
             | "/api/v1/node/heartbeat"
             | "/api/v1/node/desired-config"
@@ -872,6 +889,9 @@ async fn shutdown_signal() {
 }
 
 async fn security_headers(request: Request, next: Next) -> Response {
+    // Bearer-scoped integration responses also carry an explicit "private"
+    // directive. The outer security layer must not overwrite that contract.
+    let integration_request = request.uri().path().starts_with("/api/v1/integrations/");
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     headers.insert(
@@ -880,7 +900,11 @@ async fn security_headers(request: Request, next: Next) -> Response {
     );
     headers.insert(
         HeaderName::from_static("cache-control"),
-        HeaderValue::from_static("no-store"),
+        HeaderValue::from_static(if integration_request {
+            "no-store, private"
+        } else {
+            "no-store"
+        }),
     );
     headers.insert(
         HeaderName::from_static("x-frame-options"),

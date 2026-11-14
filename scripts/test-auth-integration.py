@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Real PostgreSQL/Redis API smoke tests. Only run on a disposable CI database."""
 import base64
+import concurrent.futures
+import uuid
 import hashlib
 import hmac
 import json
@@ -63,6 +65,182 @@ def totp(secret):
     value = struct.unpack(">I", digest[offset:offset+4])[0] & 0x7fffffff
     return f"{value % 1000000:06d}"
 
+
+
+
+def service_api(method, path, bearer=None, payload=None, idempotency=None, cookie=None, origin=None):
+    """Machine-to-machine call: never implicitly send browser Origin or cookies."""
+    headers = {"Accept": "application/json"}
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+    if bearer is not None:
+        headers["Authorization"] = "Bearer " + bearer
+    if idempotency is not None:
+        headers["Idempotency-Key"] = idempotency
+    if cookie is not None:
+        headers["Cookie"] = cookie
+    if origin is not None:
+        headers["Origin"] = origin
+    req = Request(
+        BASE + "/api/v1/integrations" + path,
+        data=json.dumps(payload).encode() if payload is not None else None,
+        headers=headers,
+        method=method,
+    )
+    try:
+        response = urlopen(req, timeout=35)
+    except HTTPError as error:
+        response = error
+    with response:
+        body = response.read()
+        return response.status, json.loads(body) if body else {}, response.headers
+
+
+def totp_for_step(secret, step):
+    key = base64.b32decode(secret)
+    digest = hmac.new(key, struct.pack(">Q", step), hashlib.sha1).digest()
+    offset = digest[-1] & 15
+    value = struct.unpack(">I", digest[offset:offset+4])[0] & 0x7fffffff
+    return f"{value % 1000000:06d}"
+
+
+def next_unused_totp(secret, last_step):
+    """Only choose server-accepted adjacent TOTP steps, never reuse a consumed one."""
+    while int(time.time() // 30) < last_step:
+        time.sleep(min(0.5, max(0.05, last_step * 30 + 0.1 - time.time())))
+    step = max(last_step + 1, int(time.time() // 30) + 1)
+    return totp_for_step(secret, step), step
+
+
+def test_scoped_integration_api(owner_cookie, secret, user_id):
+    """E2E with real PostgreSQL and Redis; only disposable CI objects."""
+    check(service_api("GET", "/capabilities")[0], 401, "service API requires Bearer")
+    check(service_api("GET", "/capabilities", bearer="xmni_v1_" + "a" * 64)[0],
+          401, "unknown token denied")
+    check(service_api("GET", "/users", cookie=owner_cookie)[0],
+          403, "browser owner cookie is not a service credential")
+
+    # The user in this test was created earlier by the real administrator API.
+    # A finite expiry is required: 'unlimited' cannot silently be converted.
+    expiry = (int(time.time()) + 86_400) * 1000
+    check(api("PATCH", f"/collections/users/{user_id}",
+              {"expireAt": expiry}, owner_cookie)[0], 200,
+          "set finite entitlement baseline")
+    another_status, another_user, _ = api(
+        "POST", "/collections/users",
+        {"username": "ci_service_out_of_scope", "limit": 10}, owner_cookie)
+    check(another_status, 201, "create out-of-scope identity")
+    other_id = another_user["id"]
+
+    # Confirm needs MFA even after a valid owner cookie is issued.
+    issuance = {
+        "clientName": "ci_telegram_bot",
+        "label": "ci_token_one",
+        "scopes": ["users:read", "traffic:read", "entitlements:grant", "users:write"],
+        "expiresInDays": 2,
+        "allUsers": False,
+        "allowedUserIds": [user_id],
+    }
+    check(api("POST", "/integration-tokens", {**issuance, "mfaCode": ""}, owner_cookie)[0],
+          401, "token issuance needs a valid one-time owner factor")
+    factor, step1 = next_unused_totp(secret, int(time.time() // 30))
+    first = {**issuance, "mfaCode": factor}
+    status, issued, _ = api("POST", "/integration-tokens", first, owner_cookie)
+    check(status, 200, "owner issues bounded service token after MFA")
+    token = issued["token"]
+    assert token.startswith("xmni_v1_") and len(token) == len("xmni_v1_") + 64
+    assert issued["shownOnce"] and issued["tokenId"] > 0
+    check(api("POST", "/integration-tokens",
+              {**first, "label": "ci_replayed_totp"}, owner_cookie)[0],
+          401, "step-up MFA code cannot be reused")
+
+    status, public, _ = service_api("GET", "/capabilities", token)
+    check(status, 200, "bearer credentials accepted")
+    assert "entitlements:grant" in public["data"]["scopes"]
+    check(service_api("GET", "/capabilities", token, cookie=owner_cookie)[0],
+          403, "mixed cookie and bearer rejected")
+    check(service_api("GET", "/capabilities", token, origin=BASE)[0],
+          403, "browser Origin cannot reuse service bearer")
+
+    status, user, headers = service_api("GET", f"/users/{user_id}", token)
+    check(status, 200, "scoped service reads permitted user")
+    assert headers.get("Cache-Control") == "no-store, private"
+    assert user["data"]["id"] == user_id
+    projection = json.dumps(user)
+    for forbidden in ("xrayId", "trojanPassword", "subscriptionUrl", "ssLegacyPassword"):
+        assert forbidden not in projection, f"Secret field leaked: {forbidden}"
+    assert user["data"]["expireAtMs"] == expiry
+    check(service_api("GET", f"/users/{other_id}", token)[0], 404,
+          "object-level access denied without revealing user")
+    status, listing, _ = service_api("GET", "/users?limit=1", token)
+    check(status, 200, "bounded list of scoped users")
+    assert [row["id"] for row in listing["data"]] == [user_id]
+    check(service_api("GET", f"/users/{user_id}/subscription", token)[0],
+          403, "users:read cannot reveal subscription bearer URL")
+    check(service_api("GET", f"/users/{user_id}/traffic", token)[0],
+          200, "separate traffic read scope allowed")
+
+    grant_key = str(uuid.uuid4())
+    grant = {"days": 30, "sourceReference": "ci-entitlement-a"}
+    check(service_api("POST", f"/users/{user_id}/entitlements/grant",
+                      token, grant)[0], 400, "idempotency key mandatory")
+    def concurrent_call(_):
+        return service_api("POST", f"/users/{user_id}/entitlements/grant",
+                           token, grant, idempotency=grant_key)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(concurrent_call, range(8)))
+    assert all(status == 200 for status, _, _ in results), results
+    answers = [body["data"] for _, body, _ in results]
+    assert sum(not a["replayed"] for a in answers) == 1, answers
+    assert len({a["expireAtMs"] for a in answers}) == 1, answers
+    check(service_api("POST", f"/users/{user_id}/entitlements/grant", token,
+                      {"days": 31, "sourceReference": "ci-entitlement-a"},
+                      grant_key)[0], 409, "same key with different body rejected")
+    status, after, _ = service_api("GET", f"/users/{user_id}", token)
+    check(status, 200, "verify atomic persisted grant")
+    expected_expiry = expiry + 30 * 86_400_000
+    assert after["data"]["expireAtMs"] == expected_expiry, after
+
+    key_disable = str(uuid.uuid4())
+    check(service_api("POST", f"/users/{user_id}/disable", token,
+                      {"reason": "CI access test"}, key_disable)[0],
+          200, "scoped disabling works")
+    status, disabled, _ = service_api("GET", f"/users/{user_id}", token)
+    check(status, 200, "read disabled user")
+    assert disabled["data"]["disabled"] is True
+    check(service_api("POST", f"/users/{user_id}/enable", token,
+                      {"reason": "CI access restoration"}, str(uuid.uuid4()))[0],
+          200, "scoped enabling works")
+    assert service_api("GET", f"/users/{user_id}", token)[1]["data"]["disabled"] is False
+
+    # Same client, DIFFERENT token: ledger keys must survive credential rotation.
+    factor2, step2 = next_unused_totp(secret, step1)
+    status, rotated, _ = api("POST", "/integration-tokens", {
+        **issuance,
+        "label": "ci_rotated_token",
+        "mfaCode": factor2
+    }, owner_cookie)
+    check(status, 200, "issue rotated token for same stable client")
+    assert rotated["clientId"] == issued["clientId"]
+    token2 = rotated["token"]
+    status, previous, _ = service_api("POST",
+        f"/users/{user_id}/entitlements/grant", token2, grant, grant_key)
+    check(status, 200, "replay after service-token rotation")
+    assert previous["data"]["replayed"] is True
+    assert previous["data"]["expireAtMs"] == expected_expiry
+
+    factors3, step3 = next_unused_totp(secret, step2)
+    check(api("DELETE", f"/integration-tokens/{issued['tokenId']}",
+              {"mfaCode": factors3}, owner_cookie)[0],
+          200, "owner revokes old token with fresh MFA")
+    check(service_api("GET", "/capabilities", token)[0],
+          401, "revocation is immediately enforced")
+    check(service_api("GET", "/capabilities", token2)[0],
+          200, "rotation keeps replacement token valid")
+    status, tokens, _ = api("GET", "/integration-tokens", cookie=owner_cookie)
+    check(status, 200, "owner sees token metadata")
+    assert issued["token"] not in json.dumps(tokens), "Raw token persisted in list!"
+    print("Scoped Integration API: RBAC, MFA, rotation, idempotency and BOLA passed.")
 
 def main():
     owner, owner_cookie = login(USER, PASSWORD)
@@ -443,6 +621,7 @@ def main():
     status, _, fresh_cookie = api(
         "POST", "/auth/mfa/verify", {"challenge": fresh["challenge"], "code": codes[1]})
     check(status, 200, "new password plus MFA works")
+    test_scoped_integration_api(fresh_cookie, setup["secret"], user_id)
     check(api("PATCH", f"/admins/{owner_id}", {"isActive": False}, fresh_cookie)[0], 400,
           "owner cannot disable own account")
     check(api("DELETE", f"/admins/{owner_id}", cookie=fresh_cookie)[0], 400,
