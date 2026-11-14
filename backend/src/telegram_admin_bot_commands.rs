@@ -190,7 +190,6 @@ fn parse_proposal(cmd: &str, arg: &str) -> Result<Proposal, &'static str> {
     }
 }
 
-
 const SQUADS_PER_PAGE: i64 = 8;
 
 /// Short-lived, admin-bound picker. No account is created until a squad was
@@ -202,12 +201,11 @@ async fn start_create_picker(
     admin_id: i64,
     proposal: &Proposal,
 ) -> Result<(), &'static str> {
-    let any_squad: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='squads')",
-    )
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|_| "database_unavailable")?;
+    let any_squad: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='squads')")
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|_| "database_unavailable")?;
     if !any_squad {
         return api.send(chat, tr(api.language,
             "🗂 Сначала создайте сквад в веб-панели. Без сквада пользователь не получит доступ.",
@@ -242,63 +240,105 @@ pub(super) async fn create_squad_picker(
          WHERE nonce=$1::UUID AND admin_id=$2 AND action='create'
            AND squad_id IS NULL AND consumed_at IS NULL AND expires_at>NOW()",
     )
-    .bind(nonce.to_string()).bind(admin_id)
-    .fetch_optional(&state.pool).await.map_err(|_|"database_unavailable")?;
+    .bind(nonce.to_string())
+    .bind(admin_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| "database_unavailable")?;
     let Some(proposal) = proposal else {
-        return api.send(chat,tr(api.language,
-            "⏳ Выбор сквада истёк. Повторите команду /create.",
-            "⏳ Squad selection expired. Run /create again."),
-            buttons(vec![vec![(tr(api.language,"🏠 Меню","🏠 Menu"),"v:menu".into())]])
-        ).await;
+        return api
+            .send(
+                chat,
+                tr(
+                    api.language,
+                    "⏳ Выбор сквада истёк. Повторите команду /create.",
+                    "⏳ Squad selection expired. Run /create again.",
+                ),
+                buttons(vec![vec![(
+                    tr(api.language, "🏠 Меню", "🏠 Menu"),
+                    "v:menu".into(),
+                )]]),
+            )
+            .await;
     };
-    let username: String = proposal.try_get::<Option<String>,_>("username")
-        .map_err(|_|"database_unavailable")?.ok_or("invalid_command")?;
-    let days: i64 = proposal.try_get::<Option<i64>,_>("amount")
-        .map_err(|_|"database_unavailable")?.ok_or("invalid_command")?;
+    let username: String = proposal
+        .try_get::<Option<String>, _>("username")
+        .map_err(|_| "database_unavailable")?
+        .ok_or("invalid_command")?;
+    let days: i64 = proposal
+        .try_get::<Option<i64>, _>("amount")
+        .map_err(|_| "database_unavailable")?
+        .ok_or("invalid_command")?;
     let rows = sqlx::query(
         "SELECT id,data->>'name' AS name FROM panel_records
          WHERE collection='squads' ORDER BY id LIMIT $1 OFFSET $2",
     )
-    .bind(SQUADS_PER_PAGE+1)
-    .bind(page*SQUADS_PER_PAGE)
-    .fetch_all(&state.pool).await.map_err(|_|"database_unavailable")?;
+    .bind(SQUADS_PER_PAGE + 1)
+    .bind(page * SQUADS_PER_PAGE)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| "database_unavailable")?;
     if rows.is_empty() {
-        return api.send(chat,tr(api.language,
-            "Сквады не найдены. Проверьте сквады в веб-панели.",
-            "No squads found. Check squads in the web panel."),
-            buttons(vec![vec![(tr(api.language,"🏠 Меню","🏠 Menu"),"v:menu".into())]])
-        ).await;
+        return api
+            .send(
+                chat,
+                tr(
+                    api.language,
+                    "Сквады не найдены. Проверьте сквады в веб-панели.",
+                    "No squads found. Check squads in the web panel.",
+                ),
+                buttons(vec![vec![(
+                    tr(api.language, "🏠 Меню", "🏠 Menu"),
+                    "v:menu".into(),
+                )]]),
+            )
+            .await;
     }
-    let has_next=rows.len()>SQUADS_PER_PAGE as usize;
-    let mut keyboard: Vec<Vec<Value>>=Vec::new();
+    let has_next = rows.len() > SQUADS_PER_PAGE as usize;
+    let mut keyboard: Vec<Vec<Value>> = Vec::new();
     for row in rows.into_iter().take(SQUADS_PER_PAGE as usize) {
-        let id: i64=row.try_get("id").map_err(|_|"database_unavailable")?;
-        let name: Option<String>=row.try_get("name").map_err(|_|"database_unavailable")?;
-        let label=name.as_deref().filter(|x|!x.trim().is_empty()).unwrap_or("Squad");
+        let id: i64 = row.try_get("id").map_err(|_| "database_unavailable")?;
+        let name: Option<String> = row.try_get("name").map_err(|_| "database_unavailable")?;
+        let label = name
+            .as_deref()
+            .filter(|x| !x.trim().is_empty())
+            .unwrap_or("Squad");
         keyboard.push(vec![json!({
             "text":format!("🗂 {} · #{id}",label.chars().take(34).collect::<String>()),
             "callback_data":format!("v:cs:{nonce}:{id}")
         })]);
     }
-    let mut nav=Vec::new();
-    if page>0 { nav.push(json!({
-        "text":tr(api.language,"◀ Назад","◀ Previous"),
-        "callback_data":format!("v:cp:{nonce}:{}",page-1)
-    })); }
-    if has_next {nav.push(json!({
-        "text":tr(api.language,"Далее ▶","Next ▶"),
-        "callback_data":format!("v:cp:{nonce}:{}",page+1)
-    }));}
-    if !nav.is_empty() {keyboard.push(nav);}
-    keyboard.push(vec![json!({"text":tr(api.language,"Отмена","Cancel"),"callback_data":"v:menu"})]);
-    let message=format!(
+    let mut nav = Vec::new();
+    if page > 0 {
+        nav.push(json!({
+            "text":tr(api.language,"◀ Назад","◀ Previous"),
+            "callback_data":format!("v:cp:{nonce}:{}",page-1)
+        }));
+    }
+    if has_next {
+        nav.push(json!({
+            "text":tr(api.language,"Далее ▶","Next ▶"),
+            "callback_data":format!("v:cp:{nonce}:{}",page+1)
+        }));
+    }
+    if !nav.is_empty() {
+        keyboard.push(nav);
+    }
+    keyboard.push(vec![
+        json!({"text":tr(api.language,"Отмена","Cancel"),"callback_data":"v:menu"}),
+    ]);
+    let message = format!(
         "{} <b>{}</b> · {days} {}\n\n{}",
-        tr(api.language,"👤 Новый пользователь:","👤 New user:"),
+        tr(api.language, "👤 Новый пользователь:", "👤 New user:"),
         escape(&username),
-        tr(api.language,"дней","days"),
-        tr(api.language,"Выберите сквад для доступа:","Select an access squad:")
+        tr(api.language, "дней", "days"),
+        tr(
+            api.language,
+            "Выберите сквад для доступа:",
+            "Select an access squad:"
+        )
     );
-    api.send(chat,&message,json!(keyboard)).await
+    api.send(chat, &message, json!(keyboard)).await
 }
 
 pub(super) async fn select_create_squad(
@@ -309,50 +349,87 @@ pub(super) async fn select_create_squad(
     nonce: Uuid,
     squad_id: i64,
 ) -> Result<(), &'static str> {
-    if squad_id<=0 {return Err("invalid_command");}
-    let squad_name=sqlx::query_scalar::<_,Option<String>>(
+    if squad_id <= 0 {
+        return Err("invalid_command");
+    }
+    let squad_name = sqlx::query_scalar::<_, Option<String>>(
         "SELECT data->>'name' FROM panel_records WHERE collection='squads' AND id=$1",
     )
-    .bind(squad_id).fetch_optional(&state.pool).await.map_err(|_|"database_unavailable")?;
-    let Some(squad_name)=squad_name else {
-        return create_squad_picker(api,state,chat,admin_id,nonce,0).await;
+    .bind(squad_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    let Some(squad_name) = squad_name else {
+        return create_squad_picker(api, state, chat, admin_id, nonce, 0).await;
     };
     // The first choice wins. Stale/replayed buttons cannot change the selected
     // squad or extend a consumed confirmation.
-    let row=sqlx::query(
+    let row = sqlx::query(
         "UPDATE telegram_admin_bot_actions
          SET squad_id=$3,expires_at=NOW()+INTERVAL '60 seconds'
          WHERE nonce=$1::UUID AND admin_id=$2 AND action='create'
            AND squad_id IS NULL AND consumed_at IS NULL AND expires_at>NOW()
          RETURNING username,amount",
     )
-    .bind(nonce.to_string()).bind(admin_id).bind(squad_id)
-    .fetch_optional(&state.pool).await.map_err(|_|"database_unavailable")?;
-    let Some(row)=row else {
-        return api.send(chat,tr(api.language,
-            "⏳ Выбор уже подтверждён или устарел. Повторите /create.",
-            "⏳ This selection is already confirmed or expired. Run /create again."),
-            buttons(vec![vec![(tr(api.language,"🏠 Меню","🏠 Menu"),"v:menu".into())]])
-        ).await;
+    .bind(nonce.to_string())
+    .bind(admin_id)
+    .bind(squad_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    let Some(row) = row else {
+        return api
+            .send(
+                chat,
+                tr(
+                    api.language,
+                    "⏳ Выбор уже подтверждён или устарел. Повторите /create.",
+                    "⏳ This selection is already confirmed or expired. Run /create again.",
+                ),
+                buttons(vec![vec![(
+                    tr(api.language, "🏠 Меню", "🏠 Menu"),
+                    "v:menu".into(),
+                )]]),
+            )
+            .await;
     };
-    let username: String=row.try_get::<Option<String>,_>("username")
-        .map_err(|_|"database_unavailable")?.ok_or("invalid_command")?;
-    let days: i64=row.try_get::<Option<i64>,_>("amount")
-        .map_err(|_|"database_unavailable")?.ok_or("invalid_command")?;
-    let name=escape(squad_name.as_deref().unwrap_or("Squad"));
-    let message=format!(
+    let username: String = row
+        .try_get::<Option<String>, _>("username")
+        .map_err(|_| "database_unavailable")?
+        .ok_or("invalid_command")?;
+    let days: i64 = row
+        .try_get::<Option<i64>, _>("amount")
+        .map_err(|_| "database_unavailable")?
+        .ok_or("invalid_command")?;
+    let name = escape(squad_name.as_deref().unwrap_or("Squad"));
+    let message = format!(
         "✅ <b>{}</b>\n\n👤 <b>{}</b> · {days} {}\n🗂 {}: <b>{name}</b> (#{squad_id})\n\n{}",
-        tr(api.language,"Подтвердите создание","Confirm user creation"),
+        tr(
+            api.language,
+            "Подтвердите создание",
+            "Confirm user creation"
+        ),
         escape(&username),
-        tr(api.language,"дней","days"),
-        tr(api.language,"Сквад","Squad"),
-        tr(api.language,"Подтверждение действует 60 секунд и используется один раз.",
-           "Confirmation is valid for 60 seconds and can be used once.")
+        tr(api.language, "дней", "days"),
+        tr(api.language, "Сквад", "Squad"),
+        tr(
+            api.language,
+            "Подтверждение действует 60 секунд и используется один раз.",
+            "Confirmation is valid for 60 seconds and can be used once."
+        )
     );
-    api.send(chat,&message,buttons(vec![
-        vec![(tr(api.language,"✅ Подтвердить","✅ Confirm"),format!("x:{nonce}"))],
-        vec![(tr(api.language,"Отмена","Cancel"),"v:menu".into())],
-    ])).await
+    api.send(
+        chat,
+        &message,
+        buttons(vec![
+            vec![(
+                tr(api.language, "✅ Подтвердить", "✅ Confirm"),
+                format!("x:{nonce}"),
+            )],
+            vec![(tr(api.language, "Отмена", "Cancel"), "v:menu".into())],
+        ]),
+    )
+    .await
 }
 
 async fn propose(
@@ -362,8 +439,8 @@ async fn propose(
     admin_id: i64,
     proposal: Proposal,
 ) -> Result<(), &'static str> {
-    if proposal.action=="create" {
-        return start_create_picker(api,state,chat,admin_id,&proposal).await;
+    if proposal.action == "create" {
+        return start_create_picker(api, state, chat, admin_id, &proposal).await;
     }
     // Fail early if the target does not exist. Revalidate under lock at commit.
     if proposal.user_id > 0 {
@@ -475,16 +552,21 @@ async fn create_account(
     squad_id: i64,
     language: Language,
 ) -> Result<(i64, String), &'static str> {
-    if squad_id<=0 || parse_proposal("/create", &format!("{username} {amount}")).is_err() {
+    if squad_id <= 0 || parse_proposal("/create", &format!("{username} {amount}")).is_err() {
         return Err("invalid_command");
     }
     // Lock the selected squad until this transaction commits. Never create an
     // apparently active account with an invalid or removed access group.
-    let selected=sqlx::query_scalar::<_,i64>(
+    let selected = sqlx::query_scalar::<_, i64>(
         "SELECT id FROM panel_records WHERE collection='squads' AND id=$1 FOR SHARE",
     )
-    .bind(squad_id).fetch_optional(&mut **tx).await.map_err(|_|"database_unavailable")?;
-    if selected.is_none() {return Err("squad_not_found");}
+    .bind(squad_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    if selected.is_none() {
+        return Err("squad_not_found");
+    }
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
         .bind(username.to_lowercase())
         .execute(&mut **tx)
@@ -615,11 +697,20 @@ pub(super) async fn apply_extra(
     let username: Option<String> = row
         .try_get("username")
         .map_err(|_| "database_unavailable")?;
-    let selected_squad: Option<i64> = row.try_get("squad_id")
+    let selected_squad: Option<i64> = row
+        .try_get("squad_id")
         .map_err(|_| "database_unavailable")?;
     let (result_id, summary) = if action == "create" {
         let username = username.as_deref().ok_or("invalid_command")?;
-        create_account(state, tx, username, amount, selected_squad.ok_or("squad_not_selected")?, language).await?
+        create_account(
+            state,
+            tx,
+            username,
+            amount,
+            selected_squad.ok_or("squad_not_selected")?,
+            language,
+        )
+        .await?
     } else {
         update_account(tx, &action, id, amount, language).await?
     };
