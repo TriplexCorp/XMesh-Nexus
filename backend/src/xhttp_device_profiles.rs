@@ -60,7 +60,7 @@ fn positive_max(value: Option<&Value>) -> bool {
         .and_then(|n| n.parse::<i64>().ok())
         .is_some_and(|n| n > 0)
 }
-fn validate_device_fields(fields: &serde_json::Map<String,Value>) -> Result<(), &'static str> {
+fn validate_device_fields(fields: &serde_json::Map<String, Value>) -> Result<(), &'static str> {
     if fields.len() > CLIENT_FIELDS.len() {
         return Err("Too many XHTTP device options.");
     }
@@ -107,10 +107,7 @@ fn validate_device_fields(fields: &serde_json::Map<String,Value>) -> Result<(), 
                     }
                 }
             }
-            "xPaddingBytes"
-            | "uplinkChunkSize"
-            | "scMaxEachPostBytes"
-            | "scMinPostsIntervalMs"
+            "xPaddingBytes" | "uplinkChunkSize" | "scMaxEachPostBytes" | "scMinPostsIntervalMs"
                 if !nonnegative_range(v) =>
             {
                 return Err("Invalid XHTTP numeric range.");
