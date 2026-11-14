@@ -26,6 +26,8 @@ const ENABLED_SCOPES: &[&str] = &[
     "squads:read",
     "squads:members:write",
     "nodes:read",
+    "telegram:read",
+    "telegram:assign",
     "entitlements:grant",
 ];
 const TOKEN_PREFIX: &str = "xmni_v1_";
