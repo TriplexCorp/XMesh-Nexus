@@ -79,6 +79,16 @@ assert.match(app,/c==='users'&&k==='created'\?x\.id:x\[k\]/,
  'Default user sort must show newly created accounts, even without createdAt');
 assert.match(app,/DB\.users=normalizeUserList\(payload\.items\)/,
  'User list should refresh from the authoritative database');
+assert.match(app,/const usersEditorBusy=\(\)=>Boolean\(document\.querySelector\('#xm-sharing-dialog\[open\]'\)\)/,
+ 'User refresh must identify active device editors');
+assert.match(app,/if\(!backendReady\|\|usersEditorBusy\(\)\)return/,
+ 'Background refresh must not start while editing a user device');
+assert.match(app,/if\(usersEditorBusy\(\)\)return;\s*DB\.users=normalizeUserList\(payload\.items\)/,
+ 'Refresh started before an editor opens must not overwrite its data');
+assert.match(app,/usersLastSyncedAt=Date\.now\(\);\s*DB\.set=/,
+ 'Bootstrap must prevent a redundant initial user refresh');
+assert.match(app,/if\(Date\.now\(\)-usersLastSyncedAt>15000\)void refreshPanelUsers\(\)/,
+ 'Entering users shortly after bootstrap must preserve its state');
 assert.match(app,/DB\[key\]=Array\.isArray\(collections\[key\]\)\?\(key==='users'\?normalizeUserList\(collections\[key\]\)/,
  'Bootstrap must normalize legacy users before any rendering');
 assert.match(app,/setInterval\(\(\)=>\{if\(cur==='users'&&!document\.hidden\)void refreshPanelUsers\(\)/,
