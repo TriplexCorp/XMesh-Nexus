@@ -16,15 +16,23 @@ fn invalid(message: &'static str) -> Problem {
 }
 
 fn object<'a>(data: &'a Value, fields: &[&str]) -> Result<&'a Map<String, Value>, Problem> {
-    let fields_map = data.as_object().ok_or_else(|| invalid("A JSON object is required"))?;
-    if fields_map.keys().any(|name| !fields.contains(&name.as_str())) {
+    let fields_map = data
+        .as_object()
+        .ok_or_else(|| invalid("A JSON object is required"))?;
+    if fields_map
+        .keys()
+        .any(|name| !fields.contains(&name.as_str()))
+    {
         return Err(invalid("Unknown or read-only field"));
     }
     Ok(fields_map)
 }
 
 fn name(value: &Value) -> Result<String, Problem> {
-    let username = value.as_str().ok_or_else(|| invalid("Invalid username"))?.trim();
+    let username = value
+        .as_str()
+        .ok_or_else(|| invalid("Invalid username"))?
+        .trim();
     if username.is_empty()
         || username.chars().count() > 128
         || username.chars().any(char::is_control)
@@ -35,7 +43,9 @@ fn name(value: &Value) -> Result<String, Problem> {
 }
 
 fn limit(value: &Value) -> Result<f64, Problem> {
-    let amount = value.as_f64().ok_or_else(|| invalid("Quota must be a number"))?;
+    let amount = value
+        .as_f64()
+        .ok_or_else(|| invalid("Quota must be a number"))?;
     if !amount.is_finite() || !(0.0..=1_000_000.0).contains(&amount) {
         return Err(invalid("Quota must be between 0 and 1000000 GB"));
     }
@@ -47,13 +57,20 @@ async fn references(
     object: &Map<String, Value>,
 ) -> Result<(), Problem> {
     if let Some(squads) = object.get("squadIds") {
-        let array = squads.as_array().ok_or_else(|| invalid("Invalid squadIds"))?;
+        let array = squads
+            .as_array()
+            .ok_or_else(|| invalid("Invalid squadIds"))?;
         if array.len() > 256 {
             return Err(invalid("Too many squads"));
         }
         let mut ids = array
             .iter()
-            .map(|value| value.as_i64().filter(|id| *id > 0).ok_or_else(|| invalid("Invalid squad ID")))
+            .map(|value| {
+                value
+                    .as_i64()
+                    .filter(|id| *id > 0)
+                    .ok_or_else(|| invalid("Invalid squad ID"))
+            })
             .collect::<Result<Vec<_>, _>>()?;
         ids.sort_unstable();
         ids.dedup();
@@ -73,7 +90,10 @@ async fn references(
     if let Some(template) = object.get("templateId")
         && !template.is_null()
     {
-        let template_id = template.as_i64().filter(|id| *id > 0).ok_or_else(|| invalid("Invalid template ID"))?;
+        let template_id = template
+            .as_i64()
+            .filter(|id| *id > 0)
+            .ok_or_else(|| invalid("Invalid template ID"))?;
         let exists: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='templates' AND id=$1)",
         )
@@ -88,11 +108,24 @@ async fn references(
 }
 
 fn build_create(body: &Value, now: i64) -> Result<Value, Problem> {
-    let fields = object(body, &[
-        "username", "hold", "holdDays", "expireAtMs", "limitGb",
-        "cdnLimitGb", "squadIds", "templateId",
-    ])?;
-    let username = name(fields.get("username").ok_or_else(|| invalid("username required"))?)?;
+    let fields = object(
+        body,
+        &[
+            "username",
+            "hold",
+            "holdDays",
+            "expireAtMs",
+            "limitGb",
+            "cdnLimitGb",
+            "squadIds",
+            "templateId",
+        ],
+    )?;
+    let username = name(
+        fields
+            .get("username")
+            .ok_or_else(|| invalid("username required"))?,
+    )?;
     let hold = fields.get("hold").map_or(Ok(false), |v| {
         v.as_bool().ok_or_else(|| invalid("hold must be boolean"))
     })?;
@@ -103,7 +136,9 @@ fn build_create(body: &Value, now: i64) -> Result<Value, Problem> {
     data.insert("hold".into(), json!(hold));
     data.insert("used".into(), json!(0));
     if hold {
-        let days = days.and_then(Value::as_i64).filter(|v| (1..=3650).contains(v))
+        let days = days
+            .and_then(Value::as_i64)
+            .filter(|v| (1..=3650).contains(v))
             .ok_or_else(|| invalid("holdDays (1-3650) is required for hold"))?;
         if expiry.is_some() {
             return Err(invalid("A held subscription cannot have an active expiry"));
@@ -113,7 +148,8 @@ fn build_create(body: &Value, now: i64) -> Result<Value, Problem> {
         if days.is_some() {
             return Err(invalid("holdDays is only valid when hold=true"));
         }
-        let expiry = expiry.and_then(Value::as_i64)
+        let expiry = expiry
+            .and_then(Value::as_i64)
             .filter(|v| *v > now && *v <= now.saturating_add(3_650_i64 * 86_400_000))
             .ok_or_else(|| invalid("An explicit future expireAtMs is required"))?;
         data.insert("expireAt".into(), json!(expiry));
@@ -139,18 +175,32 @@ fn build_create(body: &Value, now: i64) -> Result<Value, Problem> {
 }
 
 fn apply_patch(data: &mut Value, body: &Value) -> Result<(), Problem> {
-    let fields = object(body, &[
-        "username", "limitGb", "cdnLimitGb", "squadIds", "templateId", "note",
-    ])?;
+    let fields = object(
+        body,
+        &[
+            "username",
+            "limitGb",
+            "cdnLimitGb",
+            "squadIds",
+            "templateId",
+            "note",
+        ],
+    )?;
     if fields.is_empty() {
         return Err(invalid("Empty user patch"));
     }
     let current = data.as_object_mut().ok_or_else(Problem::unavailable)?;
     for (field, value) in fields {
         match field.as_str() {
-            "username" => { current.insert("username".into(), json!(name(value)?)); }
-            "limitGb" => { current.insert("limit".into(), json!(limit(value)?)); }
-            "cdnLimitGb" => { current.insert("cdnLimitGb".into(), json!(limit(value)?)); }
+            "username" => {
+                current.insert("username".into(), json!(name(value)?));
+            }
+            "limitGb" => {
+                current.insert("limit".into(), json!(limit(value)?));
+            }
+            "cdnLimitGb" => {
+                current.insert("cdnLimitGb".into(), json!(limit(value)?));
+            }
             "squadIds" => {
                 if !value.is_array() {
                     return Err(invalid("squadIds must be an array"));
@@ -167,7 +217,9 @@ fn apply_patch(data: &mut Value, body: &Value) -> Result<(), Problem> {
                 }
             }
             "note" => {
-                let note = value.as_str().ok_or_else(|| invalid("note must be a string"))?;
+                let note = value
+                    .as_str()
+                    .ok_or_else(|| invalid("note must be a string"))?;
                 if note.len() > 2048 || note.chars().any(char::is_control) {
                     return Err(invalid("Invalid note"));
                 }
@@ -182,12 +234,16 @@ fn apply_patch(data: &mut Value, body: &Value) -> Result<(), Problem> {
 /// ETag values use database updated_at microseconds, not a client-controlled JSON field.
 /// Reads and writes share the same epoch-based revision, including legacy panel edits.
 pub(super) fn matches_revision(headers: &HeaderMap, revision: i64) -> Result<(), Problem> {
-    let raw = headers.get("if-match").and_then(|value| value.to_str().ok())
-        .ok_or_else(|| Problem::new(
-            StatusCode::PRECONDITION_REQUIRED,
-            "precondition_required",
-            "If-Match with current user revision is required",
-        ))?;
+    let raw = headers
+        .get("if-match")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| {
+            Problem::new(
+                StatusCode::PRECONDITION_REQUIRED,
+                "precondition_required",
+                "If-Match with current user revision is required",
+            )
+        })?;
     let expected = format!("\"{revision}\"");
     if raw != expected {
         return Err(Problem::new(
@@ -208,7 +264,11 @@ pub(super) async fn create(
     principal.allow_scope("users:create")?;
     // A limited token cannot give itself a newly created user outside its assigned IDs.
     if principal.allowed_user_ids.is_some() {
-        return Err(Problem::new(StatusCode::FORBIDDEN, "scope_denied", "Creating users requires an explicitly approved allUsers token"));
+        return Err(Problem::new(
+            StatusCode::FORBIDDEN,
+            "scope_denied",
+            "Creating users requires an explicitly approved allUsers token",
+        ));
     }
     let data = build_create(&body, now_ms())?;
     let key = grants::key(&headers)?;
@@ -223,26 +283,49 @@ pub(super) async fn create(
     let username = data["username"].as_str().ok_or_else(Problem::unavailable)?;
     // Serialize concurrent creations from this API for the same normalized username.
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
-        .bind(username.to_lowercase()).execute(&mut *tx).await?;
+        .bind(username.to_lowercase())
+        .execute(&mut *tx)
+        .await?;
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users' AND LOWER(data->>'username')=LOWER($1))",
     )
     .bind(username).fetch_one(&mut *tx).await?;
     if exists {
-        return Err(Problem::new(StatusCode::CONFLICT, "duplicate_username", "Username already exists"));
+        return Err(Problem::new(
+            StatusCode::CONFLICT,
+            "duplicate_username",
+            "Username already exists",
+        ));
     }
-    references(&mut tx, object(&body, &[
-        "username", "hold", "holdDays", "expireAtMs", "limitGb",
-        "cdnLimitGb", "squadIds", "templateId",
-    ])?).await?;
+    references(
+        &mut tx,
+        object(
+            &body,
+            &[
+                "username",
+                "hold",
+                "holdDays",
+                "expireAtMs",
+                "limitGb",
+                "cdnLimitGb",
+                "squadIds",
+                "templateId",
+            ],
+        )?,
+    )
+    .await?;
     let row = sqlx::query(
         "INSERT INTO panel_records(collection,data) VALUES('users',$1)
          RETURNING id,(EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision",
     )
-    .bind(data.clone()).fetch_one(&mut *tx).await?;
+    .bind(data.clone())
+    .fetch_one(&mut *tx)
+    .await?;
     let id: i64 = row.try_get("id")?;
     let revision: i64 = row.try_get("revision")?;
-    user_subscriptions::provision_new_user(&state, id, &mut tx).await.map_err(Problem::from)?;
+    user_subscriptions::provision_new_user(&state, id, &mut tx)
+        .await
+        .map_err(Problem::from)?;
     let mut user = data;
     user["id"] = json!(id);
     let mut result = users::safe_user(&user);
@@ -262,7 +345,17 @@ pub(super) async fn patch(
     principal.allow_scope("users:update")?;
     principal.allow_user(id)?;
     // Validate before consuming an idempotency key or obtaining a row lock.
-    object(&body, &["username", "limitGb", "cdnLimitGb", "squadIds", "templateId", "note"])?;
+    object(
+        &body,
+        &[
+            "username",
+            "limitGb",
+            "cdnLimitGb",
+            "squadIds",
+            "templateId",
+            "note",
+        ],
+    )?;
     let key = grants::key(&headers)?;
     let hash = grants::request_hash("user.patch", id, &body)?;
     let mut tx = state.pool.begin().await?;
@@ -276,8 +369,10 @@ pub(super) async fn patch(
         "SELECT data,(EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision
          FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE",
     )
-    .bind(id).fetch_optional(&mut *tx).await?
-    .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND,"not_found","User not found"))?;
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))?;
     let revision: i64 = row.try_get("revision")?;
     matches_revision(&headers, revision)?;
     let mut user: Value = row.try_get("data")?;
@@ -297,20 +392,31 @@ pub(super) async fn patch(
             "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users'
              AND id<>$1 AND LOWER(data->>'username')=LOWER($2))",
         )
-        .bind(id).bind(username).fetch_one(&mut *tx).await?;
+        .bind(id)
+        .bind(username)
+        .fetch_one(&mut *tx)
+        .await?;
         if exists {
-            return Err(Problem::new(StatusCode::CONFLICT, "duplicate_username", "Username already exists"));
+            return Err(Problem::new(
+                StatusCode::CONFLICT,
+                "duplicate_username",
+                "Username already exists",
+            ));
         }
     }
     let row = sqlx::query(
         "UPDATE panel_records SET data=$2,updated_at=NOW()
          WHERE collection='users' AND id=$1
          RETURNING (EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision",
-    ).bind(id).bind(&user).fetch_one(&mut *tx).await?;
+    )
+    .bind(id)
+    .bind(&user)
+    .fetch_one(&mut *tx)
+    .await?;
     user["id"] = json!(id);
     let mut result = users::safe_user(&user);
-    result["revision"] = json!(row.try_get::<i64,_>("revision")?);
-    grants::complete(&mut tx,&principal,&key,"user.patch",id,&result).await?;
+    result["revision"] = json!(row.try_get::<i64, _>("revision")?);
+    grants::complete(&mut tx, &principal, &key, "user.patch", id, &result).await?;
     tx.commit().await?;
     Ok(reply(result))
 }
@@ -321,32 +427,64 @@ mod tests {
     #[test]
     fn reject_credential_overpost_and_unbounded_new_accounts() {
         let now = 1_800_000_000_000_i64;
-        assert!(build_create(&json!({"username":"alice","expireAtMs":now+86_400_000}),now).is_ok());
-        assert!(build_create(&json!({"username":"alice","xrayId":"forged","expireAtMs":now+86_400_000}),now).is_err());
-        assert!(build_create(&json!({"username":"alice"}),now).is_err());
-        assert!(build_create(&json!({"username":"alice","hold":true,"holdDays":30}),now).is_ok());
-        assert!(build_create(&json!({"username":"alice","hold":true,"holdDays":30,"expireAtMs":now+86_400_000}),now).is_err());
-        assert!(build_create(&json!({"username":"alice","limitGb":-1,"expireAtMs":now+86_400_000}),now).is_err());
+        assert!(
+            build_create(
+                &json!({"username":"alice","expireAtMs":now+86_400_000}),
+                now
+            )
+            .is_ok()
+        );
+        assert!(
+            build_create(
+                &json!({"username":"alice","xrayId":"forged","expireAtMs":now+86_400_000}),
+                now
+            )
+            .is_err()
+        );
+        assert!(build_create(&json!({"username":"alice"}), now).is_err());
+        assert!(build_create(&json!({"username":"alice","hold":true,"holdDays":30}), now).is_ok());
+        assert!(
+            build_create(
+                &json!({"username":"alice","hold":true,"holdDays":30,"expireAtMs":now+86_400_000}),
+                now
+            )
+            .is_err()
+        );
+        assert!(
+            build_create(
+                &json!({"username":"alice","limitGb":-1,"expireAtMs":now+86_400_000}),
+                now
+            )
+            .is_err()
+        );
     }
     #[test]
     fn patch_never_accepts_usage_credentials_or_expiry() {
-        for forbidden in ["xrayId","usedGb","used","expireAtMs","disabled","holdDays","cdnUsedBytes"] {
+        for forbidden in [
+            "xrayId",
+            "usedGb",
+            "used",
+            "expireAtMs",
+            "disabled",
+            "holdDays",
+            "cdnUsedBytes",
+        ] {
             let mut body = json!({"limitGb":5.0});
             body[forbidden] = json!(100);
             let mut user = json!({"username":"alice","limit":1.0});
-            assert!(apply_patch(&mut user,&body).is_err(), "{forbidden}");
+            assert!(apply_patch(&mut user, &body).is_err(), "{forbidden}");
         }
-        let mut user=json!({"username":"alice","limit":1.0});
-        assert!(apply_patch(&mut user,&json!({"limitGb":5})).is_ok());
-        assert_eq!(user["limit"],5.0);
+        let mut user = json!({"username":"alice","limit":1.0});
+        assert!(apply_patch(&mut user, &json!({"limitGb":5})).is_ok());
+        assert_eq!(user["limit"], 5.0);
     }
     #[test]
     fn revision_requires_strict_quoted_tag() {
-        let mut headers=HeaderMap::new();
-        assert!(matches_revision(&headers,42).is_err());
-        headers.insert("if-match",axum::http::HeaderValue::from_static("42"));
-        assert!(matches_revision(&headers,42).is_err());
-        headers.insert("if-match",axum::http::HeaderValue::from_static("\"42\""));
-        assert!(matches_revision(&headers,42).is_ok());
+        let mut headers = HeaderMap::new();
+        assert!(matches_revision(&headers, 42).is_err());
+        headers.insert("if-match", axum::http::HeaderValue::from_static("42"));
+        assert!(matches_revision(&headers, 42).is_err());
+        headers.insert("if-match", axum::http::HeaderValue::from_static("\"42\""));
+        assert!(matches_revision(&headers, 42).is_ok());
     }
 }
