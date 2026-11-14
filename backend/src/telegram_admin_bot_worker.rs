@@ -459,41 +459,40 @@ async fn handle_extra_confirmation(
     row: sqlx::postgres::PgRow,
     mut tx: sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<(), &'static str> {
-        let result =
-            commands::apply_extra(state, admin_id, nonce, &row, &mut tx, api.language).await;
-        let (record_id, message) = match result {
-            Ok(value) => value,
-            Err(reason) if reason != "database_unavailable" => {
-                drop(tx);
-                let message = match reason {
-                    "duplicate_username" => "This username already exists.",
-                    "nonexpiring_user" => {
-                        "This account has unlimited duration or is waiting for first connection. Change it in the panel."
-                    }
-                    "user_not_found" => "User not found.",
-                    _ => "This action is no longer valid. Check the user and try again.",
-                };
-                api.send(
-                    chat,
-                    message,
-                    buttons(vec![vec![("🏠 Меню", "v:menu".into())]]),
-                )
-                .await?;
-                return Ok(());
-            }
-            Err(reason) => return Err(reason),
-        };
-        tx.commit().await.map_err(|_| "database_unavailable")?;
-        api.send(
-            chat,
-            &format!("✅ {message}"),
-            buttons(vec![
-                vec![("👤 Карточка", format!("v:user:{record_id}"))],
-                vec![("🏠 Меню", "v:menu".into())],
-            ]),
-        )
-        .await?;
-        return Ok(());
+    let result = commands::apply_extra(state, admin_id, nonce, &row, &mut tx, api.language).await;
+    let (record_id, message) = match result {
+        Ok(value) => value,
+        Err(reason) if reason != "database_unavailable" => {
+            drop(tx);
+            let message = match reason {
+                "duplicate_username" => "This username already exists.",
+                "nonexpiring_user" => {
+                    "This account has unlimited duration or is waiting for first connection. Change it in the panel."
+                }
+                "user_not_found" => "User not found.",
+                _ => "This action is no longer valid. Check the user and try again.",
+            };
+            api.send(
+                chat,
+                message,
+                buttons(vec![vec![("🏠 Меню", "v:menu".into())]]),
+            )
+            .await?;
+            return Ok(());
+        }
+        Err(reason) => return Err(reason),
+    };
+    tx.commit().await.map_err(|_| "database_unavailable")?;
+    api.send(
+        chat,
+        &format!("✅ {message}"),
+        buttons(vec![
+            vec![("👤 Карточка", format!("v:user:{record_id}"))],
+            vec![("🏠 Меню", "v:menu".into())],
+        ]),
+    )
+    .await?;
+    return Ok(());
     Ok(())
 }
 
@@ -504,7 +503,7 @@ async fn apply_access_toggle(
     nonce: Uuid,
     user_id: i64,
     action: &str,
-    tx: &mut sqlx::Transaction<'_,sqlx::Postgres>,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<Option<bool>, &'static str> {
     let record =
         sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
@@ -513,7 +512,8 @@ async fn apply_access_toggle(
             .await
             .map_err(|_| "database_unavailable")?;
     let Some(record) = record else {
-        api.send(chat, "Пользователь больше не существует.", menu_buttons()).await?;
+        api.send(chat, "Пользователь больше не существует.", menu_buttons())
+            .await?;
         return Ok(None);
     };
     let mut data: Value = record.try_get("data").map_err(|_| "database_unavailable")?;
@@ -605,9 +605,11 @@ async fn consume_confirmation(
     if matches!(action.as_str(), "create" | "renew" | "quota") {
         return handle_extra_confirmation(api, state, chat, admin_id, nonce, row, tx).await;
     }
-    let Some(disabled)=apply_access_toggle(
-        api, chat, admin_id, nonce, user_id, &action, &mut tx
-    ).await? else { return Ok(()); };
+    let Some(disabled) =
+        apply_access_toggle(api, chat, admin_id, nonce, user_id, &action, &mut tx).await?
+    else {
+        return Ok(());
+    };
     tx.commit().await.map_err(|_| "database_unavailable")?;
     let text = if disabled {
         "🔴 Пользователь отключён."
@@ -845,7 +847,10 @@ async fn dispatch(
                 return Ok(());
             };
             commands::set_language(state, callback.from.id, language).await?;
-            let localized = BotApi { language, ..api.clone() };
+            let localized = BotApi {
+                language,
+                ..api.clone()
+            };
             return home(&localized, message.chat.id).await;
         }
         let preference = commands::language(state, callback.from.id).await?;
