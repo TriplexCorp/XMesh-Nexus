@@ -163,7 +163,9 @@ fn menu_buttons() -> Value {
             ("🖥 Узлы", "v:nodes".into()),
             ("🔎 Поиск", "v:search".into()),
         ],
-        vec![("🗂 Сквады", "v:squads".into()),("🌐 Язык", "v:language".into())],
+        vec![("🗂 Сквады","v:squads".into()),("🔎 TG ID","v:findtg".into())],
+        vec![("➕ Создать","v:create".into()),("⏱ Продлить","v:renew".into())],
+        vec![("📦 Квота","v:quota".into()),("🌐 Язык","v:language".into())],
         vec![("❔ Помощь", "v:help".into())],
     ])
 }
@@ -384,6 +386,8 @@ async fn user_card(api: &BotApi, state: &AppState, chat: i64, id: i64) -> Result
         &message,
         buttons(vec![
             vec![(toggle.0, toggle.1)],
+            vec![("⏱ Продлить",format!("v:guide:renew:{id}")),
+                 ("📦 Квота",format!("v:guide:quota:{id}"))],
             vec![
                 ("🔄 Обновить", format!("v:user:{id}")),
                 ("🏠 Меню", "v:menu".into()),
@@ -467,6 +471,13 @@ async fn consume_confirmation(
             )
             .await;
     };
+    // The allowlist can change while a confirmation is displayed. Hold a
+    // shared lock through commit so removed administrators cannot race writes.
+    let still_authorized:bool=sqlx::query_scalar(
+        "SELECT enabled AND $1=ANY(admin_ids) FROM telegram_admin_bot
+         WHERE singleton=TRUE FOR SHARE"
+    ).bind(admin_id).fetch_one(&mut *tx).await.map_err(|_|"database_unavailable")?;
+    if !still_authorized {return Err("permission_revoked");}
     let user_id: i64 = row.try_get("user_id").map_err(|_| "database_unavailable")?;
     let action: String = row.try_get("action").map_err(|_| "database_unavailable")?;
     if matches!(action.as_str(),"create"|"renew"|"quota") {
@@ -600,7 +611,10 @@ async fn handle_command(
         return result;
     }
     match cmd {
-        "/start"|"/menu"|"/help" => home(api,chat).await,
+        "/start"|"/menu" => home(api,chat).await,
+        "/help" => api.send(chat,
+            "Команды:\n/start — меню\n/stats — сводка\n/users — пользователи\n/nodes — ноды\n/squads — сквады\n/find имя — поиск\n/findtg ID — поиск по Telegram ID\n/user ID — карточка\n/create имя 30 — создать на 30 дней\n/renew ID 30 — продлить на 30 дней\n/quota ID 50 — лимит 50 ГБ (0 — безлимит)\n/language — выбрать язык\n\nВсе изменения требуют подтверждения.",
+            menu_buttons()).await,
         "/stats" => stats(api,state,chat).await,
         "/users" => users(api,state,chat).await,
         "/nodes" => nodes(api,state,chat).await,
@@ -650,6 +664,31 @@ async fn handle_callback(
     }
     if data == "v:language" {
         return commands::choose_language(api,chat).await;
+    }
+    for (name,usage_ru,usage_en) in [
+      ("create","/create имя 30","/create username 30"),
+      ("renew","/renew 123 30","/renew 123 30"),
+      ("quota","/quota 123 50","/quota 123 50"),
+      ("findtg","/findtg 123456789","/findtg 123456789")
+    ] {
+        if data==format!("v:{name}") {
+            let example=locale::tr(api.language,usage_ru,usage_en);
+            return api.send(chat,&format!("{} <code>{example}</code>",
+                locale::tr(api.language,"Введите команду:","Send this command:")),
+                buttons(vec![vec![("🏠 Меню","v:menu".into())]])).await;
+        }
+    }
+    if let Some(other)=data.strip_prefix("v:guide:"){
+        let mut parts=other.split(':');
+        if let (Some(action),Some(raw_id),None)=(parts.next(),parts.next(),parts.next())
+            && matches!(action,"renew"|"quota")
+            && let Ok(id)=raw_id.parse::<i64>()
+            && id>0 {
+            let usage=if action=="renew"{format!("/renew {id} 30")}else{format!("/quota {id} 50")};
+            return api.send(chat,&format!("{} <code>{usage}</code>",
+                locale::tr(api.language,"Введите команду:","Send this command:")),
+                buttons(vec![vec![("👤 Карточка",format!("v:user:{id}"))]])).await;
+        }
     }
     if data == "v:help" {
         return handle_command(api, state, chat, admin_id, "/help").await;
