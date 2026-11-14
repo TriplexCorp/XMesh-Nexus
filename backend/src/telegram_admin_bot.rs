@@ -37,8 +37,19 @@ fn encrypt(state: &AppState, token: &str) -> Result<Vec<u8>, ApiError> {
     let mut nonce = [0u8; 12];
     OsRng.fill_bytes(&mut nonce);
     let ciphertext = secret_cipher(state)
-        .encrypt(Nonce::from_slice(&nonce), Payload { msg: token.as_bytes(), aad: AAD })
-        .map_err(|_| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "Не удалось сохранить токен бота."))?;
+        .encrypt(
+            Nonce::from_slice(&nonce),
+            Payload {
+                msg: token.as_bytes(),
+                aad: AAD,
+            },
+        )
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Не удалось сохранить токен бота.",
+            )
+        })?;
     let mut bytes = nonce.to_vec();
     bytes.extend(ciphertext);
     Ok(bytes)
@@ -46,29 +57,50 @@ fn encrypt(state: &AppState, token: &str) -> Result<Vec<u8>, ApiError> {
 
 pub(crate) fn decrypt(state: &AppState, ciphertext: &[u8]) -> Result<String, ApiError> {
     if ciphertext.len() < 29 {
-        return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "Зашифрованный токен бота повреждён."));
+        return Err(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Зашифрованный токен бота повреждён.",
+        ));
     }
     let plaintext = secret_cipher(state)
-        .decrypt(Nonce::from_slice(&ciphertext[..12]), Payload {
-            msg: &ciphertext[12..],
-            aad: AAD,
-        })
-        .map_err(|_| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "Не удалось расшифровать токен бота."))?;
-    String::from_utf8(plaintext)
-        .map_err(|_| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "Зашифрованный токен бота повреждён."))
+        .decrypt(
+            Nonce::from_slice(&ciphertext[..12]),
+            Payload {
+                msg: &ciphertext[12..],
+                aad: AAD,
+            },
+        )
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Не удалось расшифровать токен бота.",
+            )
+        })?;
+    String::from_utf8(plaintext).map_err(|_| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Зашифрованный токен бота повреждён.",
+        )
+    })
 }
 
 pub(crate) fn validate_token(token: &str) -> bool {
-    let Some((id, secret)) = token.split_once(':') else { return false };
+    let Some((id, secret)) = token.split_once(':') else {
+        return false;
+    };
     (5..=16).contains(&id.len())
         && id.bytes().all(|b| b.is_ascii_digit())
         && (30..=96).contains(&secret.len())
-        && secret.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
+        && secret
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
 }
 
 fn validate_ids(ids: &[i64], enabled: bool) -> Result<(), ApiError> {
     if ids.len() > 50 || (enabled && ids.is_empty()) || ids.iter().any(|id| *id <= 0) {
-        return Err(bad("Укажите от 1 до 50 корректных Telegram ID администраторов."));
+        return Err(bad(
+            "Укажите от 1 до 50 корректных Telegram ID администраторов.",
+        ));
     }
     let mut sorted = ids.to_vec();
     sorted.sort_unstable();
@@ -105,7 +137,7 @@ pub(crate) async fn load(state: &AppState) -> Result<BotConfig, ApiError> {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all="camelCase",deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct BotSave {
     enabled: bool,
     admin_ids: Vec<i64>,
@@ -170,11 +202,18 @@ pub(crate) async fn save(
     let original: Option<Vec<u8>> = row.try_get("token_ciphertext")?;
     let old_fingerprint: Option<String> = row.try_get("token_fingerprint")?;
     let fingerprint = requested_token.map(|token| hex::encode(Sha256::digest(token.as_bytes())));
-    let rotated = body.clear_token || fingerprint.as_ref().is_some_and(|value| old_fingerprint.as_ref() != Some(value));
+    let rotated = body.clear_token
+        || fingerprint
+            .as_ref()
+            .is_some_and(|value| old_fingerprint.as_ref() != Some(value));
     let next_token = if body.clear_token {
         None
     } else if let Some(token) = requested_token {
-        if !rotated { original.clone() } else { Some(encrypt(&state,token)?) }
+        if !rotated {
+            original.clone()
+        } else {
+            Some(encrypt(&state, token)?)
+        }
     } else {
         original.clone()
     };
@@ -194,21 +233,31 @@ pub(crate) async fn save(
     .bind(body.enabled && next_token.is_some())
     .bind(&body.admin_ids)
     .bind(&next_token)
-    .bind(if body.clear_token { None } else { fingerprint.or(old_fingerprint) })
+    .bind(if body.clear_token {
+        None
+    } else {
+        fingerprint.or(old_fingerprint)
+    })
     .bind(rotated)
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
     crate::audit(
-        &state.pool, &actor.username, "telegram_bot.configuration_updated",
-        None, None,
+        &state.pool,
+        &actor.username,
+        "telegram_bot.configuration_updated",
+        None,
+        None,
         json!({
             "enabled":body.enabled,
             "adminCount":body.admin_ids.len(),
             "tokenChanged":rotated
         }),
-    ).await;
-    Ok(Json(json!({"saved":true,"enabled":body.enabled,"tokenConfigured":next_token.is_some()})))
+    )
+    .await;
+    Ok(Json(
+        json!({"saved":true,"enabled":body.enabled,"tokenConfigured":next_token.is_some()}),
+    ))
 }
 
 pub(crate) fn spawn_worker(state: AppState) {
@@ -218,8 +267,12 @@ pub(crate) fn spawn_worker(state: AppState) {
 }
 
 pub(crate) fn now_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default()
-        .as_millis().try_into().unwrap_or(i64::MAX)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX)
 }
 
 #[cfg(test)]
@@ -231,9 +284,9 @@ mod tests {
         for raw in ["", "1234:1234", "abc:whatever", "12345:hello", "1:xxx"] {
             assert!(!validate_token(raw), "{raw}");
         }
-        assert!(validate_ids(&[1,2,3],true).is_ok());
-        assert!(validate_ids(&[],true).is_err());
-        assert!(validate_ids(&[2,2],true).is_err());
-        assert!(validate_ids(&[-1001],true).is_err());
+        assert!(validate_ids(&[1, 2, 3], true).is_ok());
+        assert!(validate_ids(&[], true).is_err());
+        assert!(validate_ids(&[2, 2], true).is_err());
+        assert!(validate_ids(&[-1001], true).is_err());
     }
 }
