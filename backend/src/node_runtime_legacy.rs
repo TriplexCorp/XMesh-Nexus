@@ -1703,6 +1703,7 @@ pub async fn preview_routing(
         )
     })?;
     // Preview uses the same MASQUE and per-node TLS compilation guards.
+    crate::xhttp_device_profiles::strip_from_node_config(&mut config);
     ensure_masque_address(&mut config)?;
     configure_node_managed_tls(&node, &mut config)?;
     // Identical stats-first ordering to live signed policy provisioning.
@@ -2149,6 +2150,7 @@ async fn compile_node_profile(
             ));
         }
     };
+    crate::xhttp_device_profiles::strip_from_node_config(&mut config);
     configure_local_xray_inbound(&mut config, port)?;
     ensure_masque_address(&mut config)?;
     let tls_provision = configure_node_managed_tls(&node, &mut config)?;

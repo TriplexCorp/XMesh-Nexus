@@ -79,9 +79,19 @@
 | **Analytics** | Node RX/TX, system metrics, Xray runtime, per-user/per-inbound traffic, исторические измерения |
 | **Security** | RBAC, observer least privilege, TOTP MFA/recovery, sessions, Redis login throttling, audit/security boundaries, signed node identity |
 | **Updates** | Owner-authorized panel update, managed Agent update, managed Xray update, runtime version confirmation |
+| **Telegram-бот (админка)** | Встроенный в Rust-API бот с owner-only настройкой, BotFather token, списком администраторов, статусом подключения, меню и подтверждаемым включением/отключением пользователей |
+| **Integration API v1** | Отдельная Bearer-аутентификация и ограниченный реализованный набор операций для интеграций: чтение, права, управление пользователями, квотами, сквадами и Telegram ID; полная OpenAPI-спецификация реализована лишь частично |
 | **v6 POSTQUANTUM** | XSP-v2 strict-PQ Nexus↔Agent operational path с fail-closed policy и evidence-bound activation |
 
 ---
+
+## Встроенный Telegram-бот и интеграции
+
+В меню **Система → Telegram-бот** владелец панели может вставить токен отдельного бота BotFather, указать до 50 доверенных Telegram user ID и включить встроенное подключение по long polling — без отдельного контейнера или входящего Telegram webhook. Доступ к командам есть только у разрешённых пользователей **в личных чатах**. Поддерживаются меню, статистика, пользователи, поиск, карточки, перечень нод и подтверждаемое включение/отключение доступа. Удаление пользователей, управление Xray и изменение квот через этот бот не доступны.
+
+Для **внешних** сайтов и платёжных/клиентских ботов существует отдельный **Integration API v1** со scoped Bearer-токенами и идемпотентными операциями. Он внедряется поэтапно: описанные в OpenAPI операции нельзя считать рабочими без соответствующего зарегистрированного обработчика. Внешние сервисы не должны использовать cookie администратора или доступ к базе данных.
+
+Документация: [встроенный Telegram-бот](docs/telegram-admin-bot.md) · [Integration API](docs/integrations/README.md).
 
 ## XRAY STUDIO — полноценная рабочая среда
 
@@ -94,7 +104,7 @@ XRAY STUDIO сочетает быстрый конструктор и работ
 - syntax/semantic diagnostics и targeted fixes;
 - несколько inbound в одной конфигурации;
 - transport-aware параметры;
-- TLS и REALITY;
+- TLS и REALITY, включая широкий адаптивный редактор TLS (версия, ALPN, SNI, Reject Unknown SNI, Advanced JSON);
 - XHTTP constructor;
 - FinalMask;
 - расширенные клиентские параметры;

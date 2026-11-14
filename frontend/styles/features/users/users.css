@@ -1,8 +1,6 @@
-/* Feature ownership: users. Shared tokens, controls, materials and viewport safety live in styles/system. */
-dialog:not(.side):not(.pop):not(.pal):not(.user-modal) {
-  margin:auto;
-  width:min(30rem,calc(100vw - 2rem));
-}
+/* Feature ownership: users. Native dialog sizes live in styles/system.
+ * Do not target generic dialog:not(...) here: that selector previously squeezed
+ * unrelated XRAY STUDIO TLS and REALITY workspaces into 30rem action dialogs. */
 .users-panel .bulk {
   background:var(--nx-section-bg);
   border:1px solid var(--nx-border);

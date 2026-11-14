@@ -77,9 +77,19 @@ Instead of permanent SSH sessions, hand-edited JSON and separate scripts for use
 | **Analytics** | Node RX/TX, system metrics, Xray runtime, per-user/per-inbound traffic and historical measurements |
 | **Security** | RBAC, observer least privilege, TOTP MFA/recovery, sessions, Redis login throttling, audit boundaries and signed node identity |
 | **Updates** | Owner-authorized panel update, managed Agent update, managed Xray update and runtime version confirmation |
+| **Built-in Telegram admin bot** | Owner-configured BotFather token, admin allowlist, connection status, interactive menu and confirmed user enable/disable operations |
+| **Integration API v1** | Separate scoped Bearer authentication and a released subset for users, entitlements, quotas, squad catalog and Telegram IDs; the complete OpenAPI specification is only partially implemented |
 | **v6 POSTQUANTUM** | XSP-v2 strict-PQ Nexus↔Agent operational path with fail-closed policy and evidence-bound activation |
 
 ---
+
+## Built-in Telegram administration and external integrations
+
+Under **System → Telegram bot**, the panel owner can provide a dedicated BotFather token, allow up to 50 trusted numeric Telegram user IDs, and enable the built-in Rust long-polling worker. No separate bot container or incoming webhook is required. Commands work only in private chats with allowlisted IDs. The bot currently supports menus, statistics, user lookup and details, node lists, and confirmed user enable/disable. It cannot delete users, control Xray or change quotas.
+
+**External** bots and websites use the independent **Integration API v1**, with scoped Bearer tokens and idempotent operations, not administrator cookies or direct database access. Implementation is incremental: do not assume every operation in the OpenAPI contract is already live.
+
+Read: [Telegram admin bot](docs/telegram-admin-bot.md) · [Integration API](docs/integrations/README.md).
 
 ## XRAY STUDIO
 
@@ -91,7 +101,7 @@ It includes:
 - syntax/semantic diagnostics and targeted fixes;
 - multiple inbounds;
 - transport-aware settings;
-- TLS and REALITY;
+- TLS and REALITY, including a responsive TLS editor for version policy, ALPN, SNI, unknown-SNI rejection and Advanced JSON;
 - the XHTTP constructor;
 - FinalMask;
 - advanced client-side parameters;

@@ -128,8 +128,11 @@ fn effective_xhttp(config: &Value) -> Value {
 fn device_xhttp<'a>(inbound: &'a Value, device: &str) -> Option<&'a Value> {
     let name = match device {
         "ios" => "iOS",
+        "android" => "Android",
         "windows" => "Windows",
-        _ => return None,
+        "macos" => "macOS",
+        "linux" => "Linux",
+        _ => "Auto",
     };
     inbound
         .get("xmesh")
@@ -543,6 +546,33 @@ mod tests {
         assert_eq!(ios["xhttpSettings"]["mode"], "packet-up");
         assert_eq!(ios["xhttpSettings"]["xPaddingObfsMode"], true);
         assert!(ios["xhttpSettings"].get("scStreamUpServerSecs").is_none());
+    }
+    #[test]
+    fn platform_profiles_apply_to_android_macos_linux_and_fallback_without_leaking() {
+        let inbound = json!({
+            "streamSettings":{"network":"xhttp","security":"none","xhttpSettings":{"path":"/x","mode":"auto"}},
+            "xmesh":{"xhttpDeviceProfiles":{
+                "Android":{"mode":"stream-up","xmux":{"maxConcurrency":1,"maxConnections":0}},
+                "macOS":{"mode":"stream-up","xmux":{"cMaxReuseTimes":"64-128"}},
+                "Linux":{"mode":"packet-up","scMaxEachPostBytes":"100-200"},
+                "Auto":{"mode":"auto","uplinkHTTPMethod":"POST"}
+            }}
+        });
+        for (device, expected) in [
+            ("android", "stream-up"),
+            ("macos", "stream-up"),
+            ("linux", "packet-up"),
+            ("auto", "auto"),
+        ] {
+            let client = client_stream(&inbound, &json!({}), device).unwrap();
+            assert_eq!(client["xhttpSettings"]["mode"], expected);
+            assert!(client["xhttpSettings"].get("xmesh").is_none());
+        }
+        let host = json!({"clientXhttpSettings":{"mode":"stream-one"}});
+        let c = client_stream(&inbound, &host, "android").unwrap();
+        assert_eq!(c["xhttpSettings"]["mode"], "stream-one");
+        let unknown = client_stream(&inbound, &json!({}), "unknown").unwrap();
+        assert_eq!(unknown["xhttpSettings"]["mode"], "auto");
     }
     #[test]
     fn never_leak_server_reality_tls_and_finalmask() {
