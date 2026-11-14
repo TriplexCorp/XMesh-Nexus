@@ -4,7 +4,8 @@ use crate::{AppState, cdn_quota};
 use axum::{
     Json,
     extract::{Extension, Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
+    response::{IntoResponse, Response},
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use hmac::{Hmac, Mac};
@@ -60,7 +61,7 @@ fn cursor_read(state: &AppState, principal: &ServicePrincipal, raw: &str) -> Res
     Ok(id)
 }
 
-fn safe_user(user: &Value) -> Value {
+pub(super) fn safe_user(user: &Value) -> Value {
     // Fixed, opt-in projection. New backend fields stay secret by default.
     let pick = |name: &str| user.get(name).cloned().unwrap_or(Value::Null);
     json!({
@@ -81,7 +82,7 @@ fn safe_user(user: &Value) -> Value {
     })
 }
 
-async fn with_meter(state: &AppState, id: i64, mut user: Value) -> Result<Value, Problem> {
+async fn with_meter(state: &AppState, id: i64, mut user: Value, revision: i64) -> Result<Value, Problem> {
     user["id"] = json!(id);
     let metered_bytes = crate::user_metered_bytes(&state.pool, id)
         .await
@@ -90,7 +91,9 @@ async fn with_meter(state: &AppState, id: i64, mut user: Value) -> Result<Value,
     cdn_quota::attach_usage(&state.pool, std::slice::from_mut(&mut user))
         .await
         .map_err(Problem::from)?;
-    Ok(safe_user(&user))
+    let mut safe = safe_user(&user);
+    safe["revision"] = json!(revision);
+    Ok(safe)
 }
 
 pub(super) async fn list(
@@ -112,7 +115,7 @@ pub(super) async fn list(
         None => 0,
     };
     let rows = sqlx::query(
-        "SELECT id,data FROM panel_records
+        "SELECT id,data,(EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision FROM panel_records
          WHERE collection='users' AND id>$1
            AND ($2::bigint[] IS NULL OR id=ANY($2))
          ORDER BY id LIMIT $3",
@@ -129,7 +132,8 @@ pub(super) async fn list(
         let id: i64 = row.try_get("id")?;
         let user: Value = row.try_get("data")?;
         last_id = id;
-        items.push(with_meter(&state, id, user).await?);
+        let revision: i64 = row.try_get("revision")?;
+        items.push(with_meter(&state, id, user, revision).await?);
     }
     let mut result = reply(json!(items));
     result.0["meta"]["limit"] = json!(limit);
@@ -145,17 +149,24 @@ pub(super) async fn get(
     State(state): State<AppState>,
     Extension(principal): Extension<ServicePrincipal>,
     Path(id): Path<i64>,
-) -> Result<Json<Value>, Problem> {
+) -> Result<Response, Problem> {
     principal.allow_scope("users:read")?;
     principal.allow_user(id)?;
-    let user = sqlx::query_scalar::<_, Value>(
-        "SELECT data FROM panel_records WHERE collection='users' AND id=$1",
+    let row = sqlx::query(
+        "SELECT data,(EXTRACT(EPOCH FROM updated_at)*1000000)::BIGINT AS revision
+         FROM panel_records WHERE collection='users' AND id=$1",
     )
     .bind(id)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))?;
-    Ok(reply(with_meter(&state, id, user).await?))
+    let user: Value = row.try_get("data")?;
+    let revision: i64 = row.try_get("revision")?;
+    let mut response = reply(with_meter(&state, id, user, revision).await?).into_response();
+    let tag = HeaderValue::from_str(&format!("\"{revision}\""))
+        .map_err(|_| Problem::unavailable())?;
+    response.headers_mut().insert(header::ETAG, tag);
+    Ok(response)
 }
 
 pub(super) async fn traffic(
