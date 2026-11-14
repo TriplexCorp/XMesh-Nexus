@@ -396,7 +396,7 @@ async fn update_account(
             tr(language, "Пользователь", "User"),
             tr(language, "продлён на", "renewed by"),
             tr(language, "дней.", "days.")
-        );
+        )
     } else {
         if !(0..=100_000).contains(&amount) {
             return Err("invalid_command");
@@ -406,7 +406,7 @@ async fn update_account(
             "{} #{id}: {} {amount} GB.",
             tr(language, "Пользователь", "User"),
             tr(language, "лимит установлен", "quota set to")
-        );
+        )
     };
     crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
     sqlx::query(
