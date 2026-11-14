@@ -174,7 +174,7 @@ fn parse_proposal(cmd: &str, arg: &str) -> Result<Proposal, &'static str> {
                 username: None,
             })
         }
-        "/quota" if (0..=100000).contains(&qty) => {
+        "/quota" if (0..=100_000).contains(&qty) => {
             let id = args[0].parse::<i64>().map_err(|_| "invalid_command")?;
             if id <= 0 {
                 return Err("invalid_command");
@@ -299,24 +299,13 @@ pub(super) async fn extra_command(
     }
 }
 
-pub(super) async fn apply_extra(
+async fn create_account(
     state: &AppState,
-    admin_id: i64,
-    nonce: Uuid,
-    row: &sqlx::postgres::PgRow,
     tx: &mut Transaction<'_, Postgres>,
+    username: &str,
+    amount: i64,
     language: Language,
 ) -> Result<(i64, String), &'static str> {
-    let action: String = row.try_get("action").map_err(|_| "database_unavailable")?;
-    let id: i64 = row.try_get("user_id").map_err(|_| "database_unavailable")?;
-    let amount: i64 = row.try_get("amount").map_err(|_| "database_unavailable")?;
-    let username: Option<String> = row
-        .try_get("username")
-        .map_err(|_| "database_unavailable")?;
-    let result_id;
-    let summary;
-    if action == "create" {
-        let username = username.as_deref().ok_or("invalid_command")?;
         if parse_proposal("/create", &format!("{username} {amount}")).is_err() {
             return Err("invalid_command");
         }
@@ -349,7 +338,7 @@ pub(super) async fn apply_extra(
         crate::protocol_credentials::provision(&mut record);
         let data = Value::Object(record);
         crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
-        result_id = sqlx::query_scalar(
+        let result_id = sqlx::query_scalar(
             "INSERT INTO panel_records(collection,data) VALUES('users',$1) RETURNING id",
         )
         .bind(data)
@@ -359,12 +348,22 @@ pub(super) async fn apply_extra(
         crate::user_subscriptions::provision_new_user(state, result_id, tx)
             .await
             .map_err(|_| "database_unavailable")?;
-        summary = format!(
+        let summary = format(
             "{} #{result_id} {}",
             tr(language, "Пользователь", "User"),
             tr(language, "создан.", "created.")
         );
-    } else {
+        Ok((result_id, summary))
+}
+
+async fn update_account(
+    tx: &mut Transaction<'_, Postgres>,
+    action: &str,
+    id: i64,
+    amount: i64,
+    language: Language,
+) -> Result<(i64, String), &'static str> {
+        let summary;
         if !matches!(action.as_str(), "renew" | "quota") || id <= 0 {
             return Err("invalid_command");
         }
@@ -401,7 +400,7 @@ pub(super) async fn apply_extra(
                 tr(language, "дней.", "days.")
             );
         } else {
-            if !(0..=100000).contains(&amount) {
+            if !(0..=100_000).contains(&amount) {
                 return Err("invalid_command");
             }
             data["limit"] = json!(amount);
@@ -421,8 +420,29 @@ pub(super) async fn apply_extra(
         .execute(&mut **tx)
         .await
         .map_err(|_| "database_unavailable")?;
-        result_id = id;
-    }
+        Ok((id, summary))
+}
+
+pub(super) async fn apply_extra(
+    state: &AppState,
+    admin_id: i64,
+    nonce: Uuid,
+    row: &sqlx::postgres::PgRow,
+    tx: &mut Transaction<'_, Postgres>,
+    language: Language,
+) -> Result<(i64, String), &'static str> {
+    let action: String = row.try_get("action").map_err(|_| "database_unavailable")?;
+    let id: i64 = row.try_get("user_id").map_err(|_| "database_unavailable")?;
+    let amount: i64 = row.try_get("amount").map_err(|_| "database_unavailable")?;
+    let username: Option<String> = row
+        .try_get("username")
+        .map_err(|_| "database_unavailable")?;
+    let (result_id, summary) = if action == "create" {
+        let username = username.as_deref().ok_or("invalid_command")?;
+        create_account(state, tx, username, amount, language).await?
+    } else {
+        update_account(tx, &action, id, amount, language).await?
+    };
     sqlx::query(
         "UPDATE telegram_admin_bot_actions SET consumed_at=NOW()
          WHERE nonce=$1::UUID AND consumed_at IS NULL",
