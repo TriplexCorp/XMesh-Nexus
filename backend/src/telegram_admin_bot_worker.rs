@@ -492,7 +492,6 @@ async fn handle_extra_confirmation(
         ]),
     )
     .await?;
-    return Ok(());
     Ok(())
 }
 
