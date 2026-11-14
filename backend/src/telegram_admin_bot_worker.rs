@@ -612,8 +612,9 @@ async fn handle_command(
     }
     match cmd {
         "/start"|"/menu" => home(api,chat).await,
-        "/help" => api.send(chat,
+        "/help" => api.send(chat,locale::tr(api.language,
             "Команды:\n/start — меню\n/stats — сводка\n/users — пользователи\n/nodes — ноды\n/squads — сквады\n/find имя — поиск\n/findtg ID — поиск по Telegram ID\n/user ID — карточка\n/create имя 30 — создать на 30 дней\n/renew ID 30 — продлить на 30 дней\n/quota ID 50 — лимит 50 ГБ (0 — безлимит)\n/language — выбрать язык\n\nВсе изменения требуют подтверждения.",
+            "Commands:\n/start — menu\n/stats — overview\n/users — users\n/nodes — nodes\n/squads — squads\n/find username — search\n/findtg ID — Telegram ID lookup\n/user ID — user card\n/create username 30 — create for 30 days\n/renew ID 30 — extend by 30 days\n/quota ID 50 — 50 GB quota (0 = unlimited)\n/language — select language\n\nAll changes require explicit confirmation."),
             menu_buttons()).await,
         "/stats" => stats(api,state,chat).await,
         "/users" => users(api,state,chat).await,
