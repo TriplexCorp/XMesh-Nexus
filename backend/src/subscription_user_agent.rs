@@ -9,6 +9,9 @@ pub enum Device {
     Auto,
     Ios,
     Windows,
+    Android,
+    Macos,
+    Linux,
 }
 
 impl Device {
@@ -17,6 +20,9 @@ impl Device {
             Self::Auto => "auto",
             Self::Ios => "ios",
             Self::Windows => "windows",
+            Self::Android => "android",
+            Self::Macos => "macos",
+            Self::Linux => "linux",
         }
     }
 }
@@ -81,17 +87,19 @@ pub fn detect(headers: &HeaderMap) -> Client {
         || has_agent_token(&ua, "ios")
         || ua.contains("cfnetwork");
     let windows = ua.contains("windows") || ua.contains("win64") || ua.contains("win32");
-    let other_os = ua.contains("android")
-        || ua.contains("linux")
-        || ua.contains("macintosh")
-        || ua.contains("mac os x")
-        || ua.contains("darwin");
+    let android = ua.contains("android");
+    let macos = ua.contains("macintosh") || ua.contains("mac os x") || ua.contains("darwin");
+    let linux = ua.contains("linux") && !android;
     let device = if ios {
         Device::Ios
     } else if windows {
         Device::Windows
-    } else if other_os {
-        Device::Auto
+    } else if android {
+        Device::Android
+    } else if macos {
+        Device::Macos
+    } else if linux {
+        Device::Linux
     } else if streisand || shadowrocket {
         Device::Ios
     } else if v2rayn {
@@ -175,7 +183,10 @@ pub fn negotiate(
         selected.device = match device.to_ascii_lowercase().as_str() {
             "ios" => Device::Ios,
             "windows" => Device::Windows,
-            "auto" | "android" | "macos" | "linux" => Device::Auto,
+            "auto" => Device::Auto,
+            "android" => Device::Android,
+            "macos" => Device::Macos,
+            "linux" => Device::Linux,
             _ => return Err("Неподдерживаемый профиль устройства"),
         }
     }
