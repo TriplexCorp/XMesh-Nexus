@@ -306,54 +306,54 @@ async fn create_account(
     amount: i64,
     language: Language,
 ) -> Result<(i64, String), &'static str> {
-        if parse_proposal("/create", &format!("{username} {amount}")).is_err() {
-            return Err("invalid_command");
-        }
-        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
-            .bind(username.to_lowercase())
-            .execute(&mut **tx)
-            .await
-            .map_err(|_| "database_unavailable")?;
-        let duplicate: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users'
+    if parse_proposal("/create", &format!("{username} {amount}")).is_err() {
+        return Err("invalid_command");
+    }
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(username.to_lowercase())
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| "database_unavailable")?;
+    let duplicate: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users'
              AND LOWER(data->>'username')=LOWER($1))",
-        )
-        .bind(username)
-        .fetch_one(&mut **tx)
+    )
+    .bind(username)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    if duplicate {
+        return Err("duplicate_username");
+    }
+    let now = crate::telegram_admin_bot::now_ms();
+    let expire = now
+        .checked_add(amount.checked_mul(86_400_000).ok_or("invalid_command")?)
+        .ok_or("invalid_command")?;
+    let mut record = Map::new();
+    record.insert("username".into(), json!(username));
+    record.insert("hold".into(), json!(false));
+    record.insert("expireAt".into(), json!(expire));
+    record.insert("limit".into(), json!(0));
+    record.insert("used".into(), json!(0));
+    crate::protocol_credentials::provision(&mut record);
+    let data = Value::Object(record);
+    crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
+    let result_id = sqlx::query_scalar(
+        "INSERT INTO panel_records(collection,data) VALUES('users',$1) RETURNING id",
+    )
+    .bind(data)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    crate::user_subscriptions::provision_new_user(state, result_id, tx)
         .await
         .map_err(|_| "database_unavailable")?;
-        if duplicate {
-            return Err("duplicate_username");
-        }
-        let now = crate::telegram_admin_bot::now_ms();
-        let expire = now
-            .checked_add(amount.checked_mul(86_400_000).ok_or("invalid_command")?)
-            .ok_or("invalid_command")?;
-        let mut record = Map::new();
-        record.insert("username".into(), json!(username));
-        record.insert("hold".into(), json!(false));
-        record.insert("expireAt".into(), json!(expire));
-        record.insert("limit".into(), json!(0));
-        record.insert("used".into(), json!(0));
-        crate::protocol_credentials::provision(&mut record);
-        let data = Value::Object(record);
-        crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
-        let result_id = sqlx::query_scalar(
-            "INSERT INTO panel_records(collection,data) VALUES('users',$1) RETURNING id",
-        )
-        .bind(data)
-        .fetch_one(&mut **tx)
-        .await
-        .map_err(|_| "database_unavailable")?;
-        crate::user_subscriptions::provision_new_user(state, result_id, tx)
-            .await
-            .map_err(|_| "database_unavailable")?;
-        let summary = format(
-            "{} #{result_id} {}",
-            tr(language, "Пользователь", "User"),
-            tr(language, "создан.", "created.")
-        );
-        Ok((result_id, summary))
+    let summary = format(
+        "{} #{result_id} {}",
+        tr(language, "Пользователь", "User"),
+        tr(language, "создан.", "created."),
+    );
+    Ok((result_id, summary))
 }
 
 async fn update_account(
@@ -363,64 +363,63 @@ async fn update_account(
     amount: i64,
     language: Language,
 ) -> Result<(i64, String), &'static str> {
-        let summary;
-        if !matches!(action.as_str(), "renew" | "quota") || id <= 0 {
+    let summary;
+    if !matches!(action.as_str(), "renew" | "quota") || id <= 0 {
+        return Err("invalid_command");
+    }
+    let db =
+        sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(|_| "database_unavailable")?;
+    let Some(db) = db else {
+        return Err("user_not_found");
+    };
+    let mut data: Value = db.try_get("data").map_err(|_| "database_unavailable")?;
+    if action == "renew" {
+        if !(1..=3650).contains(&amount) || data.get("hold") == Some(&Value::Bool(true)) {
             return Err("invalid_command");
         }
-        let db = sqlx::query(
-            "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE",
-        )
-        .bind(id)
-        .fetch_optional(&mut **tx)
-        .await
-        .map_err(|_| "database_unavailable")?;
-        let Some(db) = db else {
-            return Err("user_not_found");
-        };
-        let mut data: Value = db.try_get("data").map_err(|_| "database_unavailable")?;
-        if action == "renew" {
-            if !(1..=3650).contains(&amount) || data.get("hold") == Some(&Value::Bool(true)) {
-                return Err("invalid_command");
-            }
-            // Do not implicitly turn a lifetime account into an expiring account.
-            let old = data
-                .get("expireAt")
-                .and_then(Value::as_i64)
-                .filter(|v| *v > 0)
-                .ok_or("nonexpiring_user")?;
-            let new = old
-                .max(crate::telegram_admin_bot::now_ms())
-                .checked_add(amount.checked_mul(86_400_000).ok_or("invalid_command")?)
-                .ok_or("invalid_command")?;
-            data["expireAt"] = json!(new);
-            summary = format!(
-                "{} #{id} {} {amount} {}",
-                tr(language, "Пользователь", "User"),
-                tr(language, "продлён на", "renewed by"),
-                tr(language, "дней.", "days.")
-            );
-        } else {
-            if !(0..=100_000).contains(&amount) {
-                return Err("invalid_command");
-            }
-            data["limit"] = json!(amount);
-            summary = format!(
-                "{} #{id}: {} {amount} GB.",
-                tr(language, "Пользователь", "User"),
-                tr(language, "лимит установлен", "quota set to")
-            );
+        // Do not implicitly turn a lifetime account into an expiring account.
+        let old = data
+            .get("expireAt")
+            .and_then(Value::as_i64)
+            .filter(|v| *v > 0)
+            .ok_or("nonexpiring_user")?;
+        let new = old
+            .max(crate::telegram_admin_bot::now_ms())
+            .checked_add(amount.checked_mul(86_400_000).ok_or("invalid_command")?)
+            .ok_or("invalid_command")?;
+        data["expireAt"] = json!(new);
+        summary = format!(
+            "{} #{id} {} {amount} {}",
+            tr(language, "Пользователь", "User"),
+            tr(language, "продлён на", "renewed by"),
+            tr(language, "дней.", "days.")
+        );
+    } else {
+        if !(0..=100_000).contains(&amount) {
+            return Err("invalid_command");
         }
-        crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
-        sqlx::query(
-            "UPDATE panel_records SET data=$2,updated_at=NOW()
+        data["limit"] = json!(amount);
+        summary = format!(
+            "{} #{id}: {} {amount} GB.",
+            tr(language, "Пользователь", "User"),
+            tr(language, "лимит установлен", "quota set to")
+        );
+    }
+    crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
+    sqlx::query(
+        "UPDATE panel_records SET data=$2,updated_at=NOW()
              WHERE collection='users' AND id=$1",
-        )
-        .bind(id)
-        .bind(data)
-        .execute(&mut **tx)
-        .await
-        .map_err(|_| "database_unavailable")?;
-        Ok((id, summary))
+    )
+    .bind(id)
+    .bind(data)
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    Ok((id, summary))
 }
 
 pub(super) async fn apply_extra(
