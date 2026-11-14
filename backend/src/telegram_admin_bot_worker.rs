@@ -797,20 +797,8 @@ async fn handle_callback(
             return create_confirmation(api, state, chat, admin_id, action, id).await;
         }
     }
-    // Telegram callback_data is limited to 64 bytes: UUID + page or squad ID
-    // is intentionally compact. Always bind it to the originating admin and
-    // an unexpired PostgreSQL picker, never trust a raw callback squad ID.
-    if let Some(raw) = data.strip_prefix("v:cp:")
-        && let Some((nonce, page)) = raw.rsplit_once(':')
-        && let (Ok(nonce), Ok(page)) = (Uuid::parse_str(nonce), page.parse::<i64>())
-    {
-        return commands::create_squad_picker(api, state, chat, admin_id, nonce, page).await;
-    }
-    if let Some(raw) = data.strip_prefix("v:cs:")
-        && let Some((nonce, squad_id)) = raw.rsplit_once(':')
-        && let (Ok(nonce), Ok(squad_id)) = (Uuid::parse_str(nonce), squad_id.parse::<i64>())
-    {
-        return commands::select_create_squad(api, state, chat, admin_id, nonce, squad_id).await;
+    if let Some(result) = commands::create_picker_callback(api, state, chat, admin_id, data).await {
+        return result;
     }
     if let Some(nonce) = data.strip_prefix("x:") {
         return consume_confirmation(api, state, chat, admin_id, nonce).await;
