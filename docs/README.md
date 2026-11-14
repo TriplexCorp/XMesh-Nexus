@@ -29,6 +29,8 @@ The dated [Development Checkpoint — 2026-10-31](DEVELOPMENT_CHECKPOINT_2026-10
 | [AUTONOMOUS_NODES.md](AUTONOMOUS_NODES.md) | Managed node/Agent operational model |
 | [DEVELOPMENT_CHECKPOINT_2026-10-31.md](DEVELOPMENT_CHECKPOINT_2026-10-31.md) | Current UX/security/config invariants that future development must preserve |
 | [UI_SYSTEM.md](UI_SYSTEM.md) | Authoritative Design System v3 contract: three system CSS owners, scoped feature composition, explicit markup semantics and regression rules |
+| [telegram-admin-bot.md](telegram-admin-bot.md) | Built-in owner-managed Telegram admin bot: setup, allowlist, safe commands and connection diagnostics |
+| [integrations/README.md](integrations/README.md) | Separate, incrementally released external Integration API v1: implemented routes vs OpenAPI contract |
 | [ENTERPRISE_ROADMAP.md](ENTERPRISE_ROADMAP.md) | Current engineering/release roadmap and readiness boundaries |
 
 ## Xray configuration
@@ -94,7 +96,7 @@ When a product contract changes:
 
 - update the subsystem documentation in the same PR;
 - update [DEVELOPMENT_CHECKPOINT_2026-10-31.md](DEVELOPMENT_CHECKPOINT_2026-10-31.md) or replace it with a newer dated checkpoint when the old one becomes stale;
-- for panel UI changes, preserve the [UI System contract](UI_SYSTEM.md): the three system modules own shared tokens, materials, controls and shell; scoped feature CSS owns page/editor composition; renderers declare workspace and surface roles explicitly (the historical `ui-builder.js` was removed);
+- for panel UI changes, preserve the [UI System contract](UI_SYSTEM.md): the three system modules own shared tokens, materials, controls and shell; scoped feature CSS owns page/editor composition (without global selectors that shrink unrelated native dialogs); renderers declare workspace and surface roles explicitly (the historical `ui-builder.js` was removed);
 - update README feature claims if user-visible behavior changed;
 - keep installation ports/dependencies synchronized with `install.sh` and `compose.yaml`;
 - preserve the single-public-443 invariant unless an explicit replacement architecture is reviewed;

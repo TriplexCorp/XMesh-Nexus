@@ -486,7 +486,7 @@ Those boundaries are intentional. The project aims to make state and evidence ex
 
 ---
 
-## Integration API v1 contract (RFC; not yet implemented)
+## Integration API v1 (partially released; full contract still RFC)
 
 **Purpose:** XMesh Nexus is a universal VPN control plane, not a shop, payment
 processor, Telegram bot, or subscription reseller. Any trusted external client
@@ -494,14 +494,17 @@ processor, Telegram bot, or subscription reseller. Any trusted external client
 versioned API. Marzban/RemnaWave compatibility may be offered through adapters,
 but must not define Nexus's internal data model.
 
-**Implementation status (2026-11-13):** This section describes the desired
-contract, **not live endpoints**. The existing administrator API is available at
-`/api/v1/collections/*`, `/api/v1/users/{id}/subscription` and related routes.
-Those routes use an interactive, cookie-authenticated administrator session.
-There is no general-purpose integration Bearer token, idempotent entitlement
-grant, verified Telegram linking, or production event-delivery outbox yet.
-The legacy `tokens` collection is explicitly disabled. Do not give a bot an
-owner's username, password, or browser session cookie.
+**Implementation status:** The service-token core, idempotent entitlement grants,
+selected user mutations/quotas, squad/node catalog operations and scoped
+Telegram-ID lookup/assignment are implemented under `/api/v1/integrations/`.
+They require dedicated scoped Bearer tokens: do not supply an administrator
+cookie or database credentials. The complete 76-operation OpenAPI contract
+is **not** yet fully implemented; notably, verified Telegram ownership and
+transactional event webhook delivery are not available. The panel also
+has an independent [built-in owner-managed Telegram admin bot](telegram-admin-bot.md),
+configured under System → Telegram bot; it is not the same thing as an
+external Integration API service token. See [current API release map](integrations/README.md)
+for the supported subset and security boundaries.
 
 ### Product ownership: one source of truth per kind of data
 
@@ -522,8 +525,8 @@ reference only, to make a requested entitlement grant idempotent.
 All *new* integration endpoints live beneath `/api/v1/integrations/`. Existing
 administrative and node-agent endpoints continue working unchanged and are
 **not** exposed with integration credentials by default. A dedicated token
-administration UI/API, accessible to the **owner** via normal MFA/session, will
-manage the integration credentials. Every new API release requires an
+administration API, accessible to the **owner** via normal MFA/session,
+manages the released integration credentials. Every new API release requires an
 OpenAPI 3.1 schema generated or checked against actual registered handlers;
 schema-first design does **not** imply a route already exists.
 
