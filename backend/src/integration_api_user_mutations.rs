@@ -377,9 +377,21 @@ pub(super) async fn patch(
     matches_revision(&headers, revision)?;
     let mut user: Value = row.try_get("data")?;
     apply_patch(&mut user, &body)?;
-    references(&mut tx, object(&body, &[
-        "username", "limitGb", "cdnLimitGb", "squadIds", "templateId", "note",
-    ])?).await?;
+    references(
+        &mut tx,
+        object(
+            &body,
+            &[
+                "username",
+                "limitGb",
+                "cdnLimitGb",
+                "squadIds",
+                "templateId",
+                "note",
+            ],
+        )?,
+    )
+    .await?;
     if body.get("username").is_some() {
         // Coordinate service-side renames with service-side user creation.
         // Compare the normalized saved name, not untrusted whitespace in input.
