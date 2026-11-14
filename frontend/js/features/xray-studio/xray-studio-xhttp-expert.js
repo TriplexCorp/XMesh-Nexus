@@ -77,12 +77,81 @@
    option('session','Session ID','Placement, key, table и length.'),
    option('sequence','Sequence','Placement и key для packet sequencing.'),
    option('uplink','Uplink request','HTTP method, data placement/key и chunk size.'),
+   option('device','Профили устройств · iOS / Android / Desktop','XMUX и режимы для разных ОС. Настройки меняют только клиентские подписки.'),
    option('generate','Чистый server preset','Документированный preset без client-only полей.')
   ];
   if(mode==='packet-up'||mode==='auto')choices.push(option('packet','PACKET-UP · server','scMaxEachPostBytes и scMaxBufferedPosts.'));
   if(mode==='stream-up'||mode==='auto')choices.push(option('stream','STREAM-UP · server','scStreamUpServerSecs.'));
   choices.push(option('server','Server response / limits','noSSEHeader и serverMaxHeaderBytes.'),option('advanced','Строгий server JSON','Полный SplitHTTPConfig с role/mode validation.'));
   const action=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · expert server inbound',description:'Поля соответствуют актуальному SplitHTTPConfig Xray-core. Client-only параметры намеренно не предлагаются.',confirmLabel:'Открыть',selectFirst:false,fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]});if(!action)return;
+
+  if(action.action==='device'){
+   const names=['iOS','Android','Windows','macOS','Linux','Auto'];
+   const presets={
+    ios:{mode:'packet-up',uplinkHTTPMethod:'POST',scMaxEachPostBytes:'131072-524288',scMinPostsIntervalMs:'10-50',
+      xmux:{maxConcurrency:0,maxConnections:'3-6',cMaxReuseTimes:0,hMaxRequestTimes:'100-300',hMaxReusableSecs:'180-600',hKeepAlivePeriod:0}},
+    desktop:{mode:'stream-up',uplinkHTTPMethod:'POST',
+      xmux:{maxConcurrency:1,maxConnections:0,cMaxReuseTimes:'64-128',hMaxRequestTimes:'600-900',hMaxReusableSecs:'1800-3000',hKeepAlivePeriod:0}},
+    neutral:{mode:'auto',uplinkHTTPMethod:'POST'},
+   };
+   const existing=sel.inbound.xmesh?.xhttpDeviceProfiles||sel.inbound.xhttpDeviceProfiles||{};
+   const choice=await ask({eyebrow:'XRAY STUDIO / XHTTP CLIENTS',title:'Профили устройств',description:'Клиентские параметры: отдельные настройки каждой ОС. Данные не попадут в серверный inbound Xray.',confirmLabel:'Настроить',fields:[
+    {name:'device',label:'Платформа',type:'select',value:'iOS',options:names.map(v=>({value:v,label:v}))},
+    {name:'preset',label:'Профиль',type:'select',value:'custom',options:[
+      {value:'custom',label:'Текущие настройки · редактировать'},
+      {value:'ios',label:'Мобильный · packet-up'},
+      {value:'desktop',label:'Универсальный · stream-up'},
+      {value:'neutral',label:'Нейтральный · auto'},
+      {value:'inherit',label:'Сбросить · наследовать из XHTTP'}]}
+   ]});if(!choice)return;
+   if(choice.preset==='inherit'){
+    commit(root,sel,ib=>{
+      if(ib.xmesh?.xhttpDeviceProfiles)delete ib.xmesh.xhttpDeviceProfiles[choice.device];
+      if(ib.xhttpDeviceProfiles)delete ib.xhttpDeviceProfiles[choice.device];
+    },'XHTTP: профиль '+choice.device+' сброшен');return;
+   }
+   const base=choice.preset==='custom'
+    ? clone(existing[choice.device]||presets.neutral)
+    : clone(presets[choice.preset]);
+   const defaults={maxConcurrency:0,maxConnections:0,cMaxReuseTimes:0,hMaxRequestTimes:0,hMaxReusableSecs:0,hKeepAlivePeriod:0};
+   const xmux=base.xmux?{...defaults,...base.xmux}:defaults;
+   const fields=[
+    {name:'mode',label:'Режим XHTTP',type:'select',value:base.mode||'auto',options:MODES.map(v=>({value:v,label:v}))},
+    {name:'method',label:'Метод uplink',type:'select',value:base.uplinkHTTPMethod||'POST',options:[{value:'POST',label:'POST'},{value:'GET',label:'GET · packet-up'}]},
+    {name:'bytes',label:'Размер одного POST · packet-up',value:String(base.scMaxEachPostBytes??''),placeholder:'131072-524288'},
+    {name:'interval',label:'Интервал POST, мс · packet-up',value:String(base.scMinPostsIntervalMs??''),placeholder:'10-50'},
+    ...['maxConcurrency','maxConnections','cMaxReuseTimes','hMaxRequestTimes','hMaxReusableSecs','hKeepAlivePeriod'].map(name=>({
+      name,label:'XMUX · '+name,value:String(xmux[name]??0),required:true
+    }))
+   ];
+   const create=v=>{
+    const out={mode:v.mode,uplinkHTTPMethod:v.method};
+    if(v.bytes.trim())out.scMaxEachPostBytes=parseRange(v.bytes,{min:1});
+    if(v.interval.trim())out.scMinPostsIntervalMs=parseRange(v.interval,{min:0});
+    const m={};
+    for(const name of Object.keys(defaults)){
+      const raw=String(v[name]??'').trim();
+      if(name==='hKeepAlivePeriod'){
+        if(!/^-?\d+$/.test(raw)||Number(raw)<-1||!Number.isSafeInteger(Number(raw)))throw Error('XMUX keepalive: -1 или целое число >= 0');
+        m[name]=Number(raw);
+      }else m[name]=parseRange(raw,{min:0});
+    }
+    if(Object.values(m).some(val=>val!==0))out.xmux=m;
+    const {mode,...advanced}=out;
+    const errors=strict().validateAdvanced(advanced,mode,'client');
+    if(errors.length)throw Error(errors[0]);
+    if(mode!=='packet-up'&&(out.scMaxEachPostBytes!=null||out.scMinPostsIntervalMs!=null))throw Error('POST tuning применим только к packet-up');
+    return out;
+   };
+   const edited=await ask({eyebrow:'XRAY STUDIO / XHTTP CLIENTS',title:'XHTTP · '+choice.device,description:'Готовый пресет можно редактировать. Конфликт XMUX maxConnections/maxConcurrency или параметры не того режима будут отклонены.',confirmLabel:'Сохранить профиль',fields,validate:v=>{try{create(v);return ''}catch(err){return err.message}}});if(!edited)return;
+   const profile=create(edited);
+   commit(root,sel,ib=>{
+     ib.xmesh??={};ib.xmesh.xhttpDeviceProfiles??={};
+     ib.xmesh.xhttpDeviceProfiles[choice.device]=profile;
+     if(ib.xhttpDeviceProfiles)delete ib.xhttpDeviceProfiles[choice.device];
+   },'XHTTP: '+choice.device+' · '+profile.mode+' сохранён');
+   return;
+  }
   if(action.action==='mode'){
    const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Режим XHTTP',description:'Смена mode удаляет несовместимые tuning-поля.',confirmLabel:'Применить',fields:[{name:'mode',label:'Mode',type:'select',wide:true,value:mode,options:MODES.map(v=>({value:v,label:v}))}]});if(!r)return;
    commit(root,sel,ib=>strict().normalizeForMode(ensure(ib),r.mode,'server'),'XHTTP mode: '+r.mode);return;
