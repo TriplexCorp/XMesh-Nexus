@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum Language { Ru, En }
 impl Language {
-    pub(super) const fn from_db(s: &str) -> Option<Self> {
+    pub(super) fn from_db(s: &str) -> Option<Self> {
         match s {"ru"=>Some(Self::Ru),"en"=>Some(Self::En),_=>None}
     }
     pub(super) const fn code(self) -> &'static str {
