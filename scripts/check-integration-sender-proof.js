@@ -27,7 +27,7 @@ assert.match(proof,/redis::cmd\("SET"\)/,'Nonce replay must be protected by Redi
 assert.match(proof,/\.arg\("NX"\)/,'Nonce must be single-use');
 assert.match(proof,/\.arg\("EX"\)/,'Nonce expiration must be bounded');
 assert.doesNotMatch(proof,/Box::leak|unwrap_unchecked/,'Proof parsing cannot leak memory or use unchecked unsafe code');
-assert.match(grant,/max_grant_days\.is_some_and/,'Per-token grant cap must apply');
+assert.match(grant,/max_grant_days\s*\.is_some_and/,'Per-token grant cap must apply');
 assert.match(create,/max_creates_per_day/,'Per-client creation cap must apply');
 assert.match(create,/FROM integration_clients WHERE id=\$1 FOR UPDATE/,'Concurrent issuance must serialize per integration client');
 assert.match(create,/completed_at > NOW\(\) - INTERVAL '24 hours'/,'Only committed issuance within 24h counts');
