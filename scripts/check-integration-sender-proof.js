@@ -15,7 +15,7 @@ const studio=read('frontend/js/features/subscriptions/subscription-studio.js');
 assert.match(migration,/ADD COLUMN proof_public_key BYTEA/,'Public proof key must be immutable on token creation');
 assert.match(migration,/max_grant_days INTEGER/,'Grant cap must be persisted');
 assert.match(migration,/max_creates_per_day INTEGER/,'Provision cap must be persisted');
-assert.match(auth,/Mutating API scopes require a sender-constrained Ed25519 proofPublicKey/,'New write tokens cannot be bearer-only');
+assert.match(auth,/All new API tokens require an Ed25519 proofPublicKey/,'New service tokens must not be bearer-only');
 assert.match(auth,/VerifyingKey::from_bytes/,'Public keys must be validated at issuance');
 assert.match(auth,/proof::constrain/,'Every protected request must carry a verified proof');
 assert.match(auth,/maxCreatesPerDay/,'Owner must see issued account caps');
