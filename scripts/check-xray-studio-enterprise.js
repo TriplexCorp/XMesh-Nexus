@@ -141,8 +141,8 @@ assert.deepEqual(dialogTitles,['Профили устройств'],
  'One click should show platform selection directly, never the expert-server catalog');
 dialogTitles.length=0;
 invokeExpert('xhttp');
-assert.deepEqual(dialogTitles,['XHTTP · expert server inbound'],
- 'The existing XHTTP server expert entry must remain unchanged');
+assert.deepEqual(dialogTitles,['XHTTP · серверные настройки'],
+ 'XHTTP server entry must open its redesigned localized editor without changing dispatch behavior');
 
 // Exercise clean/RAW XHTTP using the real capture dispatcher and complete
 // device profile save path, not just checking for a visible toolbar button.
