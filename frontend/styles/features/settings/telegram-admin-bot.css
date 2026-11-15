@@ -263,3 +263,71 @@
   .tb-heading-icon{width:33px;height:33px}
 }
 @media(prefers-reduced-motion:reduce){.tb-help-link,.tb-form-actions button,.tb-art-circle{animation:none;transition:none;transform:none}}
+
+/* 2026 control-center readability pass: real-size controls and one token focus
+   boundary. The input itself is borderless: avoid nested global focus rings. */
+.tb-workspace{max-width:none;margin-inline:0;gap:16px;font-size:14px}
+.tb-banner{min-height:184px;padding:27px clamp(24px,2.6vw,40px)}
+.tb-banner h2{font-size:clamp(25px,2.05vw,34px);margin:13px 0 9px}
+.tb-banner p{font-size:14px;line-height:1.65;max-width:740px}
+.tb-banner-bottom{margin-top:20px}
+.tb-help-link{min-height:38px;font-size:13px;padding:8px 15px}
+.tb-pill{font-size:12px;padding:9px 12px}
+.tb-metric{min-height:84px;padding:16px 18px;grid-template-columns:48px minmax(0,1fr)}
+.tb-metric-icon{width:48px;height:48px}
+.tb-metric-icon .tb-icon-svg{width:23px;height:23px}
+.tb-metric>span:not(.tb-metric-icon){font-size:13px}
+.tb-metric strong{font-size:16px}
+.tb-panel{padding:24px 26px}
+.tb-panel-head{padding-bottom:19px;margin-bottom:21px}
+.tb-panel-head h3{font-size:21px}
+.tb-panel-head p{font-size:13px}
+.tb-heading-icon{width:44px;height:44px}
+.tb-field-label{font-size:14px;margin:18px 0 10px}
+.tb-workspace .tb-token-field{
+ padding:4px 5px 4px 7px;border:1px solid var(--nx-border);
+ border-radius:12px;background:var(--nx-control-bg);
+ box-shadow:none;transition:border-color .18s,box-shadow .18s;
+}
+.tb-workspace .tb-token-field:focus-within{
+ border-color:var(--tb-accent);
+ box-shadow:0 0 0 3px color-mix(in srgb,var(--tb-accent) 14%,transparent);
+}
+.tb-workspace .tb-token-field input,
+.tb-workspace .tb-token-field input:focus,
+.tb-workspace .tb-token-field input:focus-visible{
+ display:block;height:43px;min-height:43px;min-width:0;width:100%;
+ font-size:15px;line-height:1.35;padding:0 13px;color:var(--tx);
+ border:0!important;outline:0!important;outline-offset:0!important;
+ box-shadow:none!important;background:transparent!important;
+ -webkit-appearance:none;appearance:none;
+}
+.tb-workspace .tb-token-field .tb-minor{
+ flex:none;min-height:39px;padding:9px 14px;font-size:13px;
+ border-radius:9px;
+}
+.tb-field-help{font-size:12px;line-height:1.55;margin-top:9px}
+.tb-field-head>span{font-size:12px}
+.tb-workspace textarea{min-height:107px;padding:12px 14px;font-size:14px;line-height:1.65}
+.tb-enable-row{min-height:66px;padding:13px 15px;gap:14px}
+.tb-enable-icon{width:41px;height:41px}
+.tb-enable-row strong{font-size:14px}
+.tb-enable-row small{font-size:12px}
+.tb-form-actions{gap:10px;margin-top:21px}
+.tb-form-actions button{min-height:44px;padding:11px 16px;font-size:13px}
+.tb-form-actions .tb-icon-svg{width:18px;height:18px}
+.tb-feedback{font-size:12px}
+.tb-feature{min-height:69px;padding:13px 0}
+.tb-feature-icon{width:43px;height:43px}
+.tb-feature strong{font-size:14px}
+.tb-feature p{font-size:12px;line-height:1.5}
+.tb-note-card{padding:19px 21px}
+.tb-note-card strong{font-size:14px}
+.tb-note-card p,.tb-health p{font-size:12px}
+@media(max-width:700px){
+ .tb-banner{padding:20px;min-height:0}
+ .tb-banner h2{font-size:24px}
+ .tb-status-grid{grid-template-columns:1fr}
+ .tb-panel{padding:18px}
+ .tb-form-actions button{flex:1 1 100%}
+}
