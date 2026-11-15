@@ -103,4 +103,45 @@ assert(!root.classList.contains('sv-outline-hidden'),'Show inspector');
 inspector.renderInspector(null,[],'{invalid');
 assert.equal(ids.insInbounds.textContent,'—','Invalid JSON cannot display stale counts');
 assert(/Ошибка/.test(ids.outlineStatus.textContent),'Invalid JSON is announced');
+// The visible transport toolbar shortcut must skip the expert-server catalog.
+// Exercise the actual capture-phase dispatcher, not just a text marker.
+const expertSource=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-xhttp-expert.js','utf8');
+new Function(expertSource);
+const expertEvents=[],dialogTitles=[];
+const expertWindow={
+ XMeshXhttpStrict:{normalizeForMode(){}},
+ XMeshStudioDialogs:{request:async spec=>{dialogTitles.push(spec.title);return null}},
+ addEventListener(type,listener,capture){if(type==='click')expertEvents.push({listener,capture})}
+};
+new Function('window',expertSource)(expertWindow);
+assert.equal(expertEvents.length,1,'XHTTP must register one capture handler');
+assert.equal(expertEvents[0].capture,true,'XHTTP tools must use capture before generic toolbar actions');
+const xhttpSource={value:JSON.stringify({inbounds:[{
+ tag:'vless-main',protocol:'vless',streamSettings:{network:'xhttp',xhttpSettings:{path:'/xhttp',mode:'auto'}}
+}]})};
+const expertRoot={
+ querySelector(selector){
+  if(selector==='[data-v="source"]')return xhttpSource;
+  if(selector==='[data-tool-inbound]')return {value:'0'};
+  return null;
+ }
+};
+const invokeExpert=tool=>{
+ let prevented=false,stopped=false;
+ const button={dataset:{tool},closest:selector=>selector==='#xm-studio-v4'?expertRoot:null};
+ expertEvents[0].listener({
+  target:{closest:selector=>selector.includes('[data-tool="'+tool+'"]')?button:null},
+  preventDefault(){prevented=true},
+  stopImmediatePropagation(){stopped=true}
+ });
+ assert(prevented&&stopped,tool+' shortcut must bypass the generic dispatcher');
+};
+invokeExpert('xhttp-device');
+assert.deepEqual(dialogTitles,['Профили устройств'],
+ 'One click should show platform selection directly, never the expert-server catalog');
+dialogTitles.length=0;
+invokeExpert('xhttp');
+assert.deepEqual(dialogTitles,['XHTTP · expert server inbound'],
+ 'The existing XHTTP server expert entry must remain unchanged');
+
 console.log('XRAY Studio enterprise: shell, theme, keyboard navigation, inspector safety, responsive layout and cache keys OK');
