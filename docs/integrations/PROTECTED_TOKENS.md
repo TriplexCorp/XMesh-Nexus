@@ -18,6 +18,12 @@ breaking running bots. This is a temporary backward-compatibility boundary,
 for `senderConstrained:false` and revoke/reissue those credentials.
 Do not activate destructive changes or assume that an unbound old key is safe.
 
+When all historical keys are migrated, enable
+`XMESH_INTEGRATION_REQUIRE_PROOF=true` in the Nexus deployment environment
+and redeploy the API. This **rejects all remaining unbound keys** at
+authentication time (401). Keep it `false` during the migration to avoid
+surprising production outages. Verify the token inventory before cutover.
+
 This stage uses an application-verified Ed25519 proof rather than relying on
 an untrusted forwarded mTLS certificate header. **It is not RFC 9449 DPoP and
 it is not an mTLS gateway deployment**. A future gateway may additionally
