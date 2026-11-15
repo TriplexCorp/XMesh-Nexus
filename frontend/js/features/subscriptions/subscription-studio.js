@@ -375,7 +375,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-preview" data-subscription-preview="" data-subscription-owner="demo_user" data-subscription-plan="">',
       '<header class="subscription-preview-brand">',
       '<div class="subscription-public-brand-identity">',
-      '<span data-subscription-logo-symbol="" hidden>✦</span>',
+      '<span data-subscription-logo-symbol="" hidden>'+studioGlyph('globe')+'</span>',
       '<img data-subscription-logo="" alt="" src="/favicon.svg">',
       '<div class="subscription-public-brand-copy">',
       '<b data-subscription-brand="">',
