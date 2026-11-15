@@ -15,6 +15,17 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "🔗 Подписка": "🔗 Subscription",
+    "🗑 Удалить": "🗑 Delete",
+    "🔗 Ссылка подписки": "🔗 Subscription link",
+    "🗑 Удалить пользователя": "🗑 Delete user",
+    "Ссылка недоступна: у пользователя нет восстанавливаемой HTTPS-подписки. Проверьте домен или перевыпустите ссылку в веб-панели.": "Link unavailable: the user has no recoverable HTTPS subscription. Check the domain or reissue the link in the web panel.",
+    "Это персональный секрет. Не пересылайте ссылку посторонним: любой, кто её получит, сможет открыть подписку.": "This is a personal secret. Do not share it with untrusted people: anyone holding this link can open the subscription.",
+    "Безвозвратное удаление": "Permanent deletion",
+    "Пользователь и его ссылка подписки будут удалены. Восстановить их этой кнопкой нельзя. Подтверждение действует 60 секунд и используется один раз.": "The user and their subscription link will be deleted. This cannot be undone with this button. Confirmation expires in 60 seconds and is single-use.",
+    "Удаление отменено: пользователь исчез или его имя изменилось. Откройте новую карточку и повторите действие.": "Deletion cancelled: the user no longer exists or their username changed. Open a fresh user card and try again.",
+    "✅ Пользователь удалён. Персональная подписка отозвана.": "✅ User deleted. Their personal subscription was revoked.",
+    "Команды: /start — меню /stats — сводка /users — пользователи /nodes — ноды /squads — сквады /find имя — поиск /findtg ID — поиск по Telegram ID /user ID — карточка /create имя 30 — создать на 30 дней /renew ID 30 — продлить на 30 дней /quota ID 50 — лимит 50 ГБ (0 — безлимит) /subscription ID — ссылка подписки /delete ID — удалить пользователя /language — выбрать язык Все изменения требуют подтверждения.": "Commands: /start — menu /stats — overview /users — users /nodes — nodes /squads — squads /find username — search /findtg ID — Telegram ID lookup /user ID — user card /create username 30 — create for 30 days /renew ID 30 — extend by 30 days /quota ID 50 — 50 GB quota (0 = unlimited) /subscription ID — subscription link /delete ID — delete user /language — select language All changes require explicit confirmation.",
     "🗂 Сначала создайте сквад в веб-панели. Без сквада пользователь не получит доступ.": "🗂 Create a squad in the web panel first. Without it, the user will have no access.",
     "⏳ Выбор сквада истёк. Повторите команду /create.": "⏳ Squad selection expired. Run /create again.",
     "Сквады не найдены. Проверьте сквады в веб-панели.": "No squads found. Check the web panel.",

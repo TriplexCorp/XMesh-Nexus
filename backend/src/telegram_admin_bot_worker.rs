@@ -173,6 +173,10 @@ fn menu_buttons() -> Value {
         ],
         vec![
             ("📦 Квота", "v:quota".into()),
+            ("🔗 Подписка", "v:subscription".into()),
+        ],
+        vec![
+            ("🗑 Удалить", "v:delete".into()),
             ("🌐 Язык", "v:language".into()),
         ],
         vec![("❔ Помощь", "v:help".into())],
@@ -399,6 +403,14 @@ async fn user_card(api: &BotApi, state: &AppState, chat: i64, id: i64) -> Result
                 ("⏱ Продлить", format!("v:guide:renew:{id}")),
                 ("📦 Квота", format!("v:guide:quota:{id}")),
             ],
+            vec![(
+                locale::tr(api.language, "🔗 Ссылка подписки", "🔗 Subscription link"),
+                format!("v:link:{id}"),
+            )],
+            vec![(
+                locale::tr(api.language, "🗑 Удалить пользователя", "🗑 Delete user"),
+                format!("v:ask:delete:{id}"),
+            )],
             vec![
                 ("🔄 Обновить", format!("v:user:{id}")),
                 ("🏠 Меню", "v:menu".into()),
@@ -406,6 +418,95 @@ async fn user_card(api: &BotApi, state: &AppState, chat: i64, id: i64) -> Result
         ]),
     )
     .await
+}
+
+/// Existing public link only: do not rotate a bearer credential when the
+/// administrator simply wants to copy it. Never write the URL to an audit log.
+fn valid_bot_subscription_url(url: &str) -> bool {
+    !url.is_empty() && crate::subscription_settings::safe_https_url(url)
+}
+
+async fn subscription_link(
+    api: &BotApi,
+    state: &AppState,
+    chat: i64,
+    admin_id: i64,
+    id: i64,
+) -> Result<(), &'static str> {
+    let data = match crate::user_subscriptions::service_subscription_status(state, id).await {
+        Ok(data) => data,
+        Err(err) if err.status == axum::http::StatusCode::NOT_FOUND => {
+            return api
+                .send(
+                    chat,
+                    locale::tr(api.language, "Пользователь не найден.", "User not found."),
+                    menu_buttons(),
+                )
+                .await;
+        }
+        Err(_) => return Err("database_unavailable"),
+    };
+    let Some(url) = data
+        .get("url")
+        .and_then(Value::as_str)
+        .filter(|url| valid_bot_subscription_url(url))
+    else {
+        return api.send(
+            chat,
+            locale::tr(
+                api.language,
+                "Ссылка недоступна: у пользователя нет восстанавливаемой HTTPS-подписки. Проверьте домен или перевыпустите ссылку в веб-панели.",
+                "Link unavailable: the user has no recoverable HTTPS subscription. Check the domain or reissue the link in the web panel.",
+            ),
+            buttons(vec![vec![
+                (locale::tr(api.language, "👤 Карточка", "👤 User details"), format!("v:user:{id}")),
+            ]]),
+        ).await;
+    };
+    // Log only the actor and user ID. The full bearer URL is a secret.
+    sqlx::query(
+        "INSERT INTO panel_audit_log(actor,action,collection,record_id,detail)
+         VALUES($1,'telegram_bot.subscription_link_viewed','users',$2,$3)",
+    )
+    .bind(format!("telegram:{admin_id}"))
+    .bind(id)
+    .bind(json!({"telegramAdminId":admin_id}))
+    .execute(&state.pool)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    let message = format!(
+        "{} <code>#{id}</code>\n\n<code>{}</code>\n\n{}",
+        locale::tr(
+            api.language,
+            "🔗 <b>Ссылка подписки</b>",
+            "🔗 <b>Subscription link</b>"
+        ),
+        escape(url),
+        locale::tr(
+            api.language,
+            "Это персональный секрет. Не пересылайте ссылку посторонним: любой, кто её получит, сможет открыть подписку.",
+            "This is a personal secret. Do not share it with untrusted people: anyone holding this link can open the subscription.",
+        ),
+    );
+    api.send(
+        chat,
+        &message,
+        buttons(vec![vec![
+            (
+                locale::tr(api.language, "👤 Карточка", "👤 User details"),
+                format!("v:user:{id}"),
+            ),
+            (
+                locale::tr(api.language, "🏠 Меню", "🏠 Menu"),
+                "v:menu".into(),
+            ),
+        ]]),
+    )
+    .await
+}
+
+fn valid_confirmation_action(action: &str) -> bool {
+    matches!(action, "enable" | "disable" | "delete")
 }
 
 async fn create_confirmation(
@@ -416,28 +517,72 @@ async fn create_confirmation(
     action: &str,
     user_id: i64,
 ) -> Result<(), &'static str> {
-    if !matches!(action, "enable" | "disable") || user_id <= 0 {
+    if !valid_confirmation_action(action) || user_id <= 0 {
         return Err("invalid_command");
     }
+    // Snapshot the exact username for irreversible deletion. If the record
+    // changes identity before confirmation, the transaction must fail closed.
+    let target_username = if action == "delete" {
+        let name = sqlx::query_scalar::<_, String>(
+            "SELECT data->>'username' FROM panel_records WHERE collection='users' AND id=$1",
+        )
+        .bind(user_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| "database_unavailable")?;
+        let Some(name) = name else {
+            return api
+                .send(
+                    chat,
+                    locale::tr(api.language, "Пользователь не найден.", "User not found."),
+                    menu_buttons(),
+                )
+                .await;
+        };
+        Some(name)
+    } else {
+        None
+    };
     let nonce = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO telegram_admin_bot_actions(nonce,admin_id,user_id,action,expires_at)
-         VALUES($1::UUID,$2,$3,$4,NOW()+INTERVAL '60 seconds')",
+        "INSERT INTO telegram_admin_bot_actions(nonce,admin_id,user_id,action,username,expires_at)
+         VALUES($1::UUID,$2,$3,$4,$5,NOW()+INTERVAL '60 seconds')",
     )
     .bind(nonce.to_string())
     .bind(admin_id)
     .bind(user_id)
     .bind(action)
+    .bind(target_username.as_deref())
     .execute(&state.pool)
     .await
     .map_err(|_| "database_unavailable")?;
-    let verb = if action == "enable" {
-        "включить"
-    } else {
-        "отключить"
-    };
-    let text = format!(
-        "⚠️ <b>Подтверждение действия</b>\n\nВы действительно хотите <b>{verb}</b> пользователя <code>#{user_id}</code>?\n\nПодтверждение действует 60 секунд и может быть использовано только один раз."
+    let text = target_username.map_or_else(
+        || {
+            let verb = if action == "enable" {
+                "включить"
+            } else {
+                "отключить"
+            };
+            format!(
+                "⚠️ <b>Подтверждение действия</b>\n\nВы действительно хотите <b>{verb}</b> пользователя <code>#{user_id}</code>?\n\nПодтверждение действует 60 секунд и может быть использовано только один раз."
+            )
+        },
+        |name| {
+            format!(
+                "{}\n\n<b>{}</b> · <code>#{user_id}</code>\n\n{}",
+                locale::tr(
+                    api.language,
+                    "🗑 <b>Безвозвратное удаление</b>",
+                    "🗑 <b>Permanent deletion</b>"
+                ),
+                escape(&name),
+                locale::tr(
+                    api.language,
+                    "Пользователь и его ссылка подписки будут удалены. Восстановить их этой кнопкой нельзя. Подтверждение действует 60 секунд и используется один раз.",
+                    "The user and their subscription link will be deleted. This cannot be undone with this button. Confirmation expires in 60 seconds and is single-use.",
+                ),
+            )
+        },
     );
     api.send(
         chat,
@@ -564,6 +709,66 @@ async fn apply_access_toggle(
     Ok(Some(disabled))
 }
 
+// Same user deletion semantics as the panel: subscription token cascades
+// with panel_records, while node IP rotation cursors are cleared explicitly.
+async fn delete_confirmed_user(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    admin_id: i64,
+    nonce: Uuid,
+    user_id: i64,
+    expected_username: &str,
+) -> Result<bool, &'static str> {
+    let current = sqlx::query_scalar::<_, String>(
+        "SELECT data->>'username' FROM panel_records
+         WHERE collection='users' AND id=$1 FOR UPDATE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    if current.as_deref() != Some(expected_username) {
+        return Ok(false);
+    }
+    sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE user_id=$1")
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| "database_unavailable")?;
+    let removed = sqlx::query_scalar::<_, i64>(
+        "DELETE FROM panel_records WHERE collection='users' AND id=$1 RETURNING id",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    if removed != Some(user_id) {
+        return Err("database_unavailable");
+    }
+    sqlx::query(
+        "UPDATE telegram_admin_bot_actions SET consumed_at=NOW()
+         WHERE nonce=$1::UUID AND consumed_at IS NULL",
+    )
+    .bind(nonce.to_string())
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    sqlx::query(
+        "INSERT INTO panel_audit_log(actor,action,collection,record_id,detail)
+         VALUES($1,'telegram_bot.user_deleted','users',$2,$3)",
+    )
+    .bind(format!("telegram:{admin_id}"))
+    .bind(user_id)
+    .bind(json!({
+        "telegramAdminId": admin_id,
+        "username": expected_username,
+        "operationId": nonce.to_string()
+    }))
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| "database_unavailable")?;
+    Ok(true)
+}
+
 async fn consume_confirmation(
     api: &BotApi,
     state: &AppState,
@@ -613,6 +818,42 @@ async fn consume_confirmation(
     let action: String = row.try_get("action").map_err(|_| "database_unavailable")?;
     if matches!(action.as_str(), "create" | "renew" | "quota") {
         return handle_extra_confirmation(api, state, chat, admin_id, nonce, row, tx).await;
+    }
+    if action == "delete" {
+        let snapshot: Option<String> = row
+            .try_get("username")
+            .map_err(|_| "database_unavailable")?;
+        let expected = snapshot.as_deref().ok_or("invalid_command")?;
+        if !delete_confirmed_user(&mut tx, admin_id, nonce, user_id, expected).await? {
+            drop(tx);
+            return api.send(
+                chat,
+                locale::tr(
+                    api.language,
+                    "Удаление отменено: пользователь исчез или его имя изменилось. Откройте новую карточку и повторите действие.",
+                    "Deletion cancelled: the user no longer exists or their username changed. Open a fresh user card and try again.",
+                ),
+                menu_buttons(),
+            ).await;
+        }
+        tx.commit().await.map_err(|_| "database_unavailable")?;
+        return api
+            .send(
+                chat,
+                locale::tr(
+                    api.language,
+                    "✅ Пользователь удалён. Персональная подписка отозвана.",
+                    "✅ User deleted. Their personal subscription was revoked.",
+                ),
+                buttons(vec![
+                    vec![("👥 Пользователи", "v:users".into())],
+                    vec![("🏠 Меню", "v:menu".into())],
+                ]),
+            )
+            .await;
+    }
+    if !matches!(action.as_str(), "enable" | "disable") {
+        return Err("invalid_command");
     }
     let Some(disabled) =
         apply_access_toggle(api, chat, admin_id, nonce, user_id, &action, &mut tx).await?
@@ -681,8 +922,8 @@ async fn handle_command(
     match cmd {
         "/start"|"/menu" => home(api,chat).await,
         "/help" => api.send(chat,locale::tr(api.language,
-            "Команды:\n/start — меню\n/stats — сводка\n/users — пользователи\n/nodes — ноды\n/squads — сквады\n/find имя — поиск\n/findtg ID — поиск по Telegram ID\n/user ID — карточка\n/create имя 30 — создать на 30 дней\n/renew ID 30 — продлить на 30 дней\n/quota ID 50 — лимит 50 ГБ (0 — безлимит)\n/language — выбрать язык\n\nВсе изменения требуют подтверждения.",
-            "Commands:\n/start — menu\n/stats — overview\n/users — users\n/nodes — nodes\n/squads — squads\n/find username — search\n/findtg ID — Telegram ID lookup\n/user ID — user card\n/create username 30 — create for 30 days\n/renew ID 30 — extend by 30 days\n/quota ID 50 — 50 GB quota (0 = unlimited)\n/language — select language\n\nAll changes require explicit confirmation."),
+            "Команды:\n/start — меню\n/stats — сводка\n/users — пользователи\n/nodes — ноды\n/squads — сквады\n/find имя — поиск\n/findtg ID — поиск по Telegram ID\n/user ID — карточка\n/create имя 30 — создать на 30 дней\n/renew ID 30 — продлить на 30 дней\n/quota ID 50 — лимит 50 ГБ (0 — безлимит)\n/subscription ID — ссылка подписки\n/delete ID — удалить пользователя\n/language — выбрать язык\n\nВсе изменения требуют подтверждения.",
+            "Commands:\n/start — menu\n/stats — overview\n/users — users\n/nodes — nodes\n/squads — squads\n/find username — search\n/findtg ID — Telegram ID lookup\n/user ID — user card\n/create username 30 — create for 30 days\n/renew ID 30 — extend by 30 days\n/quota ID 50 — 50 GB quota (0 = unlimited)\n/subscription ID — subscription link\n/delete ID — delete user\n/language — select language\n\nAll changes require explicit confirmation."),
             menu_buttons()).await,
         "/stats" => stats(api,state,chat).await,
         "/users" => users(api,state,chat).await,
@@ -692,13 +933,23 @@ async fn handle_command(
             Ok(id) if id>0 => user_card(api,state,chat,id).await,
             _ => api.send(chat,"Используйте <code>/user 123</code>",menu_buttons()).await
         },
+        "/subscription" | "/link" => match arg.parse::<i64>() {
+            Ok(id) if id > 0 => subscription_link(api, state, chat, admin_id, id).await,
+            _ => api.send(chat,
+                locale::tr(api.language,"Используйте <code>/subscription 123</code>","Use <code>/subscription 123</code>"),
+                menu_buttons()).await
+        },
         // No commands can change access without first issuing a short-lived
         // single-use confirmation nonce to this exact administrator.
-        "/enable"|"/disable" => match arg.parse::<i64>() {
+        "/enable"|"/disable"|"/delete" => match arg.parse::<i64>() {
             Ok(id) if id>0 => create_confirmation(
                 api,state,chat,admin_id,&cmd[1..],id
             ).await,
-            _=>api.send(chat,"Используйте <code>/disable 123</code> или <code>/enable 123</code>",menu_buttons()).await
+            _=>api.send(chat,
+                locale::tr(api.language,
+                    "Используйте <code>/enable 123</code>, <code>/disable 123</code> или <code>/delete 123</code>",
+                    "Use <code>/enable 123</code>, <code>/disable 123</code> or <code>/delete 123</code>"),
+                menu_buttons()).await
         },
         _ => api.send(chat,
             "Команды:\n/start — меню\n/stats — сводка\n/users — пользователи\n/nodes — ноды\n/find имя — поиск\n/user ID — карточка\n\nВсе изменения доступа требуют отдельного подтверждения.",
@@ -706,6 +957,10 @@ async fn handle_command(
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Keeps Telegram navigation inside a single authorized callback dispatcher"
+)]
 async fn handle_callback(
     api: &BotApi,
     state: &AppState,
@@ -738,6 +993,8 @@ async fn handle_callback(
         ("create", "/create имя 30", "/create username 30"),
         ("renew", "/renew 123 30", "/renew 123 30"),
         ("quota", "/quota 123 50", "/quota 123 50"),
+        ("subscription", "/subscription 123", "/subscription 123"),
+        ("delete", "/delete 123", "/delete 123"),
         ("findtg", "/findtg 123456789", "/findtg 123456789"),
     ] {
         if data == format!("v:{name}") {
@@ -787,6 +1044,13 @@ async fn handle_callback(
         && id > 0
     {
         return user_card(api, state, chat, id).await;
+    }
+    if let Some(id) = data
+        .strip_prefix("v:link:")
+        .and_then(|v| v.parse::<i64>().ok())
+        && id > 0
+    {
+        return subscription_link(api, state, chat, admin_id, id).await;
     }
     if let Some(other) = data.strip_prefix("v:ask:") {
         let mut parts = other.split(':');
@@ -1036,5 +1300,27 @@ mod tests {
     fn callback_names_do_not_leak_secrets() {
         assert!(!format!("{:?}", menu_buttons()).contains("bot123:"));
         assert!(Uuid::parse_str(&Uuid::new_v4().to_string()).is_ok());
+    }
+    #[test]
+    fn irreversible_actions_are_allowlisted_and_bounded() {
+        assert!(valid_confirmation_action("delete"));
+        assert!(valid_confirmation_action("enable"));
+        assert!(!valid_confirmation_action("rotate"));
+        assert!(!valid_confirmation_action("delete_all"));
+        assert!(!valid_confirmation_action("DELETE"));
+    }
+    #[test]
+    fn only_complete_https_subscription_urls_are_sent() {
+        assert!(valid_bot_subscription_url(
+            "https://sub.example.org/s/abc123"
+        ));
+        assert!(!valid_bot_subscription_url(""));
+        assert!(!valid_bot_subscription_url("/s/private"));
+        assert!(!valid_bot_subscription_url(
+            "http://sub.example.org/s/token"
+        ));
+        assert!(!valid_bot_subscription_url(
+            "https://user:pass@example.org/s/token"
+        ));
     }
 }

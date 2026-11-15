@@ -41,6 +41,8 @@ const STRINGS: &[(&str, &str)] = &[
     ("Продлить", "Renew"),
     ("продлить", "renew"),
     ("Квота", "Quota"),
+    ("Подписка", "Subscription"),
+    ("Удалить", "Delete"),
     ("Лимит трафика", "Traffic quota"),
     ("Язык", "Language"),
     ("выбрать язык", "select language"),
