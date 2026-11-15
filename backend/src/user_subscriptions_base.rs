@@ -2005,7 +2005,11 @@ fn portal_decoration(
     let legacy_logo = studio_string(settings, "subscriptionLogoUrl", "");
     let logo = portal_brand_logo(settings)
         .map(str::to_owned)
-        .or_else(|| legacy_logo.starts_with("https://").then(|| legacy_logo.to_owned()))
+        .or_else(|| {
+            legacy_logo
+                .starts_with("https://")
+                .then(|| legacy_logo.to_owned())
+        })
         .unwrap_or_else(portal_favicon);
     let logo_markup = format!(
         "<img src=\"{}\" alt=\"\" class=\"subscription-preview-logo\">",

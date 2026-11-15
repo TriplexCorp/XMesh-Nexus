@@ -235,7 +235,9 @@ fn validate_external_urls(object: &Map<String, Value>) -> Result<(), ApiError> {
             .as_str()
             .ok_or_else(|| bad("Логотип должен быть PNG-изображением."))?;
         if !valid_brand_logo(value) {
-            return Err(bad("Логотип должен быть безопасным PNG размером до 256 КБ."));
+            return Err(bad(
+                "Логотип должен быть безопасным PNG размером до 256 КБ.",
+            ));
         }
     }
 
@@ -375,10 +377,18 @@ mod tests {
             &json!({"subscriptionSupportUrl":"http://example.com"})
         ));
         assert!(accepts(&json!({"brandLogo":""})));
-        assert!(accepts(&json!({"brandLogo":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"})));
-        assert!(!accepts(&json!({"brandLogo":"data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+"})));
-        assert!(!accepts(&json!({"brandLogo":"data:image/png;base64,not-base64"})));
-        assert!(!accepts(&json!({"brandLogo":"https://example.com/logo.svg"})));
+        assert!(accepts(
+            &json!({"brandLogo":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"})
+        ));
+        assert!(!accepts(
+            &json!({"brandLogo":"data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+"})
+        ));
+        assert!(!accepts(
+            &json!({"brandLogo":"data:image/png;base64,not-base64"})
+        ));
+        assert!(!accepts(
+            &json!({"brandLogo":"https://example.com/logo.svg"})
+        ));
         assert!(accepts(&json!({"subscriptionAnnouncementEnabled": true})));
         assert!(accepts(&json!({"subscriptionAnnouncementEnabled": false})));
         assert!(!accepts(&json!({"subscriptionAnnouncementEnabled": "on"})));
