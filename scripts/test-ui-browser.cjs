@@ -1899,6 +1899,28 @@ async function main() {
       const centers=g.controls.map(r=>r.y+r.height/2);
       assert(Math.max(...centers)-Math.min(...centers)<=3,'Header controls must share a vertical axis');
       assert(Math.abs(g.usage.y+g.usage.height/2-g.identity.y-g.identity.height/2)<=3,'Usage and Xray ID must align');
+      const identityFit=await page.locator('#dlg').evaluate(dialog=>{
+        const row=dialog.querySelector('.user-identity-row'),label=row?.querySelector('span');
+        const code=row?.querySelector('.user-id-value');
+        if(!row||!label||!code)return null;
+        const original=code.textContent;
+        code.textContent='67e50000-c522-4b68-949f-14998bd46710';
+        const value=code.getBoundingClientRect(),name=label.getBoundingClientRect();
+        const range=document.createRange();range.selectNodeContents(code);
+        const ink=range.getBoundingClientRect();
+        const result={row:row.getBoundingClientRect().toJSON(),
+          value:value.toJSON(),name:name.toJSON(),ink:ink.toJSON(),
+          scrollWidth:code.scrollWidth,clientWidth:code.clientWidth,
+          labelWhiteSpace:getComputedStyle(label).whiteSpace};
+        code.textContent=original;
+        return result;
+      });
+      assert(identityFit&&identityFit.ink.width>0,'Xray ID must be visible in the user card');
+      assert(identityFit.ink.right<=identityFit.value.right+2,
+        'Full UUID must fit on one line without being truncated: '+JSON.stringify(identityFit));
+      assert(identityFit.labelWhiteSpace==='nowrap'&&identityFit.name.height<=identityFit.value.height+3,
+        'Xray ID label must not break into two lines');
+
       assert.equal(g.paneScrolls,0,'Only the shared body may scroll');
       assert(g.clientHeight>0,'Fixed-size frame must retain a scrollable content region');
       assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
@@ -1979,7 +2001,14 @@ async function main() {
       for(const key of ['acc','routing','traffic','dev','ov']){
         await page.locator(`[data-user-editor-tab="${key}"]`).click();
         const bounds=await page.locator('#dlg').boundingBox();
-        assert(Math.abs(bounds.height-g.dialog.height)<=1&&Math.abs(bounds.y-g.dialog.y)<=1,'User task switching must not shift the dialog');
+        assert(bounds.y>=0&&bounds.y+bounds.height<=height+1,
+          'All user task heights must stay inside the viewport: '+JSON.stringify({key,bounds,height}));
+        if(key==='traffic') assert(bounds.height>=g.dialog.height-1,
+          'Traffic workspace should gain vertical room when its telemetry needs it');
+        if(key==='routing'||key==='dev') assert(bounds.height<=g.dialog.height+1,
+          'Shorter tasks must not inherit the tall traffic layout');
+        if(key==='ov') assert(Math.abs(bounds.height-g.dialog.height)<=1,
+          'Returning to Settings must restore its original frame height');
         assert.equal(await page.locator('[data-user-editor-pane][inert]').count(),4);
         if(key==='acc') assert.equal(await page.locator('.user-pane-access .user-heading-with-icon > svg.ic').count(),2,'Access and subscription must keep semantic Nexus icons');
         if(key==='traffic') assert.equal(await page.locator('.user-pane-insights .user-heading-with-icon > svg.ic').count(),1,'Traffic heading must use the shared SVG icon');

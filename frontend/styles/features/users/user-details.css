@@ -1695,11 +1695,53 @@ dialog.user-modal .user-pane {
  * on phones they stack without moving the dialog frame. */
 #dlg.user-modal .user-overview-band{
   display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,22rem);
+  grid-template-columns:minmax(0,1fr) minmax(28rem,33rem);
   align-items:center;
-  column-gap:.85rem;
+  column-gap:1rem;
   row-gap:.3rem;
 }
+@media(min-width:1101px){
+  #dlg.user-modal .user-overview-band>.user-usage-line:first-child{
+    flex-wrap:nowrap;
+    white-space:nowrap;
+  }
+  #dlg.user-modal .user-overview-band>.user-identity-row{
+    display:flex;
+    flex:1 1 auto;
+    max-width:none;
+    white-space:nowrap;
+  }
+  #dlg.user-modal .user-identity-row>span{
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  #dlg.user-modal .user-identity-row code{
+    min-width:0;
+    font-size:.78rem;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:clip;
+  }
+}
+/* Below 1100px, let groups occupy separate rows instead of crushing UUID.
+ * The value remains selectable and the copy action is always reachable. */
+@media (min-width:761px) and (max-width:1100px){
+  #dlg.user-modal .user-overview-band{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-modal .user-overview-band>.user-identity-row{
+    grid-column:1;
+    grid-row:3;
+    flex:1 1 auto;
+  }
+  #dlg.user-modal .user-overview-band>.user-usage-line:not(:first-child){grid-row:4}
+}
+/* Keep the five existing tabs in one strip: never fold controls onto a second line. */
+#dlg.user-modal .user-editor-tabs{
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+#dlg.user-modal .user-editor-tabs>[role=tab]{flex:0 0 auto;white-space:nowrap}
 #dlg.user-modal .user-overview-band>.user-usage-line:first-child{
   grid-column:1;
   grid-row:1;
@@ -1996,3 +2038,10 @@ dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
   #dlg.user-modal .user-node-quota-row{grid-template-columns:minmax(0,1fr)}
 }
 
+
+/* Always keep the Xray ID label, UUID and copy control on one line. At phone
+   widths the group may occupy its own overview row, never split the ID itself. */
+#dlg.user-modal .user-identity-row{flex-wrap:nowrap;max-width:100%}
+#dlg.user-modal .user-identity-row>span{flex:0 0 auto;white-space:nowrap}
+#dlg.user-modal .user-identity-row code{white-space:nowrap;min-width:0}
+#dlg.user-modal .user-identity-row .user-id-copy{flex-shrink:0}

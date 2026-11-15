@@ -107,7 +107,7 @@ dialog#dlg.node-wide>form.box{
  * shell geometry; only the shared central content area scrolls.
  * Keep the workspace bounded to useful reading width, not a stretched page. */
 dialog#dlg.user-modal{
-  --dialog-width:clamp(64rem,54vw,100rem);
+  --dialog-width:clamp(72rem,72vw,112rem);
   --modal-off:translateY(22px) scale(.972);
   box-sizing:border-box;
   width:min(var(--dialog-width),calc(100vw - 2rem));
@@ -347,9 +347,27 @@ html[data-motion=off] #dlg.user-modal::backdrop{
  * without eating the full physical screen or changing other dialogs. */
 @media(min-width:2800px) and (max-height:1300px){
   dialog#dlg.user-modal{
-    --dialog-width:78rem;
+    --dialog-width:88rem;
     zoom:1.28;
     height:min(clamp(38.5rem,70dvh,49rem),82dvh);
     block-size:min(clamp(38.5rem,70dvh,49rem),82dvh);
+  }
+}
+
+/* User workspaces have different content density. Expand content-heavy tabs,
+   but keep short Routing / Devices panes compact instead of adding dead space.
+   The body remains the sole scroll owner and the footer stays visible. */
+@media (min-width:1100px){
+  dialog#dlg.user-modal{
+    height:min(clamp(40rem,70dvh,55rem),calc(100dvh - 2rem));
+    block-size:min(clamp(40rem,70dvh,55rem),calc(100dvh - 2rem));
+  }
+  dialog#dlg.user-modal:has(.user-editor-tabs [data-user-editor-tab="traffic"][aria-selected="true"]){
+    height:min(clamp(42rem,76dvh,52rem),calc(100dvh - 2rem));
+    block-size:min(clamp(42rem,76dvh,52rem),calc(100dvh - 2rem));
+  }
+  dialog#dlg.user-modal:has(.user-editor-tabs :is([data-user-editor-tab="routing"],[data-user-editor-tab="dev"])[aria-selected="true"]){
+    height:min(clamp(38.5rem,58dvh,44rem),calc(100dvh - 2rem));
+    block-size:min(clamp(38.5rem,58dvh,44rem),calc(100dvh - 2rem));
   }
 }
