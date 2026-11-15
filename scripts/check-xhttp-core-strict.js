@@ -35,7 +35,18 @@ const auto=api.generatedProfile('auto','server');
 for(const key of ['scMaxEachPostBytes','scMinPostsIntervalMs','scMaxBufferedPosts','scStreamUpServerSecs'])
  assert(!(key in auto),`auto server preset must stay neutral and omit ${key}`);
 
-let errors=api.validateSettings({path:'/x',mode:'stream-up',extra:{scMaxEachPostBytes:'500000-1000000'}},'server');
+// No-extra is a valid Xray SplitHTTPConfig. Outer path/mode/host keys
+// MUST NOT be fed to the advanced-only validator. This is the real-world
+// failure that kept mode and path edits from reaching XRAY STUDIO's JSON.
+for(const mode of ['auto','packet-up','stream-up','stream-one']){
+ const result=api.validateSettings({path:'/xhttp',mode,host:'cdn.example.org'},'server');
+ assert.equal(result.length,0,'Ordinary XHTTP config rejected for '+mode+': '+result.join('; '));
+}
+let errors=api.validateSettings({path:'/xhttp',mode:'packet-up',xmux:{maxConnections:2}},'server');
+assert(errors.some(x=>x.includes('client-only')),'Client-only fields must remain rejected without extra');
+errors=api.validateSettings({path:'/xhttp',mode:'auto',rogue:'value'},'server');
+assert(errors.some(x=>x.includes('Неизвестный параметр')),'Unknown fields must remain rejected without extra');
+errors=api.validateSettings({path:'/x',mode:'stream-up',extra:{scMaxEachPostBytes:'500000-1000000'}},'server');
 assert(errors.some(x=>x.includes('packet-up')),'stream-up must reject packet-up tuning');
 errors=api.validateSettings({path:'/x',mode:'packet-up',extra:{scMinPostsIntervalMs:'10-20'}},'server');
 assert(errors.some(x=>x.includes('client-only')),'server inbound must reject client-only post interval');

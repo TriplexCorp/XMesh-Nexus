@@ -85,7 +85,16 @@
    let extra;try{extra=extraObject(settings)}catch(error){errors.push(error.message);return errors}
    const shadowed=[...ADVANCED_KEYS].filter(key=>own(settings,key));if(shadowed.length)errors.push(`При наличии extra эти top-level поля игнорируются Xray-core: ${shadowed.join(', ')}`);
    errors.push(...validateAdvanced(extra,mode,role));
-  }else errors.push(...validateAdvanced(settings,mode,role));
+  }else {
+   // path, host and mode are outer SplitHTTPConfig fields. Previously the
+   // entire object was passed to the advanced-only validator, rejecting every
+   // normal inbound without extra as an unknown Xray-core setting.
+   // Unknown outer fields are still rejected above; role/mode restrictions
+   // on advanced settings remain strictly enforced below.
+   const inline={};
+   for(const key of ADVANCED_KEYS)if(own(settings,key))inline[key]=settings[key];
+   errors.push(...validateAdvanced(inline,mode,role));
+  }
   return [...new Set(errors)];
  }
  function materialize(settings){let extra=extraObject(settings);for(const key of ADVANCED_KEYS){if(!own(extra,key)&&own(settings,key))extra[key]=clone(settings[key]);delete settings[key]}delete settings.h2Params;delete extra.h2Params;return extra}
