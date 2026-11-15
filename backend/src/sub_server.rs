@@ -865,6 +865,19 @@ mod tests {
         assert!(!valid_domain("sub.example.com@evil.test"));
     }
     #[test]
+    fn mirrored_server_state_is_independent_and_revocable() {
+        let first = "a".repeat(32);
+        let second = "b".repeat(32);
+        for name in [HEARTBEAT, PENDING_UPDATE, CURRENT_UPDATE, UPDATE_STATUS] {
+            assert_ne!(scoped_key(Some(&first), name), scoped_key(Some(&second), name));
+            assert_ne!(scoped_key(Some(&first), name), scoped_key(None, name));
+            assert!(scoped_key(Some(&first), name).starts_with("xmesh:sub:mirror:"));
+        }
+        assert_eq!(scoped_key(None, HEARTBEAT), HEARTBEAT);
+        assert!(valid_domain("mirror1.example.org"));
+        assert!(!valid_domain("https://evil.example.org/"));
+    }
+    #[test]
     fn agent_signature_binds_route_timestamp_nonce_and_exact_body() {
         use ed25519_dalek::{Signer, SigningKey};
         let key = SigningKey::from_bytes(&[7u8; 32]);
