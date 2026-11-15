@@ -867,7 +867,7 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
             | "/api/v1/node/restart/ack" => request.headers().contains_key("x-xmesh-signature"),
             "/api/v1/sub-server/agent/poll" | "/api/v1/sub-server/agent/report" => {
                 signed_sub_agent_request(request.headers())
-            },
+            }
             "/api/v1/sub-server/claim" | "/api/v1/node/enroll" => request
                 .headers()
                 .get(header::CONTENT_TYPE)
@@ -5204,8 +5204,14 @@ mod tests {
     fn sub_agent_signed_machine_requests_are_not_blocked_by_legacy_bearer_csrf() {
         use axum::http::{HeaderMap, HeaderValue, header};
         let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        headers.insert("x-xmesh-sub-timestamp", HeaderValue::from_static("1800000000"));
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        headers.insert(
+            "x-xmesh-sub-timestamp",
+            HeaderValue::from_static("1800000000"),
+        );
         headers.insert(
             "x-xmesh-sub-nonce",
             HeaderValue::from_static("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
@@ -5215,10 +5221,16 @@ mod tests {
             HeaderValue::from_static("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         );
         assert!(super::signed_sub_agent_request(&headers));
-        headers.insert(header::AUTHORIZATION, HeaderValue::from_static("Bearer legacy"));
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_static("Bearer legacy"),
+        );
         assert!(!super::signed_sub_agent_request(&headers));
         headers.remove(header::AUTHORIZATION);
-        headers.insert(header::COOKIE, HeaderValue::from_static("session=untrusted"));
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("session=untrusted"),
+        );
         assert!(!super::signed_sub_agent_request(&headers));
         headers.remove(header::COOKIE);
         headers.append(
