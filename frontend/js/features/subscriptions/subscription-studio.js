@@ -356,7 +356,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<p class="subscription-preview-caption">Включённое приложение отображается в каталоге, но совместимость зависит от формата подписки, транспорта и версии клиента. Один токен поддерживает ручной выбор формата через ?format=xray, links, base64, mihomo или singbox.</p>',
       '<div class="subscription-client-editor">'+clientCatalog.map(([key,label,platform,group])=>
         '<div class="subscription-client-row" data-client-row="'+key+'"><label class="subscription-client-toggle"><input type="checkbox" name="subClient_'+key+'"'+(data.subscriptionClients[key]?' checked':'')+'><span class="subscription-client-symbol">'+esc(label.slice(0,2))+'</span><span class="subscription-client-name"><b>'+esc(label)+'</b><small>'+esc(platform)+'</small><small>Формат: '+esc(clientFormats[key])+' · проверяйте транспорт</small></span></label>'+
-        '<details class="subscription-client-details"><summary>Ссылка</summary><label class="f subscription-field"><span>HTTPS-адрес установки</span><input name="subClientLink_'+key+'" type="url" maxlength="512" value="'+esc(data.subscriptionClientLinks[key]||'')+'" placeholder="https://example.com/app" autocomplete="off" spellcheck="false"><small>Необязательно. Адрес не подставляется автоматически.</small></label></details></div>'
+        '<details class="subscription-client-details"><summary>Настроить ссылку</summary><label class="f subscription-field"><span>HTTPS-адрес установки</span><input name="subClientLink_'+key+'" type="url" maxlength="512" value="'+esc(data.subscriptionClientLinks[key]||'')+'" placeholder="https://example.com/app" autocomplete="off" spellcheck="false"><small>Необязательно. Адрес не подставляется автоматически.</small></label></details></div>'
       ).join('')+'</div>',
       '<div class="subscription-custom-toolbar"><div><b>Свои приложения</b><small>Собственные названия, платформы и адреса установки</small></div><button type="button" class="gh sm" data-custom-client-add>+ Добавить приложение</button></div>',
       '<div class="subscription-client-editor" data-custom-client-editor>'+data.subscriptionCustomClients.map(client=>renderCustomClient(client)).join('')+'</div>',
@@ -636,7 +636,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<button type="button" class="gh" data-sub-flood-refresh>Обновить статистику</button></div>',
       '</section>',
       '<aside class="card subscription-sub-scope"><div class="subscription-security-note-heading">'+studioGlyph('shield')+'<strong>Безопасность шлюза</strong></div>',
-      '<p>Агент обращается к Nexus по HTTPS. Отдельный административный порт не нужен. Установщик проверяется, обновления подписываются, а данные пользователей остаются в Nexus.</p></aside>',
+      '<p>Агент сам обращается к Nexus по HTTPS. Отдельный административный порт не нужен. Установщик проверяется, обновления подписываются, а данные пользователей остаются в Nexus.</p></aside>',
       '</div></form></div>'
 
     ].join('');
@@ -1546,7 +1546,7 @@ window.XMeshSubscriptionStudio = (() => {
         const enabled=clientCatalog.filter(([id])=>d.subscriptionClients[id]);
         const customEnabled=d.subscriptionCustomClients.filter(client=>client.enabled&&client.name);
         const allEnabled=[...enabled,...customEnabled.map(client=>[client.id,client.name,client.platforms])];
-        $('[data-subscription-client-count]').textContent='Отображается: '+allEnabled.length+' из '+(clientCatalog.length+d.subscriptionCustomClients.length);
+        $('[data-subscription-client-count]').textContent='Активно '+allEnabled.length+' из '+(clientCatalog.length+d.subscriptionCustomClients.length);
         const apps=$('[data-subscription-apps]');
         apps.hidden=!d.subscriptionShowApps||!allEnabled.length;
         $('[data-subscription-apps-title]').textContent=(english?d.subscriptionAppsTitleEn:d.subscriptionAppsTitle)||appsHeading(lang);
