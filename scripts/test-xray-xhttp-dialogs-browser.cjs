@@ -120,7 +120,12 @@ const main=async()=>{
     }
     await modal(page).locator('select[name="mode"]').selectOption('packet-up');
     await modal(page).locator('.xm-studio-modal-accept').click();
-    await page.waitForFunction(()=>!document.querySelector('dialog.xm-studio-modal[open]'));
+    // Closing the native dialog resolves the modal promise; the caller then
+    // commits JSON in the next microtask. Await actual persisted state.
+    await page.waitForFunction(()=>{
+     try{return JSON.parse(document.querySelector('[data-v="source"]').value).inbounds?.[0]?.streamSettings?.xhttpSettings?.mode==='packet-up'}
+     catch{return false}
+    });
     assert.equal((await json(page)).inbounds[0].streamSettings.xhttpSettings.mode,'packet-up');
     // Nested edit then Cancel must not alter JSON.
     await openExpert(page);
@@ -132,7 +137,10 @@ const main=async()=>{
     await choose(page,'basic');
     await modal(page).locator('input[name="path"]').fill('/saved-'+lang);
     await modal(page).locator('.xm-studio-modal-accept').click();
-    await page.waitForFunction(()=>!document.querySelector('dialog.xm-studio-modal[open]'));
+    await page.waitForFunction(expected=>{
+     try{return JSON.parse(document.querySelector('[data-v="source"]').value).inbounds?.[0]?.streamSettings?.xhttpSettings?.path===expected}
+     catch{return false}
+    },'/saved-'+lang);
     assert.equal((await json(page)).inbounds[0].streamSettings.xhttpSettings.path,'/saved-'+lang);
     // Edit on a clean JSON: explicit conversion, two-step profile choice and
     // REAL strict XHTTP client validation + live, JSON-only preview.
@@ -163,7 +171,10 @@ const main=async()=>{
     assert.equal((JSON.parse(await modal(page).locator('.xm-studio-modal-preview-code').textContent())).xmesh.xhttpDeviceProfiles.iOS.xmux.maxConnections,'4-7');
     await page.evaluate(value=>window.XMeshI18n.setLanguage(value),lang);
     await modal(page).locator('.xm-studio-modal-accept').click();
-    await page.waitForFunction(()=>!document.querySelector('dialog.xm-studio-modal[open]'));
+    await page.waitForFunction(()=>{
+     try{return JSON.parse(document.querySelector('[data-v="source"]').value).inbounds?.[0]?.xmesh?.xhttpDeviceProfiles?.iOS?.xmux?.maxConnections==='4-7'}
+     catch{return false}
+    });
     const saved=await json(page),inbound=saved.inbounds[0];
     assert.equal(inbound.listen,'127.0.0.1');
     assert.equal(inbound.streamSettings.network,'xhttp');
