@@ -7,7 +7,7 @@ function request(spec={}){
   const active=document.activeElement;
   const dlg=document.createElement('dialog');
   const realityDialog=spec.eyebrow==='XRAY STUDIO / REALITY'||spec.title==='Настройка REALITY';
-  const xhttpDialog=String(spec.eyebrow||'').startsWith('XRAY STUDIO / XHTTP');
+  const xhttpDialog=String(spec.eyebrow||'').startsWith('XRAY STUDIO / XHTTP') && Boolean(spec.fields?.length);
   const hasPreview=typeof spec.preview==='function';
   dlg.className='xm-studio-modal'+(spec.fields?.some(field=>field.type==='cards')?' xm-studio-modal--cards':'')+(realityDialog?' xm-studio-modal--reality':'')+(xhttpDialog?' xm-studio-modal--xhttp':'')+(hasPreview?' xm-studio-modal--preview':'');
   dlg.setAttribute('aria-labelledby','xm-studio-modal-title');
