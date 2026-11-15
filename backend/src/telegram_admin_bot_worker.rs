@@ -556,31 +556,34 @@ async fn create_confirmation(
     .execute(&state.pool)
     .await
     .map_err(|_| "database_unavailable")?;
-    let text = if let Some(name) = target_username {
-        format!(
-            "{}\n\n<b>{}</b> · <code>#{user_id}</code>\n\n{}",
-            locale::tr(
-                api.language,
-                "🗑 <b>Безвозвратное удаление</b>",
-                "🗑 <b>Permanent deletion</b>"
-            ),
-            escape(&name),
-            locale::tr(
-                api.language,
-                "Пользователь и его ссылка подписки будут удалены. Восстановить их этой кнопкой нельзя. Подтверждение действует 60 секунд и используется один раз.",
-                "The user and their subscription link will be deleted. This cannot be undone with this button. Confirmation expires in 60 seconds and is single-use.",
-            ),
-        )
-    } else {
-        let verb = if action == "enable" {
-            "включить"
-        } else {
-            "отключить"
-        };
-        format!(
-            "⚠️ <b>Подтверждение действия</b>\n\nВы действительно хотите <b>{verb}</b> пользователя <code>#{user_id}</code>?\n\nПодтверждение действует 60 секунд и может быть использовано только один раз."
-        )
-    };
+    let text = target_username.map_or_else(
+        || {
+            let verb = if action == "enable" {
+                "включить"
+            } else {
+                "отключить"
+            };
+            format!(
+                "⚠️ <b>Подтверждение действия</b>\n\nВы действительно хотите <b>{verb}</b> пользователя <code>#{user_id}</code>?\n\nПодтверждение действует 60 секунд и может быть использовано только один раз."
+            )
+        },
+        |name| {
+            format!(
+                "{}\n\n<b>{}</b> · <code>#{user_id}</code>\n\n{}",
+                locale::tr(
+                    api.language,
+                    "🗑 <b>Безвозвратное удаление</b>",
+                    "🗑 <b>Permanent deletion</b>"
+                ),
+                escape(&name),
+                locale::tr(
+                    api.language,
+                    "Пользователь и его ссылка подписки будут удалены. Восстановить их этой кнопкой нельзя. Подтверждение действует 60 секунд и используется один раз.",
+                    "The user and their subscription link will be deleted. This cannot be undone with this button. Confirmation expires in 60 seconds and is single-use.",
+                ),
+            )
+        },
+    );
     api.send(
         chat,
         &text,
@@ -954,6 +957,10 @@ async fn handle_command(
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Keeps Telegram navigation inside a single authorized callback dispatcher"
+)]
 async fn handle_callback(
     api: &BotApi,
     state: &AppState,
