@@ -15,6 +15,25 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Свой логотип · сохраняется на сервере": "Custom logo · stored on the server",
+    "Стандартный SVG · используется, пока не загрузите свой": "Default SVG · used until you upload your own",
+    "Файл логотипа должен быть не больше 2 МБ.": "Logo file must not exceed 2 MB.",
+    "Выберите PNG, JPG, WebP или SVG.": "Choose a PNG, JPG, WebP or SVG file.",
+    "Некорректные размеры изображения.": "Invalid image dimensions.",
+    "Изображение не удалось обработать.": "Unable to process the image.",
+    "Слишком сложное изображение. Попробуйте оптимизировать логотип.": "Image is too complex. Try optimizing the logo.",
+    "Предпросмотр фирменного логотипа": "Brand logo preview",
+    "Фирменный логотип": "Brand logo",
+    "Один логотип для панели управления и страницы подписки. SVG, PNG, JPG или WebP · до 2 МБ.": "One logo for the panel and subscription page. SVG, PNG, JPG or WebP · up to 2 MB.",
+    "Загрузить изображение": "Upload image",
+    "Логотип подготовлен. Нажмите «Сохранить», чтобы применить его везде.": "Logo ready. Click Save to apply it everywhere.",
+    "Не удалось прочитать логотип.": "Unable to read the logo.",
+    "Бренд, логотип и домены сохранены": "Brand, logo and domains saved",
+    "Отдельный URL логотипа": "Separate logo URL",
+    "Необязательный старый способ. Основной логотип загружается в Настройки → Бренд и домены и имеет приоритет.": "Optional legacy method. The primary logo is uploaded in Settings → Brand and Domains and takes precedence.",
+    "Логотип должен быть PNG-изображением.": "Logo must be a PNG image.",
+    "Логотип должен быть безопасным PNG размером до 256 КБ.": "Logo must be a safe PNG image up to 256 KB.",
+
     "Создайте команду установки выше и выполните её на VPS. Агент подключится автоматически.": "Generate the installer command above and run it on the VPS. The agent will connect automatically.",
     "Ошибка проверки:": "Status check failed:",
     "Агент ранее выходил на связь. Последняя активность:": "The agent previously connected. Last seen:",
