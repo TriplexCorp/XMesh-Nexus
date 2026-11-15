@@ -37,6 +37,16 @@ assert(install.includes('--cert-identity') && install.includes('--source-digest 
   'Bind the installer to exact commit and trusted release workflow identity');
 assert(install.includes('--release-sha "$xmesh_sha"'),
   'The privileged installer must independently verify exact release commit');
+assert(install.includes('--bundle "$xmesh_dir/provenance.jsonl"'),
+  'Public Sigstore bundle must be verified offline without a GitHub login');
+assert(!install.includes('gh auth login') && !install.includes('GH_TOKEN'),
+  'A clean VPS must never need a personal GitHub credential');
+const verifierMatch=/<<'XMESH_VERIFY_BOOTSTRAP'\n([\s\S]*?)\nXMESH_VERIFY_BOOTSTRAP\n/.exec(install);
+assert(verifierMatch,'A fixed self-contained public bundle bootstrap must be present');
+const verifierSyntax=require('node:child_process').spawnSync('python3',['-c',
+  'import ast,sys; ast.parse(sys.stdin.read())'],{input:verifierMatch[1],encoding:'utf8'});
+assert.equal(verifierSyntax.status,0,
+  'The embedded no-login verifier must be valid Python: '+verifierSyntax.stderr);
 assert(!install.includes('/51d90ff15ef2a68415e23b325b3a37393b8b97b5/'),
   'Obsolete Bearer-auth installer must not be offered');
 assert(install.includes("--enroll-token-stdin <<'XMESH_ENROLL_TOKEN'"),'One-time secret must be provided through stdin');
