@@ -131,7 +131,12 @@ async fn mirror_by_id(pool: &PgPool, id: &str) -> Result<Option<MirrorRecord>, A
 fn scoped_key(mirror_id: Option<&str>, base: &str) -> String {
     mirror_id.map_or_else(
         || base.to_owned(),
-        |id| format!("xmesh:sub:mirror:{id}:{}", base.strip_prefix("xmesh:sub:").unwrap_or(base)),
+        |id| {
+            format!(
+                "xmesh:sub:mirror:{id}:{}",
+                base.strip_prefix("xmesh:sub:").unwrap_or(base)
+            )
+        },
     )
 }
 
@@ -158,7 +163,10 @@ fn unique_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     Some(first)
 }
 
-#[expect(clippy::too_many_lines, reason = "Agent authorization is kept together to audit request binding, Ed25519 verification, rate limits and nonce atomicity")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Agent authorization is kept together to audit request binding, Ed25519 verification, rate limits and nonce atomicity"
+)]
 async fn authorize(
     state: &AppState,
     headers: &HeaderMap,
@@ -319,7 +327,10 @@ pub struct Claim {
     public_key: String,
 }
 
-#[expect(clippy::too_many_lines, reason = "Single-use primary and mirror enrollment share an audited atomic claim boundary")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Single-use primary and mirror enrollment share an audited atomic claim boundary"
+)]
 pub async fn claim(
     State(state): State<AppState>,
     Json(body): Json<Claim>,
