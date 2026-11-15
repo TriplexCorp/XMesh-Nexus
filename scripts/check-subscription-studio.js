@@ -122,7 +122,8 @@ assert.match(guard,/RETRY_AFTER/,'429 responses must include Retry-After');
 assert.match(guard,/const LUA/,'Redis counters must use atomic scripts');
 assert.match(route,/subscription_flood::enforce/,'Public feed and portal paths require enforcement');
 assert.match(rust,/get\(subscription_flood::status\)/,'Owner status route must exist');
-assert.match(guard,/mode: "monitor"/,'Default must not block live customers');
+assert.match(guard,/mode: "protect"/,'Fresh deployments must actively protect subscription tokens');
+assert.match(src,/subscriptionFlood:\{enabled:true,mode:'protect',ipPerMinute:120,tokenPerMinute:30\}/,'New studio settings must default to protect mode');
 
 assert.match(view,/data-sub-public-copy/,'Address card must offer copyable link template');
 assert.match(view,/data-sub-health-copy/,'Health endpoint must be copyable');
