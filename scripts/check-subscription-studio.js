@@ -120,6 +120,8 @@ const route=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
 assert.match(guard,/MAX_TOKEN_BUCKETS_PER_MINUTE/,'Untrusted-token keys must be bounded');
 assert.match(guard,/RETRY_AFTER/,'429 responses must include Retry-After');
 assert.match(guard,/const LUA/,'Redis counters must use atomic scripts');
+assert.match(guard,/\.arg\(config\.token_per_minute\)/,'Server must enforce the exact configured token cap');
+assert.doesNotMatch(guard,/token_per_minute\.saturating_add/,'No undisclosed request allowance above the chosen cap');
 assert.match(route,/subscription_flood::enforce/,'Public feed and portal paths require enforcement');
 assert.match(rust,/get\(subscription_flood::status\)/,'Owner status route must exist');
 assert.match(guard,/mode: "protect"/,'Fresh deployments must actively protect subscription tokens');
