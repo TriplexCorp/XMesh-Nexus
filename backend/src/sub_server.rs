@@ -237,7 +237,7 @@ async fn authorize(
         // Existing primary gateway only. Mirrors always require the selector.
         (primary_key.ok_or_else(fail)?.to_owned(), None)
     };
-    let public_bytes: [u8; 32] = hex::decode(public_key)
+    let public_bytes: [u8; 32] = hex::decode(&public_key)
         .map_err(|_| fail())?
         .try_into()
         .map_err(|_| fail())?;
@@ -258,14 +258,14 @@ async fn authorize(
         &format!(
             "xmesh:sub:auth:key:{}:{}",
             now() / 60,
-            sha256_hex(public_key)
+            sha256_hex(&public_key)
         ),
         SUB_AGENT_RATE_PER_MINUTE,
     )
     .await?;
     // Atomic, expiring nonce state: even a valid intercepted signature
     // cannot be replayed, including on another agent endpoint.
-    let replay_key = format!("xmesh:sub:nonce:{}:{nonce}", sha256_hex(public_key));
+    let replay_key = format!("xmesh:sub:nonce:{}:{nonce}", sha256_hex(&public_key));
     let mut conn = state.redis.clone();
     let inserted: Option<String> = redis::cmd("SET")
         .arg(&replay_key)
@@ -348,44 +348,79 @@ pub async fn claim(
         SUB_CLAIM_GLOBAL_PER_MINUTE,
     )
     .await?;
-    let domain = current_domain(&state).await?;
-    if body.domain != domain {
-        return Err(ApiError::new(
-            StatusCode::FORBIDDEN,
-            "Домен сервера не совпадает с доменом подписок.",
-        ));
-    }
+    // Single-use enrollment is scoped to a saved gateway identity. It cannot
+    // be retargeted to an arbitrary domain, including a deleted mirror.
     let mut conn = state.redis.clone();
     let matched: Option<String> = redis::cmd("GETDEL")
-        .arg(format!(
-            "{ENROLL_PREFIX}{}",
-            sha256_hex(&body.enrollment_token)
-        ))
+        .arg(format!("{ENROLL_PREFIX}{}", sha256_hex(&body.enrollment_token)))
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
-    if matched.as_deref() != Some(domain.as_str()) {
-        return Err(ApiError::new(
-            StatusCode::UNAUTHORIZED,
-            "Код подключения истёк или уже использован.",
-        ));
+    let binding = matched.ok_or_else(|| {
+        ApiError::new(StatusCode::UNAUTHORIZED, "Код подключения истёк или уже использован.")
+    })?;
+    if let Some(id) = binding.strip_prefix(MIRROR_ENROLL_TAG) {
+        let (_, _, domain, existing_key) = mirror_by_id(&state.pool, id)
+            .await?
+            .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Зеркало удалено."))?;
+        if body.domain != domain {
+            return Err(ApiError::new(StatusCode::FORBIDDEN, "Домен зеркала не совпадает."));
+        }
+        // Reject an agent identity shared between gateways. Each VPS needs
+        // its own independent Ed25519 private key.
+        if credential(&state.pool).await?
+            .as_ref()
+            .and_then(|value| value.get("publicKey"))
+            .and_then(Value::as_str) == Some(body.public_key.as_str())
+        {
+            return Err(ApiError::new(StatusCode::CONFLICT, "Ключ уже используется основным шлюзом."));
+        }
+        if existing_key.as_deref() != Some(body.public_key.as_str()) {
+            let changed = sqlx::query(
+                "UPDATE sub_mirrors SET public_key=$1,updated_at=NOW() WHERE id=$2 AND domain=$3",
+            )
+            .bind(&body.public_key)
+            .bind(id)
+            .bind(&body.domain)
+            .execute(&state.pool)
+            .await?;
+            if changed.rows_affected() != 1 {
+                return Err(ApiError::new(StatusCode::CONFLICT, "Зеркало больше не существует."));
+            }
+        }
+        let _: i64 = redis::cmd("DEL")
+            .arg(scoped_key(Some(id), HEARTBEAT))
+            .arg(scoped_key(Some(id), PENDING_UPDATE))
+            .arg(scoped_key(Some(id), CURRENT_UPDATE))
+            .arg(scoped_key(Some(id), UPDATE_STATUS))
+            .query_async(&mut conn)
+            .await
+            .map_err(|_| backend_error())?;
+    } else {
+        let domain = current_domain(&state).await?;
+        if binding != domain || body.domain != domain {
+            return Err(ApiError::new(StatusCode::FORBIDDEN, "Домен сервера не совпадает с доменом подписок."));
+        }
+        // Prevent reusing the public signing identity of an existing mirror.
+        let mirror: Option<String> =
+            sqlx::query_scalar("SELECT id FROM sub_mirrors WHERE public_key=$1")
+                .bind(&body.public_key).fetch_optional(&state.pool).await?;
+        if mirror.is_some() {
+            return Err(ApiError::new(StatusCode::CONFLICT, "Ключ уже привязан к зеркалу."));
+        }
+        sqlx::query(
+            "INSERT INTO app_settings (key,value) VALUES ($1,$2) \
+             ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()",
+        )
+        .bind(CREDENTIAL_KEY)
+        .bind(json!({"publicKey":body.public_key,"domain":domain}))
+        .execute(&state.pool)
+        .await?;
+        let _: i64 = redis::cmd("DEL")
+            .arg(HEARTBEAT).arg(PENDING_UPDATE).arg(CURRENT_UPDATE).arg(UPDATE_STATUS)
+            .query_async(&mut conn)
+            .await.map_err(|_| backend_error())?;
     }
-    sqlx::query(
-        "INSERT INTO app_settings (key,value) VALUES ($1,$2) \
-         ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()",
-    )
-    .bind(CREDENTIAL_KEY)
-    .bind(json!({"publicKey":body.public_key,"domain":domain}))
-    .execute(&state.pool)
-    .await?;
-    // A prior agent may still have a heartbeat from its rotated token.
-    let _: i64 = redis::cmd("DEL")
-        .arg(HEARTBEAT)
-        .arg(PENDING_UPDATE)
-        .arg(CURRENT_UPDATE)
-        .query_async(&mut conn)
-        .await
-        .map_err(|_| backend_error())?;
     Ok(Json(json!({"ok":true})))
 }
 
