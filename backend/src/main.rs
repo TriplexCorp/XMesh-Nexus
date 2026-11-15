@@ -1576,6 +1576,7 @@ fn validate_settings_keys(object: &serde_json::Map<String, Value>) -> Result<(),
                 | "subscriptionDomain"
                 | "subscriptionPath"
                 | "subscriptionBrand"
+                | "brandLogo"
                 | "subscriptionAnnouncement"
                 | "subscriptionUpdateInterval"
                 | "subscriptionAnnouncementRotationHours"

@@ -1,6 +1,7 @@
 //! Validation for the live public subscription portal and client catalog.
 use crate::ApiError;
 use axum::http::StatusCode;
+use base64::Engine as _;
 use serde_json::{Map, Value};
 
 const CLIENTS: &[&str] = &[
@@ -202,7 +203,42 @@ fn validate_portal_appearance(object: &Map<String, Value>) -> Result<(), ApiErro
     Ok(())
 }
 
+/// Store only inert rasterized image data. User-provided SVGs are converted
+/// to PNG in the browser before being saved and never reach the server as XML.
+pub fn valid_brand_logo(value: &str) -> bool {
+    if value.is_empty() {
+        return true;
+    }
+    let Some(encoded) = value.strip_prefix("data:image/png;base64,") else {
+        return false;
+    };
+    if encoded.len() > 360_000 || encoded.len() % 4 != 0 {
+        return false;
+    }
+    let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(encoded) else {
+        return false;
+    };
+    if bytes.len() < 24 || bytes.len() > 256 * 1024 {
+        return false;
+    }
+    if !bytes.starts_with(b"\x89PNG\r\n\x1a\n") || &bytes[12..16] != b"IHDR" {
+        return false;
+    }
+    let width = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+    let height = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]);
+    (1..=1024).contains(&width) && (1..=1024).contains(&height)
+}
+
 fn validate_external_urls(object: &Map<String, Value>) -> Result<(), ApiError> {
+    if let Some(logo) = object.get("brandLogo") {
+        let value = logo
+            .as_str()
+            .ok_or_else(|| bad("Логотип должен быть PNG-изображением."))?;
+        if !valid_brand_logo(value) {
+            return Err(bad("Логотип должен быть безопасным PNG размером до 256 КБ."));
+        }
+    }
+
     for key in [
         "subscriptionLogoUrl",
         "subscriptionSupportUrl",
@@ -338,6 +374,11 @@ mod tests {
         assert!(!accepts(
             &json!({"subscriptionSupportUrl":"http://example.com"})
         ));
+        assert!(accepts(&json!({"brandLogo":""})));
+        assert!(accepts(&json!({"brandLogo":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"})));
+        assert!(!accepts(&json!({"brandLogo":"data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+"})));
+        assert!(!accepts(&json!({"brandLogo":"data:image/png;base64,not-base64"})));
+        assert!(!accepts(&json!({"brandLogo":"https://example.com/logo.svg"})));
         assert!(accepts(&json!({"subscriptionAnnouncementEnabled": true})));
         assert!(accepts(&json!({"subscriptionAnnouncementEnabled": false})));
         assert!(!accepts(&json!({"subscriptionAnnouncementEnabled": "on"})));

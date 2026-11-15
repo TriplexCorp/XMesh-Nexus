@@ -46,7 +46,7 @@ window.XMeshSubscriptionExperience={mount(root,options){
   quick.append(quickTitle,quickNote,quickPlatforms,quickOpen);dashboard.append(quick,serverPanel);
   const nav=el('nav','experience-shortcuts'),account=el('aside','experience-account');
   const plan=el('section','experience-plan'),owner=el('section','experience-owner');
-  const planContent=el('div','experience-plan-content'),planBadge=el('span','experience-plan-symbol','✦');
+  const planContent=el('div','experience-plan-content'),planBadge=el('span','experience-plan-symbol');
   const planLabel=el('small','experience-plan-label'),planName=el('h2','experience-plan-name'),planNote=el('p','experience-plan-note');
   planContent.append(planLabel,planName,planNote);plan.append(planBadge,planContent);
   const ownerHeading=el('div','experience-owner-heading'),ownerAvatar=el('span','experience-owner-avatar');
@@ -70,6 +70,13 @@ window.XMeshSubscriptionExperience={mount(root,options){
     if(metric&&metric.parentElement!==account)account.append(metric);
     owner.hidden=false;
     account.hidden=!metric||metric.hidden;root.classList.toggle('experience-no-account',account.hidden);
+    // Same owner-uploaded logo in the portal header and subscription plan card;
+    // live Studio previews refresh both without remounting the dashboard.
+    const sourceLogo=root.querySelector('.subscription-public-brand-identity .subscription-preview-logo, .subscription-public-brand-identity [data-subscription-logo]');
+    const markSrc=sourceLogo?.getAttribute('src')||'/favicon.svg';
+    let badgeImg=planBadge.querySelector('img');
+    if(!badgeImg){badgeImg=el('img','experience-plan-mark');badgeImg.alt='';badgeImg.decoding='async';planBadge.replaceChildren(badgeImg)}
+    if(badgeImg.getAttribute('src')!==markSrc)badgeImg.src=markSrc;
     const ownerValue=(root.dataset.subscriptionOwner||'').trim();
     const planValue=(root.dataset.subscriptionPlan||'').trim();
     planLabel.textContent=t('Ваш тариф','Your plan');

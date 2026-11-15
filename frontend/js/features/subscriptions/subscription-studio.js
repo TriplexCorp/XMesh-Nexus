@@ -291,7 +291,7 @@ window.XMeshSubscriptionStudio = (() => {
       field('subscriptionTextColor','Цвет текста',data.subscriptionTextColor,'Основной цвет надписей.',{color:true}),
       '</div>',
       '<div class="subscription-studio-heading subscription-studio-subheading"><span>✦</span><div><h3>Персонализация</h3><p>Свой логотип, заголовки и контакты.</p></div></div>',
-      field('subscriptionLogoUrl','URL логотипа',data.subscriptionLogoUrl,'Только HTTPS. Оставьте пустым для стандартной пиктограммы.',{placeholder:'https://example.com/logo.png',max:512}),
+      field('subscriptionLogoUrl','Отдельный URL логотипа',data.subscriptionLogoUrl,'Необязательный старый способ. Основной логотип загружается в Настройки → Бренд и домены и имеет приоритет.',{placeholder:'https://example.com/logo.png',max:512}),
       field('subscriptionHero','Заголовок статуса (RU)',data.subscriptionHero,'Оставьте пустым для стандартного текста.',{placeholder:'Ваша подписка активна',max:100}),
       field('subscriptionHeroEn','Заголовок статуса (EN)',data.subscriptionHeroEn,'Английский вариант. Оставьте пустым для стандартного текста.',{max:100}),
       field('subscriptionCta','Текст подключения (RU)',data.subscriptionCta,'Пустое поле — стандартный перевод.',{placeholder:'Подключить устройство',max:80}),
@@ -372,8 +372,8 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-preview" data-subscription-preview="" data-subscription-owner="demo_user" data-subscription-plan="">',
       '<header class="subscription-preview-brand">',
       '<div class="subscription-public-brand-identity">',
-      '<span data-subscription-logo-symbol="">✦</span>',
-      '<img data-subscription-logo="" alt="" hidden="">',
+      '<span data-subscription-logo-symbol="" hidden>✦</span>',
+      '<img data-subscription-logo="" alt="" src="/favicon.svg">',
       '<div class="subscription-public-brand-copy">',
       '<b data-subscription-brand="">',
       '</b>',
@@ -828,7 +828,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=262af6d1ee44',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=6a55fffe32d1'
+        '/subscription-public.css?v=4d4bfd6beeb3'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
@@ -1478,13 +1478,12 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-radius]').textContent=d.subscriptionRadius;
         $('[data-subscription-brand]').textContent=d.subscriptionBrand||settings.brand||'VPN';
         const logo=$('[data-subscription-logo]'),symbol=$('[data-subscription-logo-symbol]');
-        const logoUrl=validHttps(d.subscriptionLogoUrl)?d.subscriptionLogoUrl:'';
-        if(logoUrl){
-          if(logo.getAttribute('src')!==logoUrl)logo.src=logoUrl;
-          logo.hidden=false;symbol.hidden=true;
-        }else{
-          logo.hidden=true;logo.removeAttribute('src');symbol.hidden=false;
-        }
+        const logoUrl=typeof data.brandLogo==='string'&&
+          data.brandLogo.startsWith('data:image/png;base64,')&&data.brandLogo.length<=360022
+          ?data.brandLogo:(validHttps(d.subscriptionLogoUrl)&&d.subscriptionLogoUrl
+            ?d.subscriptionLogoUrl:'/favicon.svg');
+        if(logo.getAttribute('src')!==logoUrl)logo.src=logoUrl;
+        logo.hidden=false;symbol.hidden=true;
         $('[data-subscription-brand-note]').textContent=english?'Your subscription':'Ваша подписка';
         const dashboard=english?{
           'portal-quickstart-title':'Connect in three steps','portal-guide-copy':'Copy your link above',

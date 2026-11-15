@@ -990,7 +990,59 @@ const saveAppearanceControls=()=>{
  apply();
  syncSubscriptionTheme();
 };
-const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
+// The owner-uploaded PNG is the shared visual identity of Nexus and the
+// public subscriber portal. Never use raw SVG markup or untrusted HTML here.
+const safeBrandLogo=value=>typeof value==='string'&&
+  value.startsWith('data:image/png;base64,')&&value.length<=360022 ? value : '';
+const brandLogoSource=value=>safeBrandLogo(value)||'/favicon.svg';
+const brand=()=>{
+  $('#bn').textContent=DB.set.brand||'XMesh Nexus';
+  const mark=$('#lg'),img=document.createElement('img');
+  img.alt='';img.decoding='async';img.src=brandLogoSource(DB.set.brandLogo);
+  mark.replaceChildren(img);mark.classList.add('has-brand-image');
+  const favicon=document.querySelector('link[rel="icon"]');
+  if(favicon){
+    favicon.type=safeBrandLogo(DB.set.brandLogo)?'image/png':'image/svg+xml';
+    favicon.href=brandLogoSource(DB.set.brandLogo);
+  }
+};
+const paintBrandLogoPreview=form=>{
+  const img=form?.querySelector('[data-brand-logo-preview]');
+  const input=form?.querySelector('[name="brandLogo"]');
+  if(!img||!input)return;
+  img.src=brandLogoSource(input.value);
+  const info=form.querySelector('[data-brand-logo-state]');
+  if(info)info.textContent=safeBrandLogo(input.value)
+    ? 'Свой логотип · сохраняется на сервере'
+    : 'Стандартный SVG · используется, пока не загрузите свой';
+};
+const rasterBrandLogo=async file=>{
+  if(!file||file.size<1||file.size>2*1024*1024)
+    throw Error('Файл логотипа должен быть не больше 2 МБ.');
+  const type=file.type.toLowerCase(),name=file.name.toLowerCase();
+  if(!['image/png','image/jpeg','image/webp','image/svg+xml'].includes(type)&&
+     !/\.(png|jpe?g|webp|svg)$/.test(name))
+    throw Error('Выберите PNG, JPG, WebP или SVG.');
+  const objectUrl=URL.createObjectURL(file);
+  try{
+    const picture=new Image();picture.src=objectUrl;await picture.decode();
+    if(!picture.naturalWidth||!picture.naturalHeight||
+        picture.naturalWidth>8192||picture.naturalHeight>8192)
+      throw Error('Некорректные размеры изображения.');
+    for(const size of [512,384,256]){
+      const canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;
+      const context=canvas.getContext('2d');
+      if(!context)throw Error('Изображение не удалось обработать.');
+      const scale=Math.min(size/picture.naturalWidth,size/picture.naturalHeight);
+      const w=Math.max(1,Math.round(picture.naturalWidth*scale));
+      const h=Math.max(1,Math.round(picture.naturalHeight*scale));
+      context.drawImage(picture,Math.floor((size-w)/2),Math.floor((size-h)/2),w,h);
+      const data=canvas.toDataURL('image/png');
+      if(data.length<=360022)return data;
+    }
+    throw Error('Слишком сложное изображение. Попробуйте оптимизировать логотип.');
+  }finally{URL.revokeObjectURL(objectUrl)}
+};
 
 let T=[],cur='',RT=0;
 // The panel theme is browser-local; subscription appearance is saved via API.
@@ -5204,7 +5256,7 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Межстрочный интервал</b><small>Расстояние между строками описаний и вспомогательного текста.</small></div><div class="setting-control">${choices('lineSpacing',[['compact','Плотный'],['normal','Обычный'],['relaxed','Свободный']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Ровные цифры</b><small>Цифры одинаковой ширины для удобного сравнения показателей.</small></div><label class="sw"><input type="checkbox" id="tabular-nums" ${C.tabularNums?'checked':''} aria-label="Ровные цифры"><span></span></label></div>
     </section>
-  <div class="card" id="brand-panel" data-settings-group="general"><div class="hd"><div><h3>Бренд и домены</h3><p>Отдельные названия и домены панели управления и подписки</p></div></div><form data-k="brand" method="dialog" class="sg settings-brand-form"><div class="settings-brand-fields">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}${field({k:'subscriptionBrand',l:'Название подписки',ph:'Название вашего сервиса',h:'Название клиентского портала. Если пусто — используется название панели. Изменяется также в SUBSCRIPTION STUDIO.'},DB.set.subscriptionBrand||'')}${field({k:'subscriptionDomain',l:'Домен подписки',ph:'sub.example.com',h:'Независим от домена панели. Оформление и размещение — в SUBSCRIPTION STUDIO.'},DB.set.subscriptionDomain||'')}</div><div class="setting-actions"><button class="btn">Сохранить</button></div></form></div>
+  <div class="card" id="brand-panel" data-settings-group="general"><div class="hd"><div><h3>Бренд и домены</h3><p>Отдельные названия и домены панели управления и подписки</p></div></div><form data-k="brand" method="dialog" class="sg settings-brand-form"><div class="settings-brand-logo"><div class="settings-brand-logo-picture"><img data-brand-logo-preview alt="Предпросмотр фирменного логотипа" src="/favicon.svg"></div><div class="settings-brand-logo-body"><b>Фирменный логотип</b><small>Один логотип для панели управления и страницы подписки. SVG, PNG, JPG или WebP · до 2 МБ.</small><div class="settings-brand-logo-actions"><label class="gh settings-logo-upload">Загрузить изображение<input type="file" data-brand-logo-upload accept=".svg,.png,.jpg,.jpeg,.webp,image/svg+xml,image/png,image/jpeg,image/webp"></label><button type="button" class="gh" data-brand-logo-clear>Сбросить</button></div><small data-brand-logo-state>Стандартный SVG · используется, пока не загрузите свой</small></div><input type="hidden" name="brandLogo" value="${esc(DB.set.brandLogo||'')}"></div><div class="settings-brand-fields">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}${field({k:'subscriptionBrand',l:'Название подписки',ph:'Название вашего сервиса',h:'Название клиентского портала. Если пусто — используется название панели. Изменяется также в SUBSCRIPTION STUDIO.'},DB.set.subscriptionBrand||'')}${field({k:'subscriptionDomain',l:'Домен подписки',ph:'sub.example.com',h:'Независим от домена панели. Оформление и размещение — в SUBSCRIPTION STUDIO.'},DB.set.subscriptionDomain||'')}</div><div class="setting-actions"><button class="btn">Сохранить</button></div></form></div>
   <section class="card sg" data-settings-group="general"><div class="appearance-card-heading"><h3>Поведение панели</h3><small>Персональные параметры текущего браузера — не меняют настройки других администраторов.</small></div>
     <div class="setting-row"><div class="setting-copy"><b>Стартовая страница</b><small>Куда переходить при открытии панели без выбранного раздела.</small></div><div class="setting-control"><select id="start-page" aria-label="Стартовая страница">${[['home','Дашборд'],['statistics','Статистика'],['users','Пользователи'],['nodes','Узлы'],['hosts','Хосты'],['profiles','XRAY STUDIO'],['subscription','SUBSCRIPTION STUDIO'],['last','Последний открытый раздел']].map(([v,l])=>`<option value="${v}" ${C.startPage===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Счётчик пользователей в меню</b><small>Показывать количество пользователей рядом с разделом навигации.</small></div><label class="sw"><input type="checkbox" id="nav-counter" ${C.navCounter?'checked':''} aria-label="Счётчик пользователей в меню"><span></span></label></div>
@@ -5304,6 +5356,7 @@ async function setP(){
     </details><div class="act"><button type="button" class="btn" data-cdn-tags-save ${sessionUser?.role!=='owner'?'disabled':''}>${ic('check')} Сохранить правила CDN</button></div>
   </section>`;
   source.innerHTML=sourceHtml+cdnSettingsMarkup;
+  paintBrandLogoPreview(source.content.querySelector('form[data-k="brand"]'));
   const groups=SETTINGS_PAGES.find(([key])=>key===settingsPage)?.[4]||['general'];
   const selected=[...source.content.querySelectorAll('[data-settings-group]')]
     .filter(card=>groups.includes(card.dataset.settingsGroup))
@@ -5405,6 +5458,31 @@ function pdraw(query){
 const copyT=t=>(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Скопировано'),()=>{const i=$('#lk');i.select();document.execCommand('copy');toast('Скопировано')});
 const sel=()=>{$$('#ut tbody tr').forEach(r=>{const i=+r.dataset.id;r.classList.toggle('sel',UQ.sel.has(i));const c=$('[data-sel]',r);if(c)c.checked=UQ.sel.has(i)});const a=$('[data-sela]');if(a)a.checked=$$('#ut tbody tr').every(r=>UQ.sel.has(+r.dataset.id));drawBulk()};
 const delUsers=async ids=>{const gone=DB.users.filter(u=>[...ids].some(id=>String(id)===String(u.id)));try{for(const user of gone)await removeXrayUserFromProfiles(user);for(const id of ids)await api.remove('users',id)}catch(error){toast('Не удалось удалить пользователя: '+(error.message||'ошибка backend'));return}ids.forEach(i=>UQ.sel.delete(i));toast(`Удалено: ${ids.size}`,'Отменить',async()=>{try{if(backendReady){for(const user of gone)await api.create('users',user)}else{DB.users.push(...gone);save()}render(1);toast('Пользователи восстановлены')}catch(error){toast('Не удалось восстановить: '+error.message)}});dlg.close();render(1)};
+// Brand editor uploads are rasterized before saving: no executable SVG reaches
+// PostgreSQL, subscription mirrors, favicon or the administrator interface.
+document.addEventListener('change',async event=>{
+  if(!event.target.matches('[data-brand-logo-upload]'))return;
+  const file=event.target.files?.[0],form=event.target.closest('form[data-k="brand"]');
+  if(!file||!form)return;
+  event.target.disabled=true;
+  try{
+    const data=await rasterBrandLogo(file);
+    if(!form.isConnected)return;
+    form.querySelector('[name="brandLogo"]').value=data;
+    paintBrandLogoPreview(form);
+    toast('Логотип подготовлен. Нажмите «Сохранить», чтобы применить его везде.');
+  }catch(error){toast(error.message||'Не удалось прочитать логотип.')}
+  finally{if(event.target.isConnected){event.target.value='';event.target.disabled=false}}
+});
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-brand-logo-clear]');
+  if(!button)return;
+  const form=button.closest('form[data-k="brand"]');
+  if(!form)return;
+  event.preventDefault();
+  form.querySelector('[name="brandLogo"]').value='';
+  paintBrandLogoPreview(form);
+});
 document.addEventListener('input',e=>{
   const form=e.target.closest('form[data-k="uedit"]');
   if(!form)return;
@@ -6479,7 +6557,7 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     }catch(error){er('Не удалось добавить в сквад: '+(error.message||'ошибка API'))}
     finally{delete f.dataset.saving;if(button?.isConnected)button.disabled=false}
   }
-  else if(k=='brand'){e.preventDefault();const d=read([{k:'brand'},{k:'domain'},{k:'subscriptionBrand'},{k:'subscriptionDomain'}],f);try{await api.saveSettings(d);brand();toast('Названия и домены сохранены')}catch(err){return er(err.message)}}});
+  else if(k=='brand'){e.preventDefault();const d=read([{k:'brand'},{k:'domain'},{k:'subscriptionBrand'},{k:'subscriptionDomain'},{k:'brandLogo'}],f);try{await api.saveSettings(d);brand();toast('Бренд, логотип и домены сохранены')}catch(err){return er(err.message)}}});
 const acts2=ok=>`<div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">${ok}</button></div>`;
 $('#theme').onclick=()=>{C.theme=document.documentElement.dataset.theme=='dark'?'light':'dark';apply();syncSubscriptionTheme();if(cur=='set')render(1)};
 // Notifications must not depend on the local "runtime" variable inside nodesP().

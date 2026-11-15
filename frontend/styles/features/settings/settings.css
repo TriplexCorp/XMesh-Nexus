@@ -1031,3 +1031,28 @@ html[data-link-style=underline] .settings-workspace .settings-type-link{
   grid-template-columns:repeat(2,minmax(0,1fr));
  }
 }
+
+/* One compact identity editor for sidebar, tab icon and subscription. */
+.settings-brand-form .settings-brand-logo{
+  display:flex;align-items:center;gap:16px;min-width:0;padding:16px;margin-bottom:14px;
+  border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--nx-panel-bg) 86%,var(--a) 4%);
+}
+.settings-brand-logo-picture{
+  flex:none;display:grid;place-items:center;width:76px;height:76px;padding:8px;
+  border:1px solid var(--nx-border-strong);border-radius:18px;background:var(--nx-control-bg);
+}
+.settings-brand-logo-picture img{display:block;width:100%;height:100%;object-fit:contain;border-radius:12px}
+.settings-brand-logo-body{display:grid;gap:7px;min-width:0}
+.settings-brand-logo-body>b{font-weight:750;font-size:1rem;color:var(--tx)}
+.settings-brand-logo-body>small{color:var(--mu);font-size:.78rem;line-height:1.45}
+.settings-brand-logo-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.settings-logo-upload{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:36px;cursor:pointer;padding:8px 12px}
+.settings-logo-upload>input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.settings-logo-upload:focus-within{outline:2px solid var(--a);outline-offset:2px}
+.settings-brand-logo-actions>.gh{min-height:36px}
+.settings-brand-logo-body>[data-brand-logo-state]{font-size:.72rem}
+@media(max-width:600px){
+  .settings-brand-form .settings-brand-logo{align-items:flex-start;gap:12px;padding:12px}
+  .settings-brand-logo-picture{width:60px;height:60px;border-radius:14px}
+}
