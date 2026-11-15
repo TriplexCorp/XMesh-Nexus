@@ -603,6 +603,44 @@ pub async fn report(
 mod tests {
     use super::*;
     #[test]
+    fn signed_agent_message_rejects_tampering_and_bearer_reuse() {
+        use ed25519_dalek::{Signer, SigningKey};
+        let signer = SigningKey::from_bytes(&[8u8;32]);
+        let key = signer.verifying_key().to_bytes();
+        let token_hash = sha256_hex(&"a".repeat(64));
+        let timestamp = now();
+        let nonce = "b".repeat(32);
+        let body = br#"{"version":"0.4.0"}"#;
+        let sig = signer.sign(&signed_agent_message(
+            &token_hash, AGENT_POLL_PATH, timestamp, &nonce, body,
+        ));
+        let mut headers = HeaderMap::new();
+        headers.insert("x-xmesh-proof-ts",timestamp.to_string().parse().unwrap());
+        headers.insert("x-xmesh-proof-nonce",nonce.parse().unwrap());
+        headers.insert("x-xmesh-proof-sig",hex::encode(sig.to_bytes()).parse().unwrap());
+        assert!(verified_agent_nonce(&headers,&key,&token_hash,AGENT_POLL_PATH,body).is_ok());
+        assert!(verified_agent_nonce(&headers,&key,&token_hash,AGENT_REPORT_PATH,body).is_err());
+        assert!(verified_agent_nonce(&headers,&key,&token_hash,AGENT_POLL_PATH,br#"{"version":"0.5.0"}"#).is_err());
+        assert!(verified_agent_nonce(&headers,&key,&sha256_hex("stolen-token"),AGENT_POLL_PATH,body).is_err());
+        headers.insert("x-xmesh-proof-ts",(timestamp-120).to_string().parse().unwrap());
+        assert!(verified_agent_nonce(&headers,&key,&token_hash,AGENT_POLL_PATH,body).is_err());
+    }
+
+    #[test]
+    fn proof_key_and_header_validation_fail_closed() {
+        use ed25519_dalek::SigningKey;
+        let key = SigningKey::from_bytes(&[3u8;32]).verifying_key().to_bytes();
+        assert!(decoded_public_key(&hex::encode(key)).is_some());
+        assert!(decoded_public_key(&"GG".repeat(32)).is_none());
+        assert!(decoded_public_key("0").is_none());
+        let mut headers=HeaderMap::new();
+        headers.append("x-xmesh-proof-ts","123".parse().unwrap());
+        headers.append("x-xmesh-proof-ts","123".parse().unwrap());
+        assert!(single_proof_header(&headers,"x-xmesh-proof-ts").is_none());
+        assert!(single_proof_header(&headers,"x-xmesh-proof-nonce").is_none());
+    }
+
+    #[test]
     fn strict_token_and_domain_rules() {
         assert!(is_hex(&"a".repeat(64), 64));
         assert!(!is_hex("a;command", 64));
