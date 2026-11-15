@@ -1050,3 +1050,54 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
   .subscription-public .experience-dashboard .subscription-public-primary-action>.experience-start,
   .subscription-public .experience-dashboard .experience-quick-platforms button{transition:none}
 }
+
+
+/* Shared public page + Studio preview: controls must never leak text into neighbours.
+   Preserve the traffic donut and the real portal composition. */
+.subscription-public .experience-dashboard .subscription-public-primary-action{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) repeat(2,48px);
+  gap:8px;
+  width:100%;min-width:0;max-width:100%;
+  align-items:stretch;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>*{
+  box-sizing:border-box;min-width:0;max-width:100%;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>.experience-start{
+  grid-column:1;
+  width:100%;min-width:0;
+  overflow:hidden;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  text-align:center;
+  line-height:1.25;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>
+  :is(#connect-link,#toggle-qr,[data-subscription-copy],[data-subscription-qr]){
+  display:grid;place-items:center;
+  width:48px;max-width:48px;min-width:0;
+  padding:0;
+  font-size:0!important;line-height:0!important;
+  letter-spacing:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-indent:0;
+  flex:none;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>
+  :is(#connect-link,#toggle-qr,[data-subscription-copy],[data-subscription-qr])::before{
+  display:block;width:22px;height:22px;flex:none;
+}
+.subscription-public .experience-dashboard .subscription-public-primary-action>[hidden],
+.subscription-public .experience-dashboard .subscription-preview-quick>[hidden]{display:none!important}
+@container cabinet (max-width:520px){
+  .subscription-public .experience-dashboard .subscription-public-primary-action{
+    grid-template-columns:minmax(0,1fr) repeat(2,44px);
+    gap:6px;
+  }
+  .subscription-public .experience-dashboard .subscription-public-primary-action>
+    :is(#connect-link,#toggle-qr,[data-subscription-copy],[data-subscription-qr]){
+    width:44px;max-width:44px;
+  }
+}
