@@ -3,10 +3,12 @@
 use crate::{ApiError, AppState, audit, auth, read_settings, require_owner};
 use axum::{
     Json,
+    body::Bytes,
     extract::{Extension, State},
     http::{HeaderMap, StatusCode, header},
 };
 use rand_core::{OsRng, RngCore};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -25,6 +27,12 @@ const CREDENTIAL_KEY: &str = "sub_server_agent";
 const SUB_AGENT_RATE_PER_MINUTE: i64 = 30;
 const SUB_AUTH_GLOBAL_PER_MINUTE: i64 = 3000;
 const SUB_CLAIM_GLOBAL_PER_MINUTE: i64 = 300;
+const PROOF_PREFIX: &str = "xmesh-sub-proof-v1";
+const AGENT_POLL_PATH: &str = "/api/v1/sub-server/agent/poll";
+const AGENT_REPORT_PATH: &str = "/api/v1/sub-server/agent/report";
+const MAX_BODY_BYTES: usize = 16_384;
+const PROOF_TTL_SECONDS: u64 = 180;
+const CLOCK_SKEW_SECONDS: u64 = 60;
 const RATE_LUA: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],90) end; return n";
 
 async fn consume_budget(state: &AppState, key: &str, limit: i64) -> Result<(), ApiError> {
@@ -106,7 +114,9 @@ async fn credential(pool: &PgPool) -> Result<Option<Value>, ApiError> {
             .await?,
     )
 }
-async fn authorize(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
+async fn authorize(
+    state: &AppState, headers: &HeaderMap, path: &str, body: &[u8],
+) -> Result<(), ApiError> {
     let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Недействительный ключ XMesh Sub.");
     // A manager is a machine client. Browser cookies and forwarded identities
     // must never authenticate this admin-capable channel.
@@ -136,12 +146,6 @@ async fn authorize(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError
     )
     .await?;
     let token_hash = sha256_hex(raw);
-    consume_budget(
-        state,
-        &format!("xmesh:sub:auth:token:{minute}:{token_hash}"),
-        SUB_AGENT_RATE_PER_MINUTE,
-    )
-    .await?;
     let settings = credential(&state.pool).await?.ok_or_else(fail)?;
     let stored = settings
         .get("hash")
@@ -153,6 +157,19 @@ async fn authorize(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError
     if !bool::from(stored.as_slice().ct_eq(computed.as_slice())) {
         return Err(fail());
     }
+    if let Some(key) = settings.get("proofPublicKey").and_then(Value::as_str) {
+        let key = decoded_public_key(key).ok_or_else(fail)?;
+        verify_agent_proof(state, headers, &key, &token_hash, path, body).await?;
+    } else if std::env::var("XMESH_SUB_REQUIRE_PROOF").ok().as_deref()==Some("true") {
+        return Err(fail());
+    }
+    // A copied bearer cannot exhaust the valid agent's per-token budget.
+    consume_budget(
+        state,
+        &format!("xmesh:sub:auth:token:{minute}:{token_hash}"),
+        SUB_AGENT_RATE_PER_MINUTE,
+    )
+    .await?;
     Ok(())
 }
 
@@ -191,6 +208,67 @@ pub async fn issue_enrollment(
 pub struct Claim {
     enrollment_token: String,
     domain: String,
+    #[serde(default)]
+    proof_public_key: Option<String>,
+}
+
+fn decoded_public_key(text: &str) -> Option<[u8; 32]> {
+    if text.len() != 64 || text.bytes().any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase()) {
+        return None;
+    }
+    let bytes = hex::decode(text).ok()?;
+    let array: [u8; 32] = bytes.try_into().ok()?;
+    VerifyingKey::from_bytes(&array).ok()?;
+    Some(array)
+}
+
+fn signed_agent_message(
+    token_hash: &str, path: &str, timestamp: u64, nonce: &str, body: &[u8],
+) -> Vec<u8> {
+    let body_hash = hex::encode(Sha256::digest(body));
+    format!("{PROOF_PREFIX}\n{token_hash}\nPOST\n{path}\n{timestamp}\n{nonce}\n{body_hash}").into_bytes()
+}
+
+/// A sender-bound agent has both its long-lived pairing token and a private
+/// Ed25519 key, which is never uploaded to Nexus.
+async fn verify_agent_proof(
+    state: &AppState, headers: &HeaderMap, key: &[u8; 32],
+    token_hash: &str, path: &str, body: &[u8],
+) -> Result<(), ApiError> {
+    let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Invalid XMesh Sub request proof");
+    let value = |name| {
+        let mut values = headers.get_all(name).iter();
+        let value = values.next().and_then(|v| v.to_str().ok())?;
+        if values.next().is_some() { return None; }
+        Some(value)
+    };
+    let timestamp = value("x-xmesh-proof-ts").ok_or_else(fail)?;
+    let nonce = value("x-xmesh-proof-nonce").ok_or_else(fail)?;
+    let signature = value("x-xmesh-proof-sig").ok_or_else(fail)?;
+    let seconds: u64 = timestamp.parse().map_err(|_| fail())?;
+    if timestamp != seconds.to_string()
+        || seconds.abs_diff(now()) > CLOCK_SKEW_SECONDS
+        || nonce.len() != 32 || nonce.bytes().any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
+        || signature.len() != 128
+        || signature.bytes().any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
+    {
+        return Err(fail());
+    }
+    let signature = hex::decode(signature).map_err(|_| fail())?;
+    let signature = Signature::from_slice(&signature).map_err(|_| fail())?;
+    let verifying_key = VerifyingKey::from_bytes(key).map_err(|_| fail())?;
+    verifying_key.verify(&signed_agent_message(token_hash,path,seconds,nonce,body),&signature)
+        .map_err(|_| fail())?;
+    // Reserve the nonce only AFTER valid authentication. Reject replay across
+    // concurrent requests, restarts and distributed Nexus instances.
+    let nonce_hash = sha256_hex(nonce);
+    let mut redis = state.redis.clone();
+    let result: Option<String> = redis::cmd("SET")
+        .arg(format!("xmesh:sub:proof:v1:{token_hash}:{nonce_hash}"))
+        .arg("1").arg("NX").arg("EX").arg(PROOF_TTL_SECONDS)
+        .query_async(&mut redis).await.map_err(|_| backend_error())?;
+    if result.is_none() { return Err(fail()); }
+    Ok(())
 }
 
 pub async fn claim(
@@ -215,6 +293,13 @@ pub async fn claim(
         SUB_CLAIM_GLOBAL_PER_MINUTE,
     )
     .await?;
+    let public_key = body.proof_public_key
+        .as_deref().map(|value| decoded_public_key(value).ok_or_else(|| {
+            api_error("Invalid Ed25519 public key")
+        })).transpose()?;
+    if public_key.is_none() && std::env::var("XMESH_SUB_REQUIRE_PROOF").ok().as_deref()==Some("true") {
+        return Err(api_error("Sender-constrained enrollment is required"));
+    }
     let domain = current_domain(&state).await?;
     if body.domain != domain {
         return Err(ApiError::new(
@@ -243,7 +328,8 @@ pub async fn claim(
          ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()",
     )
     .bind(CREDENTIAL_KEY)
-    .bind(json!({"hash":sha256_hex(&token),"domain":domain}))
+    .bind(json!({"hash":sha256_hex(&token),"domain":domain,
+        "proofPublicKey":body.proof_public_key}))
     .execute(&state.pool)
     .await?;
     // A prior agent may still have a heartbeat from its rotated token.
@@ -293,6 +379,7 @@ pub async fn status(
     let configured_domain = current_domain(&state).await.unwrap_or_default();
     Ok(Json(json!({
         "enrolled":credential.is_some(),
+        "senderConstrained": credential.as_ref().and_then(|v|v.get("proofPublicKey")).and_then(Value::as_str).is_some(),
         "online":is_online,
         "domain":domain,
         "domainMatches":domain==configured_domain,
@@ -387,9 +474,11 @@ pub struct Poll {
 pub async fn poll(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(body): Json<Poll>,
+    body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    authorize(&state, &headers).await?;
+    if body.len()>MAX_BODY_BYTES {return Err(api_error("Oversized agent request"));}
+    authorize(&state, &headers, AGENT_POLL_PATH, &body).await?;
+    let body: Poll = serde_json::from_slice(&body).map_err(|_|api_error("Invalid poll request"))?;
     if body.version.is_empty()
         || body.version.len() > 40
         || !body
@@ -450,9 +539,11 @@ pub struct Report {
 pub async fn report(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(body): Json<Report>,
+    body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    authorize(&state, &headers).await?;
+    if body.len()>MAX_BODY_BYTES {return Err(api_error("Oversized agent request"));}
+    authorize(&state, &headers, AGENT_REPORT_PATH, &body).await?;
+    let body: Report = serde_json::from_slice(&body).map_err(|_|api_error("Invalid agent report"))?;
     if !is_hex(&body.job_id, 32)
         || !matches!(body.stage.as_str(), "running" | "completed" | "failed")
         || body.detail.len() > 160
