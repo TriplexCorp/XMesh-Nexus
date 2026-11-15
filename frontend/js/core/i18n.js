@@ -15,6 +15,18 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Скопировать код привязки": "Copy pairing code",
+    "Команда не содержит секретов. При запуске вставьте одноразовый код в скрытый запрос на VPS.": "The command contains no secrets. When running it, paste the one-time code into the hidden prompt on the VPS.",
+    "Установка готова. Скопируйте команду и отдельный одноразовый код привязки.": "Installation is ready. Copy the command and the separate one-time pairing code.",
+    "Скопируйте команду и отдельный код привязки. Введите код в скрытом запросе на VPS. Срок действия кода — 60 минут.": "Copy the command and the separate pairing code. Enter the code at the hidden VPS prompt. The code is valid for 60 minutes.",
+    "Создайте команду. Одноразовый код будет доступен отдельной кнопкой и не попадёт в историю команд.": "Generate the command. The one-time code will be available through a separate button and will not enter shell history.",
+    "Команда": "Command",
+    "Код привязки": "Pairing code",
+    "На VPS запустите команду и вставьте отдельный одноразовый код в скрытый запрос.": "Run the command on the VPS and paste the separate one-time code into the hidden prompt.",
+    "Готово. Скопируйте команду и отдельный код привязки зеркала.": "Ready. Copy the command and the separate mirror pairing code.",
+    "Одноразовый код зеркала скопирован": "One-time mirror code copied",
+    "Одноразовый код привязки скопирован": "One-time pairing code copied",
+    "Сначала создайте новый код привязки.": "Generate a new pairing code first.",
     "Встроенное администрирование в Telegram": "Built-in administration in Telegram",
     "Карточки, продление, персональные ссылки и удаление с подтверждением.": "User cards, renewals, subscription links and confirmed deletion.",
     "Включение, отключение и удаление с одноразовым подтверждением.": "Enable, disable and delete with single-use confirmation.",
