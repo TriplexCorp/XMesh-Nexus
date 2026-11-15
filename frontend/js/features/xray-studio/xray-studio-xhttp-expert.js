@@ -99,20 +99,30 @@
    if(!confirmed)return;
   }
   const choices=[
-   option('mode','Режим XHTTP',`Текущий: ${mode}. auto / packet-up / stream-up / stream-one.`),
-   option('basic','Path / Host','Маршрут и отдельный HTTP Host.'),
-   option('headers','HTTP headers','Пользовательские заголовки, кроме Host.'),
-   option('padding','Padding / obfuscation','xPaddingBytes + obfs/key/header/placement/method.'),
-   option('session','Session ID','Placement, key, table и length.'),
-   option('sequence','Sequence','Placement и key для packet sequencing.'),
-   option('uplink','Uplink request','HTTP method, data placement/key и chunk size.'),
-   option('device','Профили устройств · iOS / Android / Desktop','XMUX и режимы для разных ОС. Настройки меняют только клиентские подписки.'),
-   option('generate','Чистый server preset','Документированный preset без client-only полей.')
+   option('mode','Режим XHTTP','При изменении режима несовместимые поля будут очищены.'),
+   option('basic','Путь / HTTP Host','Путь подключения и отдельный заголовок Host.'),
+   option('headers','HTTP-заголовки','Дополнительные заголовки, кроме Host.'),
+   option('padding','Заполнение / обфускация','Размер заполнения и параметры маскировки трафика.'),
+   option('session','Идентификатор сессии','Размещение, ключ, таблица символов и длина ID.'),
+   option('sequence','Последовательность','Размещение и ключ для нумерации пакетов.'),
+   option('uplink','Исходящий HTTP-запрос','Метод HTTP, размещение данных и размер блока.'),
+   option('device','Профили устройств · iOS / Android / ПК','Режим и XMUX для платформ. Меняет только клиентские подписки.'),
+   option('generate','Чистый серверный пресет','Генерация проверенного серверного пресета без клиентских полей.')
   ];
-  if(mode==='packet-up'||mode==='auto')choices.push(option('packet','PACKET-UP · server','scMaxEachPostBytes и scMaxBufferedPosts.'));
-  if(mode==='stream-up'||mode==='auto')choices.push(option('stream','STREAM-UP · server','scStreamUpServerSecs.'));
-  choices.push(option('server','Server response / limits','noSSEHeader и serverMaxHeaderBytes.'),option('advanced','Строгий server JSON','Полный SplitHTTPConfig с role/mode validation.'));
-  const action=directAction==='device'?{action:'device'}:await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · expert server inbound',description:'Выберите раздел и нажмите «Открыть». Параметры попадут в JSON только после подтверждения в редакторе. Client-only настройки находятся в профилях устройств.',confirmLabel:'Открыть',selectFirst:false,previewLabel:'Текущая серверная конфигурация',preview:values=>({раздел:choices.find(item=>item.value===values.action)?.label||'Выберите раздел',подсказка:'Карточка только открывает редактор — JSON пока не изменён',xhttpSettings:x}),fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]});if(!action)return;
+  if(mode==='packet-up'||mode==='auto')choices.push(option('packet','PACKET-UP · сервер','Настройка размера POST и буферизации.'));
+  if(mode==='stream-up'||mode==='auto')choices.push(option('stream','STREAM-UP · сервер','Настройка времени жизни потока.'));
+  choices.push(option('server','Ответ сервера / лимиты','Ограничение размера заголовков и SSE.'),option('advanced','Строгий JSON сервера','Полный SplitHTTPConfig с проверкой совместимости.'));
+  const action=directAction==='device'?{action:'device'}:await ask({
+   eyebrow:'XRAY STUDIO / XHTTP',
+   title:'XHTTP · серверные настройки',
+   description:'Выберите раздел. Каждая настройка изменится в JSON только после отдельного подтверждения.',
+   confirmLabel:'Открыть',
+   selectFirst:false,
+   previewLabel:'Текущие параметры сервера',
+   previewHint:'Предпросмотр не изменяет JSON. Выберите раздел слева и подтвердите настройки в редакторе.',
+   preview:()=>({network:'xhttp',xhttpSettings:x}),
+   fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]
+  });if(!action)return;
 
   if(action.action==='device'){
    const names=['iOS','Android','Windows','macOS','Linux','Auto'];
@@ -172,7 +182,17 @@
     if(mode!=='packet-up'&&(out.scMaxEachPostBytes!=null||out.scMinPostsIntervalMs!=null))throw Error('POST tuning применим только к packet-up');
     return out;
    };
-   const edited=await ask({eyebrow:'XRAY STUDIO / XHTTP CLIENTS',title:'XHTTP · '+choice.device,description:'Профиль записывается в xmesh.xhttpDeviceProfiles и применяется к клиентской подписке для выбранной ОС. Серверные настройки не содержат клиентский XMUX.',confirmLabel:'Сохранить профиль',previewLabel:'Что попадёт в клиентскую подписку',preview:values=>({платформа:choice.device,xmesh:{xhttpDeviceProfiles:{[choice.device]:create(values)}}}),fields,validate:v=>{try{create(v);return ''}catch(err){return err.message}}});if(!edited)return;
+   const edited=await ask({
+    eyebrow:'XRAY STUDIO / XHTTP CLIENTS',
+    title:'XHTTP · '+choice.device,
+    description:'Профиль сохраняется для выбранной платформы и влияет только на клиентскую подписку, не на серверный Xray.',
+    confirmLabel:'Сохранить профиль',
+    previewLabel:'Клиентский профиль · JSON',
+    previewHint:'Предпросмотр показывает фактические поля, которые будут записаны. Сохраните профиль, затем сохраните JSON в панели.',
+    preview:values=>({xmesh:{xhttpDeviceProfiles:{[choice.device]:create(values)}}}),
+    fields,
+    validate:v=>{try{create(v);return ''}catch(err){return err.message}}
+   });if(!edited)return;
    const profile=create(edited);
    commit(root,sel,ib=>{
      ib.xmesh??={};ib.xmesh.xhttpDeviceProfiles??={};
@@ -182,19 +202,19 @@
    return;
   }
   if(action.action==='mode'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Режим XHTTP',description:'Смена mode удаляет несовместимые tuning-поля.',confirmLabel:'Применить',fields:[{name:'mode',label:'Mode',type:'select',wide:true,value:mode,options:MODES.map(v=>({value:v,label:v}))}]});if(!r)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Режим XHTTP',description:'Изменение режима удалит несовместимые дополнительные параметры.',confirmLabel:'Применить',fields:[{name:'mode',label:'Режим',type:'select',wide:true,value:mode,options:MODES.map(v=>({value:v,label:v}))}]});if(!r)return;
    commit(root,sel,ib=>strict().normalizeForMode(ensure(ib),r.mode,'server'),'XHTTP mode: '+r.mode);return;
   }
   if(action.action==='basic'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Path / Host',description:'Path может содержать query; Host задаётся отдельно и не должен дублироваться в headers.',confirmLabel:'Применить',fields:[{name:'path',label:'Path',wide:true,value:String(x.path||'/'),required:true,validate:v=>String(v).startsWith('/')&&!/\s/.test(v)?'':'Path должен начинаться с / и не содержать пробелы'},{name:'host',label:'Host · необязательно',wide:true,value:String(x.host||'')}]});if(!r)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Путь / HTTP Host',description:'Путь может содержать параметры запроса. Заголовок Host задаётся отдельно от остальных HTTP-заголовков.',confirmLabel:'Применить',fields:[{name:'path',label:'Path',wide:true,value:String(x.path||'/'),required:true,validate:v=>String(v).startsWith('/')&&!/\s/.test(v)?'':'Path должен начинаться с / и не содержать пробелы'},{name:'host',label:'Host · необязательно',wide:true,value:String(x.host||'')}]});if(!r)return;
    commit(root,sel,ib=>{const s=ensure(ib);s.path=r.path;setOrDelete(s,'host',r.host)},'XHTTP: path/host обновлены');return;
   }
   if(action.action==='headers'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'HTTP headers',description:'Host запрещён ядром внутри headers — используйте отдельное поле Host.',confirmLabel:'Применить',fields:[{name:'json',label:'headers · JSON object',type:'textarea',wide:true,rows:12,value:JSON.stringify(e.headers||{},null,2),required:true,validate:v=>{try{const obj=parseObject(v,'headers');for(const [k,val] of Object.entries(obj)){if(k.toLowerCase()==='host')return 'Host нельзя помещать в headers';if(typeof val!=='string')return `headers.${k} должен быть строкой`}return ''}catch(err){return err.message}}}]});if(!r)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'HTTP-заголовки',description:'Указывайте только дополнительные заголовки. Host настраивается отдельно.',confirmLabel:'Применить',fields:[{name:'json',label:'headers · JSON object',type:'textarea',wide:true,rows:12,value:JSON.stringify(e.headers||{},null,2),required:true,validate:v=>{try{const obj=parseObject(v,'headers');for(const [k,val] of Object.entries(obj)){if(k.toLowerCase()==='host')return 'Host нельзя помещать в headers';if(typeof val!=='string')return `headers.${k} должен быть строкой`}return ''}catch(err){return err.message}}}]});if(!r)return;
    commit(root,sel,ib=>{const a=advanced(ensure(ib)),obj=parseObject(r.json,'headers');if(Object.keys(obj).length)a.headers=obj;else delete a.headers},'XHTTP: headers обновлены');return;
   }
   if(action.action==='padding'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Padding / obfuscation',description:'При выключенном obfs explicit placement/key/header/method удаляются, потому что ядро их не использует.',confirmLabel:'Применить',fields:[
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Заполнение / обфускация',description:'При выключенной обфускации неиспользуемые настройки размещения и ключей удаляются.',confirmLabel:'Применить',fields:[
     {name:'bytes',label:'xPaddingBytes',wide:true,value:String(e.xPaddingBytes??'100-1000'),required:true,validate:v=>{try{parseRange(v,{min:1});return ''}catch(err){return err.message}}},
     {name:'obfs',label:'xPaddingObfsMode',type:'select',value:String(Boolean(e.xPaddingObfsMode)),options:[{value:'false',label:'false · core compatibility behavior'},{value:'true',label:'true · explicit obfuscation controls'}]},
     {name:'placement',label:'xPaddingPlacement',type:'select',value:String(e.xPaddingPlacement||'queryInHeader'),options:PADDING_PLACEMENTS.map(v=>({value:v,label:v}))},
@@ -205,7 +225,7 @@
    commit(root,sel,ib=>{const a=advanced(ensure(ib));a.xPaddingBytes=parseRange(r.bytes,{min:1});if(r.obfs==='true'){a.xPaddingObfsMode=true;a.xPaddingPlacement=r.placement;a.xPaddingMethod=r.method;setOrDelete(a,'xPaddingKey',r.key);setOrDelete(a,'xPaddingHeader',r.header)}else{delete a.xPaddingObfsMode;delete a.xPaddingPlacement;delete a.xPaddingMethod;delete a.xPaddingKey;delete a.xPaddingHeader}},'XHTTP: padding/obfuscation обновлены');return;
   }
   if(action.action==='session'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Session ID',description:'Placement по умолчанию path. Custom table проходит ту же минимальную проверку пространства ID, что и ядро.',confirmLabel:'Применить',fields:[
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Идентификатор сессии',description:'По умолчанию ID передаётся в пути. Для собственной таблицы символов проверяется достаточность вариантов.',confirmLabel:'Применить',fields:[
     {name:'placement',label:'sessionIDPlacement',type:'select',value:String(e.sessionIDPlacement||'path'),options:PLACEMENTS.map(v=>({value:v,label:v}))},
     {name:'key',label:'sessionIDKey · optional',value:String(e.sessionIDKey||''),placeholder:'auto: X-Session / x_session'},
     {name:'table',label:'sessionIDTable · optional',wide:true,value:String(e.sessionIDTable||''),placeholder:'Base62 / hex / custom ASCII alphabet'},
@@ -214,11 +234,11 @@
    commit(root,sel,ib=>{const a=advanced(ensure(ib));a.sessionIDPlacement=r.placement;setOrDelete(a,'sessionIDKey',r.key);if(r.table){a.sessionIDTable=r.table;a.sessionIDLength=parseRange(r.length,{min:1})}else{delete a.sessionIDTable;delete a.sessionIDLength}},'XHTTP: Session ID обновлён');return;
   }
   if(action.action==='sequence'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Sequence placement',description:'Sequence может идти в path, query, header или cookie.',confirmLabel:'Применить',fields:[{name:'placement',label:'seqPlacement',type:'select',wide:true,value:String(e.seqPlacement||'path'),options:PLACEMENTS.map(v=>({value:v,label:v}))},{name:'key',label:'seqKey · optional',wide:true,value:String(e.seqKey||''),placeholder:'auto: X-Seq / x_seq'}]});if(!r)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Размещение последовательности',description:'Номер пакета можно передавать в пути, параметре запроса, заголовке или cookie.',confirmLabel:'Применить',fields:[{name:'placement',label:'seqPlacement',type:'select',wide:true,value:String(e.seqPlacement||'path'),options:PLACEMENTS.map(v=>({value:v,label:v}))},{name:'key',label:'seqKey · optional',wide:true,value:String(e.seqKey||''),placeholder:'auto: X-Seq / x_seq'}]});if(!r)return;
    commit(root,sel,ib=>{const a=advanced(ensure(ib));a.seqPlacement=r.placement;setOrDelete(a,'seqKey',r.key)},'XHTTP: sequence placement обновлён');return;
   }
   if(action.action==='uplink'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Uplink request',description:'GET и header/cookie data placement допустимы ядром только в packet-up. Chunk < 64 ядро всё равно нормализует до 64.',confirmLabel:'Применить',fields:[
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Исходящий HTTP-запрос',description:'GET и передача данных в заголовках/cookie допустимы только с packet-up. Минимальный блок — 64 байта.',confirmLabel:'Применить',fields:[
     {name:'method',label:'uplinkHTTPMethod',value:String(e.uplinkHTTPMethod||'POST').toUpperCase(),required:true,validate:v=>/^[!#$%&'*+.^_`|~0-9A-Z-]+$/.test(String(v).toUpperCase())?'':'Некорректный HTTP token'},
     {name:'placement',label:'uplinkDataPlacement',type:'select',value:String(e.uplinkDataPlacement||'body'),options:UPLINK_PLACEMENTS.map(v=>({value:v,label:v}))},
     {name:'key',label:'uplinkDataKey · optional',value:String(e.uplinkDataKey||''),placeholder:'auto: X-Data / x_data'},
@@ -227,24 +247,24 @@
    commit(root,sel,ib=>{const a=advanced(ensure(ib));a.uplinkHTTPMethod=String(r.method).toUpperCase();a.uplinkDataPlacement=r.placement;if(r.placement==='body'||r.placement==='auto')delete a.uplinkDataKey;else setOrDelete(a,'uplinkDataKey',r.key);if(r.chunk)a.uplinkChunkSize=parseRange(r.chunk,{min:64});else delete a.uplinkChunkSize},'XHTTP: uplink request обновлён');return;
   }
   if(action.action==='generate'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Чистый server preset',description:'Preset создаётся строгим генератором и проходит role/mode validation.',confirmLabel:'Сгенерировать',fields:[{name:'mode',label:'Mode',type:'select',wide:true,value:mode,options:MODES.map(v=>({value:v,label:v}))}]});if(!r)return;
-   const preset=strict().generatedProfile(r.mode,'server'),review=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Проверка preset',description:'Можно удалить необязательные поля, но client-only параметры валидатор не пропустит.',confirmLabel:'Применить',fields:[{name:'json',label:'extra',type:'textarea',wide:true,rows:16,value:JSON.stringify(preset,null,2),required:true,validate:v=>{try{return strict().validateAdvanced(parseObject(v,'extra'),r.mode,'server')[0]||''}catch(err){return err.message}}}]});if(!review)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Чистый серверный пресет',description:'Генератор проверяет совместимость режима и серверных параметров.',confirmLabel:'Сгенерировать',fields:[{name:'mode',label:'Режим',type:'select',wide:true,value:mode,options:MODES.map(v=>({value:v,label:v}))}]});if(!r)return;
+   const preset=strict().generatedProfile(r.mode,'server'),review=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Проверка серверного пресета',description:'Необязательные поля можно удалить. Клиентские параметры не пройдут проверку.',confirmLabel:'Применить',fields:[{name:'json',label:'extra',type:'textarea',wide:true,rows:16,value:JSON.stringify(preset,null,2),required:true,validate:v=>{try{return strict().validateAdvanced(parseObject(v,'extra'),r.mode,'server')[0]||''}catch(err){return err.message}}}]});if(!review)return;
    commit(root,sel,ib=>{const s=ensure(ib);s.mode=r.mode;s.extra=parseObject(review.json,'extra')},'XHTTP: server preset применён');return;
   }
   if(action.action==='packet'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'PACKET-UP · server',description:'Только server-relevant packet-up knobs.',confirmLabel:'Применить',fields:[{name:'bytes',label:'scMaxEachPostBytes',wide:true,value:String(e.scMaxEachPostBytes??'1000000'),required:true,validate:v=>{try{parseRange(v,{min:1});return ''}catch(err){return err.message}}},{name:'buffered',label:'scMaxBufferedPosts',type:'number',wide:true,value:String(e.scMaxBufferedPosts??30),min:1,required:true}]});if(!r)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'PACKET-UP · сервер',description:'Серверные настройки размера POST и количества буферизуемых запросов.',confirmLabel:'Применить',fields:[{name:'bytes',label:'scMaxEachPostBytes',wide:true,value:String(e.scMaxEachPostBytes??'1000000'),required:true,validate:v=>{try{parseRange(v,{min:1});return ''}catch(err){return err.message}}},{name:'buffered',label:'scMaxBufferedPosts',type:'number',wide:true,value:String(e.scMaxBufferedPosts??30),min:1,required:true}]});if(!r)return;
    commit(root,sel,ib=>{const a=advanced(ensure(ib));a.scMaxEachPostBytes=parseRange(r.bytes,{min:1});a.scMaxBufferedPosts=Number(r.buffered)},'XHTTP: packet-up server tuning обновлён');return;
   }
   if(action.action==='stream'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'STREAM-UP · server',description:'Server-side lifetime окна stream-up.',confirmLabel:'Применить',fields:[{name:'secs',label:'scStreamUpServerSecs',wide:true,value:String(e.scStreamUpServerSecs??'20-80'),required:true,validate:v=>{try{parseRange(v,{min:0,allowMinusOne:true});return ''}catch(err){return err.message}}}]});if(!r)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'STREAM-UP · сервер',description:'Ограничения времени жизни серверного потока.',confirmLabel:'Применить',fields:[{name:'secs',label:'scStreamUpServerSecs',wide:true,value:String(e.scStreamUpServerSecs??'20-80'),required:true,validate:v=>{try{parseRange(v,{min:0,allowMinusOne:true});return ''}catch(err){return err.message}}}]});if(!r)return;
    commit(root,sel,ib=>{advanced(ensure(ib)).scStreamUpServerSecs=parseRange(r.secs,{min:0,allowMinusOne:true})},'XHTTP: stream-up server tuning обновлён');return;
   }
   if(action.action==='server'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Server response / limits',description:'Только параметры серверной стороны SplitHTTPConfig.',confirmLabel:'Применить',fields:[{name:'max',label:'serverMaxHeaderBytes · 0 = core default 8192',type:'number',wide:true,value:String(e.serverMaxHeaderBytes??0),min:0,required:true},{name:'sse',label:'noSSEHeader',type:'select',wide:true,value:String(Boolean(e.noSSEHeader)),options:[{value:'false',label:'false · default SSE header behavior'},{value:'true',label:'true · suppress SSE header'}]}]});if(!r)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'Ответ сервера / лимиты',description:'Настройки серверного ответа и ограничений HTTP-заголовков.',confirmLabel:'Применить',fields:[{name:'max',label:'serverMaxHeaderBytes · 0 = core default 8192',type:'number',wide:true,value:String(e.serverMaxHeaderBytes??0),min:0,required:true},{name:'sse',label:'noSSEHeader',type:'select',wide:true,value:String(Boolean(e.noSSEHeader)),options:[{value:'false',label:'false · default SSE header behavior'},{value:'true',label:'true · suppress SSE header'}]}]});if(!r)return;
    commit(root,sel,ib=>{const a=advanced(ensure(ib));if(Number(r.max)>0)a.serverMaxHeaderBytes=Number(r.max);else delete a.serverMaxHeaderBytes;if(r.sse==='true')a.noSSEHeader=true;else delete a.noSSEHeader},'XHTTP: server response/limits обновлены');return;
   }
   if(action.action==='advanced'){
-   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · strict server JSON',description:'Полная актуальная server-side схема. Client-only поля xmux/downloadSettings/noGRPCHeader/scMinPostsIntervalMs блокируются.',confirmLabel:'Применить',fields:[{name:'json',label:'xhttpSettings',type:'textarea',wide:true,rows:24,value:JSON.stringify(clone(x),null,2),required:true,validate:v=>{try{return strict().validateSettings(parseObject(v,'xhttpSettings'),'server')[0]||''}catch(err){return err.message}}}]});if(!r)return;
+   const r=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · строгий JSON сервера',description:'Полная схема серверных настроек XHTTP. Клиентские параметры XMUX и другие несовместимые поля будут отклонены.',confirmLabel:'Применить',fields:[{name:'json',label:'xhttpSettings',type:'textarea',wide:true,rows:24,value:JSON.stringify(clone(x),null,2),required:true,validate:v=>{try{return strict().validateSettings(parseObject(v,'xhttpSettings'),'server')[0]||''}catch(err){return err.message}}}]});if(!r)return;
    const parsed=parseObject(r.json,'xhttpSettings');commit(root,sel,ib=>{ib.streamSettings??={};ib.streamSettings.network='xhttp';ib.streamSettings.xhttpSettings=parsed},'XHTTP: strict server JSON применён');
   }
  }
