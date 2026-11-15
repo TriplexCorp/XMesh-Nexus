@@ -359,6 +359,23 @@ mod tests {
         validate(input.as_object().unwrap()).is_ok()
     }
     #[test]
+    fn validates_uploaded_brand_logo() {
+        assert!(accepts(&json!({"brandLogo":""})));
+        assert!(accepts(
+            &json!({"brandLogo":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"})
+        ));
+        assert!(!accepts(
+            &json!({"brandLogo":"data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+"})
+        ));
+        assert!(!accepts(
+            &json!({"brandLogo":"data:image/png;base64,not-base64"})
+        ));
+        assert!(!accepts(
+            &json!({"brandLogo":"https://example.com/logo.svg"})
+        ));
+    }
+
+    #[test]
     fn validates_clients_and_presentation() {
         assert!(accepts(
             &json!({"subscriptionClients":{"happ":true,"incy":false},
@@ -375,19 +392,6 @@ mod tests {
         ));
         assert!(!accepts(
             &json!({"subscriptionSupportUrl":"http://example.com"})
-        ));
-        assert!(accepts(&json!({"brandLogo":""})));
-        assert!(accepts(
-            &json!({"brandLogo":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"})
-        ));
-        assert!(!accepts(
-            &json!({"brandLogo":"data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+"})
-        ));
-        assert!(!accepts(
-            &json!({"brandLogo":"data:image/png;base64,not-base64"})
-        ));
-        assert!(!accepts(
-            &json!({"brandLogo":"https://example.com/logo.svg"})
         ));
         assert!(accepts(&json!({"subscriptionAnnouncementEnabled": true})));
         assert!(accepts(&json!({"subscriptionAnnouncementEnabled": false})));
