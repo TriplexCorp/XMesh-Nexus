@@ -6,10 +6,10 @@ mod auth;
 mod catalog;
 #[path = "integration_api_grants.rs"]
 mod grants;
-#[path = "integration_api_quotas.rs"]
-mod quotas;
 #[path = "integration_api_proof.rs"]
 mod proof;
+#[path = "integration_api_quotas.rs"]
+mod quotas;
 #[path = "integration_api_squad_members.rs"]
 mod squad_members;
 #[path = "integration_api_telegram.rs"]
