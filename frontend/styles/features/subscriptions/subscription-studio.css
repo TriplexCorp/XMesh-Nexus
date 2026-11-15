@@ -1103,8 +1103,14 @@
 .subscription-mirror-actions .subscription-mirror-remove:hover{color:var(--er);background:color-mix(in srgb,var(--er) 8%,var(--nx-item-bg))}
 .subscription-mirror-card button:disabled{opacity:.5;cursor:not-allowed}
 .subscription-mirror-command{display:grid;gap:.45rem;min-width:0;padding-top:.7rem;border-top:1px solid var(--st-border)}
-.subscription-mirror-command>div{display:flex;align-items:center;justify-content:space-between;gap:.4rem}
-.subscription-mirror-command b{font-size:.74rem}
+.subscription-mirror-command>div{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.4rem}
+.subscription-mirror-command b{font-size:.74rem;flex:1 1 9rem}
+.subscription-mirror-command [data-mirror-action="copy-token"]{
+ border-color:color-mix(in srgb,var(--a) 36%,var(--st-border));
+}
+.subscription-sub-install-actions [data-sub-token-copy]:not(:disabled){
+ border-color:color-mix(in srgb,var(--a) 36%,var(--st-border));
+}
 .subscription-mirror-command .gh{min-height:1.85rem;font-size:.67rem}
 .subscription-mirror-command .gh svg{width:.9rem;height:.9rem}
 .subscription-mirror-command code{
