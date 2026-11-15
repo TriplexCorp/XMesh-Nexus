@@ -601,10 +601,19 @@ mod tests {
     fn agent_signature_binds_route_timestamp_nonce_and_exact_body() {
         use ed25519_dalek::{Signer, SigningKey};
         let key = SigningKey::from_bytes(&[7u8; 32]);
-        let payload = br#"{"version":"1.2.3"}"#;
+        let payload = br#"{"version":"1.0.0"}"#;
         let nonce = "a".repeat(32);
         let signed = agent_canonical("poll", "1794710000", &nonce, payload);
         let sig = key.sign(signed.as_bytes());
+        // Independently generated OpenSSL 3 Ed25519 interoperability vector.
+        assert_eq!(
+            hex::encode(key.verifying_key().to_bytes()),
+            "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"
+        );
+        assert_eq!(
+            hex::encode(sig.to_bytes()),
+            "a13c20fe26aa66f7b1465d4e0cfbcfe2a0975f350b30767095d493af881596da2932527c84b9809b74d3bcdc5286a527cc2d5aa1661b4b66744882270b562d03"
+        );
         let verify = key.verifying_key();
         assert!(verify.verify(signed.as_bytes(), &sig).is_ok());
         assert!(
