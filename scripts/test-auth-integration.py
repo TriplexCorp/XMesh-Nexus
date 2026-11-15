@@ -38,8 +38,8 @@ def sender_proof(method, path, bearer, wire):
     nonce = os.urandom(16).hex()
     token_hash = hashlib.sha256(bearer.encode()).hexdigest()
     body_hash = hashlib.sha256(wire).hexdigest()
-    to_sign = (f"xmesh-proof-v1\\n{token_hash}\\n{method}\\n"
-               f"/api/v1/integrations{path}\\n{when}\\n{nonce}\\n{body_hash}").encode()
+    to_sign = (f"xmesh-proof-v1\n{token_hash}\n{method}\n"
+               f"/api/v1/integrations{path}\n{when}\n{nonce}\n{body_hash}").encode()
     signature = subprocess.run(
         ["openssl","pkeyutl","-sign","-rawin","-inkey",PROOF_KEY_FILE],
         input=to_sign,check=True,capture_output=True,
