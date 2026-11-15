@@ -110,7 +110,10 @@ async fn credential(pool: &PgPool) -> Result<Option<Value>, ApiError> {
     )
 }
 fn valid_lower_hex(input: &str, size: usize) -> bool {
-    input.len() == size && input.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    input.len() == size
+        && input
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
 fn agent_canonical(route: &str, timestamp: &str, nonce: &str, body: &[u8]) -> String {
@@ -123,7 +126,9 @@ fn agent_canonical(route: &str, timestamp: &str, nonce: &str, body: &[u8]) -> St
 fn unique_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     let mut values = headers.get_all(name).iter();
     let first = values.next()?.to_str().ok()?;
-    if values.next().is_some() { return None; }
+    if values.next().is_some() {
+        return None;
+    }
     Some(first)
 }
 
@@ -133,7 +138,12 @@ async fn authorize(
     raw_body: &[u8],
     route: &str,
 ) -> Result<(), ApiError> {
-    let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Недействительная подпись XMesh Sub.");
+    let fail = || {
+        ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Недействительная подпись XMesh Sub.",
+        )
+    };
     // No Bearer fallback. The private Ed25519 key never leaves the Sub VPS.
     // Browser cookies and forwarded identities cannot authenticate this channel.
     if headers.contains_key(header::COOKIE)
@@ -144,20 +154,26 @@ async fn authorize(
         return Err(fail());
     }
     if raw_body.len() > MAX_AGENT_BODY_BYTES {
-        return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "Запрос агента слишком большой."));
+        return Err(ApiError::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Запрос агента слишком большой.",
+        ));
     }
     consume_budget(
         state,
         &format!("xmesh:sub:auth:global:{}", now() / 60),
         SUB_AUTH_GLOBAL_PER_MINUTE,
-    ).await?;
+    )
+    .await?;
 
     let timestamp = unique_header(headers, "x-xmesh-sub-timestamp")
         .filter(|s| !s.is_empty() && s.len() <= 16 && s.bytes().all(|b| b.is_ascii_digit()))
         .filter(|s| s.len() == 1 || !s.starts_with('0'))
         .ok_or_else(fail)?;
     let epoch = timestamp.parse::<u64>().map_err(|_| fail())?;
-    if epoch.abs_diff(now()) > MAX_CLOCK_SKEW_SECONDS { return Err(fail()); }
+    if epoch.abs_diff(now()) > MAX_CLOCK_SKEW_SECONDS {
+        return Err(fail());
+    }
     let nonce = unique_header(headers, "x-xmesh-sub-nonce")
         .filter(|s| valid_lower_hex(s, 32))
         .ok_or_else(fail)?;
@@ -166,31 +182,53 @@ async fn authorize(
         .ok_or_else(fail)?;
 
     let settings = credential(&state.pool).await?.ok_or_else(fail)?;
-    let public_key = settings.get("publicKey").and_then(Value::as_str)
-        .filter(|s| valid_lower_hex(s, 64)).ok_or_else(fail)?;
-    let public_bytes: [u8; 32] = hex::decode(public_key).map_err(|_| fail())?
-        .try_into().map_err(|_| fail())?;
+    let public_key = settings
+        .get("publicKey")
+        .and_then(Value::as_str)
+        .filter(|s| valid_lower_hex(s, 64))
+        .ok_or_else(fail)?;
+    let public_bytes: [u8; 32] = hex::decode(public_key)
+        .map_err(|_| fail())?
+        .try_into()
+        .map_err(|_| fail())?;
     let verifier = VerifyingKey::from_bytes(&public_bytes).map_err(|_| fail())?;
-    let signature_bytes: [u8; 64] = hex::decode(signature_hex).map_err(|_| fail())?
-        .try_into().map_err(|_| fail())?;
-    verifier.verify(
-        agent_canonical(route, timestamp, nonce, raw_body).as_bytes(),
-        &Signature::from_bytes(&signature_bytes)
-    ).map_err(|_| fail())?;
+    let signature_bytes: [u8; 64] = hex::decode(signature_hex)
+        .map_err(|_| fail())?
+        .try_into()
+        .map_err(|_| fail())?;
+    verifier
+        .verify(
+            agent_canonical(route, timestamp, nonce, raw_body).as_bytes(),
+            &Signature::from_bytes(&signature_bytes),
+        )
+        .map_err(|_| fail())?;
 
     consume_budget(
         state,
-        &format!("xmesh:sub:auth:key:{}:{}", now() / 60, sha256_hex(public_key)),
+        &format!(
+            "xmesh:sub:auth:key:{}:{}",
+            now() / 60,
+            sha256_hex(public_key)
+        ),
         SUB_AGENT_RATE_PER_MINUTE,
-    ).await?;
+    )
+    .await?;
     // Atomic, expiring nonce state: even a valid intercepted signature
     // cannot be replayed, including on another agent endpoint.
     let replay_key = format!("xmesh:sub:nonce:{}:{nonce}", sha256_hex(public_key));
     let mut conn = state.redis.clone();
-    let inserted: Option<String> = redis::cmd("SET").arg(&replay_key)
-        .arg("1").arg("NX").arg("EX").arg(300)
-        .query_async(&mut conn).await.map_err(|_| backend_error())?;
-    if inserted.is_none() { return Err(fail()); }
+    let inserted: Option<String> = redis::cmd("SET")
+        .arg(&replay_key)
+        .arg("1")
+        .arg("NX")
+        .arg("EX")
+        .arg(300)
+        .query_async(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    if inserted.is_none() {
+        return Err(fail());
+    }
     Ok(())
 }
 
@@ -237,7 +275,8 @@ pub async fn claim(
     Json(body): Json<Claim>,
 ) -> Result<Json<Value>, ApiError> {
     if !valid_lower_hex(&body.public_key, 64)
-        || hex::decode(&body.public_key).ok()
+        || hex::decode(&body.public_key)
+            .ok()
             .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
             .and_then(|bytes| VerifyingKey::from_bytes(&bytes).ok())
             .is_none()
@@ -433,7 +472,8 @@ pub async fn poll(
     body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
     authorize(&state, &headers, &body, "poll").await?;
-    let body: Poll = serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый запрос агента."))?;
+    let body: Poll =
+        serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый запрос агента."))?;
     if body.version.is_empty()
         || body.version.len() > 40
         || !body
@@ -497,7 +537,8 @@ pub async fn report(
     body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
     authorize(&state, &headers, &body, "report").await?;
-    let body: Report = serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый отчёт Sub-сервера."))?;
+    let body: Report =
+        serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый отчёт Sub-сервера."))?;
     if !is_hex(&body.job_id, 32)
         || !matches!(body.stage.as_str(), "running" | "completed" | "failed")
         || body.detail.len() > 160
@@ -566,15 +607,29 @@ mod tests {
         let sig = key.sign(signed.as_bytes());
         let verify = key.verifying_key();
         assert!(verify.verify(signed.as_bytes(), &sig).is_ok());
-        assert!(verify.verify(
-            agent_canonical("report", "1794710000", &nonce, payload).as_bytes(), &sig
-        ).is_err());
-        assert!(verify.verify(
-            agent_canonical("poll", "1794710000", &nonce, b"{}").as_bytes(), &sig
-        ).is_err());
-        assert!(verify.verify(
-            agent_canonical("poll", "1794710001", &nonce, payload).as_bytes(), &sig
-        ).is_err());
+        assert!(
+            verify
+                .verify(
+                    agent_canonical("report", "1794710000", &nonce, payload).as_bytes(),
+                    &sig
+                )
+                .is_err()
+        );
+        assert!(
+            verify
+                .verify(
+                    agent_canonical("poll", "1794710000", &nonce, b"{}").as_bytes(),
+                    &sig
+                )
+                .is_err()
+        );
+        assert!(
+            verify
+                .verify(
+                    agent_canonical("poll", "1794710001", &nonce, payload).as_bytes(),
+                    &sig
+                )
+                .is_err()
+        );
     }
-
 }
