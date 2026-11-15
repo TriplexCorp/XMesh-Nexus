@@ -108,8 +108,8 @@ async function run(){
   'Device profile shortcut must be clearly labelled and directly visible for XHTTP');
  const rawTransport=sample();
  rawTransport.inbounds[0].streamSettings.network='raw';
- assert.doesNotMatch(harness(rawTransport).host.innerHTML,/data-tool="xhttp-device"/,
-  'Do not offer XHTTP client profiles on an inbound with a different transport');
+ assert.match(harness(rawTransport).host.innerHTML,/data-tool="xhttp-device"/,
+  'RAW inbounds must expose XHTTP device profiles with an explicit conversion confirmation');
  assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','xhttp-device','dns','routing','outbounds','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,false,true,true,true,true,true,true]);
 
  const shadowsocksReality=sample();
