@@ -371,6 +371,22 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/sub-server/flood", get(subscription_flood::status))
         .route("/sub-server/enrollment", post(sub_server::issue_enrollment))
         .route("/sub-server/update", post(sub_server::request_update))
+        .route(
+            "/sub-server/mirrors",
+            get(sub_server::list_mirrors).post(sub_server::create_mirror),
+        )
+        .route(
+            "/sub-server/mirrors/{id}",
+            axum::routing::delete(sub_server::delete_mirror),
+        )
+        .route(
+            "/sub-server/mirrors/{id}/enrollment",
+            post(sub_server::issue_mirror_enrollment),
+        )
+        .route(
+            "/sub-server/mirrors/{id}/update",
+            post(sub_server::request_mirror_update),
+        )
         .route("/client-routing", patch(patch_client_routing))
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
@@ -1865,6 +1881,24 @@ async fn patch_settings(
     validate_settings_presentation(object)?;
     validate_settings_announcements(object)?;
     validate_settings_integrations(object)?;
+
+    // A public hostname must never simultaneously belong to the primary Sub
+    // gateway and a separately enrolled mirror identity.
+    if let Some(domain) = object.get("subscriptionDomain").and_then(Value::as_str)
+        && !domain.is_empty()
+    {
+        let duplicate: Option<String> =
+            sqlx::query_scalar("SELECT id FROM sub_mirrors WHERE domain=LOWER($1)")
+                .bind(domain)
+                .fetch_optional(&state.pool)
+                .await?;
+        if duplicate.is_some() {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Этот домен уже используется зеркалом подписок.",
+            ));
+        }
+    }
 
     let row = sqlx::query(
         "INSERT INTO app_settings (key, value) VALUES ('panel', $1) \

@@ -1033,11 +1033,20 @@ const syncSubscriptionTheme=()=>{
  }).catch(error=>toast('Не удалось синхронизировать тему подписки: '+(error.message||'API')));
  return subscriptionThemeSync;
 };
+const subMirrorId=id=>{
+ if(!/^[a-f0-9]{32}$/.test(String(id)))throw Error('Некорректный идентификатор зеркала.');
+ return id;
+};
 const subServerApi={
  enroll:()=>backendRequest('/api/v1/sub-server/enrollment',{method:'POST',body:'{}'}),
  status:()=>backendRequest('/api/v1/sub-server/status'),
  floodStatus:()=>backendRequest('/api/v1/sub-server/flood'),
- update:()=>backendRequest('/api/v1/sub-server/update',{method:'POST',body:'{}'})
+ update:()=>backendRequest('/api/v1/sub-server/update',{method:'POST',body:'{}'}),
+ mirrors:()=>backendRequest('/api/v1/sub-server/mirrors'),
+ createMirror:(name,domain)=>backendRequest('/api/v1/sub-server/mirrors',{method:'POST',body:JSON.stringify({name,domain})}),
+ deleteMirror:id=>backendRequest('/api/v1/sub-server/mirrors/'+subMirrorId(id),{method:'DELETE'}),
+ enrollMirror:id=>backendRequest('/api/v1/sub-server/mirrors/'+subMirrorId(id)+'/enrollment',{method:'POST',body:'{}'}),
+ updateMirror:id=>backendRequest('/api/v1/sub-server/mirrors/'+subMirrorId(id)+'/update',{method:'POST',body:'{}'})
 };
 const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(
  DB.set,patch=>api.saveSettings(patch),toast,

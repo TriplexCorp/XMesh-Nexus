@@ -89,6 +89,49 @@ assert.match(view,/data-sub-agent-version/,'Server card must expose real agent v
 assert.match(view,/data-sub-agent-seen/,'Server card must expose live last-seen timestamp');
 assert.match(view,/data-sub-flood-card/,'Owner needs a compact flood protection card');
 
+assert.match(view,/class="subscription-fleet-hero"/,
+ 'Server page must expose one unified primary/mirror infrastructure heading');
+assert.match(view,/class="subscription-mirror-list"/,
+ 'Saved mirrors must have a dedicated compact card collection');
+for(const action of ['data-mirror-open','data-mirror-save','data-mirror-refresh',
+  'data-mirror-list','data-mirror-domain','data-mirror-name']){
+  assert(view.includes(action),'Mirror fleet control is missing: '+action);
+}
+assert.match(src,/subApi\.createMirror\(name,domain\)/,
+ 'Creating a mirror must persist a separate owner-owned gateway');
+assert.match(src,/subApi\.enrollMirror\(id\)/,
+ 'Mirror install must issue its own single-use code');
+assert.match(src,/subApi\.updateMirror\(id\)/,
+ 'An update must target exactly one mirror');
+assert.match(src,/subApi\.deleteMirror\(id\)/,
+ 'An owner must be able to revoke the selected mirror');
+assert.match(src,/mirrorTokens\.set\(id,/,
+ 'One-time mirror secrets must remain ephemeral in this tab');
+for(const action of ['mirrors:','createMirror:','deleteMirror:','enrollMirror:','updateMirror:']){
+  assert(app.includes(action),'Mirror client API missing '+action);
+}
+assert.match(rust,/\/sub-server\/mirrors\/\{id\}\/enrollment/,
+ 'Mirror enrollment endpoint must be registered');
+assert.match(rust,/\/sub-server\/mirrors\/\{id\}\/update/,
+ 'Mirror update endpoint must be registered');
+const mirrorControl=fs.readFileSync('backend/src/sub_server.rs','utf8');
+const mirrorMigration=fs.readFileSync('backend/migrations/0123_sub_mirror_gateways.sql','utf8');
+assert.match(mirrorMigration,/public_key VARCHAR\(64\) UNIQUE/,
+ 'Mirror Ed25519 public identities must remain individually unique');
+assert.match(mirrorMigration,/domain VARCHAR\(253\) NOT NULL UNIQUE/,
+ 'Two mirror identities must not share one domain');
+assert.match(mirrorControl,/scoped_key\(mirror_id\.as_deref\(\), HEARTBEAT\)/,
+ 'Each agent must have isolated heartbeat state');
+assert.match(mirrorControl,/scoped_key\(mirror_id\.as_deref\(\), PENDING_UPDATE\)/,
+ 'Each agent must receive only its own update jobs');
+assert.match(mirrorControl,/x-xmesh-sub-public-key/,
+ 'Every mirror request must select a signer verified by its exact Ed25519 identity');
+assert.match(mirrorControl,/strip_prefix\(MIRROR_ENROLL_TAG\)/,
+ 'One-use mirror pairing tokens must not be exchangeable for primary credentials');
+assert.match(mirrorControl,/require_owner\(&actor\)/,
+ 'Mirror management must be owner-only');
+
+
 assert.doesNotMatch(view,/name="json_dns"/,'DNS must not have a preset dropdown');
 assert.doesNotMatch(view,/name="json_customDnsProtocol"/,'DNS must not have a protocol selector');
 assert.match(view,/name="json_customDnsAddress"/,'DNS must have a single editable address');

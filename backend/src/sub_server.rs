@@ -4,7 +4,7 @@ use crate::{ApiError, AppState, audit, auth, read_settings, require_owner};
 use axum::{
     Json,
     body::Bytes,
-    extract::{Extension, State},
+    extract::{Extension, Path, State},
     http::{HeaderMap, StatusCode, header},
 };
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -23,6 +23,9 @@ const PENDING_UPDATE: &str = "xmesh:sub:update:pending";
 const CURRENT_UPDATE: &str = "xmesh:sub:update:current";
 const UPDATE_STATUS: &str = "xmesh:sub:update:status";
 const CREDENTIAL_KEY: &str = "sub_server_agent";
+const MAX_MIRRORS: i64 = 16;
+const MIRROR_ENROLL_TAG: &str = "mirror:";
+
 const SUB_AGENT_RATE_PER_MINUTE: i64 = 30;
 const SUB_AUTH_GLOBAL_PER_MINUTE: i64 = 3000;
 const SUB_CLAIM_GLOBAL_PER_MINUTE: i64 = 300;
@@ -109,6 +112,34 @@ async fn credential(pool: &PgPool) -> Result<Option<Value>, ApiError> {
             .await?,
     )
 }
+
+type MirrorRecord = (String, String, String, Option<String>);
+
+async fn mirror_by_id(pool: &PgPool, id: &str) -> Result<Option<MirrorRecord>, ApiError> {
+    if !valid_lower_hex(id, 32) {
+        return Err(api_error("Недопустимый идентификатор зеркала."));
+    }
+    let row = sqlx::query_as::<_, MirrorRecord>(
+        "SELECT id,name,domain,public_key FROM sub_mirrors WHERE id=$1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row)
+}
+
+fn scoped_key(mirror_id: Option<&str>, base: &str) -> String {
+    mirror_id.map_or_else(
+        || base.to_owned(),
+        |id| {
+            format!(
+                "xmesh:sub:mirror:{id}:{}",
+                base.strip_prefix("xmesh:sub:").unwrap_or(base)
+            )
+        },
+    )
+}
+
 fn valid_lower_hex(input: &str, size: usize) -> bool {
     input.len() == size
         && input
@@ -132,12 +163,16 @@ fn unique_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     Some(first)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Agent authorization is kept together to audit request binding, Ed25519 verification, rate limits and nonce atomicity"
+)]
 async fn authorize(
     state: &AppState,
     headers: &HeaderMap,
     raw_body: &[u8],
     route: &str,
-) -> Result<(), ApiError> {
+) -> Result<Option<String>, ApiError> {
     let fail = || {
         ApiError::new(
             StatusCode::UNAUTHORIZED,
@@ -181,13 +216,35 @@ async fn authorize(
         .filter(|s| valid_lower_hex(s, 128))
         .ok_or_else(fail)?;
 
-    let settings = credential(&state.pool).await?.ok_or_else(fail)?;
-    let public_key = settings
-        .get("publicKey")
+    // Public key header is only a lookup selector. Authentication continues
+    // to require a valid signature from that key; copying the selector grants
+    // no access. Each mirror is independently revocable by deleting its row.
+    let advertised = unique_header(headers, "x-xmesh-sub-public-key");
+    let primary = credential(&state.pool).await?;
+    let primary_key = primary
+        .as_ref()
+        .and_then(|setting| setting.get("publicKey"))
         .and_then(Value::as_str)
-        .filter(|s| valid_lower_hex(s, 64))
-        .ok_or_else(fail)?;
-    let public_bytes: [u8; 32] = hex::decode(public_key)
+        .filter(|value| valid_lower_hex(value, 64));
+    let (public_key, mirror_id) = if let Some(candidate) = advertised {
+        if !valid_lower_hex(candidate, 64) {
+            return Err(fail());
+        }
+        if primary_key == Some(candidate) {
+            (candidate.to_owned(), None)
+        } else {
+            let id: Option<String> =
+                sqlx::query_scalar("SELECT id FROM sub_mirrors WHERE public_key=$1")
+                    .bind(candidate)
+                    .fetch_optional(&state.pool)
+                    .await?;
+            (candidate.to_owned(), Some(id.ok_or_else(fail)?))
+        }
+    } else {
+        // Existing primary gateway only. Mirrors always require the selector.
+        (primary_key.ok_or_else(fail)?.to_owned(), None)
+    };
+    let public_bytes: [u8; 32] = hex::decode(&public_key)
         .map_err(|_| fail())?
         .try_into()
         .map_err(|_| fail())?;
@@ -208,14 +265,14 @@ async fn authorize(
         &format!(
             "xmesh:sub:auth:key:{}:{}",
             now() / 60,
-            sha256_hex(public_key)
+            sha256_hex(&public_key)
         ),
         SUB_AGENT_RATE_PER_MINUTE,
     )
     .await?;
     // Atomic, expiring nonce state: even a valid intercepted signature
     // cannot be replayed, including on another agent endpoint.
-    let replay_key = format!("xmesh:sub:nonce:{}:{nonce}", sha256_hex(public_key));
+    let replay_key = format!("xmesh:sub:nonce:{}:{nonce}", sha256_hex(&public_key));
     let mut conn = state.redis.clone();
     let inserted: Option<String> = redis::cmd("SET")
         .arg(&replay_key)
@@ -229,7 +286,7 @@ async fn authorize(
     if inserted.is_none() {
         return Err(fail());
     }
-    Ok(())
+    Ok(mirror_id)
 }
 
 pub async fn issue_enrollment(
@@ -270,6 +327,10 @@ pub struct Claim {
     public_key: String,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Single-use primary and mirror enrollment share an audited atomic claim boundary"
+)]
 pub async fn claim(
     State(state): State<AppState>,
     Json(body): Json<Claim>,
@@ -298,13 +359,8 @@ pub async fn claim(
         SUB_CLAIM_GLOBAL_PER_MINUTE,
     )
     .await?;
-    let domain = current_domain(&state).await?;
-    if body.domain != domain {
-        return Err(ApiError::new(
-            StatusCode::FORBIDDEN,
-            "Домен сервера не совпадает с доменом подписок.",
-        ));
-    }
+    // Single-use enrollment is scoped to a saved gateway identity. It cannot
+    // be retargeted to an arbitrary domain, including a deleted mirror.
     let mut conn = state.redis.clone();
     let matched: Option<String> = redis::cmd("GETDEL")
         .arg(format!(
@@ -314,28 +370,97 @@ pub async fn claim(
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
-    if matched.as_deref() != Some(domain.as_str()) {
-        return Err(ApiError::new(
+    let binding = matched.ok_or_else(|| {
+        ApiError::new(
             StatusCode::UNAUTHORIZED,
             "Код подключения истёк или уже использован.",
-        ));
+        )
+    })?;
+    if let Some(id) = binding.strip_prefix(MIRROR_ENROLL_TAG) {
+        let (_, _, domain, existing_key) = mirror_by_id(&state.pool, id)
+            .await?
+            .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Зеркало удалено."))?;
+        if body.domain != domain {
+            return Err(ApiError::new(
+                StatusCode::FORBIDDEN,
+                "Домен зеркала не совпадает.",
+            ));
+        }
+        // Reject an agent identity shared between gateways. Each VPS needs
+        // its own independent Ed25519 private key.
+        if credential(&state.pool)
+            .await?
+            .as_ref()
+            .and_then(|value| value.get("publicKey"))
+            .and_then(Value::as_str)
+            == Some(body.public_key.as_str())
+        {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Ключ уже используется основным шлюзом.",
+            ));
+        }
+        if existing_key.as_deref() != Some(body.public_key.as_str()) {
+            let changed = sqlx::query(
+                "UPDATE sub_mirrors SET public_key=$1,updated_at=NOW() WHERE id=$2 AND domain=$3",
+            )
+            .bind(&body.public_key)
+            .bind(id)
+            .bind(&body.domain)
+            .execute(&state.pool)
+            .await?;
+            if changed.rows_affected() != 1 {
+                return Err(ApiError::new(
+                    StatusCode::CONFLICT,
+                    "Зеркало больше не существует.",
+                ));
+            }
+        }
+        let _: i64 = redis::cmd("DEL")
+            .arg(scoped_key(Some(id), HEARTBEAT))
+            .arg(scoped_key(Some(id), PENDING_UPDATE))
+            .arg(scoped_key(Some(id), CURRENT_UPDATE))
+            .arg(scoped_key(Some(id), UPDATE_STATUS))
+            .query_async(&mut conn)
+            .await
+            .map_err(|_| backend_error())?;
+    } else {
+        let domain = current_domain(&state).await?;
+        if binding != domain || body.domain != domain {
+            return Err(ApiError::new(
+                StatusCode::FORBIDDEN,
+                "Домен сервера не совпадает с доменом подписок.",
+            ));
+        }
+        // Prevent reusing the public signing identity of an existing mirror.
+        let mirror: Option<String> =
+            sqlx::query_scalar("SELECT id FROM sub_mirrors WHERE public_key=$1")
+                .bind(&body.public_key)
+                .fetch_optional(&state.pool)
+                .await?;
+        if mirror.is_some() {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Ключ уже привязан к зеркалу.",
+            ));
+        }
+        sqlx::query(
+            "INSERT INTO app_settings (key,value) VALUES ($1,$2) \
+             ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()",
+        )
+        .bind(CREDENTIAL_KEY)
+        .bind(json!({"publicKey":body.public_key,"domain":domain}))
+        .execute(&state.pool)
+        .await?;
+        let _: i64 = redis::cmd("DEL")
+            .arg(HEARTBEAT)
+            .arg(PENDING_UPDATE)
+            .arg(CURRENT_UPDATE)
+            .arg(UPDATE_STATUS)
+            .query_async(&mut conn)
+            .await
+            .map_err(|_| backend_error())?;
     }
-    sqlx::query(
-        "INSERT INTO app_settings (key,value) VALUES ($1,$2) \
-         ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()",
-    )
-    .bind(CREDENTIAL_KEY)
-    .bind(json!({"publicKey":body.public_key,"domain":domain}))
-    .execute(&state.pool)
-    .await?;
-    // A prior agent may still have a heartbeat from its rotated token.
-    let _: i64 = redis::cmd("DEL")
-        .arg(HEARTBEAT)
-        .arg(PENDING_UPDATE)
-        .arg(CURRENT_UPDATE)
-        .query_async(&mut conn)
-        .await
-        .map_err(|_| backend_error())?;
     Ok(Json(json!({"ok":true})))
 }
 
@@ -471,7 +596,7 @@ pub async fn poll(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    authorize(&state, &headers, &body, "poll").await?;
+    let mirror_id = authorize(&state, &headers, &body, "poll").await?;
     let body: Poll =
         serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый запрос агента."))?;
     if body.version.is_empty()
@@ -494,7 +619,7 @@ pub async fn poll(
     let mut conn = state.redis.clone();
     let heartbeat = json!({"lastSeen":now(),"version":body.version});
     redis::cmd("SET")
-        .arg(HEARTBEAT)
+        .arg(scoped_key(mirror_id.as_deref(), HEARTBEAT))
         .arg(heartbeat.to_string())
         .arg("EX")
         .arg(120)
@@ -502,7 +627,7 @@ pub async fn poll(
         .await
         .map_err(|_| backend_error())?;
     let job: Option<String> = redis::cmd("GETDEL")
-        .arg(PENDING_UPDATE)
+        .arg(scoped_key(mirror_id.as_deref(), PENDING_UPDATE))
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
@@ -510,7 +635,7 @@ pub async fn poll(
         return Ok(Json(json!({"command":"none","flood":edge_policy})));
     };
     redis::cmd("SET")
-        .arg(CURRENT_UPDATE)
+        .arg(scoped_key(mirror_id.as_deref(), CURRENT_UPDATE))
         .arg(&job)
         .arg("EX")
         .arg(3600)
@@ -536,7 +661,7 @@ pub async fn report(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    authorize(&state, &headers, &body, "report").await?;
+    let mirror_id = authorize(&state, &headers, &body, "report").await?;
     let body: Report =
         serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый отчёт Sub-сервера."))?;
     if !is_hex(&body.job_id, 32)
@@ -548,7 +673,7 @@ pub async fn report(
     }
     let mut conn = state.redis.clone();
     let current: Option<String> = redis::cmd("GET")
-        .arg(CURRENT_UPDATE)
+        .arg(scoped_key(mirror_id.as_deref(), CURRENT_UPDATE))
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
@@ -565,7 +690,7 @@ pub async fn report(
         "updatedAt":now()
     });
     redis::cmd("SET")
-        .arg(UPDATE_STATUS)
+        .arg(scoped_key(mirror_id.as_deref(), UPDATE_STATUS))
         .arg(payload.to_string())
         .arg("EX")
         .arg(86400)
@@ -574,12 +699,276 @@ pub async fn report(
         .map_err(|_| backend_error())?;
     if body.stage != "running" {
         redis::cmd("DEL")
-            .arg(CURRENT_UPDATE)
+            .arg(scoped_key(mirror_id.as_deref(), CURRENT_UPDATE))
             .query_async::<i64>(&mut conn)
             .await
             .map_err(|_| backend_error())?;
     }
     Ok(Json(json!({"ok":true})))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateMirror {
+    name: String,
+    domain: String,
+}
+
+pub async fn create_mirror(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CreateMirror>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let name = body.name.trim();
+    let domain = body.domain.trim().to_ascii_lowercase();
+    if name.is_empty() || name.chars().count() > 48 || name.chars().any(char::is_control) {
+        return Err(api_error(
+            "Название зеркала должно содержать от 1 до 48 символов.",
+        ));
+    }
+    if !valid_domain(&domain) || domain == current_domain(&state).await? {
+        return Err(api_error(
+            "Укажите отдельный домен зеркала, отличный от основного.",
+        ));
+    }
+    let id = random_hex()[..32].to_owned();
+    // Serialize fleet-size checks, including concurrent owner tabs.
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(215434201)")
+        .execute(&mut *tx)
+        .await?;
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sub_mirrors")
+        .fetch_one(&mut *tx)
+        .await?;
+    if count >= MAX_MIRRORS {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Можно добавить не более 16 зеркал.",
+        ));
+    }
+    let occupied: Option<String> = sqlx::query_scalar("SELECT id FROM sub_mirrors WHERE domain=$1")
+        .bind(&domain)
+        .fetch_optional(&mut *tx)
+        .await?;
+    if occupied.is_some() {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Зеркало с таким доменом уже существует.",
+        ));
+    }
+    sqlx::query("INSERT INTO sub_mirrors(id,name,domain) VALUES($1,$2,$3)")
+        .bind(&id)
+        .bind(name)
+        .bind(&domain)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    audit(
+        &state.pool,
+        &actor.username,
+        "sub.mirror.create",
+        None,
+        None,
+        json!({"mirrorId":id,"domain":domain}),
+    )
+    .await;
+    Ok(Json(
+        json!({"id":id,"name":name,"domain":domain,"enrolled":false,"online":false}),
+    ))
+}
+
+pub async fn list_mirrors(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let records: Vec<MirrorRecord> =
+        sqlx::query_as("SELECT id,name,domain,public_key FROM sub_mirrors ORDER BY created_at,id")
+            .fetch_all(&state.pool)
+            .await?;
+    let mut conn = state.redis.clone();
+    let mut mirrors = Vec::with_capacity(records.len());
+    for (id, name, domain, key) in records {
+        let heartbeat: Option<String> = redis::cmd("GET")
+            .arg(scoped_key(Some(&id), HEARTBEAT))
+            .query_async(&mut conn)
+            .await
+            .map_err(|_| backend_error())?;
+        let heartbeat: Value = heartbeat
+            .and_then(|v| serde_json::from_str(&v).ok())
+            .unwrap_or(Value::Null);
+        let last_seen = heartbeat
+            .get("lastSeen")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let update: Option<String> = redis::cmd("GET")
+            .arg(scoped_key(Some(&id), UPDATE_STATUS))
+            .query_async(&mut conn)
+            .await
+            .map_err(|_| backend_error())?;
+        let update: Value = update
+            .and_then(|v| serde_json::from_str(&v).ok())
+            .unwrap_or(Value::Null);
+        let enrolled = key.is_some();
+        let online = enrolled && last_seen > 0 && now().saturating_sub(last_seen) <= 90;
+        mirrors.push(json!({
+            "id":id, "name":name, "domain":domain,
+            "enrolled":enrolled,"online":online,"domainMatches":true,
+            "lastSeen":last_seen,
+            "version":heartbeat.get("version").and_then(Value::as_str).unwrap_or(""),
+            "update":update
+        }));
+    }
+    Ok(Json(json!({"mirrors":mirrors, "maxMirrors":MAX_MIRRORS})))
+}
+
+pub async fn delete_mirror(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let (_, _, domain, _) = mirror_by_id(&state.pool, &id)
+        .await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Зеркало не найдено."))?;
+    let removed: Option<String> =
+        sqlx::query_scalar("DELETE FROM sub_mirrors WHERE id=$1 RETURNING id")
+            .bind(&id)
+            .fetch_optional(&state.pool)
+            .await?;
+    if removed.is_none() {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "Зеркало не найдено."));
+    }
+    let mut conn = state.redis.clone();
+    let _: i64 = redis::cmd("DEL")
+        .arg(scoped_key(Some(&id), HEARTBEAT))
+        .arg(scoped_key(Some(&id), PENDING_UPDATE))
+        .arg(scoped_key(Some(&id), CURRENT_UPDATE))
+        .arg(scoped_key(Some(&id), UPDATE_STATUS))
+        .query_async(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    audit(
+        &state.pool,
+        &actor.username,
+        "sub.mirror.delete",
+        None,
+        None,
+        json!({"mirrorId":id,"domain":domain}),
+    )
+    .await;
+    Ok(Json(json!({"ok":true})))
+}
+
+pub async fn issue_mirror_enrollment(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let (_, _, domain, _) = mirror_by_id(&state.pool, &id)
+        .await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Зеркало не найдено."))?;
+    let token = random_hex();
+    let mut conn = state.redis.clone();
+    redis::cmd("SET")
+        .arg(format!("{ENROLL_PREFIX}{}", sha256_hex(&token)))
+        .arg(format!("{MIRROR_ENROLL_TAG}{id}"))
+        .arg("EX")
+        .arg(ENROLL_TTL_SECONDS)
+        .query_async::<String>(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    audit(
+        &state.pool,
+        &actor.username,
+        "sub.mirror.enrollment.issue",
+        None,
+        None,
+        json!({"mirrorId":id,"domain":domain}),
+    )
+    .await;
+    Ok(Json(
+        json!({"enrollmentToken":token,"expiresInSeconds":ENROLL_TTL_SECONDS,
+        "domain":domain,"mirrorId":id}),
+    ))
+}
+
+pub async fn request_mirror_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let (_, _, domain, key) = mirror_by_id(&state.pool, &id)
+        .await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Зеркало не найдено."))?;
+    if key.is_none() {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Сначала подключите зеркало.",
+        ));
+    }
+    let mut conn = state.redis.clone();
+    let hb: Option<String> = redis::cmd("GET")
+        .arg(scoped_key(Some(&id), HEARTBEAT))
+        .query_async(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    let hb: Value = hb
+        .and_then(|v| serde_json::from_str(&v).ok())
+        .unwrap_or(Value::Null);
+    let last = hb.get("lastSeen").and_then(Value::as_u64).unwrap_or(0);
+    if last == 0 || now().saturating_sub(last) > 90 {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Зеркало не в сети."));
+    }
+    let current: Option<String> = redis::cmd("GET")
+        .arg(scoped_key(Some(&id), CURRENT_UPDATE))
+        .query_async(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    if current.is_some() {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Обновление зеркала уже выполняется.",
+        ));
+    }
+    let job = random_hex()[..32].to_owned();
+    let pending: Option<String> = redis::cmd("SET")
+        .arg(scoped_key(Some(&id), PENDING_UPDATE))
+        .arg(&job)
+        .arg("NX")
+        .arg("EX")
+        .arg(1800)
+        .query_async(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    if pending.is_none() {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Обновление уже в очереди.",
+        ));
+    }
+    let status = json!({"jobId":job,"stage":"queued","updatedAt":now()});
+    redis::cmd("SET")
+        .arg(scoped_key(Some(&id), UPDATE_STATUS))
+        .arg(status.to_string())
+        .arg("EX")
+        .arg(86400)
+        .query_async::<String>(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    audit(
+        &state.pool,
+        &actor.username,
+        "sub.mirror.update.request",
+        None,
+        None,
+        json!({"mirrorId":id,"domain":domain}),
+    )
+    .await;
+    Ok(Json(status))
 }
 
 #[cfg(test)]
@@ -596,6 +985,22 @@ mod tests {
         assert!(!valid_domain("localhost"));
         assert!(!valid_domain("sub.example.com:443"));
         assert!(!valid_domain("sub.example.com@evil.test"));
+    }
+    #[test]
+    fn mirrored_server_state_is_independent_and_revocable() {
+        let first = "a".repeat(32);
+        let second = "b".repeat(32);
+        for name in [HEARTBEAT, PENDING_UPDATE, CURRENT_UPDATE, UPDATE_STATUS] {
+            assert_ne!(
+                scoped_key(Some(&first), name),
+                scoped_key(Some(&second), name)
+            );
+            assert_ne!(scoped_key(Some(&first), name), scoped_key(None, name));
+            assert!(scoped_key(Some(&first), name).starts_with("xmesh:sub:mirror:"));
+        }
+        assert_eq!(scoped_key(None, HEARTBEAT), HEARTBEAT);
+        assert!(valid_domain("mirror1.example.org"));
+        assert!(!valid_domain("https://evil.example.org/"));
     }
     #[test]
     fn agent_signature_binds_route_timestamp_nonce_and_exact_body() {
