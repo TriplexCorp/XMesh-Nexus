@@ -844,10 +844,20 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
             | "/api/v1/node/restart/poll"
             | "/api/v1/node/restart/progress"
             | "/api/v1/node/restart/ack" => request.headers().contains_key("x-xmesh-signature"),
-            "/api/v1/sub-server/agent/poll" | "/api/v1/sub-server/agent/report" => request
-                .headers()
-                .get(header::AUTHORIZATION)
-                .is_some_and(|value| value.to_str().is_ok_and(|s| s.starts_with("Bearer "))),
+            // Sub agents authenticate with Ed25519 proofs, NOT legacy
+            // Bearer tokens. CSRF bypass only recognizes fully shaped
+            // cookie-less machine requests; sub_server::authorize verifies
+            // the signature, public key, nonce, body and timestamp.
+            "/api/v1/sub-server/agent/poll" | "/api/v1/sub-server/agent/report" => {
+                request.headers().get(header::AUTHORIZATION).is_none()
+                    && ["x-xmesh-sub-timestamp", "x-xmesh-sub-nonce",
+                        "x-xmesh-sub-signature"].iter().all(|name| {
+                        request.headers().get_all(*name).iter().count() == 1
+                    })
+                    && request.headers().get(header::CONTENT_TYPE)
+                        .and_then(|value| value.to_str().ok())
+                        .is_some_and(|value| value.eq_ignore_ascii_case("application/json"))
+            },
             "/api/v1/sub-server/claim" | "/api/v1/node/enroll" => request
                 .headers()
                 .get(header::CONTENT_TYPE)
