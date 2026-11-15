@@ -2045,3 +2045,19 @@ dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
 #dlg.user-modal .user-identity-row>span{flex:0 0 auto;white-space:nowrap}
 #dlg.user-modal .user-identity-row code{white-space:nowrap;min-width:0}
 #dlg.user-modal .user-identity-row .user-id-copy{flex-shrink:0}
+
+/* Put the identity group on its own row at laptop widths, after all generic
+   overview placement rules so the latter cannot push it back into column two. */
+@media (min-width:761px) and (max-width:1100px){
+  #dlg.user-modal .user-overview-band{
+    grid-template-columns:minmax(0,1fr);
+  }
+  #dlg.user-modal .user-overview-band>.user-identity-row{
+    grid-column:1/-1;
+    grid-row:3;
+  }
+  #dlg.user-modal .user-overview-band>.user-usage-line:not(:first-child){
+    grid-column:1/-1;
+    grid-row:4;
+  }
+}
