@@ -4,6 +4,8 @@ set -Eeuo pipefail
 umask 077
 die() { printf 'XMesh Nexus host setup: %s\n' "$*" >&2; exit 1; }
 root_only() { [[ "$(id -u)" == 0 ]] || die 'Run: sudo ./install.sh'; }
+# First-boot unattended-upgrades may own dpkg; wait instead of aborting.
+apt_install() { apt-get -o DPkg::Lock::Timeout=600 install "$@"; }
 valid_domain() {
  local domain="$1" label
  [[ ${#domain} -le 253 && "$domain" == *.* && "$domain" == "${domain,,}" ]] || return 1
@@ -24,7 +26,7 @@ install_deps() {
  if dpkg-query -W -f='${Status}' haproxy 2>/dev/null | grep -q 'ok installed'; then had_haproxy=1; fi
  export DEBIAN_FRONTEND=noninteractive
  apt-get update
- apt-get install -y ca-certificates curl gnupg lsb-release ubuntu-keyring openssl git iproute2
+ apt_install -y ca-certificates curl gnupg lsb-release ubuntu-keyring openssl git iproute2
  install -d -m 0755 /etc/apt/keyrings
  curl --proto '=https' --tlsv1.2 -fsSLo /etc/apt/keyrings/docker.asc https://download.docker.com/linux/ubuntu/gpg
  chmod 0644 /etc/apt/keyrings/docker.asc
@@ -39,7 +41,7 @@ Pin: origin nginx.org
 Pin-Priority: 900
 PIN
  apt-get update
- apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin nginx certbot haproxy
+ apt_install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin nginx certbot haproxy
  systemctl enable --now docker
  if (( had_haproxy == 1 )) && systemctl is-active --quiet haproxy.service && ! systemctl is-active --quiet xmesh-https-mux.service 2>/dev/null; then
   die 'An existing operator-managed HAProxy service is active. Use a dedicated host or migrate that TCP/443 configuration explicitly.'
@@ -56,7 +58,12 @@ configure_domain() {
  [[ -f "$file" && ! -L "$file" ]] || die 'Missing safe .env'
  existing_domain="$(get_setting PANEL_DOMAIN "$file")"; existing_email="$(get_setting PANEL_ACME_EMAIL "$file")"; domain="${PANEL_DOMAIN:-$existing_domain}"
  if [[ -z "$domain" ]]; then [[ -t 0 ]] || die 'Set PANEL_DOMAIN and PANEL_ACME_EMAIL in non-interactive mode'; IFS= read -r -p 'Enter panel domain (panel.example.org): ' domain || die 'Domain input cancelled'; fi
- domain="${domain,,}"; valid_domain "$domain" || die 'Invalid domain. Provide a public FQDN only (no scheme, port or wildcard)'
+ # Paste from SSH or Windows consoles may include trailing CR/whitespace.
+ # Trim only the boundaries; strict domain validation still rejects unsafe input.
+ domain="${domain#"${domain%%[![:space:]]*}"}"
+ domain="${domain%"${domain##*[![:space:]]}"}"
+ domain="${domain,,}"
+ valid_domain "$domain" || die 'Invalid domain. Provide a public FQDN only (no scheme, port or wildcard)'
  email="${PANEL_ACME_EMAIL:-$existing_email}"
  if [[ -z "$email" ]]; then [[ -t 0 ]] || die 'Set PANEL_DOMAIN and PANEL_ACME_EMAIL in non-interactive mode'; IFS= read -r -p "Let's Encrypt contact email: " email || die 'Email input cancelled'; fi
  valid_email "$email" || die 'Invalid email for ACME'
@@ -174,7 +181,7 @@ ensure_mux_runtime() {
  if ! command -v haproxy >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
-  apt-get install -y haproxy
+  apt_install -y haproxy
   systemctl disable --now haproxy.service >/dev/null 2>&1 || true
  elif systemctl is-active --quiet haproxy.service && ! systemctl is-active --quiet xmesh-https-mux.service; then
   die 'Existing system HAProxy service is active. Free TCP/443 or migrate it before enabling the XMesh 443 multiplexer.'
