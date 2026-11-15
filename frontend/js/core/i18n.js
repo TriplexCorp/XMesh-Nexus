@@ -15,6 +15,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Ошибка проверки:": "Status check failed:",
+    "Агент ранее выходил на связь. Последняя активность:": "The agent previously connected. Last seen:",
     "Ожидаем связь": "Awaiting heartbeat",
     "Агент привязан. Ожидаем первый подписанный ответ от VPS.": "Agent paired. Waiting for the first signed heartbeat from the VPS.",
     "Домен привязанного сервера отличается от сохранённого домена подписок. Требуется повторная привязка.": "The paired server domain differs from the saved subscription domain. Pair the agent again.",
