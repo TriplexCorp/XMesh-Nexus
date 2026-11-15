@@ -5,7 +5,14 @@ cd "$(dirname "$0")/.."
 host=deploy/install-panel-host.sh
 bash -n install.sh
 bash -n "$host"
-for valid in panel.example.org billing.example.net sub-domain.example.com; do
+# Package installation must tolerate unattended-upgrades on a fresh Ubuntu VPS.
+grep -Fq 'apt-get -o DPkg::Lock::Timeout=600 install' "$host"
+! grep -Fq 'apt-get install -y' "$host"
+# The installer must normalize surrounding terminal-paste whitespace/CR,
+# without weakening the strict FQDN validator for inner unsafe characters.
+grep -Fq 'domain="${domain#"${domain%%[![:space:]]*}"}"' "$host"
+grep -Fq 'domain="${domain%"${domain##*[![:space:]]}"}"' "$host"
+for valid in panel.example.org billing.example.net sub-domain.example.com free-tier.shop; do
   bash "$host" validate-domain "$valid"
 done
 for invalid in '' example localhost '*.example.org' 'https://example.org' \
