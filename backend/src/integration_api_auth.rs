@@ -429,6 +429,20 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
             "Invalid bearer token",
         )
     })?;
+    // Optional strict cutover after all historical bearer-only tokens have
+    // been replaced. Default remains compatible to avoid silently breaking bots.
+    let proof_key: Option<Vec<u8>> = row
+        .try_get("proof_public_key")
+        .map_err(|_| Problem::unavailable())?;
+    if proof_key.is_none()
+        && std::env::var("XMESH_INTEGRATION_REQUIRE_PROOF").as_deref() == Ok("true")
+    {
+        return Err(Problem::new(
+            StatusCode::UNAUTHORIZED,
+            "sender_proof_required",
+            "Legacy bearer-only integration tokens are disabled",
+        ));
+    }
     let token_id: i64 = row.try_get("id").map_err(|_| Problem::unavailable())?;
     let client_id: i64 = row
         .try_get("client_id")
@@ -465,9 +479,7 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
         allowed_user_ids: row
             .try_get("allowed_user_ids")
             .map_err(|_| Problem::unavailable())?,
-        proof_public_key: row
-            .try_get("proof_public_key")
-            .map_err(|_| Problem::unavailable())?,
+        proof_public_key: proof_key,
         token_hash: digest,
         max_grant_days: row
             .try_get("max_grant_days")
