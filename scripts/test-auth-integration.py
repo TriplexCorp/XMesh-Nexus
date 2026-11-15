@@ -40,10 +40,16 @@ def sender_proof(method, path, bearer, wire):
     body_hash = hashlib.sha256(wire).hexdigest()
     to_sign = (f"xmesh-proof-v1\n{token_hash}\n{method}\n"
                f"/api/v1/integrations{path}\n{when}\n{nonce}\n{body_hash}").encode()
-    signature = subprocess.run(
-        ["openssl","pkeyutl","-sign","-rawin","-inkey",PROOF_KEY_FILE],
-        input=to_sign,check=True,capture_output=True,
-    ).stdout.hex()
+    # Ed25519 pkeyutl is a one-shot operation; OpenSSL requires a
+    # seekable input file rather than an unnamed stdin pipe.
+    with tempfile.NamedTemporaryFile(prefix="xmesh-ci-proof-body-") as message_file:
+        message_file.write(to_sign)
+        message_file.flush()
+        signature = subprocess.run(
+            ["openssl","pkeyutl","-sign","-rawin",
+             "-inkey",PROOF_KEY_FILE,"-in",message_file.name],
+            check=True,capture_output=True,
+        ).stdout.hex()
     return {"X-XMesh-Proof-Ts":when,"X-XMesh-Proof-Nonce":nonce,"X-XMesh-Proof-Sig":signature}
 
 
