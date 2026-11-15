@@ -206,6 +206,8 @@ window.XMeshI18n=(()=>{
     "Профили устройств · iOS / Android / Desktop": "Device profiles · iOS / Android / Desktop",
     "XMUX и режимы для разных ОС. Настройки меняют только клиентские подписки.": "XMUX and modes by operating system. Changes affect only client subscriptions.",
     "Профили устройств": "Device profiles",
+    "Настройки XHTTP · сервер": "XHTTP settings · server",
+    "Профили устройств iOS / Android / Desktop · клиентский XHTTP и XMUX": "Device profiles for iOS / Android / Desktop · client-side XHTTP and XMUX",
     "Клиентские параметры: отдельные настройки каждой ОС. Данные не попадут в серверный inbound Xray.": "Per-platform client settings. These values are never deployed to the server-side Xray inbound.",
     "Текущие настройки · редактировать": "Current settings · edit",
     "Мобильный · packet-up": "Mobile · packet-up",
