@@ -300,4 +300,28 @@ assert.deepEqual(paletteAPI.paletteUserResults(usersForSearch,'not-found'),[],
 assert(paletteAPI.paletteNoteExcerpt(usersForSearch[0].desc,'восстановить').includes('Восстановить'),
  'Result excerpt must show the matched note phrase');
 
+// The shared neutral hover must never dim filled Save buttons: a zero-
+// specificity fallback preserves the primary variant backgrounds/ink.
+const telegramJs=read('frontend/js/features/settings/telegram-admin-bot.js');
+const telegramCss=read('frontend/styles/features/settings/telegram-admin-bot.css');
+const xrayStudioCss=read('frontend/styles/features/xray-studio/xray-studio-v4.css');
+assert.match(components,/:where\(button:not\(:disabled\):hover\)\{background:var\(--nx-hover-bg\)\}/,
+ 'Neutral hover must be a low-specificity fallback, not repaint Save buttons');
+assert.doesNotMatch(components,/^button:not\(:disabled\):hover\{background:/m,
+ 'Never override filled action colors with a generic hover selector');
+for(const id of ['tb-save','tb-refresh','tb-clear','tb-token','tb-admins','tb-enabled',
+ 'tb-live-status','tb-metric-state','tb-metric-admins','tb-metric-check','tb-open-bot','tb-connection-panel'])
+ assert(telegramJs.includes('id="'+id+'"'),'Telegram redesign must preserve functional binding: '+id);
+for(const label of ['Подключение и настройки','Возможности бота','Защита по умолчанию',
+ 'Сохранить и применить','Подробнее о боте'])
+ assert(telegramJs.includes(label),'Telegram console missing expected section: '+label);
+assert.match(telegramJs,/syncAdminCount\(\)/,
+ 'Telegram admin count must react to edited ID list');
+assert.match(telegramCss,/\.tb-form-actions \.tb-primary:hover:not\(:disabled\)\{[\s\S]*?background:color-mix/,
+ 'Telegram primary Save must stay filled and readable on hover');
+assert.match(xrayStudioCss,/\.xm-studio-modal \.xm-studio-modal-accept\{background:var\(--xm-dialog-accent\)/,
+ 'XRAY profile Save keeps the distinct filled accent style');
+assert.match(telegramCss,/@media\(max-width:680px\)/,'Telegram console must reflow on narrow screens');
+new Function('window',telegramJs)({});
+
 console.log(`UI architecture: one content-addressed panel graph, three system owners, ${panelFeatureFiles.length} scoped panel features, explicit layout, and dialog safety: PASS`);
