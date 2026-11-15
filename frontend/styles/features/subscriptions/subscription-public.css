@@ -766,3 +766,19 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
   .subscription-public .experience-shortcuts>button{min-height:62px;padding:8px}
 }
 @media(prefers-reduced-motion:reduce){.subscription-public .experience-plan::after{animation:none}}
+
+/* Shared customer branding: actual uploaded mark, not the old star glyph. */
+.subscription-public .subscription-public-brand-identity>img.subscription-preview-logo{
+  display:block;object-fit:contain;padding:4px;
+}
+.subscription-public .experience-plan-symbol{
+  padding:6px;overflow:hidden;transition:background-color .2s ease,border-color .2s ease;
+}
+.subscription-public .experience-plan-symbol .experience-plan-mark{
+  display:block;width:100%;height:100%;object-fit:contain;border-radius:calc(var(--portal-radius)*.46);
+}
+.subscription-public .experience-plan-content{align-self:center}
+.subscription-public .experience-dashboard .experience-plan{
+  min-height:148px;align-items:center;
+}
+@media(prefers-reduced-motion:reduce){.subscription-public .experience-plan-symbol{transition:none}}

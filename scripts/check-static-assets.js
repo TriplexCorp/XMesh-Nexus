@@ -38,6 +38,25 @@ const userViewport=read('frontend/styles/features/users/user-dialog-viewport.css
 const subscriptionSurface=read('frontend/styles/features/subscriptions/subscription-surface.css');
 const subscriptionPublic=read('frontend/styles/features/subscriptions/subscription-public.css');
 const subscriptionTemplate=read('backend/src/subscription_template.html');
+const appJs=read('frontend/js/core/app.js');
+const experienceJs=read('frontend/js/features/subscriptions/subscription-experience.js');
+const studioJs=read('frontend/js/features/subscriptions/subscription-studio.js');
+const brandingBackend=read('backend/src/subscription_settings.rs');
+const brandingPortal=read('backend/src/user_subscriptions_base.rs');
+assert(appJs.includes('data-brand-logo-upload')&&appJs.includes('rasterBrandLogo(file)'),
+  'Brand settings must support actual image uploads');
+assert(appJs.includes("k:'brandLogo'")&&appJs.includes("name=\"brandLogo\""),
+  'Brand settings must persist the uploaded asset');
+assert(appJs.includes('brandLogoSource(DB.set.brandLogo)'),
+  'Panel sidebar and favicon must use the uploaded logo');
+assert(brandingBackend.includes('pub fn valid_brand_logo(')&&brandingBackend.includes('bytes.len() > 256 * 1024'),
+  'Owner-provided brand logos require bounded raster validation');
+assert(brandingPortal.includes('portal_brand_logo(settings)')&&brandingPortal.includes('portal_brand_favicon(settings)'),
+  'Public subscription header and favicon must receive the shared logo');
+assert(experienceJs.includes('sourceLogo')&&experienceJs.includes('experience-plan-mark'),
+  'The plan card must reuse the header branding instead of a star');
+assert(studioJs.includes("data.brandLogo.startsWith('data:image/png;base64,')"),
+  'Studio preview must display the shared owner brand');
 const favicon=read('frontend/favicon.svg');
 const faviconDigest=require('node:crypto').createHash('sha256').update(favicon).digest('hex').slice(0,12);
 assert.match(favicon,/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"[^>]*viewBox="0 0 512 512"/,
@@ -50,10 +69,13 @@ for(const html of [index,login]){
 }
 assert(subscriptionTemplate.includes('href="{{FAVICON}}"'),
   'Public subscription template must embed its favicon inline');
-assert(read('backend/src/user_subscriptions_base.rs').includes('("{{FAVICON}}", portal_favicon())'),
-  'Public portal must fill its favicon from the canonical vector asset');
+assert(read('backend/src/user_subscriptions_base.rs').includes('("{{FAVICON}}", portal_brand_favicon(settings))'),
+  'Public portal must use uploaded brand favicon or canonical SVG fallback');
 assert(dockerfile.includes('COPY frontend/favicon.svg /build/frontend/favicon.svg'),
   'Docker must provide the vector to Rust at compile time');
+const signerDockerfile=read('backend/Dockerfile.xsp-signer');
+assert(signerDockerfile.includes('cp /source/frontend/favicon.svg /build/frontend/favicon.svg;'),
+  'Isolated signer Docker build must supply the SVG required by Rust include_str!');
 const publicIconCss=read('frontend/styles/features/subscriptions/subscription-public.css');
 assert.doesNotMatch(publicIconCss,/content:"[⧉▦]"/,
   'Copy and QR action icons must not depend on Unicode glyph fallback');

@@ -28,6 +28,7 @@ RUN --mount=type=secret,id=proxy_ca \
     cp -a /source/frontend/styles/features/subscriptions /build/frontend/styles/features/; \
     cp -a /source/frontend/js/features/subscriptions /build/frontend/js/features/; \
     cp /source/frontend/js/core/qr-code.js /build/frontend/js/core/; \
+    cp /source/frontend/favicon.svg /build/frontend/favicon.svg; \
     cp -a /source/docs /build/docs; \
     cp /source/VERSION /build/VERSION; \
     cargo build --profile "$SIGNER_BUILD_PROFILE" --features xsp-v2-experimental --bin xmesh-api; \

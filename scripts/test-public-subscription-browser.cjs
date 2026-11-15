@@ -30,7 +30,7 @@ function fixture(url){
  const state=url.searchParams.get('state')||'ACTIVE';
  const en=url.searchParams.get('lang')==='en',active=url.searchParams.get('active')!=='0'&&!['EXPIRED','LIMITED','DISABLED'].includes(state),unlimited=url.searchParams.get('limit')==='0',light=url.searchParams.get('theme')==='light';
  const text=(ru,enText)=>en?enText:ru;
- const data={PUBLIC_CSS:embeddedCss,PUBLIC_SCRIPTS:embeddedScripts,FAVICON:'data:image/svg+xml;base64,'+read('frontend/favicon.svg').toString('base64'),LANG:en?'en':'ru',OWNER:'demo_user',PLAN:'VPN Access',BRAND:process.env.XMESH_TEST_BRAND||'Private VPN',LOGO:'<span aria-hidden="true">S</span>',
+ const data={PUBLIC_CSS:embeddedCss,PUBLIC_SCRIPTS:embeddedScripts,FAVICON:'data:image/svg+xml;base64,'+read('frontend/favicon.svg').toString('base64'),LANG:en?'en':'ru',OWNER:'demo_user',PLAN:'VPN Access',BRAND:process.env.XMESH_TEST_BRAND||'Private VPN',LOGO:'<img class="subscription-preview-logo" alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAFUlEQVR4nGPUOLHgPwMUMDEgARQOAFzRApXxCG5qAAAAAElFTkSuQmCC">',
  ACCENT:url.searchParams.get('accent')==='dark'?'#2549bf':light?'#86e0b6':'#ff9788',SECONDARY_ACCENT:'#a3bffa',BACKGROUND:light?'#f6f8fa':'#0d1218',CARD_COLOR:light?'#ffffff':'#151c25',TEXT_COLOR:light?'#1c2938':'#edf2f7',RADIUS:'20',THEME:light?'light':'dark',LAYOUT:'standard',FONT:'system',CARD_STYLE:url.searchParams.get('material')||'soft',
  RU_SELECTED:en?'':'on',EN_SELECTED:en?'on':'',RU_CURRENT:en?'false':'page',EN_CURRENT:en?'page':'false',
  STATUS_DOT:'<span class="subscription-preview-ok">● '+text(active?'Активна':'Неактивна',active?'Active':'Inactive')+'</span>',
@@ -84,6 +84,9 @@ async function dismissDialog(page,dialog,opener){
    assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=30,'Readable heading');assert(g.minTap>=44,'Touch target too small');
    assert.equal(await page.locator('.experience-owner-name').innerText(),'demo_user','The bearer page shows the scoped subscription owner');
    assert.equal(await page.locator('.experience-plan-name').innerText(),'VPN Access','A configured plan is shown without fabricated marketing benefits');
+   assert.equal(await page.locator('.experience-plan-symbol .experience-plan-mark').getAttribute('src'),
+     await page.locator('.subscription-public-brand-identity .subscription-preview-logo').getAttribute('src'),
+     'Brand identity in the header and tariff card must be the same image');
    assert.equal(await page.locator('.experience-connect-steps').count(),0,'Remove redundant three-step onboarding');
    assert.equal(await page.locator('.experience-owner [data-subscription-expiry]').count(),1,'Expiry belongs to the owner card');
    assert.equal(await page.locator('.experience-account [data-subscription-traffic]').count(),1,'Traffic remains in the usage summary');
@@ -179,11 +182,14 @@ async function dismissDialog(page,dialog,opener){
       enroll:async()=>{window.__subEnrollCallCount++;return {enrollmentToken:'a'.repeat(64),expiresInSeconds:3600}},
       update:async()=>{throw Error('Update requires a paired, online agent')}
     };
-    const [markup,mount]=window.XMeshSubscriptionStudio.create({domain:'panel.example.org',subscriptionLanguage:'en',subscriptionSyncPanelTheme:false,subscriptionShowDevices:true,subscriptionShowSupport:true},async()=>{},()=>{},{users:2,nodes:1},null,subApi);
+    const [markup,mount]=window.XMeshSubscriptionStudio.create({domain:'panel.example.org',brandLogo:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAFUlEQVR4nGPUOLHgPwMUMDEgARQOAFzRApXxCG5qAAAAAElFTkSuQmCC',subscriptionLanguage:'en',subscriptionSyncPanelTheme:false,subscriptionShowDevices:true,subscriptionShowSupport:true},async()=>{},()=>{},{users:2,nodes:1},null,subApi);
     document.body.innerHTML=markup;mount();
   });
   const studio=page.locator('[data-subscription-preview-frame]');
   assert.equal(await studio.locator('.subscription-preview').getAttribute('lang'),'en');assert(await studio.locator('.experience-days').isVisible());
+  assert.equal(await studio.locator('[data-subscription-logo]').getAttribute('src'),'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAFUlEQVR4nGPUOLHgPwMUMDEgARQOAFzRApXxCG5qAAAAAElFTkSuQmCC');
+  assert.equal(await studio.locator('.experience-plan-mark').getAttribute('src'),'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAFUlEQVR4nGPUOLHgPwMUMDEgARQOAFzRApXxCG5qAAAAAElFTkSuQmCC');
+  assert.equal(await studio.locator('[data-subscription-logo-symbol]').isHidden(),true);
   assert.match(await studio.locator('.portal-donut-center b').innerText(),/^12.4 /);
   assert(!/[А-Яа-яЁё]/.test(await studio.innerText()),'Studio English preview has untranslated copy');
   assert(await studio.locator('.portal-app-disclosure').evaluate(el=>!el.open));

@@ -2001,15 +2001,20 @@ fn portal_decoration(
     } else {
         String::new()
     };
-    let logo = studio_string(settings, "subscriptionLogoUrl", "");
-    let logo_markup = if logo.starts_with("https://") {
-        format!(
-            "<img src=\"{}\" alt=\"\" class=\"subscription-preview-logo\">",
-            escape_html(logo)
-        )
-    } else {
-        "<span aria-hidden=\"true\">✦</span>".to_owned()
-    };
+    // Shared owner branding takes precedence over the legacy per-portal URL.
+    let legacy_logo = studio_string(settings, "subscriptionLogoUrl", "");
+    let logo = portal_brand_logo(settings)
+        .map(str::to_owned)
+        .or_else(|| {
+            legacy_logo
+                .starts_with("https://")
+                .then(|| legacy_logo.to_owned())
+        })
+        .unwrap_or_else(portal_favicon);
+    let logo_markup = format!(
+        "<img src=\"{}\" alt=\"\" class=\"subscription-preview-logo\">",
+        escape_html(&logo)
+    );
     let visible_status = studio_enabled(settings, "subscriptionShowStatus", true);
     let status_dot = if visible_status {
         format!(
@@ -2161,6 +2166,17 @@ fn portal_favicon() -> String {
     )
 }
 
+fn portal_brand_logo(settings: &Value) -> Option<&str> {
+    settings
+        .get("brandLogo")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && crate::subscription_settings::valid_brand_logo(value))
+}
+
+fn portal_brand_favicon(settings: &Value) -> String {
+    portal_brand_logo(settings).map_or_else(portal_favicon, str::to_owned)
+}
+
 fn portal_assets(nonce: &str) -> (String, String) {
     let css = [
         include_str!("../../frontend/styles/features/subscriptions/subscription-studio.css"),
@@ -2230,7 +2246,7 @@ fn portal_html(
     let changes = [
         ("{{PUBLIC_CSS}}", styles),
         ("{{PUBLIC_SCRIPTS}}", scripts),
-        ("{{FAVICON}}", portal_favicon()),
+        ("{{FAVICON}}", portal_brand_favicon(settings)),
         ("{{LANG}}", lang.to_owned()),
         ("{{BRAND}}", escape_html(logo_brand)),
         ("{{OWNER}}", owner_label),
@@ -2466,6 +2482,10 @@ mod tests {
         let template = include_str!("subscription_template.html");
         assert!(template.contains("{{PUBLIC_CSS}}"));
         assert!(template.contains("{{PUBLIC_SCRIPTS}}"));
+        assert_eq!(portal_brand_favicon(&json!({})), portal_favicon());
+        let fallback_logo = portal_decoration(&json!({}), false, true, false).logo_markup;
+        assert!(fallback_logo.contains("data:image/svg+xml;base64,"));
+        assert!(!fallback_logo.contains("✦"));
         assert!(!template.contains("href=\"/subscription-public.css"));
         assert!(!template.contains("src=\"/subscription-portal.js"));
         let (css, js) = portal_assets("test-nonce");
