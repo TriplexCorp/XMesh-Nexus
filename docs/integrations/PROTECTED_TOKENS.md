@@ -6,12 +6,11 @@ The public integration endpoint is `/api/v1/integrations/*`. Browser cookies,
 headers such as `X-Forwarded-For`, and trusted administrative sessions never
 authorize a service request. HTTPS is mandatory at the public reverse proxy.
 
-**New token creation:** owner + fresh MFA. A new token with any mutation scope
-(`users:create`, `users:update`, `users:write`, `quotas:write`,
-`squads:members:write`, `telegram:assign` or `entitlements:grant`)
-**requires** `proofPublicKey`. A read-only token can remain unbound, but
-must not be used for sensitive subscription URLs if a stolen token would
-matter. Prefer bound credentials for read-only services too.
+**New token creation:** owner + fresh MFA. **Every new token**, including
+read-only scopes such as `subscriptions:read`, **requires**
+`proofPublicKey`. Even a stolen read-only bearer must not be able to
+retrieve private subscription URLs without proof of key possession.
+Sensitive mutation scopes also receive policy limits.
 
 **Existing tokens:** pre-migration unbound tokens remain functional to avoid
 breaking running bots. This is a temporary backward-compatibility boundary,
@@ -44,7 +43,7 @@ The owner's protected `POST /api/v1/integration-tokens` accepts:
 }
 ```
 
-The server rejects mutation scopes without a valid public key. The default
+The server rejects every new service token without a valid public key. The default
 limits for newly issued mutating credentials are 30 days per grant and
 20 completed account creations per rolling 24 hours, per integration client
 (shared across its tokens). Owner may choose stricter caps or explicit values
