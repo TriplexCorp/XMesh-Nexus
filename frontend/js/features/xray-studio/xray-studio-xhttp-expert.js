@@ -112,7 +112,7 @@
   if(mode==='packet-up'||mode==='auto')choices.push(option('packet','PACKET-UP · server','scMaxEachPostBytes и scMaxBufferedPosts.'));
   if(mode==='stream-up'||mode==='auto')choices.push(option('stream','STREAM-UP · server','scStreamUpServerSecs.'));
   choices.push(option('server','Server response / limits','noSSEHeader и serverMaxHeaderBytes.'),option('advanced','Строгий server JSON','Полный SplitHTTPConfig с role/mode validation.'));
-  const action=directAction==='device'?{action:'device'}:await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · expert server inbound',description:'Поля соответствуют актуальному SplitHTTPConfig Xray-core. Client-only параметры намеренно не предлагаются.',confirmLabel:'Открыть',selectFirst:false,fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]});if(!action)return;
+  const action=directAction==='device'?{action:'device'}:await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · expert server inbound',description:'Выберите раздел и нажмите «Открыть». Параметры попадут в JSON только после подтверждения в редакторе. Client-only настройки находятся в профилях устройств.',confirmLabel:'Открыть',selectFirst:false,previewLabel:'Текущая серверная конфигурация',preview:values=>({раздел:choices.find(item=>item.value===values.action)?.label||'Выберите раздел',подсказка:'Карточка только открывает редактор — JSON пока не изменён',xhttpSettings:x}),fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]});if(!action)return;
 
   if(action.action==='device'){
    const names=['iOS','Android','Windows','macOS','Linux','Auto'];
@@ -172,7 +172,7 @@
     if(mode!=='packet-up'&&(out.scMaxEachPostBytes!=null||out.scMinPostsIntervalMs!=null))throw Error('POST tuning применим только к packet-up');
     return out;
    };
-   const edited=await ask({eyebrow:'XRAY STUDIO / XHTTP CLIENTS',title:'XHTTP · '+choice.device,description:'Готовый пресет можно редактировать. Конфликт XMUX maxConnections/maxConcurrency или параметры не того режима будут отклонены.',confirmLabel:'Сохранить профиль',fields,validate:v=>{try{create(v);return ''}catch(err){return err.message}}});if(!edited)return;
+   const edited=await ask({eyebrow:'XRAY STUDIO / XHTTP CLIENTS',title:'XHTTP · '+choice.device,description:'Профиль записывается в xmesh.xhttpDeviceProfiles и применяется к клиентской подписке для выбранной ОС. Серверные настройки не содержат клиентский XMUX.',confirmLabel:'Сохранить профиль',previewLabel:'Что попадёт в клиентскую подписку',preview:values=>({платформа:choice.device,xmesh:{xhttpDeviceProfiles:{[choice.device]:create(values)}}}),fields,validate:v=>{try{create(v);return ''}catch(err){return err.message}}});if(!edited)return;
    const profile=create(edited);
    commit(root,sel,ib=>{
      ib.xmesh??={};ib.xmesh.xhttpDeviceProfiles??={};
