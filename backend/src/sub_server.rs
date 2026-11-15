@@ -229,22 +229,22 @@ fn signed_agent_message(
     format!("{PROOF_PREFIX}\n{token_hash}\nPOST\n{path}\n{timestamp}\n{nonce}\n{body_hash}").into_bytes()
 }
 
-/// A sender-bound agent has both its long-lived pairing token and a private
-/// Ed25519 key, which is never uploaded to Nexus.
-async fn verify_agent_proof(
-    state: &AppState, headers: &HeaderMap, key: &[u8; 32],
-    token_hash: &str, path: &str, body: &[u8],
-) -> Result<(), ApiError> {
+fn single_proof_header<'a>(headers: &'a HeaderMap, name: &'static str) -> Option<&'a str> {
+    let mut values = headers.get_all(name).iter();
+    let value = values.next()?.to_str().ok()?;
+    if values.next().is_some() { return None; }
+    Some(value)
+}
+
+/// Verify signature over the full canonical public API path and *raw* JSON
+/// bytes. Never trust X-Forwarded-* headers for this machine identity.
+fn verified_agent_nonce(
+    headers: &HeaderMap, key: &[u8; 32], token_hash: &str, path: &str, body: &[u8],
+) -> Result<String, ApiError> {
     let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Invalid XMesh Sub request proof");
-    let value = |name| {
-        let mut values = headers.get_all(name).iter();
-        let value = values.next().and_then(|v| v.to_str().ok())?;
-        if values.next().is_some() { return None; }
-        Some(value)
-    };
-    let timestamp = value("x-xmesh-proof-ts").ok_or_else(fail)?;
-    let nonce = value("x-xmesh-proof-nonce").ok_or_else(fail)?;
-    let signature = value("x-xmesh-proof-sig").ok_or_else(fail)?;
+    let timestamp = single_proof_header(headers, "x-xmesh-proof-ts").ok_or_else(fail)?;
+    let nonce = single_proof_header(headers, "x-xmesh-proof-nonce").ok_or_else(fail)?;
+    let signature = single_proof_header(headers, "x-xmesh-proof-sig").ok_or_else(fail)?;
     let seconds: u64 = timestamp.parse().map_err(|_| fail())?;
     if timestamp != seconds.to_string()
         || seconds.abs_diff(now()) > CLOCK_SKEW_SECONDS
@@ -259,15 +259,27 @@ async fn verify_agent_proof(
     let verifying_key = VerifyingKey::from_bytes(key).map_err(|_| fail())?;
     verifying_key.verify(&signed_agent_message(token_hash,path,seconds,nonce,body),&signature)
         .map_err(|_| fail())?;
+    Ok(nonce.to_owned())
+}
+
+/// A sender-bound agent has both its long-lived pairing token and a private
+/// Ed25519 key, which is never uploaded to Nexus.
+async fn verify_agent_proof(
+    state: &AppState, headers: &HeaderMap, key: &[u8; 32],
+    token_hash: &str, path: &str, body: &[u8],
+) -> Result<(), ApiError> {
+    let nonce = verified_agent_nonce(headers, key, token_hash, path, body)?;
     // Reserve the nonce only AFTER valid authentication. Reject replay across
     // concurrent requests, restarts and distributed Nexus instances.
-    let nonce_hash = sha256_hex(nonce);
+    let nonce_hash = sha256_hex(&nonce);
     let mut redis = state.redis.clone();
     let result: Option<String> = redis::cmd("SET")
         .arg(format!("xmesh:sub:proof:v1:{token_hash}:{nonce_hash}"))
         .arg("1").arg("NX").arg("EX").arg(PROOF_TTL_SECONDS)
         .query_async(&mut redis).await.map_err(|_| backend_error())?;
-    if result.is_none() { return Err(fail()); }
+    if result.is_none() {
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Replayed XMesh Sub request proof"));
+    }
     Ok(())
 }
 
