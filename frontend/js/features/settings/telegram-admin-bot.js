@@ -41,7 +41,7 @@ const card=()=>String.raw`
   <header class="tb-banner">
     <div class="tb-banner-copy">
       <span class="tb-eyebrow"><span class="tb-status-pulse"></span> XMESH · CONTROL BOT</span>
-      <h2>Управление из Telegram</h2>
+      <h2>Встроенное администрирование в Telegram</h2>
       <p>Отдельный административный бот для управления XMesh Nexus. Укажите токен BotFather и доверенных администраторов — дополнительных серверов не требуется.</p>
       <div class="tb-banner-bottom">
         <a class="tb-help-link" href="#tb-capabilities">${tbGlyph('info')} Подробнее о боте</a>
@@ -88,14 +88,14 @@ const card=()=>String.raw`
     <div class="tb-side">
       <section class="tb-panel tb-features" id="tb-capabilities">
         <div class="tb-panel-head"><span class="tb-heading-icon">${tbGlyph('lightning')}</span><div><h3>Возможности бота</h3><p>Что умеет Telegram-бот в XMesh Nexus.</p></div></div>
-        <div class="tb-feature"><span class="tb-feature-icon">${tbGlyph('users')}</span><div><strong>Пользователи</strong><p>Быстрый список и карточки подписок.</p></div></div>
+        <div class="tb-feature"><span class="tb-feature-icon">${tbGlyph('users')}</span><div><strong>Пользователи</strong><p>Карточки, продление, персональные ссылки и удаление с подтверждением.</p></div></div>
         <div class="tb-feature"><span class="tb-feature-icon">${tbGlyph('search')}</span><div><strong>Поиск</strong><p>По имени или идентификатору пользователя.</p></div></div>
         <div class="tb-feature"><span class="tb-feature-icon">${tbGlyph('chart')}</span><div><strong>Сводка</strong><p>Состояние пользователей и нод.</p></div></div>
-        <div class="tb-feature"><span class="tb-feature-icon">${tbGlyph('lock')}</span><div><strong>Управление доступом</strong><p>Включение и отключение с одноразовым подтверждением.</p></div></div>
+        <div class="tb-feature"><span class="tb-feature-icon">${tbGlyph('lock')}</span><div><strong>Управление доступом</strong><p>Включение, отключение и удаление с одноразовым подтверждением.</p></div></div>
       </section>
       <section class="tb-note-card">
         <span class="tb-heading-icon">${tbGlyph('shield')}</span><div><strong>Защита по умолчанию</strong>
-        <p>Только личный чат, строгий список ID, лимит запросов, аудит и одноразовые подтверждения на 60 секунд. Используйте отдельного Telegram-бота, не занятого другим сервисом.</p></div>
+        <p>Только личный чат, доверенные Telegram ID, лимиты запросов и аудит. Удаление требует одноразового подтверждения на 60 секунд. Персональные ссылки являются секретами.</p></div>
       </section>
       <section class="tb-panel tb-health" id="tb-connection-panel" hidden>
         <strong>Диагностика подключения</strong><p id="tb-connection-detail"></p>
