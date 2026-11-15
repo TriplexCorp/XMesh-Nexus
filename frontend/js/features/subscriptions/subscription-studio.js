@@ -201,7 +201,7 @@ window.XMeshSubscriptionStudio = (() => {
       tag:'<path d="M11 3H4a1 1 0 0 0-1 1v7l9 9a2 2 0 0 0 3 0l5-5a2 2 0 0 0 0-3l-9-9Z"/><circle cx="7.5" cy="7.5" r="1"/>',
       info:'<circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/>',
       save:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v6h8V3M8 21v-8h8v8"/>',
-      plus:'<path d="M12 5v14M5 12h14"/>''
+      plus:'<path d="M12 5v14M5 12h14"/>'
     };
     return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(paths[name]||paths.server)+'</svg>';
   };
