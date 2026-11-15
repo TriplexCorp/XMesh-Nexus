@@ -348,7 +348,7 @@ async fn throttle_token(state: &AppState, token_id: i64) -> Result<(), Problem> 
 
 pub(super) async fn require_service(
     State(state): State<AppState>,
-    mut request: Request,
+    request: Request,
     next: Next,
 ) -> Response {
     let headers = request.headers().clone();
