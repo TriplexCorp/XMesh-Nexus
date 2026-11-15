@@ -25,9 +25,20 @@ assert(!studio.pathOK('//s'));
 const token='a'.repeat(64);
 const install=studio.installCommand('panel.example.org','sub.example.org','/s',token);
 assert.equal(studio.installCommand('panel.example.org','sub.example.org','/s'),'','No token must produce no command');
-assert(install.includes('TriplexCorp/XMesh-Sub/51d90ff15ef2a68415e23b325b3a37393b8b97b5/install.sh'),'Bootstrap must use an immutable audited Git revision');
-assert(install.includes('19d3049bff7d23a13ad00d06debfd86cfc3fd773ce49a87426e0a9723566579b'),'Bootstrap pins the vetted installer SHA-256');
-assert(install.includes('sha256sum --check --status'),'Installer SHA-256 must be checked before root execution');
+assert(install.includes('https://api.github.com/repos/TriplexCorp/XMesh-Sub/commits/main'),
+  'Discover the latest release commit without trusting mutable raw files');
+assert(install.includes('githubcli-archive-keyring.gpg'),
+  'Install the signed official GitHub CLI for verification');
+assert(install.includes('6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b'),
+  'Official GitHub CLI signing keyring must be pinned by SHA-256');
+assert(install.includes('gh attestation verify'),
+  'Never run the installer without successful build provenance');
+assert(install.includes('--cert-identity') && install.includes('--source-digest "$xmesh_sha"'),
+  'Bind the installer to exact commit and trusted release workflow identity');
+assert(install.includes('--release-sha "$xmesh_sha"'),
+  'The privileged installer must independently verify exact release commit');
+assert(!install.includes('/51d90ff15ef2a68415e23b325b3a37393b8b97b5/'),
+  'Obsolete Bearer-auth installer must not be offered');
 assert(install.includes("--enroll-token-stdin <<'XMESH_ENROLL_TOKEN'"),'One-time secret must be provided through stdin');
 assert(!install.includes('--enroll-token '+token),'Credential must not occur in argv');
 assert(install.includes('\n'+token+'\nXMESH_ENROLL_TOKEN'),'Token must be supplied as heredoc body only');
