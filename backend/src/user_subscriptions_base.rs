@@ -2151,6 +2151,16 @@ fn portal_theme_changes(settings: &Value) -> Vec<(&'static str, String)> {
 // The visitor page embeds its vetted assets: old XMesh Sub gateways only
 // forward bearer HTML URLs and may 404 separate CSS or JavaScript requests.
 // Scripts are bound to a fresh CSP nonce for each rendered subscription page.
+// The SVG comes from the same audited asset used by the panel and login.
+// Embed it in bearer HTML because older subscription mirrors can reject static URLs.
+fn portal_favicon() -> String {
+    format!(
+        "data:image/svg+xml;base64,{}",
+        base64::engine::general_purpose::STANDARD
+            .encode(include_str!("../../frontend/favicon.svg"))
+    )
+}
+
 fn portal_assets(nonce: &str) -> (String, String) {
     let css = [
         include_str!("../../frontend/styles/features/subscriptions/subscription-studio.css"),
@@ -2220,6 +2230,7 @@ fn portal_html(
     let changes = [
         ("{{PUBLIC_CSS}}", styles),
         ("{{PUBLIC_SCRIPTS}}", scripts),
+        ("{{FAVICON}}", portal_favicon()),
         ("{{LANG}}", lang.to_owned()),
         ("{{BRAND}}", escape_html(logo_brand)),
         ("{{OWNER}}", owner_label),
@@ -2345,8 +2356,9 @@ pub async fn portal(
                     "Повторить",
                 )
             };
+            let favicon = portal_favicon();
             let html = format!(
-                "<!doctype html><html lang=\"{}\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"referrer\" content=\"no-referrer\"><title>{title}</title><body style=\"margin:0;background:#080b11;color:#f3f5f9;font:18px/1.6 system-ui;padding:32px\"><main style=\"max-width:640px;margin:15vh auto\"><h1>{title}</h1><p>{note}</p><a href=\"\" style=\"display:inline-block;padding:12px 24px;background:#ff9788;color:#10151f;border-radius:12px\">{retry}</a></main></body></html>",
+                "<!doctype html><html lang=\"{}\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"referrer\" content=\"no-referrer\"><link rel=\"icon\" type=\"image/svg+xml\" href=\"{favicon}\"><title>{title}</title><body style=\"margin:0;background:#080b11;color:#f3f5f9;font:18px/1.6 system-ui;padding:32px\"><main style=\"max-width:640px;margin:15vh auto\"><h1>{title}</h1><p>{note}</p><a href=\"\" style=\"display:inline-block;padding:12px 24px;background:#ff9788;color:#10151f;border-radius:12px\">{retry}</a></main></body></html>",
                 if en { "en" } else { "ru" }
             );
             Ok((

@@ -38,6 +38,27 @@ const userViewport=read('frontend/styles/features/users/user-dialog-viewport.css
 const subscriptionSurface=read('frontend/styles/features/subscriptions/subscription-surface.css');
 const subscriptionPublic=read('frontend/styles/features/subscriptions/subscription-public.css');
 const subscriptionTemplate=read('backend/src/subscription_template.html');
+const favicon=read('frontend/favicon.svg');
+const faviconDigest=require('node:crypto').createHash('sha256').update(favicon).digest('hex').slice(0,12);
+assert.match(favicon,/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"[^>]*viewBox="0 0 512 512"/,
+  'Favicon must use the exact provided vector artwork');
+assert.doesNotMatch(favicon,/<script\b|\bonload\s*=|<foreignObject\b/i,
+  'The shipped SVG must not embed active content');
+for(const html of [index,login]){
+  assert(html.includes('/favicon.svg?v='+faviconDigest),
+    'Every standalone panel/login page must use the content-addressed global favicon');
+}
+assert(subscriptionTemplate.includes('href="{{FAVICON}}"'),
+  'Public subscription template must embed its favicon inline');
+assert(read('backend/src/user_subscriptions_base.rs').includes('("{{FAVICON}}", portal_favicon())'),
+  'Public portal must fill its favicon from the canonical vector asset');
+assert(dockerfile.includes('COPY frontend/favicon.svg /build/frontend/favicon.svg'),
+  'Docker must provide the vector to Rust at compile time');
+const publicIconCss=read('frontend/styles/features/subscriptions/subscription-public.css');
+assert.doesNotMatch(publicIconCss,/content:"[⧉▦]"/,
+  'Copy and QR action icons must not depend on Unicode glyph fallback');
+assert.match(publicIconCss,/mask:url\("data:image\/svg\+xml,/,
+  'Copy and QR button icons must render from inline vector masks');
 const i18nConsistency=read('frontend/js/core/i18n-consistency.js');
 const tlsJs=read('frontend/js/features/xray-studio/xray-studio-tls-dialog.js');
 const tlsCss=read('frontend/styles/features/xray-studio/xray-studio-tls-dialog.css');

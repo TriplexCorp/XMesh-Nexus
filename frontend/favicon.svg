@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Градиент фона иконки -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22262E" />
+      <stop offset="100%" stop-color="#13161B" />
+    </linearGradient>
+
+    <!-- Градиент для щита -->
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A5568" />
+      <stop offset="100%" stop-color="#2D3748" />
+    </linearGradient>
+
+    <!-- Металлический градиент для буквы X -->
+    <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7FAFC" />
+      <stop offset="50%" stop-color="#CBD5E0" />
+      <stop offset="100%" stop-color="#718096" />
+    </linearGradient>
+    
+    <!-- Тень для объема -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Подложка иконки (squircle) -->
+  <rect x="32" y="32" width="448" height="448" rx="100" fill="url(#bgGrad)" stroke="#323844" stroke-width="4" />
+  
+  <!-- Внутренняя тонкая рамка -->
+  <rect x="48" y="48" width="416" height="416" rx="86" fill="none" stroke="#282D37" stroke-width="2" />
+
+  <!-- Группа логотипа с тенью -->
+  <g filter="url(#dropShadow)">
+    <!-- Контур щита (разделенный для минимализма) -->
+    <path d="M 196 142 L 256 116 L 316 142" fill="none" stroke="url(#shieldGrad)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 148 186 C 148 256 164 316 206 356" fill="none" stroke="url(#shieldGrad)" stroke-width="10" stroke-linecap="round" />
+    <path d="M 364 186 C 364 256 348 316 306 356" fill="none" stroke="url(#shieldGrad)" stroke-width="10" stroke-linecap="round" />
+    <path d="M 226 376 L 256 396 L 286 376" fill="none" stroke="url(#shieldGrad)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Буква X (строгая геометрия) -->
+    <path d="M 164 156 L 208 156 L 256 226 L 304 156 L 348 156 L 278 256 L 348 356 L 304 356 L 256 286 L 208 356 L 164 356 L 234 256 Z" fill="#1A1E24" stroke="url(#metalGrad)" stroke-width="10" stroke-linejoin="miter" />
+  </g>
+</svg>
