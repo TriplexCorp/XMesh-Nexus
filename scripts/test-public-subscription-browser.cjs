@@ -30,7 +30,7 @@ function fixture(url){
  const state=url.searchParams.get('state')||'ACTIVE';
  const en=url.searchParams.get('lang')==='en',active=url.searchParams.get('active')!=='0'&&!['EXPIRED','LIMITED','DISABLED'].includes(state),unlimited=url.searchParams.get('limit')==='0',light=url.searchParams.get('theme')==='light';
  const text=(ru,enText)=>en?enText:ru;
- const data={PUBLIC_CSS:embeddedCss,PUBLIC_SCRIPTS:embeddedScripts,LANG:en?'en':'ru',OWNER:'demo_user',PLAN:'VPN Access',BRAND:process.env.XMESH_TEST_BRAND||'Private VPN',LOGO:'<span aria-hidden="true">S</span>',
+ const data={PUBLIC_CSS:embeddedCss,PUBLIC_SCRIPTS:embeddedScripts,FAVICON:'data:image/svg+xml;base64,'+read('frontend/favicon.svg').toString('base64'),LANG:en?'en':'ru',OWNER:'demo_user',PLAN:'VPN Access',BRAND:process.env.XMESH_TEST_BRAND||'Private VPN',LOGO:'<span aria-hidden="true">S</span>',
  ACCENT:url.searchParams.get('accent')==='dark'?'#2549bf':light?'#86e0b6':'#ff9788',SECONDARY_ACCENT:'#a3bffa',BACKGROUND:light?'#f6f8fa':'#0d1218',CARD_COLOR:light?'#ffffff':'#151c25',TEXT_COLOR:light?'#1c2938':'#edf2f7',RADIUS:'20',THEME:light?'light':'dark',LAYOUT:'standard',FONT:'system',CARD_STYLE:url.searchParams.get('material')||'soft',
  RU_SELECTED:en?'':'on',EN_SELECTED:en?'on':'',RU_CURRENT:en?'false':'page',EN_CURRENT:en?'page':'false',
  STATUS_DOT:'<span class="subscription-preview-ok">● '+text(active?'Активна':'Неактивна',active?'Active':'Inactive')+'</span>',
@@ -62,6 +62,23 @@ async function dismissDialog(page,dialog,opener){
   await context.route('https://fonts.googleapis.com/**',r=>r.abort());const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   for(const [width,height] of [[320,780],[375,812],[390,844],[430,932],[768,1024],[1024,768],[1440,1000],[1920,1080]])for(const lang of ['ru','en']){
    await page.setViewportSize({width,height});await page.goto(base+'/?lang='+lang+'&theme='+(lang==='en'?'light':'dark'));await page.waitForSelector('.portal-donut');
+   const favicon=await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute('href');
+   assert.equal(favicon,'data:image/svg+xml;base64,'+read('frontend/favicon.svg').toString('base64'),
+     'Public favicon must embed the exact user-supplied SVG without a separate mirror request');
+   const actionIcons=await page.evaluate(()=>{
+     const icon=(selector)=>{
+       const button=document.querySelector(selector),style=getComputedStyle(button,'::before');
+       return {content:style.content,width:style.width,height:style.height,
+         mask:style.maskImage==='none'?style.webkitMaskImage:style.maskImage};
+     };
+     return {copy:icon('#connect-link'),qr:icon('#toggle-qr')};
+   });
+   for(const [name,icon] of Object.entries(actionIcons)){
+     assert.equal(icon.content,'""',name+' must use an SVG instead of a font glyph');
+     assert.equal(icon.width,'24px',name+' icon width');
+     assert.equal(icon.height,'24px',name+' icon height');
+     assert(icon.mask.includes('data:image/svg+xml,'),name+' icon must be an embedded SVG mask');
+   }
    assert.equal(await page.locator('#subscription-link-card,#toggle-link').count(),0,'No link reveal UI');
    const g=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth,body:innerWidth,title:parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),minTap:Math.min(...[...document.querySelectorAll('.subscription-cabinet-tab:not([hidden]),.subscription-preview-languages a,.subscription-preview-cta')].map(el=>el.getBoundingClientRect().height))}));
    assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=30,'Readable heading');assert(g.minTap>=44,'Touch target too small');

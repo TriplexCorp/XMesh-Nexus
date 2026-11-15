@@ -8,6 +8,7 @@ ARG PANEL_BUILD_REVISION=unknown
 COPY VERSION /build/VERSION
 COPY backend/Cargo.toml ./Cargo.toml
 COPY backend/src ./src
+COPY frontend/favicon.svg /build/frontend/favicon.svg
 # Bundle public portal assets at compile time: older XMesh Sub gateways may
 # block external static files, but the visitor page must remain functional.
 COPY frontend/styles/features/subscriptions/subscription-studio.css frontend/styles/features/subscriptions/subscription-surface.css frontend/styles/features/subscriptions/subscription-public.css /build/frontend/styles/features/subscriptions/
