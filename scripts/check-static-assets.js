@@ -69,8 +69,8 @@ for(const html of [index,login]){
 }
 assert(subscriptionTemplate.includes('href="{{FAVICON}}"'),
   'Public subscription template must embed its favicon inline');
-assert(read('backend/src/user_subscriptions_base.rs').includes('("{{FAVICON}}", portal_favicon())'),
-  'Public portal must fill its favicon from the canonical vector asset');
+assert(read('backend/src/user_subscriptions_base.rs').includes('("{{FAVICON}}", portal_brand_favicon(settings))'),
+  'Public portal must use uploaded brand favicon or canonical SVG fallback');
 assert(dockerfile.includes('COPY frontend/favicon.svg /build/frontend/favicon.svg'),
   'Docker must provide the vector to Rust at compile time');
 const publicIconCss=read('frontend/styles/features/subscriptions/subscription-public.css');
