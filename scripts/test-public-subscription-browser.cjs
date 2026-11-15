@@ -178,6 +178,14 @@ async function dismissDialog(page,dialog,opener){
   await page.goto(base+'/?lang=en&limit=0');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[role="meter"],[role="progressbar"]').count(),0);assert.equal(((await page.locator('[data-subscription-traffic]').innerText()).match(/Unlimited/g)||[]).length,1);await page.screenshot({path:path.join(out,'portal-unlimited-1920-en.png'),fullPage:true,animations:'disabled'});checks++;
   await page.goto(base+'/?lang=en&active=0');await page.waitForFunction(()=>document.querySelector('[data-setup-section="connect"]').hidden);assert(await page.locator('[data-setup-section="apps"]').isHidden());assert(await page.locator('[data-setup-section="support"]').isVisible());checks++;
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto(base+'/?lang=en');await page.waitForSelector('#connect-link');assert.equal(await page.locator('[data-setup-section="connect"]').evaluate(el=>getComputedStyle(el).animationName),'none');checks++;
+  // The bearer fixture intentionally simulates a legacy mirror with 404 static
+  // requests. Studio, however, loads the real production stylesheet in ShadowRoot.
+  // Serve those exact assets here so visual parity is tested, not just DOM parity.
+  await page.route(/\/subscription-(?:studio|surface|public)\.css(?:\?.*)?$/,route=>{
+    const name=new URL(route.request().url()).pathname.slice(1);
+    return route.fulfill({status:200,contentType:'text/css',
+      body:read('frontend/styles/features/subscriptions/'+name).toString()});
+  });
   await page.goto(base+'/?lang=en');
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-experience.js').toString()});
   await page.addScriptTag({content:read('frontend/js/features/subscriptions/subscription-traffic.js').toString()});

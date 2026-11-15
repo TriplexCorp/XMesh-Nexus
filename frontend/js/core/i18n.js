@@ -15,6 +15,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Тариф": "Plan",
+    "Персональная подписка": "Personal subscription",
     "Свой логотип · сохраняется на сервере": "Custom logo · stored on the server",
     "Стандартный SVG · используется, пока не загрузите свой": "Default SVG · used until you upload your own",
     "Файл логотипа должен быть не больше 2 МБ.": "Logo file must not exceed 2 MB.",

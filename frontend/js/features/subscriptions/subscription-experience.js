@@ -78,6 +78,10 @@ window.XMeshSubscriptionExperience={mount(root,options){
     if(metric&&metric.parentElement!==account)account.append(metric);
     const state=root.dataset.subscriptionState||'ACTIVE';
     root.dataset.experienceState=state;
+    // Hide duplicate active-state hero even if a preview stylesheet is late.
+    // Non-active states still show the real, localized status explanation.
+    const stateHero=root.querySelector('.subscription-preview-hero');
+    if(stateHero)stateHero.style.display=state==='ACTIVE'?'none':'';
     owner.hidden=false;
     account.hidden=!metric||metric.hidden;root.classList.toggle('experience-no-account',account.hidden);
     // Same owner-uploaded logo in the portal header and subscription plan card;
