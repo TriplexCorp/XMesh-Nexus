@@ -22,9 +22,9 @@ const root=async(page,theme)=>{
  });
 };
 const rgb=s=>{
- const srgb=/^color\\(srgb\\s+([.\\d]+)\\s+([.\\d]+)\\s+([.\\d]+)/.exec(s);
+ const srgb=/^color\(srgb\s+([.\d]+)\s+([.\d]+)\s+([.\d]+)/.exec(s);
  if(srgb)return srgb.slice(1,4).map(v=>Number(v)*255);
- const rgba=/^rgba?\\(\\s*([.\\d]+)[, ]+([.\\d]+)[, ]+([.\\d]+)/.exec(s);
+ const rgba=/^rgba?\(\s*([.\d]+)[, ]+([.\d]+)[, ]+([.\d]+)/.exec(s);
  if(rgba)return rgba.slice(1,4).map(Number);
  throw Error('Unexpected CSS color: '+s);
 };
