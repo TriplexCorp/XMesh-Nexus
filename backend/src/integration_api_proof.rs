@@ -27,7 +27,10 @@ fn denied() -> Problem {
 fn single_header(headers: &HeaderMap, name: &'static str) -> Result<String, Problem> {
     let name = HeaderName::from_static(name);
     let mut values = headers.get_all(name).iter();
-    let value = values.next().and_then(|v| v.to_str().ok()).ok_or_else(denied)?;
+    let value = values
+        .next()
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(denied)?;
     if values.next().is_some() {
         return Err(denied());
     }
@@ -35,7 +38,10 @@ fn single_header(headers: &HeaderMap, name: &'static str) -> Result<String, Prob
 }
 
 fn lowercase_hex(value: &str, len: usize) -> bool {
-    value.len() == len && value.bytes().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    value.len() == len
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 
 pub(super) fn proof_message(
@@ -101,11 +107,20 @@ pub(super) async fn constrain(
     };
     let (parts, body) = request.into_parts();
     let bytes = to_bytes(body, BODY_LIMIT).await.map_err(|_| {
-        Problem::new(StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large", "Payload too large")
+        Problem::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "payload_too_large",
+            "Payload too large",
+        )
     })?;
     let path = parts.uri.path_and_query().map_or("/", |p| p.as_str());
     let nonce = validate_signature(
-        proof_key, token_hash, &parts.method, path, &bytes, &parts.headers,
+        proof_key,
+        token_hash,
+        &parts.method,
+        path,
+        &bytes,
+        &parts.headers,
     )?;
     let nonce_hash = hex::encode(Sha256::digest(nonce.as_bytes()));
     let mut redis = state.redis.clone();
@@ -135,18 +150,75 @@ mod tests {
         let token = hex::encode(Sha256::digest(b"example-token"));
         let nonce = "0".repeat(32);
         let time = now_ms() / 1000;
-        let expected = proof_message(&token, &Method::POST, "/api/v1/integrations/users?a=1", time, &nonce, b"{}");
+        let expected = proof_message(
+            &token,
+            &Method::POST,
+            "/api/v1/integrations/users?a=1",
+            time,
+            &nonce,
+            b"{}",
+        );
         let signature = hex::encode(key.sign(&expected).to_bytes());
         let mut headers = HeaderMap::new();
         headers.insert("x-xmesh-proof-ts", time.to_string().parse().unwrap());
         headers.insert("x-xmesh-proof-nonce", nonce.parse().unwrap());
         headers.insert("x-xmesh-proof-sig", signature.parse().unwrap());
         let pubkey = key.verifying_key().to_bytes();
-        assert!(validate_signature(&pubkey, &token, &Method::POST, "/api/v1/integrations/users?a=1", b"{}", &headers).is_ok());
-        assert!(validate_signature(&pubkey, &token, &Method::POST, "/api/v1/integrations/users?a=2", b"{}", &headers).is_err());
-        assert!(validate_signature(&pubkey, &token, &Method::GET, "/api/v1/integrations/users?a=1", b"{}", &headers).is_err());
-        assert!(validate_signature(&pubkey, &token, &Method::POST, "/api/v1/integrations/users?a=1", b"{ }", &headers).is_err());
-        assert!(validate_signature(&pubkey, &hex::encode(Sha256::digest(b"stolen-other-token")), &Method::POST, "/api/v1/integrations/users?a=1", b"{}", &headers).is_err());
+        assert!(
+            validate_signature(
+                &pubkey,
+                &token,
+                &Method::POST,
+                "/api/v1/integrations/users?a=1",
+                b"{}",
+                &headers
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_signature(
+                &pubkey,
+                &token,
+                &Method::POST,
+                "/api/v1/integrations/users?a=2",
+                b"{}",
+                &headers
+            )
+            .is_err()
+        );
+        assert!(
+            validate_signature(
+                &pubkey,
+                &token,
+                &Method::GET,
+                "/api/v1/integrations/users?a=1",
+                b"{}",
+                &headers
+            )
+            .is_err()
+        );
+        assert!(
+            validate_signature(
+                &pubkey,
+                &token,
+                &Method::POST,
+                "/api/v1/integrations/users?a=1",
+                b"{ }",
+                &headers
+            )
+            .is_err()
+        );
+        assert!(
+            validate_signature(
+                &pubkey,
+                &hex::encode(Sha256::digest(b"stolen-other-token")),
+                &Method::POST,
+                "/api/v1/integrations/users?a=1",
+                b"{}",
+                &headers
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -154,6 +226,18 @@ mod tests {
         assert!(!lowercase_hex("AA", 2));
         assert!(!lowercase_hex("gg", 2));
         assert!(!lowercase_hex("", 32));
-        assert_eq!(proof_message(&"a".repeat(64), &Method::GET, "/abc", 1, &"b".repeat(32), b"").len() > 110, true);
+        assert_eq!(
+            proof_message(
+                &"a".repeat(64),
+                &Method::GET,
+                "/abc",
+                1,
+                &"b".repeat(32),
+                b""
+            )
+            .len()
+                > 110,
+            true
+        );
     }
 }
