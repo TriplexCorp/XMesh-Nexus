@@ -119,7 +119,7 @@ function supportsVision(inbound){
 }
 function contextualToolGroups(inbound,hasInbound){
  const common=['dns','routing','outbounds','inbound'];
- if(!hasInbound)return [['Конфигурация',common]];
+ if(!hasInbound)return [['Начать с чистого JSON',['xhttp','xhttp-device',...common]]];
  const protocol=String(inbound.protocol||'').toLowerCase();
  const network=String(inbound.streamSettings?.network||'raw').toLowerCase();
  const security=String(inbound.streamSettings?.security||'none').toLowerCase();
@@ -149,7 +149,7 @@ function contextualToolGroups(inbound,hasInbound){
    networkTools.push('xhttp');
    // An existing XHTTP inbound has client-side device profiles, not another
    // server setting. Keep their editor one click away in the transport toolbar.
-   if(network==='xhttp')networkTools.push('xhttp-device');
+   if(network==='xhttp'||network==='raw')networkTools.push('xhttp-device');
   }
   else if(['ws','grpc','httpupgrade','quic'].includes(network))networkTools.push('transport-config');
  }
