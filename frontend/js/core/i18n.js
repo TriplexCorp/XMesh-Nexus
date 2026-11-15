@@ -517,6 +517,8 @@ window.XMeshI18n=(()=>{
     "Неизвестное обновление.": "Unknown update.",
     "Управление Sub-сервером": "Manage Sub server",
     "Некорректный идентификатор зеркала.": "Invalid mirror ID.",
+    "Недопустимый идентификатор зеркала.": "Invalid mirror identifier.",
+    "Этот домен уже используется зеркалом подписок.": "This domain is already assigned to a subscription mirror.",
     "Основной шлюз и независимые зеркала. У всех общие пользователи, токены и настройки из Nexus — отдельные VPS нужны только для выдачи подписок.": "The primary gateway and independent mirrors share Nexus users, tokens and settings. Separate VPSs serve subscriptions only.",
     "Основной сервер · 0 зеркал": "Primary server · 0 mirrors",
     "Добавить зеркало": "Add mirror",
