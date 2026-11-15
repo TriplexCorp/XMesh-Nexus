@@ -18,6 +18,8 @@ assert.match(migration,/max_creates_per_day INTEGER/,'Provision cap must be pers
 assert.match(auth,/All new API tokens require an Ed25519 proofPublicKey/,'New service tokens must not be bearer-only');
 assert.match(auth,/VerifyingKey::from_bytes/,'Public keys must be validated at issuance');
 assert.match(auth,/proof::constrain/,'Every protected request must carry a verified proof');
+assert(auth.indexOf('proof::constrain') < auth.indexOf('throttle_token(&state, principal.token_id)'),
+ 'A stolen bearer without proof must not exhaust the per-token request budget');
 assert.match(auth,/maxCreatesPerDay/,'Owner must see issued account caps');
 assert.match(auth,/XMESH_INTEGRATION_REQUIRE_PROOF/,'Legacy token cutover must be explicitly controllable');
 assert.match(read('compose.yaml'),/XMESH_INTEGRATION_REQUIRE_PROOF/,'Runtime must expose strict cutover control');
