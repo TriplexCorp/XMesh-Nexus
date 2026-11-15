@@ -15,6 +15,18 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "🗂 Сначала создайте сквад в веб-панели. Без сквада пользователь не получит доступ.": "🗂 Create a squad in the web panel first. Without it, the user will have no access.",
+    "⏳ Выбор сквада истёк. Повторите команду /create.": "⏳ Squad selection expired. Run /create again.",
+    "Сквады не найдены. Проверьте сквады в веб-панели.": "No squads found. Check the web panel.",
+    "◀ Назад": "◀ Previous",
+    "Далее ▶": "Next ▶",
+    "👤 Новый пользователь:": "👤 New user:",
+    "Выберите сквад для доступа:": "Select a squad for access:",
+    "⏳ Выбор уже подтверждён или устарел. Повторите /create.": "⏳ Choice already confirmed or expired. Run /create again.",
+    "Подтвердите создание": "Confirm user creation",
+    "Подтверждение действует 60 секунд и используется один раз.": "Confirmation is valid for 60 seconds and can be used once.",
+    "Сквад больше не существует. Запустите /create заново.": "This squad no longer exists. Run /create again.",
+    "Сначала выберите сквад, затем подтвердите создание.": "Select a squad before confirming user creation.",
     "Telegram-бот": "Telegram bot",
     "Модуль Telegram-бота не загружен. Перезагрузите страницу.": "The Telegram bot module is not loaded. Reload the page.",
     "Токен отклонён Telegram. Проверьте значение BotFather.": "Telegram rejected this token. Check the BotFather token.",

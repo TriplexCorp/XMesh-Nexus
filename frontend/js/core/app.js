@@ -189,9 +189,15 @@ const tags=()=>DB.profiles.flatMap(p=>inbs(p).map(i=>i.tag));
 // Must match the public JSON subscription assembler and the backend Hosts validator.
 const SUBSCRIPTION_PROTOCOLS=new Set(['vless','vmess','trojan','shadowsocks','hysteria','masque']);
 const tcol=t=>({vless:'--a',trojan:'--c3',shadowsocks:'--c4'}[DB.profiles.flatMap(inbs).find(x=>x.tag==t)?.protocol]||'--b');
-const uin=u=>[...new Set(DB.squads.filter(s=>u.squads.includes(s.id)).flatMap(s=>s.inb))];
+// External integrations (including the Telegram bot) may create users without
+// squad assignments. The complete UI must handle legacy records safely.
+const userSquads=u=>Array.isArray(u?.squads)?u.squads:[];
+const normalizeUserList=rows=>Array.isArray(rows)
+  ?rows.filter(u=>u&&typeof u==='object'&&!Array.isArray(u)).map(u=>({...u,squads:userSquads(u)}))
+  :[];
+const uin=u=>[...new Set(DB.squads.filter(s=>userSquads(u).includes(s.id)).flatMap(s=>s.inb||[]))];
 const api={
-  async list(c,o={}){await lat();let a=DB[c]||[];if(o.f)a=a.filter(o.f);if(o.sort){const k=o.sort,d=o.dir=='desc'?-1:1,v=x=>k=='status'?st(x):x[k];a=[...a].sort((x,y)=>(v(x)>v(y)?1:v(x)<v(y)?-1:0)*d)}const ids=a.map(x=>x.id),total=a.length;if(o.size)a=a.slice((o.page-1)*o.size,o.page*o.size);return{items:a,total,ids}},
+  async list(c,o={}){await lat();let a=DB[c]||[];if(o.f)a=a.filter(o.f);if(o.sort){const k=o.sort,d=o.dir=='desc'?-1:1,v=x=>k=='status'?st(x):(c==='users'&&k==='created'?x.id:x[k]);a=[...a].sort((x,y)=>(v(x)>v(y)?1:v(x)<v(y)?-1:0)*d)}const ids=a.map(x=>x.id),total=a.length;if(o.size)a=a.slice((o.page-1)*o.size,o.page*o.size);return{items:a,total,ids}},
   async create(c,o){await lat();let row;if(backendReady){const path=c==='admins'?'/api/v1/admins':'/api/v1/collections/'+encodeURIComponent(c);const body=c==='admins'?{username:o.username,password:o.password,role:o.role,isActive:o.isActive}:o;row=await backendRequest(path,{method:'POST',body:JSON.stringify(body)})}else{if(c==='admins')throw new Error('Для создания администратора требуется доступ к Rust API.');o.id=DB[c].reduce((m,x)=>Math.max(m,x.id),0)+1;row=o}DB[c].push(row);save();return row},
   async update(c,id,p){await lat();const x=DB[c].find(y=>y.id==id);if(!x)throw new Error('Запись не найдена в локальном кеше.');const path=c==='admins'?'/api/v1/admins/'+encodeURIComponent(id):'/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id);const row=backendReady?await backendRequest(path,{method:'PATCH',body:JSON.stringify(p)}):{...x,...p};Object.assign(x,row);save();return x},
   async remove(c,id){await lat();const i=DB[c].findIndex(x=>x.id==id);const old=i>=0?DB[c][i]:null;if(backendReady){const path=c==='admins'?'/api/v1/admins/'+encodeURIComponent(id):'/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id);await backendRequest(path,{method:'DELETE'});}else if(i<0){throw new Error('Запись не найдена в локальном кеше.');}if(i>=0)DB[c].splice(i,1);save();return old},
@@ -249,8 +255,8 @@ const nodeRotationValidate = data => {
 };
 const ENT={
   squads:{t:'Сквады',n:'Доступ пользователей к подключениям Xray.',s:'id',nw:'Сквад',fs:[{k:'name',l:'Название',req:1},{k:'desc',l:'Описание'},{k:'inb',l:'Инбаунды (из профилей Xray)',t:'multi',o:tags}],
-    cols:[['Название',r=>`<b>${esc(r.name)}</b><br><span class="mu">${esc(r.desc)}</span>`],['Инбаунды',r=>r.inb.map(t=>chip(esc(t),tcol(t))).join(' ')||'—'],['Пользователей',r=>DB.users.filter(u=>u.squads.includes(r.id)).length]],
-    guard:r=>DB.users.some(u=>u.squads.includes(r.id))?'В скваде есть пользователи. Сначала переведите их в другой сквад.':''},
+    cols:[['Название',r=>`<b>${esc(r.name)}</b><br><span class="mu">${esc(r.desc)}</span>`],['Инбаунды',r=>r.inb.map(t=>chip(esc(t),tcol(t))).join(' ')||'—'],['Пользователей',r=>DB.users.filter(u=>userSquads(u).includes(r.id)).length]],
+    guard:r=>DB.users.some(u=>userSquads(u).includes(r.id))?'В скваде есть пользователи. Сначала переведите их в другой сквад.':''},
   hosts:{t:'Хосты',n:'Публичные подключения и назначение серверов.',s:'order',nw:'Хост',mv:1,fs:[
     {k:'profileId',l:'Профиль XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},
     {k:'tag',l:'Inbound',t:'sel',o:tags},
@@ -2177,6 +2183,27 @@ async function homeP(){
 }
 /* ================= ПОЛЬЗОВАТЕЛИ ================= */
 const UQ={q:'',st:'all',sq:'',inbound:'',tag:'',fp:'',node:'',expiry:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
+let usersRefreshInFlight=null;
+let usersLastSyncedAt=0;
+// A background list refresh must never replace user records while a device
+// workspace is open: that dialog may have live device state and pending writes.
+const usersEditorBusy=()=>Boolean(document.querySelector('#xm-sharing-dialog[open]'));
+async function refreshPanelUsers(){
+  if(!backendReady||usersEditorBusy())return;
+  if(usersRefreshInFlight)return usersRefreshInFlight;
+  usersRefreshInFlight=(async()=>{
+    const response=await fetch('/api/v1/collections/users',{credentials:'same-origin',cache:'no-store'});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok||!Array.isArray(payload.items))throw Error(payload.error||'Не удалось обновить пользователей.');
+    // The workspace might open while this request is in flight.
+    if(usersEditorBusy())return;
+    DB.users=normalizeUserList(payload.items);
+    usersLastSyncedAt=Date.now();
+    for(const id of UQ.sel)if(!DB.users.some(user=>user.id===id))UQ.sel.delete(id);
+    if(cur==='users'&&$('#ut'))await drawUsers();
+  })();
+  try{await usersRefreshInFlight}finally{usersRefreshInFlight=null;}
+}
 async function usersP(){
   return [`<div class="card users-panel"><div class="bar2 users-statusbar"><div class="fl" id="uf"></div></div><div class="users-toolbar" data-ui-toolbar="filters">
     <div class="users-search-wrap"><label class="search users-search-field" style="cursor:text">${ic('search')}<input id="uq" placeholder="Поиск пользователей" value="${esc(UQ.q)}" aria-label="Поиск по имени, тегу, email, ссылке или Telegram ID"></label><span class="users-search-hint">Поиск по имени · тегу · email · ссылке · Telegram ID</span></div>
@@ -2189,7 +2216,12 @@ async function usersP(){
     <label>Узел <select data-user-filter="node"><option value="">Все узлы</option>${DB.nodes.map(n=>`<option value="${n.id}"${UQ.node===String(n.id)?' selected':''}>${esc(n.name)}</option>`).join('')}</select></label>
     <label>Срок <select data-user-filter="expiry"><option value="">Любой срок</option><option value="eternal"${UQ.expiry==='eternal'?' selected':''}>Бессрочно</option><option value="3"${UQ.expiry==='3'?' selected':''}>До 3 дней</option><option value="7"${UQ.expiry==='7'?' selected':''}>До 7 дней</option><option value="30"${UQ.expiry==='30'?' selected':''}>До 30 дней</option></select></label>
     <button type="button" class="gh sm" data-user-filter-reset>Сбросить фильтры</button>
-  </div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
+  </div><div id="ut"></div></div>`,()=>{drawUsers();
+    // Startup bootstrap already has the latest users; avoid a second request
+    // racing with newly opened device controls on the first render.
+    if(Date.now()-usersLastSyncedAt>15000)void refreshPanelUsers().catch(error=>console.warn('XMesh users refresh failed:',error));
+    T.push(setInterval(()=>{if(cur==='users'&&!document.hidden)void refreshPanelUsers().catch(error=>console.warn('XMesh users refresh failed:',error))},30000));
+    let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
     $$('[data-user-filter]').forEach(el=>el.onchange=()=>{UQ[el.dataset.userFilter]=el.value;UQ.page=1;drawUsers()});
     $('[data-user-filter-reset]').onclick=()=>{for(const key of ['sq','inbound','tag','node','expiry'])UQ[key]='';UQ.page=1;render(1)};
     // Poll only user presence, not the entire bootstrap with profiles and secrets.
@@ -2239,11 +2271,11 @@ async function usersP(){
     T.push(setInterval(()=>{void refreshPresence()},10000));
   }];
 }
-const uf=u=>(UQ.st=='all'||(UQ.st=='ONLINE'?isOn(u):st(u)==UQ.st))&&(!UQ.sq||u.squads.includes(+UQ.sq))&&(!UQ.tag||u.tag===UQ.tag)
+const uf=u=>(UQ.st=='all'||(UQ.st=='ONLINE'?isOn(u):st(u)==UQ.st))&&(!UQ.sq||userSquads(u).includes(+UQ.sq))&&(!UQ.tag||u.tag===UQ.tag)
 &&(!UQ.expiry||(UQ.expiry==='eternal'?!u.expireAt:!!u.expireAt&&u.expireAt>=Date.now()&&u.expireAt-Date.now()<=Number(UQ.expiry)*DAY))
-&&(!UQ.inbound||DB.squads.some(s=>u.squads.includes(s.id)&&(s.inb||[]).includes(UQ.inbound)))
-&&(!UQ.node||DB.nodes.some(n=>String(n.id)===UQ.node&&DB.squads.some(s=>u.squads.includes(s.id)&&(s.inb||[]).some(tag=>DB.profiles.some(p=>String(p.id)===String(n.profileId)&&inbs(p).some(ib=>ib.tag===tag))))))
-&&(!UQ.q||[u.username,u.tag,u.email,u.desc,u.tg,u.short,...u.squads.map(id=>DB.squads.find(s=>s.id===id)?.name||'')].join(' ').toLowerCase().includes(UQ.q));
+&&(!UQ.inbound||DB.squads.some(s=>userSquads(u).includes(s.id)&&(s.inb||[]).includes(UQ.inbound)))
+&&(!UQ.node||DB.nodes.some(n=>String(n.id)===UQ.node&&DB.squads.some(s=>userSquads(u).includes(s.id)&&(s.inb||[]).some(tag=>DB.profiles.some(p=>String(p.id)===String(n.profileId)&&inbs(p).some(ib=>ib.tag===tag))))))
+&&(!UQ.q||[u.username,u.tag,u.email,u.desc,u.tg,u.short,...userSquads(u).map(id=>DB.squads.find(s=>s.id===id)?.name||'')].join(' ').toLowerCase().includes(UQ.q));
 
 function userRowQuickActions(u){
   const name=esc(u.username||('#'+u.id));
@@ -2267,7 +2299,7 @@ async function drawUsers(){
   $('#uf').innerHTML=[['all','Все',s.total],['ONLINE','Онлайн',s.online],['ACTIVE','Активные',s.by.ACTIVE||0],['ON_HOLD','Ожидают',s.by.ON_HOLD||0],['LIMITED','Лимит',s.by.LIMITED||0],['EXPIRED','Истёк',s.by.EXPIRED||0],['DISABLED','Отключены',s.by.DISABLED||0]].map(([k,l,n])=>`<button type="button" data-uf="${k}" class="${UQ.st==k?'on':''}" aria-pressed="${UQ.st===k?'true':'false'}"><span class="users-filter-label">${l}</span><b class="users-filter-count">${n}</b></button>`).join('');
   const th=(k,l)=>`<th><button data-s="${k}">${l}${UQ.sort==k?(UQ.dir=='asc'?' ↑':' ↓'):''}</button></th>`;
   const all=r.items.length&&r.items.every(u=>UQ.sel.has(u.id));
-  $('#ut').innerHTML=r.total?`<div class="tw" data-ui-layout="table"><table class="tb"><thead><tr><th class="c1"><input type="checkbox" data-sela ${all?'checked':''} aria-label="Выбрать все на странице"></th>${th('username','Пользователь')}${th('status','Статус')}${th('used','Трафик')}${th('expireAt','Срок')}<th>Доступ</th>${th('onlineAt','Был в сети')}<th class="user-row-actions-head">Действия</th></tr></thead><tbody>${r.items.map(u=>{const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,on=isOn(u);return `<tr data-id="${u.id}" class="${UQ.sel.has(u.id)?'sel':''}"><td class="c1"><input type="checkbox" data-sel="${u.id}" ${UQ.sel.has(u.id)?'checked':''} aria-label="Выбрать ${esc(u.username)}"></td><td data-l=""><div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc(u.username[0].toUpperCase())}</span><div>${esc(u.username)} ${u.tag?chip(esc(u.tag),'--c3'):''}${u.desc?`<small class="mu">${esc(u.desc)}</small>`:''}</div></div></td><td data-l="Статус">${chip(sl,sc)}</td><td data-l="Трафик"><div class="tr">${u.limit?`<div class="pb${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<small>${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</small></div></td><td data-l="Срок"${u.expireAt&&u.expireAt<Date.now()+3*DAY?' class="er"':''}>${userExpiryCell(u)}</td><td data-l="Доступ">${u.squads.map(i=>chip(esc(DB.squads.find(x=>x.id==i)?.name||'?'),'--b')).join(' ')}</td><td data-l="Был в сети">${on?'<span class="dot"></span> онлайн':ago(u.onlineAt)}</td><td data-l="Действия">${userRowQuickActions(u)}</td></tr>`}).join('')}</tbody></table></div><div class="pg"><span>${(UQ.page-1)*UQ.size+1}–${Math.min(r.total,UQ.page*UQ.size)} из ${r.total}</span><select data-psz aria-label="Строк на странице">${[15,30,60].map(n=>`<option${n==UQ.size?' selected':''}>${n}</option>`).join('')}</select><button class="ia" data-pg="-1" ${UQ.page>1?'':'disabled'} aria-label="Назад">${ic('chevronLeft')}</button><button class="ia" data-pg="1" ${UQ.page<pages?'':'disabled'} aria-label="Вперёд">${ic('chevronRight')}</button></div>`:`<div class="empty"><b>Никого не найдено</b><span>Измените поиск или фильтр, либо создайте пользователя.</span><button class="btn sm" data-nu>${ic('plus')}Создать</button></div>`;
+  $('#ut').innerHTML=r.total?`<div class="tw" data-ui-layout="table"><table class="tb"><thead><tr><th class="c1"><input type="checkbox" data-sela ${all?'checked':''} aria-label="Выбрать все на странице"></th>${th('username','Пользователь')}${th('status','Статус')}${th('used','Трафик')}${th('expireAt','Срок')}<th>Доступ</th>${th('onlineAt','Был в сети')}<th class="user-row-actions-head">Действия</th></tr></thead><tbody>${r.items.map(u=>{const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,on=isOn(u);return `<tr data-id="${u.id}" class="${UQ.sel.has(u.id)?'sel':''}"><td class="c1"><input type="checkbox" data-sel="${u.id}" ${UQ.sel.has(u.id)?'checked':''} aria-label="Выбрать ${esc(u.username)}"></td><td data-l=""><div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc(u.username[0].toUpperCase())}</span><div>${esc(u.username)} ${u.tag?chip(esc(u.tag),'--c3'):''}${u.desc?`<small class="mu">${esc(u.desc)}</small>`:''}</div></div></td><td data-l="Статус">${chip(sl,sc)}</td><td data-l="Трафик"><div class="tr">${u.limit?`<div class="pb${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<small>${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</small></div></td><td data-l="Срок"${u.expireAt&&u.expireAt<Date.now()+3*DAY?' class="er"':''}>${userExpiryCell(u)}</td><td data-l="Доступ">${userSquads(u).map(i=>chip(esc(DB.squads.find(x=>x.id==i)?.name||'?'),'--b')).join(' ')}</td><td data-l="Был в сети">${on?'<span class="dot"></span> онлайн':ago(u.onlineAt)}</td><td data-l="Действия">${userRowQuickActions(u)}</td></tr>`}).join('')}</tbody></table></div><div class="pg"><span>${(UQ.page-1)*UQ.size+1}–${Math.min(r.total,UQ.page*UQ.size)} из ${r.total}</span><select data-psz aria-label="Строк на странице">${[15,30,60].map(n=>`<option${n==UQ.size?' selected':''}>${n}</option>`).join('')}</select><button class="ia" data-pg="-1" ${UQ.page>1?'':'disabled'} aria-label="Назад">${ic('chevronLeft')}</button><button class="ia" data-pg="1" ${UQ.page<pages?'':'disabled'} aria-label="Вперёд">${ic('chevronRight')}</button></div>`:`<div class="empty"><b>Никого не найдено</b><span>Измените поиск или фильтр, либо создайте пользователя.</span><button class="btn sm" data-nu>${ic('plus')}Создать</button></div>`;
   drawBulk();
 }
 function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">${ic('calendar')}Продлить…</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`;decorateButtonIcons(b)}
@@ -5540,15 +5572,7 @@ document.addEventListener('click',async e=>{
     b.innerHTML=ic('redo')+'<span>Обновление</span>';
     b.classList.add('is-refreshing');
     try{
-      const response=await fetch('/api/v1/bootstrap',{credentials:'same-origin',cache:'no-store'});
-      const payload=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(payload.error||'Не удалось обновить пользователей.');
-      const collections=payload.collections||{};
-      for(const key of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh']){
-        if(Array.isArray(collections[key]))DB[key]=collections[key];
-      }
-      UQ.sel.clear();
-      if(cur==='users')await render(1);
+      await refreshPanelUsers();
       toast('Список пользователей обновлён');
     }catch(error){
       toast(error?.message||'Ошибка обновления пользователей');
@@ -6692,7 +6716,8 @@ async function initializePanel(){
   const payload=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(payload.error||'Не удалось загрузить данные backend.');
   const collections=payload.collections||{};
-  for(const key of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh'])DB[key]=Array.isArray(collections[key])?collections[key]:[];
+  for(const key of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh'])DB[key]=Array.isArray(collections[key])?(key==='users'?normalizeUserList(collections[key]):collections[key]):[];
+  usersLastSyncedAt=Date.now();
   DB.set={...DB.set,...(payload.settings||{}),hooks:{...DB.set.hooks,...(payload.settings?.hooks||{})}};
   backendReady=true;
   if(sessionUser?.role==='owner')syncSubscriptionTheme();

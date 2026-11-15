@@ -470,6 +470,16 @@ async fn handle_extra_confirmation(
                     "This account has unlimited duration or is waiting for first connection. Change it in the panel."
                 }
                 "user_not_found" => "User not found.",
+                "squad_not_found" => locale::tr(
+                    api.language,
+                    "Сквад больше не существует. Запустите /create заново.",
+                    "The squad no longer exists. Run /create again.",
+                ),
+                "squad_not_selected" => locale::tr(
+                    api.language,
+                    "Сначала выберите сквад, затем подтвердите создание.",
+                    "Select a squad before confirming user creation.",
+                ),
                 _ => "This action is no longer valid. Check the user and try again.",
             };
             api.send(
@@ -568,7 +578,7 @@ async fn consume_confirmation(
         .await
         .map_err(|_| "database_unavailable")?;
     let row = sqlx::query(
-        "SELECT user_id,action,amount,username FROM telegram_admin_bot_actions
+        "SELECT user_id,action,amount,username,squad_id FROM telegram_admin_bot_actions
          WHERE nonce=$1::UUID AND admin_id=$2 AND consumed_at IS NULL
            AND expires_at>NOW() FOR UPDATE",
     )
@@ -786,6 +796,9 @@ async fn handle_callback(
         {
             return create_confirmation(api, state, chat, admin_id, action, id).await;
         }
+    }
+    if let Some(result) = commands::create_picker_callback(api, state, chat, admin_id, data).await {
+        return result;
     }
     if let Some(nonce) = data.strip_prefix("x:") {
         return consume_confirmation(api, state, chat, admin_id, nonce).await;
