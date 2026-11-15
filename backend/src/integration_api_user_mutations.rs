@@ -260,6 +260,37 @@ pub(super) fn matches_revision(headers: &HeaderMap, revision: i64) -> Result<(),
     Ok(())
 }
 
+// Serialize issuance per integration client. Completed operations within a
+// rolling 24h window count; idempotent retries never consume a second slot.
+async fn enforce_create_budget(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    principal: &ServicePrincipal,
+) -> Result<(), Problem> {
+    let Some(limit) = principal.max_creates_per_day else {
+        return Ok(());
+    };
+    sqlx::query("SELECT id FROM integration_clients WHERE id=$1 FOR UPDATE")
+        .bind(principal.client_id)
+        .fetch_one(&mut **tx)
+        .await?;
+    let created: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM integration_operations
+         WHERE client_id=$1 AND action='user.create'
+           AND completed_at > NOW() - INTERVAL '24 hours'",
+    )
+    .bind(principal.client_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if created >= i64::from(limit) {
+        return Err(Problem::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "daily_creation_limit",
+            "Integration daily account creation limit exceeded",
+        ));
+    }
+    Ok(())
+}
+
 pub(super) async fn create(
     State(state): State<AppState>,
     Extension(principal): Extension<ServicePrincipal>,
@@ -288,29 +319,7 @@ pub(super) async fn create(
         response.0["meta"]["replayed"] = json!(true);
         return Ok((StatusCode::OK, response).into_response());
     }
-    // Serialize issuance per integration client; the rolling limit is over
-    // committed operations, so replayed Idempotency-Key calls never consume it.
-    if let Some(limit) = principal.max_creates_per_day {
-        sqlx::query("SELECT id FROM integration_clients WHERE id=$1 FOR UPDATE")
-            .bind(principal.client_id)
-            .fetch_one(&mut *tx)
-            .await?;
-        let created: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM integration_operations
-             WHERE client_id=$1 AND action='user.create'
-               AND completed_at > NOW() - INTERVAL '24 hours'",
-        )
-        .bind(principal.client_id)
-        .fetch_one(&mut *tx)
-        .await?;
-        if created >= i64::from(limit) {
-            return Err(Problem::new(
-                StatusCode::TOO_MANY_REQUESTS,
-                "daily_creation_limit",
-                "Integration daily account creation limit exceeded",
-            ));
-        }
-    }
+    enforce_create_budget(&mut tx, &principal).await?;
     let username = data["username"].as_str().ok_or_else(Problem::unavailable)?;
     // Serialize concurrent creations from this API for the same normalized username.
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
