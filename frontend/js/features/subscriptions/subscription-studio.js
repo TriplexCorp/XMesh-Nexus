@@ -1187,6 +1187,7 @@ window.XMeshSubscriptionStudio = (() => {
         if(!form.isConnected){window.clearInterval(pollAgent);return;}
         if(enrollmentToken&&Date.now()>=enrollmentExpiresAt)updateInstall(read());
         if(form.closest('.subscription-studio')?.dataset.subscriptionView==='servers')void refreshAgent();
+        if(form.closest('.subscription-studio')?.dataset.subscriptionView==='servers')void refreshMirrors();
         if(form.closest('.subscription-studio')?.dataset.subscriptionView==='servers')void refreshFlood();
       },20000);
       void refreshAgent();
@@ -1234,6 +1235,161 @@ window.XMeshSubscriptionStudio = (() => {
         }
         return managedCommand;
       };
+
+      // Fleet view: saved inventory from the owner-only API, ephemeral one-use
+      // installation secrets kept only in this tab, and a separate queue per VPS.
+      const mirrorList=form.querySelector('[data-mirror-list]');
+      const mirrorCreate=form.querySelector('[data-mirror-create]');
+      let mirrors=[];
+      let mirrorsLoading=false;
+      const mirrorTokens=new Map();
+      const mirrorBusy=new Set();
+      const mirrorIdValid=id=>/^[a-f0-9]{32}$/.test(String(id));
+      const mirrorCommand=(mirror)=>{
+        const token=mirrorTokens.get(mirror.id);
+        const d=read();
+        if(!token||token.expiresAt<=Date.now()||token.path!==savedInstall.path||
+           d.subscriptionPath!==savedInstall.path||!pathOK(savedInstall.path))return '';
+        const panel=String(settings?.domain||window.location?.hostname||'').trim().toLowerCase();
+        return installCommand(panel,mirror.domain,savedInstall.path,token.value);
+      };
+      const renderMirrors=()=>{
+        if(!mirrorList)return;
+        const summary=form.querySelector('[data-mirror-summary]');
+        const count=form.querySelector('[data-mirror-count]');
+        if(summary)summary.textContent='Основной сервер · '+mirrors.length+' зеркал';
+        if(count)count.textContent=mirrors.length+' / 16';
+        const addButton=form.querySelector('[data-mirror-open]');
+        if(addButton)addButton.disabled=!subApi?.createMirror||mirrors.length>=16;
+        if(!mirrors.length){
+          mirrorList.innerHTML='<div class="subscription-mirror-empty">'+
+            '<span class="subscription-mirror-empty-icon">'+studioGlyph('server')+'</span>'+
+            '<div><b>Зеркала пока не добавлены</b><p>Подключите резервный VPS с собственным доменом — основной сервер останется без изменений.</p></div></div>';
+          return;
+        }
+        mirrorList.innerHTML=mirrors.map(mirror=>{
+          const validId=mirrorIdValid(mirror.id);
+          if(!validId||!hostnameOK(mirror.domain))return '';
+          const active=mirror.online===true,paired=mirror.enrolled===true;
+          const stage=mirror.update?.stage||'',busy=mirrorBusy.has(mirror.id)||
+            (stage==='queued'&&Date.now()/1000-Number(mirror.update?.updatedAt||0)<1800)||
+            (stage==='running'&&Date.now()/1000-Number(mirror.update?.updatedAt||0)<3600);
+          const state=active?'online':paired?'offline':'new';
+          const status=active?'На связи':paired?'Нет связи':'Не подключено';
+          const last=Number(mirror.lastSeen||0)>0
+            ?new Date(Number(mirror.lastSeen)*1000).toLocaleString():'—';
+          const command=mirrorCommand(mirror);
+          const href='https://'+mirror.domain+'/healthz';
+          return '<article class="subscription-mirror-card" data-mirror-id="'+esc(mirror.id)+'" role="listitem">'+
+            '<header class="subscription-mirror-card-head"><span class="subscription-mirror-server-icon">'+studioGlyph('server')+'</span>'+
+            '<div class="subscription-mirror-identity"><strong>'+esc(mirror.name)+'</strong>'+
+            '<span>'+esc(mirror.domain)+'</span></div>'+
+            '<span class="subscription-mirror-state" data-state="'+state+'">'+status+'</span></header>'+
+            '<div class="subscription-mirror-facts"><span>Версия <b>'+esc(mirror.version||'—')+'</b></span>'+
+            '<span>Последняя связь <b>'+esc(last)+'</b></span></div>'+
+            '<div class="subscription-mirror-actions">'+
+            '<button type="button" class="btn" data-mirror-action="enroll"'+(mirrorBusy.has(mirror.id)?' disabled':'')+'>'+
+              studioGlyph('terminal')+(paired?'Перевыпустить команду':'Установить зеркало')+'</button>'+
+            '<button type="button" class="gh" data-mirror-action="update"'+(!active||busy?' disabled':'')+'>'+
+              studioGlyph('refresh')+'Обновить</button>'+
+            '<button type="button" class="gh" data-mirror-action="copy">'+studioGlyph('copy')+'Ссылка</button>'+
+            '<a class="gh" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+studioGlyph('external')+'Проверить</a>'+
+            '<button type="button" class="gh subscription-mirror-remove" data-mirror-action="remove"'+(mirrorBusy.has(mirror.id)?' disabled':'')+' aria-label="Удалить зеркало">'+
+              'Удалить</button></div>'+
+            (command?'<div class="subscription-mirror-command"><div><b>Команда для нового VPS</b>'+
+              '<button type="button" class="gh" data-mirror-action="copy-command">'+studioGlyph('copy')+'Скопировать</button></div>'+
+              '<code>'+esc(command)+'</code><small>Одноразовый ключ. Не пересылайте эту команду другим.</small></div>':'')+
+            '</article>';
+        }).join('');
+      };
+      const refreshMirrors=async()=>{
+        if(!subApi?.mirrors||mirrorsLoading||!form.isConnected)return;
+        mirrorsLoading=true;
+        try{
+          const result=await subApi.mirrors();
+          mirrors=Array.isArray(result?.mirrors)?result.mirrors.filter(m=>mirrorIdValid(m.id)):[];
+          renderMirrors();
+        }catch(error){
+          if(mirrorList&&!mirrors.length)mirrorList.textContent='Не удалось загрузить зеркала: '+(error.message||'API');
+        }finally{mirrorsLoading=false;}
+      };
+      const toggleMirrorForm=visible=>{
+        if(!mirrorCreate)return;
+        mirrorCreate.hidden=!visible;
+        if(visible)mirrorCreate.querySelector('[data-mirror-name]')?.focus();
+      };
+      form.querySelector('[data-mirror-open]')?.addEventListener('click',()=>toggleMirrorForm(true));
+      form.querySelector('[data-mirror-cancel]')?.addEventListener('click',()=>toggleMirrorForm(false));
+      form.querySelector('[data-mirror-refresh]')?.addEventListener('click',()=>void refreshMirrors());
+      form.querySelector('[data-mirror-save]')?.addEventListener('click',async()=>{
+        const name=mirrorCreate.querySelector('[data-mirror-name]').value.trim();
+        const domain=mirrorCreate.querySelector('[data-mirror-domain]').value.trim().toLowerCase();
+        const d=read();
+        if(!name||[...name].length>48||!hostnameOK(domain)||domain===savedInstall.domain){
+          notify('Введите название и отдельный корректный домен зеркала.');return;
+        }
+        if(!pathOK(d.subscriptionPath)||d.subscriptionPath!==savedInstall.path){
+          notify('Сначала сохраните публичный путь подписок.');return;
+        }
+        const add=mirrorCreate.querySelector('[data-mirror-save]');
+        add.disabled=true;
+        try{
+          await subApi.createMirror(name,domain);
+          mirrorCreate.querySelector('[data-mirror-name]').value='';
+          mirrorCreate.querySelector('[data-mirror-domain]').value='';
+          toggleMirrorForm(false);
+          await refreshMirrors();
+          notify('Зеркало добавлено. Создайте команду и выполните её на новом VPS.');
+        }catch(error){notify('Не удалось добавить зеркало: '+(error.message||'API'));}
+        finally{add.disabled=false;}
+      });
+      mirrorList?.addEventListener('click',async(event)=>{
+        const action=event.target.closest('[data-mirror-action]');
+        if(!action)return;
+        const id=action.closest('[data-mirror-id]')?.dataset.mirrorId;
+        const mirror=mirrors.find(m=>m.id===id);
+        if(!mirror||!mirrorIdValid(id)||mirrorBusy.has(id))return;
+        const type=action.dataset.mirrorAction;
+        if(type==='copy'){
+          void copyStudioValue('https://'+mirror.domain+savedInstall.path+'/<token>',
+            'Шаблон ссылки зеркала скопирован');
+          return;
+        }
+        if(type==='copy-command'){
+          const command=mirrorCommand(mirror);
+          if(command)void copyStudioValue(command,'Команда зеркала скопирована');
+          return;
+        }
+        if(type==='remove'&&!window.confirm('Удалить зеркало «'+mirror.name+'»? Его агент сразу потеряет доступ к Nexus.'))return;
+        if(type==='enroll'&&(!pathOK(savedInstall.path)||
+          read().subscriptionPath!==savedInstall.path)){
+          notify('Сначала сохраните публичный путь подписок.');return;
+        }
+        mirrorBusy.add(id);renderMirrors();
+        try{
+          if(type==='enroll'){
+            const result=await subApi.enrollMirror(id);
+            if(!/^[a-f0-9]{64}$/.test(result?.enrollmentToken||'')||
+               result?.domain!==mirror.domain)throw Error('Недействительные данные привязки.');
+            const ttl=Number(result.expiresInSeconds);
+            if(!Number.isInteger(ttl)||ttl<60||ttl>3600)throw Error('Недопустимый срок действия команды.');
+            mirrorTokens.set(id,{value:result.enrollmentToken,expiresAt:Date.now()+ttl*1000,
+              path:savedInstall.path});
+            notify('Команда зеркала создана. Выполните её на отдельном чистом VPS.');
+          }else if(type==='update'){
+            await subApi.updateMirror(id);
+            notify('Зеркалу отправлено обновление.');
+          }else if(type==='remove'){
+            await subApi.deleteMirror(id);
+            mirrorTokens.delete(id);
+            notify('Зеркало удалено, агент больше не имеет доступа к Nexus.');
+          }
+          await refreshMirrors();
+        }catch(error){notify('Операция с зеркалом не выполнена: '+(error.message||'API'));}
+        finally{mirrorBusy.delete(id);renderMirrors();}
+      });
+      void refreshMirrors();
+
       const refreshPortalMode=()=>{
         const buttonEnabled=input(form,'subscriptionProfileWebPageEnabled').checked;
         const embedded=input(form,'subscriptionUseEmbeddedPortal');
