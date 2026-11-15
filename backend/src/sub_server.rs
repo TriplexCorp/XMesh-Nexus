@@ -556,7 +556,7 @@ pub async fn poll(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    authorize(&state, &headers, &body, "poll").await?;
+    let mirror_id = authorize(&state, &headers, &body, "poll").await?;
     let body: Poll =
         serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый запрос агента."))?;
     if body.version.is_empty()
@@ -579,7 +579,7 @@ pub async fn poll(
     let mut conn = state.redis.clone();
     let heartbeat = json!({"lastSeen":now(),"version":body.version});
     redis::cmd("SET")
-        .arg(HEARTBEAT)
+        .arg(scoped_key(mirror_id.as_deref(), HEARTBEAT))
         .arg(heartbeat.to_string())
         .arg("EX")
         .arg(120)
@@ -587,7 +587,7 @@ pub async fn poll(
         .await
         .map_err(|_| backend_error())?;
     let job: Option<String> = redis::cmd("GETDEL")
-        .arg(PENDING_UPDATE)
+        .arg(scoped_key(mirror_id.as_deref(), PENDING_UPDATE))
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
@@ -595,7 +595,7 @@ pub async fn poll(
         return Ok(Json(json!({"command":"none","flood":edge_policy})));
     };
     redis::cmd("SET")
-        .arg(CURRENT_UPDATE)
+        .arg(scoped_key(mirror_id.as_deref(), CURRENT_UPDATE))
         .arg(&job)
         .arg("EX")
         .arg(3600)
@@ -621,7 +621,7 @@ pub async fn report(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    authorize(&state, &headers, &body, "report").await?;
+    let mirror_id = authorize(&state, &headers, &body, "report").await?;
     let body: Report =
         serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый отчёт Sub-сервера."))?;
     if !is_hex(&body.job_id, 32)
@@ -633,7 +633,7 @@ pub async fn report(
     }
     let mut conn = state.redis.clone();
     let current: Option<String> = redis::cmd("GET")
-        .arg(CURRENT_UPDATE)
+        .arg(scoped_key(mirror_id.as_deref(), CURRENT_UPDATE))
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
@@ -650,7 +650,7 @@ pub async fn report(
         "updatedAt":now()
     });
     redis::cmd("SET")
-        .arg(UPDATE_STATUS)
+        .arg(scoped_key(mirror_id.as_deref(), UPDATE_STATUS))
         .arg(payload.to_string())
         .arg("EX")
         .arg(86400)
@@ -659,7 +659,7 @@ pub async fn report(
         .map_err(|_| backend_error())?;
     if body.stage != "running" {
         redis::cmd("DEL")
-            .arg(CURRENT_UPDATE)
+            .arg(scoped_key(mirror_id.as_deref(), CURRENT_UPDATE))
             .query_async::<i64>(&mut conn)
             .await
             .map_err(|_| backend_error())?;
