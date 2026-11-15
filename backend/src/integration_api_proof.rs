@@ -41,7 +41,10 @@ fn single_header(headers: &HeaderMap, name: &'static str) -> Result<String, Prob
 // prefixes. Missing OriginalUri is a hard authentication failure.
 fn external_path_and_query(parts: &axum::http::request::Parts) -> Result<&str, Problem> {
     let original = parts.extensions.get::<OriginalUri>().ok_or_else(denied)?;
-    Ok(original.0.path_and_query().map_or("/", |path| path.as_str()))
+    Ok(original
+        .0
+        .path_and_query()
+        .map_or("/", |path| path.as_str()))
 }
 
 fn lowercase_hex(value: &str, len: usize) -> bool {
