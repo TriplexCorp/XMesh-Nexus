@@ -73,6 +73,9 @@ assert(read('backend/src/user_subscriptions_base.rs').includes('("{{FAVICON}}", 
   'Public portal must use uploaded brand favicon or canonical SVG fallback');
 assert(dockerfile.includes('COPY frontend/favicon.svg /build/frontend/favicon.svg'),
   'Docker must provide the vector to Rust at compile time');
+const signerDockerfile=read('backend/Dockerfile.xsp-signer');
+assert(signerDockerfile.includes('cp /source/frontend/favicon.svg /build/frontend/favicon.svg;'),
+  'Isolated signer Docker build must supply the SVG required by Rust include_str!');
 const publicIconCss=read('frontend/styles/features/subscriptions/subscription-public.css');
 assert.doesNotMatch(publicIconCss,/content:"[⧉▦]"/,
   'Copy and QR action icons must not depend on Unicode glyph fallback');
