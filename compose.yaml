@@ -74,6 +74,8 @@ services:
       SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
       # Enable only after all legacy integration tokens are reissued with a proof key.
       XMESH_INTEGRATION_REQUIRE_PROOF: ${XMESH_INTEGRATION_REQUIRE_PROOF:-false}
+      # Enable only after the Sub manager has re-enrolled with an Ed25519 key.
+      XMESH_SUB_REQUIRE_PROOF: ${XMESH_SUB_REQUIRE_PROOF:-false}
       XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
       XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
       XSP_V2_P0D_AGENT_MIGRATION: ${XSP_V2_P0D_AGENT_MIGRATION:-}
