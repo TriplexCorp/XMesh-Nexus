@@ -80,6 +80,8 @@ jobs:
         run: node scripts/test-public-subscription-browser.cjs
       - name: Verify XRAY STUDIO TLS modal geometry and save across viewports
         run: node scripts/test-xray-tls-dialog-geometry.cjs
+      - name: Verify Telegram responsive dashboard and Save-button hover contrast
+        run: node scripts/test-telegram-save-hover-browser.cjs
       - name: Retain public portal geometry report and review captures
         if: always()
         uses: actions/upload-artifact@v4

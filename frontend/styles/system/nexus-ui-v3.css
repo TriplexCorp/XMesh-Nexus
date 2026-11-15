@@ -1,6 +1,6 @@
 /* Single panel presentation authority: foundation -> components -> shared layouts -> feature geometry. */
 @import url("./nexus-v3-foundation.css?v=1a2c74ea22c7");
-@import url("./nexus-v3-components.css?v=b8ffc47efc89");
+@import url("./nexus-v3-components.css?v=32cc833dd048");
 @import url("./nexus-v3-layout.css?v=36e218c85d9a");
 
 /* Scoped panel features. The public subscription portal has its own document entrypoint. */
@@ -21,7 +21,7 @@
 @import url("../features/settings/settings-updates.css?v=5e16121d5fc4");
 @import url("../features/settings/panel-version-topbar.css?v=9bb51df093d1");
 @import url("../features/settings/settings.css?v=e71791752c2c");
-@import url("../features/settings/telegram-admin-bot.css?v=4b57bc25c757");
+@import url("../features/settings/telegram-admin-bot.css?v=08559bef97df");
 @import url("../features/squads/squad-editor-premium-v5.css?v=43df105290d2");
 @import url("../features/squads/squad-cards.css?v=68c9cb6d698e");
 @import url("../features/statistics/statistics.css?v=420ca65ddb9f");
