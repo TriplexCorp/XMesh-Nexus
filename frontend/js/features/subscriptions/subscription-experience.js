@@ -31,7 +31,9 @@ window.XMeshSubscriptionExperience={mount(root,options){
       const canOpen=id==='happ'&&!!current.url;open.hidden=!canOpen;open.textContent=(current.language==='en'?'Open ':'Открыть ')+name;open.removeAttribute('href');if(canOpen)open.href='happ://add/'+current.url;
       fallback.textContent=(install.hidden?c.download+' ':'')+(canOpen?c.fallback:c.compat);
     }
-    const expiry=root.querySelector('[data-expiry]');if(expiry){let days=root.querySelector('.experience-days');if(!days){days=el('strong','experience-days');expiry.parentElement.prepend(days)}const timestamp=Number(expiry.dataset.expiry);days.textContent=Number.isFinite(timestamp)&&timestamp>0?(timestamp<Date.now()?c.expired:Math.ceil((timestamp-Date.now())/86400000)+' '+(current.language==='en'?(Math.ceil((timestamp-Date.now())/86400000)===1?'day left':c.days):({one:'день остался',few:'дня осталось',many:'дней осталось',other:'дня осталось'})[new Intl.PluralRules('ru').select(Math.ceil((timestamp-Date.now())/86400000))])):'';days.hidden=!days.textContent}
+    const expiry=root.querySelector('[data-expiry]');if(expiry){let days=root.querySelector('.experience-days');if(!days){days=el('strong','experience-days');expiry.append(days)}
+      else if(days.parentElement!==expiry)expiry.append(days);
+      const timestamp=Number(expiry.dataset.expiry);days.textContent=Number.isFinite(timestamp)&&timestamp>0?(timestamp<Date.now()?c.expired:Math.ceil((timestamp-Date.now())/86400000)+' '+(current.language==='en'?(Math.ceil((timestamp-Date.now())/86400000)===1?'day left':c.days):({one:'день остался',few:'дня осталось',many:'дней осталось',other:'дня осталось'})[new Intl.PluralRules('ru').select(Math.ceil((timestamp-Date.now())/86400000))])):'';days.hidden=!days.textContent}
   };
   change.addEventListener('click',()=>{selectedApp=null;render();choices.querySelector('button')?.focus({preventScroll:true})});
   start.addEventListener('click',()=>{selectedApp=null;render();guide.open(start)});
@@ -48,7 +50,12 @@ window.XMeshSubscriptionExperience={mount(root,options){
   const plan=el('section','experience-plan'),owner=el('section','experience-owner');
   const planContent=el('div','experience-plan-content'),planBadge=el('span','experience-plan-symbol');
   const planLabel=el('small','experience-plan-label'),planName=el('h2','experience-plan-name'),planNote=el('p','experience-plan-note');
-  planContent.append(planLabel,planName,planNote);plan.append(planBadge,planContent);
+  // The public page and Studio use the same plan heading, status badge and expiry.
+  const planHeading=el('div','experience-plan-heading'),planExpiry=el('div','experience-plan-expiry');
+  planHeading.append(planName);
+  const statusBadge=root.querySelector('.subscription-preview-hero .subscription-preview-ok');
+  if(statusBadge)planHeading.append(statusBadge);
+  planContent.append(planLabel,planHeading,planNote);plan.append(planBadge,planContent,planExpiry);
   const ownerHeading=el('div','experience-owner-heading'),ownerAvatar=el('span','experience-owner-avatar');
   const ownerDetails=el('div','experience-owner-details'),ownerLabel=el('small'),ownerName=el('strong','experience-owner-name');
   ownerAvatar.append(iconPlaceholder());ownerDetails.append(ownerLabel,ownerName);ownerHeading.append(ownerAvatar,ownerDetails);owner.append(ownerHeading);
@@ -66,8 +73,15 @@ window.XMeshSubscriptionExperience={mount(root,options){
   const refreshDashboard=()=>{
     const en=current.language==='en',t=(ru,english)=>en?english:ru;root.classList.add('experience-dashboard');
     const expiry=root.querySelector('[data-subscription-expiry]'),metric=root.querySelector('[data-subscription-traffic]');
-    if(expiry&&expiry.parentElement!==owner)owner.append(expiry);
+    if(expiry&&expiry.parentElement!==planExpiry)planExpiry.append(expiry);
+    planExpiry.hidden=!expiry||expiry.hidden;
     if(metric&&metric.parentElement!==account)account.append(metric);
+    const state=root.dataset.subscriptionState||'ACTIVE';
+    root.dataset.experienceState=state;
+    // Hide duplicate active-state hero even if a preview stylesheet is late.
+    // Non-active states still show the real, localized status explanation.
+    const stateHero=root.querySelector('.subscription-preview-hero');
+    if(stateHero)stateHero.style.display=state==='ACTIVE'?'none':'';
     owner.hidden=false;
     account.hidden=!metric||metric.hidden;root.classList.toggle('experience-no-account',account.hidden);
     // Same owner-uploaded logo in the portal header and subscription plan card;
@@ -79,13 +93,14 @@ window.XMeshSubscriptionExperience={mount(root,options){
     if(badgeImg.getAttribute('src')!==markSrc)badgeImg.src=markSrc;
     const ownerValue=(root.dataset.subscriptionOwner||'').trim();
     const planValue=(root.dataset.subscriptionPlan||'').trim();
-    planLabel.textContent=t('Ваш тариф','Your plan');
+    planLabel.textContent=t('Тариф','Plan');
     planName.textContent=planValue||t('VPN-доступ','VPN access');
-    planNote.textContent=t('Персональная подписка для подключения к VPN.','Your personal VPN subscription.');
-    ownerLabel.textContent=t('Владелец подписки','Subscription owner');
+    planNote.textContent=t('Персональная подписка','Personal subscription');
+    ownerLabel.textContent=t('Пользователь','Account');
     ownerName.textContent=ownerValue||t('Ваш аккаунт','Your account');
     const available=!!current.url;nav.hidden=!available;quick.hidden=!available;
-    const description=root.querySelector('.subscription-preview-hero p');if(description&&(description.hidden||!description.textContent.trim())){description.textContent=t('Ваш доступ, срок действия и расход трафика.','Your access, expiry and data usage.');description.hidden=false}
+    // Hero becomes an accessible state-specific warning only for inactive subscriptions.
+    // Active accounts do not waste vertical space on a self-evident page heading.
     const supportCard=root.querySelector('.subscription-cabinet-support-card');if(supportCard&&!supportCard.querySelector('.experience-support-icon')){const emblem=el('span','experience-support-icon');emblem.append(icon('help'));supportCard.prepend(emblem)}
     quickTitle.textContent=t('Быстрая настройка','Quick setup');quickNote.textContent=t('Выберите устройство, чтобы открыть инструкцию.','Choose your device to open the setup guide.');
     quickPlatforms.setAttribute('role','group');quickPlatforms.setAttribute('aria-label',t('Ваше устройство','Your device'));quickPlatforms.replaceChildren();
