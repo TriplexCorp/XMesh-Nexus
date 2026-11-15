@@ -46,6 +46,8 @@ window.XMeshI18n=(()=>{
     "Показать или скрыть токен": "Show or hide token",
     "Включить или выключить бота": "Enable or disable bot",
     "Управление из Telegram": "Control from Telegram",
+    "Управление Telegram-ботом": "Telegram bot management",
+    "Текущий статус": "Current status",
     "Отдельный административный бот для управления XMesh Nexus. Укажите токен BotFather и доверенных администраторов — дополнительных серверов не требуется.": "A dedicated administrator bot for XMesh Nexus. Enter a BotFather token and trusted administrator IDs — no extra servers required.",
     "Подробнее о боте": "About the bot",
     "Статус бота": "Bot status",
