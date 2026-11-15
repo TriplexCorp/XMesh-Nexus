@@ -33,7 +33,7 @@ async fn consume_budget(state: &AppState, key: &str, limit: i64) -> Result<(), A
         .arg(RATE_LUA).arg(1).arg(key).query_async(&mut conn).await
         .map_err(|_|backend_error())?;
     if count>limit {
-        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "XMesh Sub: превышен лимит запросов."));
+        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "XMesh Sub request rate limit exceeded."));
     }
     Ok(())
 }
