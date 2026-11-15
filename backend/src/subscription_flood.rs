@@ -221,7 +221,7 @@ mod tests {
         let config = FloodConfig::default();
         assert!(config.enabled);
         assert_eq!(config.mode, "protect");
-        assert_eq!(config.token_per_minute,30);
+        assert_eq!(config.token_per_minute, 30);
         assert!(config.validate().is_ok());
         assert!(
             validate_settings(&json!({"enabled":true,"mode":"protect",
