@@ -8,6 +8,8 @@ import hmac
 import json
 import os
 import re
+import subprocess
+import tempfile
 import struct
 import time
 from urllib.error import HTTPError
@@ -19,6 +21,37 @@ USER = os.getenv("ADMIN_USERNAME", "admin")
 PASSWORD = os.environ["ADMIN_PASSWORD"]
 VIEWER_PASSWORD = "integration-viewer-secret-password-0123"
 NEW_PASSWORD = "integration-new-owner-password-012345"
+
+# Disposable, CI-only sender key. Real bots keep their Ed25519 key outside
+# the web server and never upload it to the Nexus API.
+PROOF_KEY_FILE = tempfile.NamedTemporaryFile(prefix="xmesh-ci-proof-",delete=False).name
+os.chmod(PROOF_KEY_FILE, 0o600)
+subprocess.run(["openssl","genpkey","-algorithm","Ed25519","-out",PROOF_KEY_FILE],check=True)
+PROOF_PUBLIC_KEY = subprocess.check_output([
+    "openssl","pkey","-in",PROOF_KEY_FILE,"-pubout","-outform","DER",
+])[-32:].hex()
+PROTECTED_TOKENS = set()
+
+
+def sender_proof(method, path, bearer, wire):
+    when = str(int(time.time()))
+    nonce = os.urandom(16).hex()
+    token_hash = hashlib.sha256(bearer.encode()).hexdigest()
+    body_hash = hashlib.sha256(wire).hexdigest()
+    to_sign = (f"xmesh-proof-v1\n{token_hash}\n{method}\n"
+               f"/api/v1/integrations{path}\n{when}\n{nonce}\n{body_hash}").encode()
+    # Ed25519 pkeyutl is a one-shot operation; OpenSSL requires a
+    # seekable input file rather than an unnamed stdin pipe.
+    with tempfile.NamedTemporaryFile(prefix="xmesh-ci-proof-body-") as message_file:
+        message_file.write(to_sign)
+        message_file.flush()
+        signature = subprocess.run(
+            ["openssl","pkeyutl","-sign","-rawin",
+             "-inkey",PROOF_KEY_FILE,"-in",message_file.name],
+            check=True,capture_output=True,
+        ).stdout.hex()
+    return {"X-XMesh-Proof-Ts":when,"X-XMesh-Proof-Nonce":nonce,"X-XMesh-Proof-Sig":signature}
+
 
 
 def api(method, path, payload=None, cookie=None, origin=BASE):
@@ -68,7 +101,7 @@ def totp(secret):
 
 
 
-def service_api(method, path, bearer=None, payload=None, idempotency=None, cookie=None, origin=None, if_match=None):
+def service_api(method, path, bearer=None, payload=None, idempotency=None, cookie=None, origin=None, if_match=None, proof=True, reuse_proof=None):
     """Machine-to-machine call: never implicitly send browser Origin or cookies."""
     headers = {"Accept": "application/json"}
     if payload is not None:
@@ -83,9 +116,12 @@ def service_api(method, path, bearer=None, payload=None, idempotency=None, cooki
         headers["Cookie"] = cookie
     if origin is not None:
         headers["Origin"] = origin
+    data = json.dumps(payload).encode() if payload is not None else b""
+    if bearer in PROTECTED_TOKENS and proof:
+        headers.update(reuse_proof or sender_proof(method,path,bearer,data))
     req = Request(
         BASE + "/api/v1/integrations" + path,
-        data=json.dumps(payload).encode() if payload is not None else None,
+        data=data if payload is not None else None,
         headers=headers,
         method=method,
     )
@@ -142,6 +178,7 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
         "expiresInDays": 2,
         "allUsers": False,
         "allowedUserIds": [user_id],
+        "proofPublicKey": PROOF_PUBLIC_KEY,
     }
     check(api("POST", "/integration-tokens", {**issuance, "mfaCode": ""}, owner_cookie)[0],
           401, "token issuance needs a valid one-time owner factor")
@@ -150,12 +187,16 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
     status, issued, _ = api("POST", "/integration-tokens", first, owner_cookie)
     check(status, 200, "owner issues bounded service token after MFA")
     token = issued["token"]
+    PROTECTED_TOKENS.add(token)
+    assert issued["senderConstrained"] is True
     assert token.startswith("xmni_v1_") and len(token) == len("xmni_v1_") + 64
     assert issued["shownOnce"] and issued["tokenId"] > 0
     check(api("POST", "/integration-tokens",
               {**first, "label": "ci_replayed_totp"}, owner_cookie)[0],
           401, "step-up MFA code cannot be reused")
 
+    check(service_api("GET", "/capabilities", token, proof=False)[0],401,
+          "a stolen bearer alone cannot use a protected API token")
     status, public, _ = service_api("GET", "/capabilities", token)
     check(status, 200, "bearer credentials accepted")
     assert "entitlements:grant" in public["data"]["scopes"]
@@ -172,6 +213,11 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
     for forbidden in ("xrayId", "trojanPassword", "subscriptionUrl", "ssLegacyPassword"):
         assert forbidden not in projection, f"Secret field leaked: {forbidden}"
     assert user["data"]["expireAtMs"] == expiry
+    captured = sender_proof("GET",f"/users/{user_id}",token,b"")
+    check(service_api("GET", f"/users/{user_id}", token, reuse_proof=captured)[0],200,
+          "first signed request accepted")
+    check(service_api("GET", f"/users/{user_id}", token, reuse_proof=captured)[0],401,
+          "a replay of a signed request nonce is rejected")
     check(service_api("GET", f"/users/{other_id}", token)[0], 404,
           "object-level access denied without revealing user")
     status, listing, _ = service_api("GET", "/users?limit=1", token)
@@ -196,8 +242,11 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
     assert sum(not a["replayed"] for a in answers) == 1, answers
     assert len({a["expireAtMs"] for a in answers}) == 1, answers
     check(service_api("POST", f"/users/{user_id}/entitlements/grant", token,
-                      {"days": 31, "sourceReference": "ci-entitlement-a"},
+                      {"days": 29, "sourceReference": "ci-entitlement-a"},
                       grant_key)[0], 409, "same key with different body rejected")
+    check(service_api("POST",f"/users/{user_id}/entitlements/grant",token,
+                      {"days":31},str(uuid.uuid4()))[0],403,
+          "owner-set maxGrantDays prevents oversized grants")
     status, after, _ = service_api("GET", f"/users/{user_id}", token)
     check(status, 200, "verify atomic persisted grant")
     expected_expiry = expiry + 30 * 86_400_000
@@ -225,6 +274,7 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
     check(status, 200, "issue rotated token for same stable client")
     assert rotated["clientId"] == issued["clientId"]
     token2 = rotated["token"]
+    PROTECTED_TOKENS.add(token2)
     status, previous, _ = service_api("POST",
         f"/users/{user_id}/entitlements/grant", token2, grant, grant_key)
     check(status, 200, "replay after service-token rotation")
@@ -261,10 +311,13 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
         "expiresInDays": 2,
         "allUsers": True,
         "mfaCode": factor4,
+        "proofPublicKey": PROOF_PUBLIC_KEY,
+        "maxCreatesPerDay": 20,
     }
     status, manager_issued, _ = api("POST", "/integration-tokens", manager_issue, owner_cookie)
     check(status, 200, "owner issues explicit all-users manager key after MFA")
     manager = manager_issued["token"]
+    PROTECTED_TOKENS.add(manager)
 
     create_body = {
         "username": "ci_service_managed_user",
@@ -429,10 +482,12 @@ def test_scoped_integration_api(owner_cookie, secret, user_id):
         "allowedUserIds":[created_id],
         "expiresInDays":2,
         "mfaCode":factor5,
+        "proofPublicKey":PROOF_PUBLIC_KEY,
     }
     status, limited, _ = api("POST", "/integration-tokens", scoped_issue, owner_cookie)
     check(status, 200, "owner explicitly scopes membership token to one user")
     limited_token = limited["token"]
+    PROTECTED_TOKENS.add(limited_token)
     check(service_api("POST", membership_path, limited_token,
                       {"userIds":[other_id]}, str(uuid.uuid4()))[0], 404,
           "member batch cannot touch another user's account")

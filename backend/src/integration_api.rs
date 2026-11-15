@@ -6,6 +6,8 @@ mod auth;
 mod catalog;
 #[path = "integration_api_grants.rs"]
 mod grants;
+#[path = "integration_api_proof.rs"]
+mod proof;
 #[path = "integration_api_quotas.rs"]
 mod quotas;
 #[path = "integration_api_squad_members.rs"]
@@ -38,6 +40,10 @@ pub struct ServicePrincipal {
     name: String,
     scopes: Vec<String>,
     allowed_user_ids: Option<Vec<i64>>,
+    proof_public_key: Option<Vec<u8>>,
+    token_hash: String,
+    max_grant_days: Option<i32>,
+    max_creates_per_day: Option<i32>,
 }
 
 impl ServicePrincipal {
@@ -199,7 +205,10 @@ async fn capabilities(
             "squadsMembersWrite": client.scopes.iter().any(|s| s == "squads:members:write"),
             "nodesRead": client.scopes.iter().any(|s| s == "nodes:read"),
             "telegramRead": client.scopes.iter().any(|s| s == "telegram:read"),
-            "telegramAssign": client.scopes.iter().any(|s| s == "telegram:assign")
+            "telegramAssign": client.scopes.iter().any(|s| s == "telegram:assign"),
+            "senderConstrained": client.proof_public_key.is_some(),
+            "maxGrantDays": client.max_grant_days,
+            "maxCreatesPerDay": client.max_creates_per_day
         }
     })))
 }
@@ -246,6 +255,10 @@ mod tests {
             name: "test".into(),
             scopes: vec!["users:read".into()],
             allowed_user_ids: Some(vec![123]),
+            proof_public_key: None,
+            token_hash: "example".into(),
+            max_grant_days: None,
+            max_creates_per_day: None,
         };
         assert!(p.allow_scope("users:read").is_ok());
         assert!(p.allow_scope("entitlements:grant").is_err());

@@ -89,3 +89,25 @@ new signed desired configuration during their next reconciliation.
 Disconnected nodes may retain previously signed offline authorization until
 that policy expires; verify each node has applied the new revision before
 considering the previous VPN credentials fully revoked.
+
+## Состояние защиты публичного XMesh Sub
+
+Новые установки Nexus по умолчанию ограничивают частоту скачивания одной
+подписки режимом `protect` (30 запросов за минуту на токен).
+У уже сохранённых настроек режим не меняется автоматически, чтобы не
+нарушить работу клиентов. Настройку проверьте в Subscription Studio.
+
+У управляющего агента Sub теперь есть отдельные ограничения на запросы и
+попытки получения нового ключа до обращения к PostgreSQL; браузерные
+cookie не используются для его авторизации.
+
+Это не полноценная per-IP защита на Sub VPS: стандартный Caddy edge пока
+не исполняет `ipPerMinute`, несмотря на получение настроек в ответе
+управляющего API. Для такого ограничения понадобится подписанный релиз
+XMesh Sub. Не следует самостоятельно заменять `install.sh` или
+`manager.py` неподписанным кодом. Публичные приложения по-прежнему
+используют Bearer-ссылки: кража полной ссылки требует её ротации.
+
+Отдельное Integration API для платежных ботов использует Ed25519
+sender-constrained запросы; это **не** способ защитить публичный
+VPN-клиентский URL. См. [документацию](integrations/PROTECTED_TOKENS.md).

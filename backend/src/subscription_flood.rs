@@ -56,9 +56,11 @@ impl Default for FloodConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            mode: "monitor".to_owned(),
+            // New installations protect automatically; stored operator policy
+            // remains authoritative for existing deployments.
+            mode: "protect".to_owned(),
             ip_per_minute: 120,
-            token_per_minute: 12,
+            token_per_minute: 30,
         }
     }
 }
@@ -154,7 +156,7 @@ pub async fn enforce(state: &AppState, token: &str) -> Option<Response> {
             token_digest(token)
         ))
         .arg(format!("xmesh:subscription:flood:stats:{interval}"))
-        .arg(config.token_per_minute.saturating_add(10))
+        .arg(config.token_per_minute)
         .arg(MAX_TOKEN_BUCKETS_PER_MINUTE)
         .arg(&config.mode)
         .query_async(&mut conn)
@@ -215,10 +217,11 @@ pub async fn status(
 mod tests {
     use super::*;
     #[test]
-    fn defaults_monitor_to_preserve_existing_clients() {
+    fn defaults_protect_new_deployments_with_client_headroom() {
         let config = FloodConfig::default();
         assert!(config.enabled);
-        assert_eq!(config.mode, "monitor");
+        assert_eq!(config.mode, "protect");
+        assert_eq!(config.token_per_minute, 30);
         assert!(config.validate().is_ok());
         assert!(
             validate_settings(&json!({"enabled":true,"mode":"protect",

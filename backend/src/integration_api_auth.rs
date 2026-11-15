@@ -1,5 +1,5 @@
 //! Production service credentials: owner issuance, digest-only storage, strict Bearer middleware.
-use super::{Problem, ServicePrincipal, now_ms};
+use super::{Problem, ServicePrincipal, now_ms, proof};
 use crate::{ApiError, AppState, auth::AuthUser};
 use axum::{
     Json,
@@ -8,6 +8,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use ed25519_dalek::VerifyingKey;
 use rand_core::{OsRng, RngCore};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -46,6 +47,11 @@ pub struct IssueToken {
     #[serde(default)]
     all_users: bool,
     allowed_user_ids: Option<Vec<i64>>,
+    // 32-byte Ed25519 public key as lowercase hex. The private key never
+    // reaches Nexus and should reside on the integration host/TPM.
+    proof_public_key: Option<String>,
+    max_grant_days: Option<i32>,
+    max_creates_per_day: Option<i32>,
 }
 const fn default_expires() -> i32 {
     30
@@ -106,6 +112,58 @@ pub async fn create_token(
     let mut scopes = body.scopes;
     scopes.sort_unstable();
     scopes.dedup();
+    let proof_key = if let Some(ref input) = body.proof_public_key {
+        if input.len() != 64
+            || input
+                .bytes()
+                .any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid proofPublicKey (32-byte Ed25519 public key, lowercase hex)",
+            ));
+        }
+        let decoded = hex::decode(input)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid proofPublicKey"))?;
+        let array: [u8; 32] = decoded
+            .as_slice()
+            .try_into()
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid proofPublicKey"))?;
+        VerifyingKey::from_bytes(&array).map_err(|_| {
+            ApiError::new(StatusCode::BAD_REQUEST, "Invalid Ed25519 proofPublicKey")
+        })?;
+        Some(decoded)
+    } else {
+        None
+    };
+    if proof_key.is_none() {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "All new API tokens require an Ed25519 proofPublicKey",
+        ));
+    }
+    if body
+        .max_grant_days
+        .is_some_and(|v| !(1..=3650).contains(&v))
+        || body
+            .max_creates_per_day
+            .is_some_and(|v| !(1..=1000).contains(&v))
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid operation limits",
+        ));
+    }
+    let grant_limit = if scopes.iter().any(|s| s == "entitlements:grant") {
+        Some(body.max_grant_days.unwrap_or(30))
+    } else {
+        None
+    };
+    let creates_limit = if scopes.iter().any(|s| s == "users:create") {
+        Some(body.max_creates_per_day.unwrap_or(20))
+    } else {
+        None
+    };
     let mut allowed = body.allowed_user_ids;
     if body.all_users == allowed.is_some() {
         return Err(ApiError::new(
@@ -142,8 +200,9 @@ pub async fn create_token(
     }
     let issued = sqlx::query(
         "INSERT INTO integration_tokens
-         (client_id,label,token_hash,scopes,allowed_user_ids,created_by,expires_at)
-         VALUES($1,$2,$3,$4,$5,$6,NOW()+$7::integer * INTERVAL '1 day')
+         (client_id,label,token_hash,scopes,allowed_user_ids,created_by,expires_at,
+          proof_public_key,max_grant_days,max_creates_per_day)
+         VALUES($1,$2,$3,$4,$5,$6,NOW()+$7::integer * INTERVAL '1 day',$8,$9,$10)
          RETURNING id,expires_at",
     )
     .bind(client_id)
@@ -153,6 +212,9 @@ pub async fn create_token(
     .bind(&allowed)
     .bind(admin.id)
     .bind(body.expires_in_days)
+    .bind(&proof_key)
+    .bind(grant_limit)
+    .bind(creates_limit)
     .fetch_one(&mut *tx)
     .await?;
     let token_id: i64 = issued.try_get("id")?;
@@ -163,7 +225,7 @@ pub async fn create_token(
         "integration.token_issued",
         None,
         Some(token_id),
-        json!({"clientId":client_id,"scopes":scopes,"allUsers":body.all_users}),
+        json!({"clientId":client_id,"scopes":scopes,"allUsers":body.all_users,"senderConstrained":proof_key.is_some(),"maxGrantDays":grant_limit,"maxCreatesPerDay":creates_limit}),
     )
     .await;
     let mut response = Json(json!({
@@ -171,6 +233,9 @@ pub async fn create_token(
         "tokenId": token_id,
         "clientId": client_id,
         "scopes": scopes,
+        "senderConstrained": proof_key.is_some(),
+        "maxGrantDays": grant_limit,
+        "maxCreatesPerDay": creates_limit,
         "expiresInDays": body.expires_in_days,
         "shownOnce": true,
         "warning": "Store securely: this credential cannot be displayed again."
@@ -194,7 +259,8 @@ pub async fn list_tokens(
     crate::require_owner(&admin)?;
     let rows = sqlx::query(
         "SELECT t.id, t.client_id, c.name AS client_name, t.label, t.scopes,
-                t.allowed_user_ids, (t.expires_at <= NOW()) AS expired,
+                t.allowed_user_ids, (t.proof_public_key IS NOT NULL) AS sender_constrained,
+                t.max_grant_days, t.max_creates_per_day, (t.expires_at <= NOW()) AS expired,
                 (t.revoked_at IS NOT NULL) AS revoked
          FROM integration_tokens AS t
          JOIN integration_clients AS c ON c.id=t.client_id
@@ -209,6 +275,9 @@ pub async fn list_tokens(
         "label": r.try_get::<String,_>("label").unwrap_or_default(),
         "scopes": r.try_get::<Vec<String>,_>("scopes").unwrap_or_default(),
         "allowedUserIds": r.try_get::<Option<Vec<i64>>,_>("allowed_user_ids").unwrap_or(None),
+        "senderConstrained": r.try_get::<bool,_>("sender_constrained").unwrap_or(false),
+        "maxGrantDays": r.try_get::<Option<i32>,_>("max_grant_days").unwrap_or(None),
+        "maxCreatesPerDay": r.try_get::<Option<i32>,_>("max_creates_per_day").unwrap_or(None),
         "expired": r.try_get::<bool,_>("expired").unwrap_or(true),
         "revoked": r.try_get::<bool,_>("revoked").unwrap_or(true)
     })).collect::<Vec<_>>();
@@ -248,14 +317,60 @@ pub async fn revoke_token(
     Ok(Json(json!({"revoked":true,"tokenId":id})))
 }
 
+// Only validated request proofs may spend the per-token budget. A leaked
+// Bearer without its signing key must not be able to exhaust this budget.
+async fn throttle_token(state: &AppState, token_id: i64) -> Result<(), Problem> {
+    let minute = now_ms().div_euclid(60_000);
+    let mut redis = state.redis.clone();
+    let count: i64 = redis::cmd("EVAL")
+        .arg(RATE_SCRIPT)
+        .arg(1)
+        .arg(format!("xmesh:int:rl:v1:{token_id}:{minute}"))
+        .query_async(&mut redis)
+        .await
+        .map_err(|_| Problem::unavailable())?;
+    if count > REDIS_RATE_LIMIT_PER_MINUTE {
+        return Err(Problem::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "rate_limited",
+            "Rate limit exceeded",
+        ));
+    }
+    let _ = sqlx::query(
+        "UPDATE integration_tokens SET last_used_at=NOW()
+         WHERE id=$1 AND (last_used_at IS NULL OR last_used_at<NOW()-INTERVAL '5 minutes')",
+    )
+    .bind(token_id)
+    .execute(&state.pool)
+    .await;
+    Ok(())
+}
+
 pub(super) async fn require_service(
     State(state): State<AppState>,
-    mut request: Request,
+    request: Request,
     next: Next,
 ) -> Response {
     let headers = request.headers().clone();
     match authenticate(&state, &headers).await {
         Ok(principal) => {
+            // Proof is checked on the exact wire body and URI before handlers
+            // can perform any action. Reject stale/replayed/unsigned requests.
+            let mut request = match proof::constrain(
+                &state,
+                request,
+                &principal.token_hash,
+                principal.proof_public_key.as_deref(),
+                principal.token_id,
+            )
+            .await
+            {
+                Ok(request) => request,
+                Err(error) => return error.into_response(),
+            };
+            if let Err(err) = throttle_token(&state, principal.token_id).await {
+                return err.into_response();
+            }
             request.extensions_mut().insert(principal);
             let mut response = next.run(request).await;
             response.headers_mut().insert(
@@ -328,13 +443,14 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
     }
     let digest = hex::encode(Sha256::digest(raw.as_bytes()));
     let row = sqlx::query(
-        "SELECT t.id, t.client_id, t.scopes, t.allowed_user_ids, c.name
+        "SELECT t.id, t.client_id, t.scopes, t.allowed_user_ids,
+                t.proof_public_key, t.max_grant_days, t.max_creates_per_day, c.name
          FROM integration_tokens AS t
          JOIN integration_clients AS c ON c.id=t.client_id
          WHERE t.token_hash=$1 AND t.revoked_at IS NULL
            AND t.expires_at > NOW() AND NOT c.disabled",
     )
-    .bind(digest)
+    .bind(&digest)
     .fetch_optional(&state.pool)
     .await
     .map_err(|_| Problem::unavailable())?
@@ -345,34 +461,27 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
             "Invalid bearer token",
         )
     })?;
+    // Optional strict cutover after all historical bearer-only tokens have
+    // been replaced. Default remains compatible to avoid silently breaking bots.
+    let proof_key: Option<Vec<u8>> = row
+        .try_get("proof_public_key")
+        .map_err(|_| Problem::unavailable())?;
+    if proof_key.is_none()
+        && std::env::var("XMESH_INTEGRATION_REQUIRE_PROOF")
+            .ok()
+            .as_deref()
+            == Some("true")
+    {
+        return Err(Problem::new(
+            StatusCode::UNAUTHORIZED,
+            "sender_proof_required",
+            "Legacy bearer-only integration tokens are disabled",
+        ));
+    }
     let token_id: i64 = row.try_get("id").map_err(|_| Problem::unavailable())?;
     let client_id: i64 = row
         .try_get("client_id")
         .map_err(|_| Problem::unavailable())?;
-    let now_minute = now_ms().div_euclid(60_000);
-    let key = format!("xmesh:int:rl:v1:{token_id}:{now_minute}");
-    let mut redis = state.redis.clone();
-    let requests = redis::cmd("EVAL")
-        .arg(RATE_SCRIPT)
-        .arg(1)
-        .arg(key)
-        .query_async::<i64>(&mut redis)
-        .await
-        .map_err(|_| Problem::unavailable())?;
-    if requests > REDIS_RATE_LIMIT_PER_MINUTE {
-        return Err(Problem::new(
-            StatusCode::TOO_MANY_REQUESTS,
-            "rate_limited",
-            "Rate limit exceeded",
-        ));
-    }
-    let _ = sqlx::query(
-        "UPDATE integration_tokens SET last_used_at=NOW()
-         WHERE id=$1 AND (last_used_at IS NULL OR last_used_at<NOW()-INTERVAL '5 minutes')",
-    )
-    .bind(token_id)
-    .execute(&state.pool)
-    .await;
     Ok(ServicePrincipal {
         token_id,
         client_id,
@@ -380,6 +489,14 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
         scopes: row.try_get("scopes").map_err(|_| Problem::unavailable())?,
         allowed_user_ids: row
             .try_get("allowed_user_ids")
+            .map_err(|_| Problem::unavailable())?,
+        proof_public_key: proof_key,
+        token_hash: digest,
+        max_grant_days: row
+            .try_get("max_grant_days")
+            .map_err(|_| Problem::unavailable())?,
+        max_creates_per_day: row
+            .try_get("max_creates_per_day")
             .map_err(|_| Problem::unavailable())?,
     })
 }
