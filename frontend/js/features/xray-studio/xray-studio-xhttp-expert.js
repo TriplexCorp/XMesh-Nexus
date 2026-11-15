@@ -67,7 +67,7 @@
   source.value=JSON.stringify(doc,null,2);source.dispatchEvent(new Event('input',{bubbles:true}));source.dispatchEvent(new Event('change',{bubbles:true}));setStatus(root,label);
  }
  async function ask(spec){const api=dialogs();if(!api?.request)throw Error('Диалоговый модуль XRAY STUDIO не загружен');return api.request(spec)}
- async function openExpert(root){
+ async function openExpert(root,directAction){
   const sel=selection(root),x=ensure(clone(sel.inbound)),mode=String(x.mode||'auto'),e=snapshot(x);
   const choices=[
    option('mode','Режим XHTTP',`Текущий: ${mode}. auto / packet-up / stream-up / stream-one.`),
@@ -83,7 +83,7 @@
   if(mode==='packet-up'||mode==='auto')choices.push(option('packet','PACKET-UP · server','scMaxEachPostBytes и scMaxBufferedPosts.'));
   if(mode==='stream-up'||mode==='auto')choices.push(option('stream','STREAM-UP · server','scStreamUpServerSecs.'));
   choices.push(option('server','Server response / limits','noSSEHeader и serverMaxHeaderBytes.'),option('advanced','Строгий server JSON','Полный SplitHTTPConfig с role/mode validation.'));
-  const action=await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · expert server inbound',description:'Поля соответствуют актуальному SplitHTTPConfig Xray-core. Client-only параметры намеренно не предлагаются.',confirmLabel:'Открыть',selectFirst:false,fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]});if(!action)return;
+  const action=directAction==='device'?{action:'device'}:await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · expert server inbound',description:'Поля соответствуют актуальному SplitHTTPConfig Xray-core. Client-only параметры намеренно не предлагаются.',confirmLabel:'Открыть',selectFirst:false,fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]});if(!action)return;
 
   if(action.action==='device'){
    const names=['iOS','Android','Windows','macOS','Linux','Auto'];
@@ -220,8 +220,8 @@
   }
  }
  window.addEventListener('click',event=>{
-  const button=event.target?.closest?.('#xm-studio-v4 [data-tool="xhttp"]');if(!button)return;
+  const button=event.target?.closest?.('#xm-studio-v4 [data-tool="xhttp"], #xm-studio-v4 [data-tool="xhttp-device"]');if(!button)return;
   const root=button.closest('#xm-studio-v4');if(!root)return;
-  event.preventDefault();event.stopImmediatePropagation();Promise.resolve(openExpert(root)).catch(error=>setStatus(root,'XHTTP: '+(error?.message||error)));
+  event.preventDefault();event.stopImmediatePropagation();Promise.resolve(openExpert(root,button.dataset.tool==='xhttp-device'?'device':null)).catch(error=>setStatus(root,'XHTTP: '+(error?.message||error)));
  },true);
 })();

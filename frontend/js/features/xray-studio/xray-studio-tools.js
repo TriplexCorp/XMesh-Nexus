@@ -68,7 +68,7 @@ const tools=[
  ['reality','REALITY'],['shortid','Short ID'],['vlessens','VLESS Encryption'],['vision','XTLS Vision'],
  ['tls','TLS'],['ech','Сгенерировать ECH'],['hysteria-config','Hysteria2'],['protocol-config','Параметры протокола'],['transport-config','Параметры транспорта'],
  ['dns','DNS'],['routing','Routing'],['outbounds','Outbounds'],['inbound','Новый inbound'],
- ['xhttp','XHTTP'],['finalmask','FinalMask']
+ ['xhttp','XHTTP'],['xhttp-device','Профили устройств'],['finalmask','FinalMask']
 ];
 const details={
  reality:'REALITY: target, SNI, Short ID и X25519',shortid:'Сгенерировать Short ID для REALITY',
@@ -76,7 +76,7 @@ const details={
  tls:'Редактировать серверные TLS settings',ech:'Сгенерировать ECH для TLS и клиентских подписок', 'hysteria-config':'Настройки транспорта Hysteria2',
  'protocol-config':'Редактировать параметры текущего inbound', 'transport-config':'Настройки транспорта',
  dns:'Открыть или добавить DNS',routing:'Открыть или добавить Routing',
- outbounds:'Добавить базовые outbounds',inbound:'Создать inbound',xhttp:'Открыть или добавить настройки XHTTP',
+ outbounds:'Добавить базовые outbounds',inbound:'Создать inbound',xhttp:'Настройки XHTTP · сервер', 'xhttp-device':'Профили устройств iOS / Android / Desktop · клиентский XHTTP и XMUX',
  finalmask:'Настроить FinalMask'
 };
 const icons={
@@ -90,6 +90,7 @@ const icons={
  'protocol-config':'<path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h4"/>',
  'transport-config':'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
  xhttp:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
+ 'xhttp-device':'<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 5h4M11 19h2"/>',
  dns:'<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/>',
  routing:'<path d="M4 7h14l-3-3m3 3-3 3M20 17H6l3-3m-3 3 3 3"/>',
  outbounds:'<path d="M4 12h13m-4-4 4 4-4 4"/><rect x="2" y="3" width="20" height="18" rx="2"/>',
@@ -144,7 +145,12 @@ function contextualToolGroups(inbound,hasInbound){
  }
  if(!hysteria){
   const canUseXhttp=['vless','vmess','trojan','shadowsocks'].includes(protocol);
-  if(canUseXhttp&&(network==='xhttp'||network==='raw'))networkTools.push('xhttp');
+  if(canUseXhttp&&(network==='xhttp'||network==='raw')){
+   networkTools.push('xhttp');
+   // An existing XHTTP inbound has client-side device profiles, not another
+   // server setting. Keep their editor one click away in the transport toolbar.
+   if(network==='xhttp')networkTools.push('xhttp-device');
+  }
   else if(['ws','grpc','httpupgrade','quic'].includes(network))networkTools.push('transport-config');
  }
  // Expose FinalMask even when the first layer has not been created yet.

@@ -141,6 +141,19 @@
  background:color-mix(in srgb,var(--vaccent) 8%,var(--vfield));
  border-color:color-mix(in srgb,var(--vaccent) 45%,var(--vline))
 }
+/* A quiet but recognizable direct entry into XHTTP client profiles. */
+.sv-studio .sv-inline-tools .sv-tool-xhttp-device{
+ background:color-mix(in srgb,var(--vaccent) 9%,var(--vpanel));
+ border-color:color-mix(in srgb,var(--vaccent) 31%,var(--vline));
+ color:var(--vtext)
+}
+.sv-studio .sv-inline-tools .sv-tool-xhttp-device .sv-tool-glyph{
+ color:var(--vaccent)
+}
+.sv-studio .sv-inline-tools .sv-tool-xhttp-device:focus-visible{
+ outline:2px solid var(--vaccent);
+ outline-offset:2px
+}
 .sv-studio .sv-tool-glyph{
  display:grid;place-items:center;flex:none;width:1rem;height:1rem;
  border-radius:0;background:transparent;color:var(--vmute)

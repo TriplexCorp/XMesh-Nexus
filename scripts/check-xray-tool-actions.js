@@ -102,9 +102,15 @@ const tick=async()=>{for(let n=0;n<12;n++)await Promise.resolve()};
 
 async function run(){
  const initial=harness(sample());
- assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,9,'VLESS XHTTP Reality now includes FinalMask creation');
+ assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,10,'VLESS XHTTP Reality exposes device profiles and FinalMask');
  assert.equal(initial.issue.hidden,false,'broken ID visible as contextual warning');
- assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','dns','routing','outbounds','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,false,true,true,true,true,true]);
+ assert.match(initial.host.innerHTML,/data-tool="xhttp-device"[^>]*title="[^"]*Профили устройств/, 
+  'Device profile shortcut must be clearly labelled and directly visible for XHTTP');
+ const rawTransport=sample();
+ rawTransport.inbounds[0].streamSettings.network='raw';
+ assert.doesNotMatch(harness(rawTransport).host.innerHTML,/data-tool="xhttp-device"/,
+  'Do not offer XHTTP client profiles on an inbound with a different transport');
+ assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','xhttp-device','dns','routing','outbounds','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,false,true,true,true,true,true,true]);
 
  const shadowsocksReality=sample();
  shadowsocksReality.inbounds=[{tag:'ss-reality',port:443,protocol:'shadowsocks',settings:{network:'tcp,udp',method:'2022-blake3-aes-256-gcm',password:'local-secret'},streamSettings:{network:'xhttp',security:'reality',xhttpSettings:{path:'/proxy',mode:'auto'},realitySettings:{target:'front.example.org:443',serverNames:['front.example.org'],privateKey:PREVIOUS_KEY,shortIds:['0a0b']}}}];
