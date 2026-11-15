@@ -167,12 +167,14 @@ pub async fn enforce(state: &AppState, token: &str) -> Option<Response> {
         let mut response = (
             StatusCode::SERVICE_UNAVAILABLE,
             "Subscription protection is temporarily unavailable.",
-        ).into_response();
+        )
+            .into_response();
+        response
+            .headers_mut()
+            .insert(header::RETRY_AFTER, HeaderValue::from_static("30"));
         response.headers_mut().insert(
-            header::RETRY_AFTER, HeaderValue::from_static("30")
-        );
-        response.headers_mut().insert(
-            header::CACHE_CONTROL, HeaderValue::from_static("private, no-store")
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("private, no-store"),
         );
         return Some(response);
     }
