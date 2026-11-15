@@ -200,7 +200,8 @@ window.XMeshSubscriptionStudio = (() => {
       calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/>',
       tag:'<path d="M11 3H4a1 1 0 0 0-1 1v7l9 9a2 2 0 0 0 3 0l5-5a2 2 0 0 0 0-3l-9-9Z"/><circle cx="7.5" cy="7.5" r="1"/>',
       info:'<circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/>',
-      plus:'<path d="M12 5v14M5 12h14"/>'
+      save:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v6h8V3M8 21v-8h8v8"/>',
+      plus:'<path d="M12 5v14M5 12h14"/>''
     };
     return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(paths[name]||paths.server)+'</svg>';
   };
@@ -244,12 +245,12 @@ window.XMeshSubscriptionStudio = (() => {
       '</nav><div class="subscription-studio-actions">',
       '<span data-substudio-save-status role="status" aria-live="polite">Все изменения сохранены</span>',
       '<button type="button" class="gh sm" data-substudio-preview-toggle aria-pressed="true">Скрыть предпросмотр</button>',
-      '<button type="submit" form="subscription-studio-form" class="btn" data-substudio-save>'+studioGlyph('copy')+'Сохранить настройки</button>',
+      '<button type="submit" form="subscription-studio-form" class="btn" data-substudio-save>'+studioGlyph('save')+'Сохранить настройки</button>',
       '</div></div>',
       '<form id="subscription-studio-form" class="subscription-studio-layout">',
       '<div class="subscription-studio-main" id="substudio-portal" role="tabpanel" aria-labelledby="substudio-tab-portal">',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>01</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
+      '<div class="subscription-studio-heading"><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
       field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Сообщения чередуются с заданной ниже периодичностью.',{area:true,rows:3,max:4000,placeholder:'Пользователь: {USERNAME}\nОсталось LTE: {CDN_DATA_LEFT}'}),
       announcementHelp(),
@@ -277,7 +278,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label><input type="checkbox" name="subscriptionShowExpiry"'+(data.subscriptionShowExpiry?' checked':'')+'> Показывать срок доступа</label>',
       '</div></section>',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>02</span><div><h3>Дизайн и композиция</h3><p>Настройка каждой детали клиентской страницы без кода.</p></div></div>',
+      '<div class="subscription-studio-heading"><div><h3>Дизайн и композиция</h3><p>Настройка каждой детали клиентской страницы без кода.</p></div></div>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Компоновка</span><select name="subscriptionLayout"><option value="standard"'+(data.subscriptionLayout==='standard'?' selected':'')+'>Классическая</option><option value="centered"'+(data.subscriptionLayout==='centered'?' selected':'')+'>По центру</option><option value="compact"'+(data.subscriptionLayout==='compact'?' selected':'')+'>Компактная</option></select></label>',
       '<label class="f subscription-field"><span>Карточки</span><select name="subscriptionCardStyle"><option value="soft"'+(data.subscriptionCardStyle==='soft'?' selected':'')+'>Мягкие</option><option value="outline"'+(data.subscriptionCardStyle==='outline'?' selected':'')+'>С контуром</option><option value="flat"'+(data.subscriptionCardStyle==='flat'?' selected':'')+'>Без фона</option><option value="glass"'+(data.subscriptionCardStyle==='glass'?' selected':'')+'>Стекло</option><option value="raised"'+(data.subscriptionCardStyle==='raised'?' selected':'')+'>Объёмные</option></select></label>',
@@ -290,7 +291,7 @@ window.XMeshSubscriptionStudio = (() => {
       field('subscriptionCardColor','Цвет карточек',data.subscriptionCardColor,'Фон информационных блоков.',{color:true}),
       field('subscriptionTextColor','Цвет текста',data.subscriptionTextColor,'Основной цвет надписей.',{color:true}),
       '</div>',
-      '<div class="subscription-studio-heading subscription-studio-subheading"><span>✦</span><div><h3>Персонализация</h3><p>Свой логотип, заголовки и контакты.</p></div></div>',
+      '<div class="subscription-studio-heading subscription-studio-subheading"><div><h3>Персонализация</h3><p>Свой логотип, заголовки и контакты.</p></div></div>',
       field('subscriptionLogoUrl','Отдельный URL логотипа',data.subscriptionLogoUrl,'Необязательный старый способ. Основной логотип загружается в Настройки → Бренд и домены и имеет приоритет.',{placeholder:'https://example.com/logo.png',max:512}),
       field('subscriptionHero','Заголовок статуса (RU)',data.subscriptionHero,'Оставьте пустым для стандартного текста.',{placeholder:'Ваша подписка активна',max:100}),
       field('subscriptionHeroEn','Заголовок статуса (EN)',data.subscriptionHeroEn,'Английский вариант. Оставьте пустым для стандартного текста.',{max:100}),
@@ -306,7 +307,7 @@ window.XMeshSubscriptionStudio = (() => {
         data.subscriptionProfileWebPageEnabled!==false,'subscription-profile-page-toggle'),
       field('subscriptionProfileWebPageUrl','Свой адрес кабинета (необязательно)',data.subscriptionProfileWebPageUrl,'Оставьте пустым — приложение откроет персональный портал XMesh. Если указать свой HTTPS-адрес, он будет общим для всех подписчиков.',{placeholder:'Автоматически: личная страница XMesh',max:512}),
       '<p class="note subscription-profile-page-preview" data-subscription-profile-page-preview role="status">Будет доступен после настройки домена подписок.</p>',
-      '<div class="subscription-studio-heading subscription-studio-subheading"><span>◈</span><div><h3>Блоки страницы</h3><p>Каждый элемент включается независимо.</p></div></div>',
+      '<div class="subscription-studio-heading subscription-studio-subheading"><div><h3>Блоки страницы</h3><p>Каждый элемент включается независимо.</p></div></div>',
       '<div class="subscription-display-options subscription-visibility">',
       '<label><input type="checkbox" name="subscriptionShowStatus"'+(data.subscriptionShowStatus?' checked':'')+'> Статус подписки</label>',
       '<label><input type="checkbox" name="subscriptionShowApps"'+(data.subscriptionShowApps?' checked':'')+'> Каталог приложений</label>',
@@ -316,7 +317,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label><input type="checkbox" name="subscriptionShowSupport"'+(data.subscriptionShowSupport?' checked':'')+'> Кнопка поддержки</label>',
       '</div></section>',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>03</span><div><h3>XRAY JSON ENGINE</h3><p>Клиентский JSON, DNS и локальные подключения. Балансировка настраивается отдельно.</p></div></div>',
+      '<div class="subscription-studio-heading"><div><h3>XRAY JSON ENGINE</h3><p>Клиентский JSON, DNS и локальные подключения. Балансировка настраивается отдельно.</p></div></div>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>DNS-сервер</span>'+
         '<input name="json_customDnsAddress" type="text" maxlength="512" autocomplete="off" spellcheck="false"'+
@@ -341,9 +342,11 @@ window.XMeshSubscriptionStudio = (() => {
       'Незащищённые подключения не публикуются. Серверы с одинаковым IP сохраняются.</p>',
       '</section>',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>04</span><div><h3>Клиентские приложения</h3><p>Выбирайте, какие программы показать пользователю, и задавайте собственные ссылки на установку.</p></div></div>',
+      '<div class="subscription-studio-heading"><div><h3>Каталог приложений</h3><p>Выберите доступные клиенты и при необходимости добавьте ссылки на установку.</p></div></div>',
+      '<div class="subscription-studio-pair subscription-apps-titles">',
       field('subscriptionAppsTitle','Заголовок приложений (RU)',data.subscriptionAppsTitle,'Пустое значение — перевод по умолчанию.',{placeholder:'Приложения для подключения',max:80}),
       field('subscriptionAppsTitleEn','Заголовок приложений (EN)',data.subscriptionAppsTitleEn,'Английский заголовок раздела.',{max:80}),
+      '</div>',
       '<div class="subscription-studio-toolbar"><span class="subscription-client-counter" data-subscription-client-count>—</span><div class="subscription-client-actions">',
       '<button type="button" class="gh sm" data-client-preset="all">Включить все</button>',
       '<button type="button" class="gh sm" data-client-preset="none">Отключить все</button>',
@@ -537,7 +540,7 @@ window.XMeshSubscriptionStudio = (() => {
       '</div>',
       '</main>',
       '</div>',
-      '<div class="subscription-studio-stats"><div><small>Пользователей</small><b>'+esc(counts.users)+'</b></div><div><small>Узлов</small><b>'+esc(counts.nodes)+'</b></div></div>',
+
       '</aside>',
       '<div class="subscription-servers-page" id="substudio-servers" role="tabpanel" aria-labelledby="substudio-tab-servers" hidden>',
       '<header class="subscription-fleet-hero">',
@@ -610,7 +613,8 @@ window.XMeshSubscriptionStudio = (() => {
       '</section>',
       '<section class="card subscription-studio-section subscription-flood-card" data-sub-flood-card>',
       '<div class="subscription-studio-heading subscription-server-card-heading"><span class="subscription-server-symbol">'+studioGlyph('shield')+'</span><div><h3>Защита от флуда подписок</h3><p>Мониторинг по умолчанию — без блокировок клиентов. При необходимости включите отклонение лишних запросов.</p></div></div>',
-      '<div class="subscription-flood-toolbar"><label class="subscription-flood-switch"><input name="floodEnabled" type="checkbox"'+(data.subscriptionFlood.enabled?' checked':'')+'><span>Защита включена</span></label>',
+      '<div class="subscription-flood-toolbar">'+studioToggle('floodEnabled','Фильтрация запросов',
+        'Включает контроль частоты обращений к подпискам.',data.subscriptionFlood.enabled,'subscription-flood-switch'),
       '<span class="subscription-sub-provision-status" data-sub-flood-current-state>Мониторинг</span></div>',
       '<fieldset class="subscription-flood-mode"><legend>Режим</legend>',
       '<label><input type="radio" name="floodMode" value="monitor"'+(data.subscriptionFlood.mode!=='protect'?' checked':'')+'> Мониторинг — только считать превышения</label>',
@@ -631,8 +635,8 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-flood-footer"><small data-sub-flood-detail role="status" aria-live="polite">Для начала используйте мониторинг. Настройки сохраняются общей кнопкой «Сохранить настройки».</small>',
       '<button type="button" class="gh" data-sub-flood-refresh>Обновить статистику</button></div>',
       '</section>',
-      '<aside class="card subscription-sub-scope"><span class="subscription-server-symbol">'+studioGlyph('shield')+'</span><strong>Безопасность</strong>',
-      '<p>Агент сам обращается к Nexus по HTTPS — дополнительный административный порт не нужен. Установщик проверяется перед запуском, а обновления требуют подпись. Подписки и пользователи остаются в Nexus.</p></aside>',
+      '<aside class="card subscription-sub-scope"><div class="subscription-security-note-heading">'+studioGlyph('shield')+'<strong>Безопасность шлюза</strong></div>',
+      '<p>Агент обращается к Nexus по HTTPS. Отдельный административный порт не нужен. Установщик проверяется, обновления подписываются, а данные пользователей остаются в Nexus.</p></aside>',
       '</div></form></div>'
 
     ].join('');
@@ -678,20 +682,18 @@ window.XMeshSubscriptionStudio = (() => {
       serverPanel.append(servers);
       security.append(flood,scope);
 
-      const card=(title,description,symbolText='✦')=>{
+      const card=(title,description)=>{
         const section=document.createElement('section');
         section.className='card subscription-studio-section';
         const heading=document.createElement('div');
         heading.className='subscription-studio-heading';
-        const symbol=document.createElement('span');
-        symbol.textContent=symbolText;
         const copy=document.createElement('div');
         const h=document.createElement('h3');
         h.textContent=title;
         const p=document.createElement('p');
         p.textContent=description;
         copy.append(h,p);
-        heading.append(symbol,copy);
+        heading.append(copy);
         section.append(heading);
         return section;
       };
@@ -826,9 +828,9 @@ window.XMeshSubscriptionStudio = (() => {
       previewBody.className='subscription-studio-preview subscription-public';
       while(previewHost.firstChild)previewBody.appendChild(previewHost.firstChild);
       for(const href of [
-        '/subscription-studio.css?v=262af6d1ee44',
+        '/subscription-studio.css?v=studio-refresh-20261116',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=87451212a4bc'
+        '/subscription-public.css?v=studio-refresh-20261116'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
