@@ -120,6 +120,12 @@ const main=async()=>{
     }
     await modal(page).locator('select[name="mode"]').selectOption('packet-up');
     await modal(page).locator('.xm-studio-modal-accept').click();
+    await page.waitForTimeout(120);
+    console.log('XHTTP mode after Apply:',JSON.stringify(await page.evaluate(()=>({
+      mode:(()=>{try{return JSON.parse(document.querySelector('[data-v="source"]').value).inbounds?.[0]?.streamSettings?.xhttpSettings?.mode}catch{return 'invalid'}})(),
+      status:document.querySelector('[data-tool-status]')?.textContent,
+      dialog:document.querySelector('dialog.xm-studio-modal[open]')?.innerText?.slice(0,450)
+    }))));
     // Closing the native dialog resolves the modal promise; the caller then
     // commits JSON in the next microtask. Await actual persisted state.
     await page.waitForFunction(()=>{
