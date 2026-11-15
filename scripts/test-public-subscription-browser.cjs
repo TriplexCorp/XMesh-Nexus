@@ -311,16 +311,21 @@ async function dismissDialog(page,dialog,opener){
   const installGenerate=page.locator('[data-sub-enroll]');
   assert(await installGenerate.isEnabled(),'A saved domain must enable owner-only install generation');
   await installGenerate.click();
-  await page.waitForFunction(()=>document.querySelector('[data-sub-install-command]').textContent.includes('--enroll-token-stdin'));
+  await page.waitForFunction(()=>document.querySelector('[data-sub-install-command]').textContent.includes('/bootstrap.sh'));
   assert(await commandCopy.isEnabled(),'Copy must only be available after one-time enrollment');
   assert.equal(await page.evaluate(()=>window.__subEnrollCallCount),1,'Exactly one enroll request');
   const managedInstall=await page.locator('[data-sub-install-command]').textContent();
-  assert(managedInstall.includes('--domain sub.example.org --path /s --enroll-token-stdin'), 'Installer must read enrollment from stdin');
-  const commandLines=managedInstall.split(String.fromCharCode(10));
-  assert(commandLines.includes('a'.repeat(64))&&commandLines.includes('XMESH_ENROLL_TOKEN'),
-    'Single command carries the one-time token as a here-document, not argv');
-  assert(managedInstall.includes('sha256sum --check --status'), 'Bootstrap must verify SHA-256 before root execution');
-  assert(!managedInstall.includes('--enroll-token '+'a'.repeat(64)), 'Enrollment token must not be an argv parameter');
+  const codeCopy=page.locator('[data-sub-token-copy]');
+  assert(await codeCopy.isEnabled(),'One-time code copy must enable after enrollment');
+  assert(managedInstall.includes('--domain sub.example.org --path /s'),
+    'Installer must target the configured gateway');
+  assert(managedInstall.includes('/6fca4eb0e0388e6ec5e6817e9a8d58942935aaa2/bootstrap.sh'),
+    'Bootstrap must come from a reviewed immutable commit');
+  assert(managedInstall.length<470,'Installer still too long: '+managedInstall.length);
+  assert(!managedInstall.includes('a'.repeat(64)),
+    'Enrollment secret must never appear in the displayed command');
+  assert(!managedInstall.includes('--enroll-token'),
+    'Enrollment secret must be entered privately at the VPS prompt');
   assert.equal(await page.locator('[data-sub-health-link]').getAttribute('href'),'https://sub.example.org/healthz');
   assert.match(await page.locator('[data-sub-install-state]').innerText(),/Команда готова/);
   assert(!/подключён|онлайн/i.test(await page.locator('[data-sub-install-state]').innerText()),

@@ -817,6 +817,27 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+// This classifies only the machine request shape. Actual Ed25519
+// signature/body/timestamp/nonce verification lives in sub_server::authorize.
+// An old Bearer-only CSRF exception broke signed Sub heartbeats after enrollment.
+fn signed_sub_agent_request(headers: &HeaderMap) -> bool {
+    !headers.contains_key(header::AUTHORIZATION)
+        && !headers.contains_key(header::COOKIE)
+        && !headers.contains_key(header::ORIGIN)
+        && !headers.contains_key("sec-fetch-site")
+        && [
+            "x-xmesh-sub-timestamp",
+            "x-xmesh-sub-nonce",
+            "x-xmesh-sub-signature",
+        ]
+        .iter()
+        .all(|name| headers.get_all(*name).iter().count() == 1)
+        && headers
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.eq_ignore_ascii_case("application/json"))
+}
+
 async fn csrf_guard(request: Request, next: Next) -> Response {
     let is_mutation = matches!(
         *request.method(),
@@ -844,10 +865,9 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
             | "/api/v1/node/restart/poll"
             | "/api/v1/node/restart/progress"
             | "/api/v1/node/restart/ack" => request.headers().contains_key("x-xmesh-signature"),
-            "/api/v1/sub-server/agent/poll" | "/api/v1/sub-server/agent/report" => request
-                .headers()
-                .get(header::AUTHORIZATION)
-                .is_some_and(|value| value.to_str().is_ok_and(|s| s.starts_with("Bearer "))),
+            "/api/v1/sub-server/agent/poll" | "/api/v1/sub-server/agent/report" => {
+                signed_sub_agent_request(request.headers())
+            }
             "/api/v1/sub-server/claim" | "/api/v1/node/enroll" => request
                 .headers()
                 .get(header::CONTENT_TYPE)
@@ -5179,6 +5199,50 @@ async fn audit(
 mod tests {
     use super::{USER_ONLINE_WINDOW_MS, number, user_is_online, user_status};
     use serde_json::json;
+
+    #[test]
+    fn sub_agent_signed_machine_requests_are_not_blocked_by_legacy_bearer_csrf() {
+        use axum::http::{HeaderMap, HeaderValue, header};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        headers.insert(
+            "x-xmesh-sub-timestamp",
+            HeaderValue::from_static("1800000000"),
+        );
+        headers.insert(
+            "x-xmesh-sub-nonce",
+            HeaderValue::from_static("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+        );
+        headers.insert(
+            "x-xmesh-sub-signature",
+            HeaderValue::from_static("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+        );
+        assert!(super::signed_sub_agent_request(&headers));
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_static("Bearer legacy"),
+        );
+        assert!(!super::signed_sub_agent_request(&headers));
+        headers.remove(header::AUTHORIZATION);
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("session=untrusted"),
+        );
+        assert!(!super::signed_sub_agent_request(&headers));
+        headers.remove(header::COOKIE);
+        headers.append(
+            "x-xmesh-sub-signature",
+            HeaderValue::from_static("cccccccccccccccccccccccccccccccc"),
+        );
+        assert!(!super::signed_sub_agent_request(&headers));
+        headers.remove("x-xmesh-sub-signature");
+        assert!(!super::signed_sub_agent_request(&headers));
+        // The real verifier performs cryptographic validation after this
+        // narrow routing check; spoofed headers grant no agent privileges.
+    }
 
     #[test]
     fn user_status_rules_match_panel_contract() {
