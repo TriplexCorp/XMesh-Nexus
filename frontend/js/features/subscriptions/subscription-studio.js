@@ -11,7 +11,7 @@ window.XMeshSubscriptionStudio = (() => {
   }
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
-    subscriptionFlood:{enabled:true,mode:'monitor',ipPerMinute:120,tokenPerMinute:12},
+    subscriptionFlood:{enabled:true,mode:'protect',ipPerMinute:120,tokenPerMinute:30},
     subscriptionBrand:'', subscriptionAnnouncement:'', subscriptionAnnouncementRotationHours:24,subscriptionAnnouncementEnabled:true, subscriptionUpdateInterval:24, subscriptionDescription:'Настройки подключения и информация о подписке.',
     subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78',subscriptionSecondaryAccent:'#c6e985', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
