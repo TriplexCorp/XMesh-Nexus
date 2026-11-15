@@ -166,7 +166,7 @@ async fn authorize(
     headers: &HeaderMap,
     raw_body: &[u8],
     route: &str,
-) -> Result<(), ApiError> {
+) -> Result<Option<String>, ApiError> {
     let fail = || {
         ApiError::new(
             StatusCode::UNAUTHORIZED,
@@ -210,12 +210,33 @@ async fn authorize(
         .filter(|s| valid_lower_hex(s, 128))
         .ok_or_else(fail)?;
 
-    let settings = credential(&state.pool).await?.ok_or_else(fail)?;
-    let public_key = settings
-        .get("publicKey")
+    // Public key header is only a lookup selector. Authentication continues
+    // to require a valid signature from that key; copying the selector grants
+    // no access. Each mirror is independently revocable by deleting its row.
+    let advertised = unique_header(headers, "x-xmesh-sub-public-key");
+    let primary = credential(&state.pool).await?;
+    let primary_key = primary.as_ref()
+        .and_then(|setting| setting.get("publicKey"))
         .and_then(Value::as_str)
-        .filter(|s| valid_lower_hex(s, 64))
-        .ok_or_else(fail)?;
+        .filter(|value| valid_lower_hex(value, 64));
+    let (public_key, mirror_id) = if let Some(candidate) = advertised {
+        if !valid_lower_hex(candidate, 64) {
+            return Err(fail());
+        }
+        if primary_key == Some(candidate) {
+            (candidate.to_owned(), None)
+        } else {
+            let id: Option<String> =
+                sqlx::query_scalar("SELECT id FROM sub_mirrors WHERE public_key=$1")
+                    .bind(candidate)
+                    .fetch_optional(&state.pool)
+                    .await?;
+            (candidate.to_owned(), Some(id.ok_or_else(fail)?))
+        }
+    } else {
+        // Existing primary gateway only. Mirrors always require the selector.
+        (primary_key.ok_or_else(fail)?.to_owned(), None)
+    };
     let public_bytes: [u8; 32] = hex::decode(public_key)
         .map_err(|_| fail())?
         .try_into()
@@ -258,7 +279,7 @@ async fn authorize(
     if inserted.is_none() {
         return Err(fail());
     }
-    Ok(())
+    Ok(mirror_id)
 }
 
 pub async fn issue_enrollment(
