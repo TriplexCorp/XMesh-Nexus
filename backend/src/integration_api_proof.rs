@@ -6,7 +6,7 @@ use super::{Problem, now_ms};
 use crate::AppState;
 use axum::{
     body::{Body, to_bytes},
-    extract::Request,
+    extract::{OriginalUri, Request},
     http::{HeaderMap, Method, StatusCode, header::HeaderName},
 };
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -113,7 +113,11 @@ pub(super) async fn constrain(
             "Payload too large",
         )
     })?;
-    let path = parts.uri.path_and_query().map_or("/", |p| p.as_str());
+    // Nested axum routers strip their mount prefixes from Request::uri.
+    // Verify the exact external URI that the integration client signed.
+    // Never reconstruct this from an untrusted forwarded URL/header.
+    let original = parts.extensions.get::<OriginalUri>().ok_or_else(denied)?;
+    let path = original.0.path_and_query().map_or("/", |p| p.as_str());
     let nonce = validate_signature(
         proof_key,
         token_hash,
