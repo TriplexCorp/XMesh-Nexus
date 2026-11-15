@@ -22,6 +22,22 @@ const PENDING_UPDATE: &str = "xmesh:sub:update:pending";
 const CURRENT_UPDATE: &str = "xmesh:sub:update:current";
 const UPDATE_STATUS: &str = "xmesh:sub:update:status";
 const CREDENTIAL_KEY: &str = "sub_server_agent";
+const SUB_AGENT_RATE_PER_MINUTE: i64 = 30;
+const SUB_AUTH_GLOBAL_PER_MINUTE: i64 = 3000;
+const SUB_CLAIM_GLOBAL_PER_MINUTE: i64 = 300;
+const RATE_LUA: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],90) end; return n";
+
+async fn consume_budget(state: &AppState, key: &str, limit: i64) -> Result<(), ApiError> {
+    let mut conn = state.redis.clone();
+    let count: i64 = redis::cmd("EVAL")
+        .arg(RATE_LUA).arg(1).arg(key).query_async(&mut conn).await
+        .map_err(|_|backend_error())?;
+    if count>limit {
+        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "XMesh Sub: превышен лимит запросов."));
+    }
+    Ok(())
+}
+
 
 fn api_error(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, message)
@@ -86,14 +102,27 @@ async fn credential(pool: &PgPool) -> Result<Option<Value>, ApiError> {
 }
 async fn authorize(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
     let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Недействительный ключ XMesh Sub.");
-    let raw = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix("Bearer "))
+    // A manager is a machine client. Browser cookies and forwarded identities
+    // must never authenticate this admin-capable channel.
+    if headers.contains_key(header::COOKIE)
+        || headers.contains_key(header::ORIGIN)
+        || headers.contains_key("sec-fetch-site") {
+        return Err(fail());
+    }
+    let mut values = headers.get_all(header::AUTHORIZATION).iter();
+    let raw = values.next().and_then(|h|h.to_str().ok())
+        .and_then(|h|h.strip_prefix("Bearer "))
         .ok_or_else(fail)?;
+    if values.next().is_some() {
+        return Err(fail());
+    }
     if !is_hex(raw, 64) || raw.bytes().any(|c| c.is_ascii_uppercase()) {
         return Err(fail());
     }
+    let minute = now() / 60;
+    consume_budget(state,&format!("xmesh:sub:auth:global:{minute}"),SUB_AUTH_GLOBAL_PER_MINUTE).await?;
+    let token_hash = sha256_hex(raw);
+    consume_budget(state,&format!("xmesh:sub:auth:token:{minute}:{token_hash}"),SUB_AGENT_RATE_PER_MINUTE).await?;
     let settings = credential(&state.pool).await?.ok_or_else(fail)?;
     let stored = settings
         .get("hash")
@@ -161,6 +190,7 @@ pub async fn claim(
             "Код подключения недействителен.",
         ));
     }
+    consume_budget(&state,&format!("xmesh:sub:claim:global:{}", now()/60),SUB_CLAIM_GLOBAL_PER_MINUTE).await?;
     let domain = current_domain(&state).await?;
     if body.domain != domain {
         return Err(ApiError::new(
