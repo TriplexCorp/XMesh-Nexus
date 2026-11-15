@@ -1,7 +1,7 @@
 //! Sender-constrained Integration API tokens.
 //! An opaque bearer is insufficient when a token has a registered Ed25519 key.
 //! Proofs cover exact method/path+query/body, token digest, timestamp and nonce.
-//! This is a deterministic `XMesh` `PoP` contract, not the DPoP RFC `JWT` format.
+//! This is a deterministic `XMesh` `PoP` contract, not the `DPoP` RFC `JWT` format.
 use super::{Problem, now_ms};
 use crate::AppState;
 use axum::{
