@@ -7,8 +7,8 @@ use axum::{
     extract::{Extension, State},
     http::{HeaderMap, StatusCode, header},
 };
-use rand_core::{OsRng, RngCore};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use rand_core::{OsRng, RngCore};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -115,7 +115,10 @@ async fn credential(pool: &PgPool) -> Result<Option<Value>, ApiError> {
     )
 }
 async fn authorize(
-    state: &AppState, headers: &HeaderMap, path: &str, body: &[u8],
+    state: &AppState,
+    headers: &HeaderMap,
+    path: &str,
+    body: &[u8],
 ) -> Result<(), ApiError> {
     let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Недействительный ключ XMesh Sub.");
     // A manager is a machine client. Browser cookies and forwarded identities
@@ -160,7 +163,7 @@ async fn authorize(
     if let Some(key) = settings.get("proofPublicKey").and_then(Value::as_str) {
         let key = decoded_public_key(key).ok_or_else(fail)?;
         verify_agent_proof(state, headers, &key, &token_hash, path, body).await?;
-    } else if std::env::var("XMESH_SUB_REQUIRE_PROOF").ok().as_deref()==Some("true") {
+    } else if std::env::var("XMESH_SUB_REQUIRE_PROOF").ok().as_deref() == Some("true") {
         return Err(fail());
     }
     // A copied bearer cannot exhaust the valid agent's per-token budget.
@@ -213,7 +216,11 @@ pub struct Claim {
 }
 
 fn decoded_public_key(text: &str) -> Option<[u8; 32]> {
-    if text.len() != 64 || text.bytes().any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase()) {
+    if text.len() != 64
+        || text
+            .bytes()
+            .any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
+    {
         return None;
     }
     let bytes = hex::decode(text).ok()?;
@@ -223,23 +230,34 @@ fn decoded_public_key(text: &str) -> Option<[u8; 32]> {
 }
 
 fn signed_agent_message(
-    token_hash: &str, path: &str, timestamp: u64, nonce: &str, body: &[u8],
+    token_hash: &str,
+    path: &str,
+    timestamp: u64,
+    nonce: &str,
+    body: &[u8],
 ) -> Vec<u8> {
     let body_hash = hex::encode(Sha256::digest(body));
-    format!("{PROOF_PREFIX}\n{token_hash}\nPOST\n{path}\n{timestamp}\n{nonce}\n{body_hash}").into_bytes()
+    format!("{PROOF_PREFIX}\n{token_hash}\nPOST\n{path}\n{timestamp}\n{nonce}\n{body_hash}")
+        .into_bytes()
 }
 
 fn single_proof_header<'a>(headers: &'a HeaderMap, name: &'static str) -> Option<&'a str> {
     let mut values = headers.get_all(name).iter();
     let value = values.next()?.to_str().ok()?;
-    if values.next().is_some() { return None; }
+    if values.next().is_some() {
+        return None;
+    }
     Some(value)
 }
 
 /// Verify signature over the full canonical public API path and *raw* JSON
 /// bytes. Never trust X-Forwarded-* headers for this machine identity.
 fn verified_agent_nonce(
-    headers: &HeaderMap, key: &[u8; 32], token_hash: &str, path: &str, body: &[u8],
+    headers: &HeaderMap,
+    key: &[u8; 32],
+    token_hash: &str,
+    path: &str,
+    body: &[u8],
 ) -> Result<String, ApiError> {
     let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Invalid XMesh Sub request proof");
     let timestamp = single_proof_header(headers, "x-xmesh-proof-ts").ok_or_else(fail)?;
@@ -248,16 +266,25 @@ fn verified_agent_nonce(
     let seconds: u64 = timestamp.parse().map_err(|_| fail())?;
     if timestamp != seconds.to_string()
         || seconds.abs_diff(now()) > CLOCK_SKEW_SECONDS
-        || nonce.len() != 32 || nonce.bytes().any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
+        || nonce.len() != 32
+        || nonce
+            .bytes()
+            .any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
         || signature.len() != 128
-        || signature.bytes().any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
+        || signature
+            .bytes()
+            .any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
     {
         return Err(fail());
     }
     let signature = hex::decode(signature).map_err(|_| fail())?;
     let signature = Signature::from_slice(&signature).map_err(|_| fail())?;
     let verifying_key = VerifyingKey::from_bytes(key).map_err(|_| fail())?;
-    verifying_key.verify(&signed_agent_message(token_hash,path,seconds,nonce,body),&signature)
+    verifying_key
+        .verify(
+            &signed_agent_message(token_hash, path, seconds, nonce, body),
+            &signature,
+        )
         .map_err(|_| fail())?;
     Ok(nonce.to_owned())
 }
@@ -265,8 +292,12 @@ fn verified_agent_nonce(
 /// A sender-bound agent has both its long-lived pairing token and a private
 /// Ed25519 key, which is never uploaded to Nexus.
 async fn verify_agent_proof(
-    state: &AppState, headers: &HeaderMap, key: &[u8; 32],
-    token_hash: &str, path: &str, body: &[u8],
+    state: &AppState,
+    headers: &HeaderMap,
+    key: &[u8; 32],
+    token_hash: &str,
+    path: &str,
+    body: &[u8],
 ) -> Result<(), ApiError> {
     let nonce = verified_agent_nonce(headers, key, token_hash, path, body)?;
     // Reserve the nonce only AFTER valid authentication. Reject replay across
@@ -275,10 +306,18 @@ async fn verify_agent_proof(
     let mut redis = state.redis.clone();
     let result: Option<String> = redis::cmd("SET")
         .arg(format!("xmesh:sub:proof:v1:{token_hash}:{nonce_hash}"))
-        .arg("1").arg("NX").arg("EX").arg(PROOF_TTL_SECONDS)
-        .query_async(&mut redis).await.map_err(|_| backend_error())?;
+        .arg("1")
+        .arg("NX")
+        .arg("EX")
+        .arg(PROOF_TTL_SECONDS)
+        .query_async(&mut redis)
+        .await
+        .map_err(|_| backend_error())?;
     if result.is_none() {
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Replayed XMesh Sub request proof"));
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Replayed XMesh Sub request proof",
+        ));
     }
     Ok(())
 }
@@ -305,11 +344,16 @@ pub async fn claim(
         SUB_CLAIM_GLOBAL_PER_MINUTE,
     )
     .await?;
-    let public_key = body.proof_public_key
-        .as_deref().map(|value| decoded_public_key(value).ok_or_else(|| {
-            api_error("Invalid Ed25519 public key")
-        })).transpose()?;
-    if public_key.is_none() && std::env::var("XMESH_SUB_REQUIRE_PROOF").ok().as_deref()==Some("true") {
+    let public_key = body
+        .proof_public_key
+        .as_deref()
+        .map(|value| {
+            decoded_public_key(value).ok_or_else(|| api_error("Invalid Ed25519 public key"))
+        })
+        .transpose()?;
+    if public_key.is_none()
+        && std::env::var("XMESH_SUB_REQUIRE_PROOF").ok().as_deref() == Some("true")
+    {
         return Err(api_error("Sender-constrained enrollment is required"));
     }
     let domain = current_domain(&state).await?;
@@ -488,9 +532,12 @@ pub async fn poll(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    if body.len()>MAX_BODY_BYTES {return Err(api_error("Oversized agent request"));}
+    if body.len() > MAX_BODY_BYTES {
+        return Err(api_error("Oversized agent request"));
+    }
     authorize(&state, &headers, AGENT_POLL_PATH, &body).await?;
-    let body: Poll = serde_json::from_slice(&body).map_err(|_|api_error("Invalid poll request"))?;
+    let body: Poll =
+        serde_json::from_slice(&body).map_err(|_| api_error("Invalid poll request"))?;
     if body.version.is_empty()
         || body.version.len() > 40
         || !body
@@ -553,9 +600,12 @@ pub async fn report(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    if body.len()>MAX_BODY_BYTES {return Err(api_error("Oversized agent request"));}
+    if body.len() > MAX_BODY_BYTES {
+        return Err(api_error("Oversized agent request"));
+    }
     authorize(&state, &headers, AGENT_REPORT_PATH, &body).await?;
-    let body: Report = serde_json::from_slice(&body).map_err(|_|api_error("Invalid agent report"))?;
+    let body: Report =
+        serde_json::from_slice(&body).map_err(|_| api_error("Invalid agent report"))?;
     if !is_hex(&body.job_id, 32)
         || !matches!(body.stage.as_str(), "running" | "completed" | "failed")
         || body.detail.len() > 160
@@ -605,39 +655,71 @@ mod tests {
     #[test]
     fn signed_agent_message_rejects_tampering_and_bearer_reuse() {
         use ed25519_dalek::{Signer, SigningKey};
-        let signer = SigningKey::from_bytes(&[8u8;32]);
+        let signer = SigningKey::from_bytes(&[8u8; 32]);
         let key = signer.verifying_key().to_bytes();
         let token_hash = sha256_hex(&"a".repeat(64));
         let timestamp = now();
         let nonce = "b".repeat(32);
         let body = br#"{"version":"0.4.0"}"#;
         let sig = signer.sign(&signed_agent_message(
-            &token_hash, AGENT_POLL_PATH, timestamp, &nonce, body,
+            &token_hash,
+            AGENT_POLL_PATH,
+            timestamp,
+            &nonce,
+            body,
         ));
         let mut headers = HeaderMap::new();
-        headers.insert("x-xmesh-proof-ts",timestamp.to_string().parse().unwrap());
-        headers.insert("x-xmesh-proof-nonce",nonce.parse().unwrap());
-        headers.insert("x-xmesh-proof-sig",hex::encode(sig.to_bytes()).parse().unwrap());
-        assert!(verified_agent_nonce(&headers,&key,&token_hash,AGENT_POLL_PATH,body).is_ok());
-        assert!(verified_agent_nonce(&headers,&key,&token_hash,AGENT_REPORT_PATH,body).is_err());
-        assert!(verified_agent_nonce(&headers,&key,&token_hash,AGENT_POLL_PATH,br#"{"version":"0.5.0"}"#).is_err());
-        assert!(verified_agent_nonce(&headers,&key,&sha256_hex("stolen-token"),AGENT_POLL_PATH,body).is_err());
-        headers.insert("x-xmesh-proof-ts",(timestamp-120).to_string().parse().unwrap());
-        assert!(verified_agent_nonce(&headers,&key,&token_hash,AGENT_POLL_PATH,body).is_err());
+        headers.insert("x-xmesh-proof-ts", timestamp.to_string().parse().unwrap());
+        headers.insert("x-xmesh-proof-nonce", nonce.parse().unwrap());
+        headers.insert(
+            "x-xmesh-proof-sig",
+            hex::encode(sig.to_bytes()).parse().unwrap(),
+        );
+        assert!(verified_agent_nonce(&headers, &key, &token_hash, AGENT_POLL_PATH, body).is_ok());
+        assert!(
+            verified_agent_nonce(&headers, &key, &token_hash, AGENT_REPORT_PATH, body).is_err()
+        );
+        assert!(
+            verified_agent_nonce(
+                &headers,
+                &key,
+                &token_hash,
+                AGENT_POLL_PATH,
+                br#"{"version":"0.5.0"}"#
+            )
+            .is_err()
+        );
+        assert!(
+            verified_agent_nonce(
+                &headers,
+                &key,
+                &sha256_hex("stolen-token"),
+                AGENT_POLL_PATH,
+                body
+            )
+            .is_err()
+        );
+        headers.insert(
+            "x-xmesh-proof-ts",
+            (timestamp - 120).to_string().parse().unwrap(),
+        );
+        assert!(verified_agent_nonce(&headers, &key, &token_hash, AGENT_POLL_PATH, body).is_err());
     }
 
     #[test]
     fn proof_key_and_header_validation_fail_closed() {
         use ed25519_dalek::SigningKey;
-        let key = SigningKey::from_bytes(&[3u8;32]).verifying_key().to_bytes();
+        let key = SigningKey::from_bytes(&[3u8; 32])
+            .verifying_key()
+            .to_bytes();
         assert!(decoded_public_key(&hex::encode(key)).is_some());
         assert!(decoded_public_key(&"GG".repeat(32)).is_none());
         assert!(decoded_public_key("0").is_none());
-        let mut headers=HeaderMap::new();
-        headers.append("x-xmesh-proof-ts","123".parse().unwrap());
-        headers.append("x-xmesh-proof-ts","123".parse().unwrap());
-        assert!(single_proof_header(&headers,"x-xmesh-proof-ts").is_none());
-        assert!(single_proof_header(&headers,"x-xmesh-proof-nonce").is_none());
+        let mut headers = HeaderMap::new();
+        headers.append("x-xmesh-proof-ts", "123".parse().unwrap());
+        headers.append("x-xmesh-proof-ts", "123".parse().unwrap());
+        assert!(single_proof_header(&headers, "x-xmesh-proof-ts").is_none());
+        assert!(single_proof_header(&headers, "x-xmesh-proof-nonce").is_none());
     }
 
     #[test]
