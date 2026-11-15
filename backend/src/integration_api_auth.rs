@@ -328,7 +328,7 @@ async fn throttle_token(state: &AppState, token_id: i64) -> Result<(), Problem> 
         .arg(format!("xmesh:int:rl:v1:{token_id}:{minute}"))
         .query_async(&mut redis)
         .await
-        .map_err(|_|Problem::unavailable())?;
+        .map_err(|_| Problem::unavailable())?;
     if count > REDIS_RATE_LIMIT_PER_MINUTE {
         return Err(Problem::new(
             StatusCode::TOO_MANY_REQUESTS,
@@ -467,7 +467,10 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
         .try_get("proof_public_key")
         .map_err(|_| Problem::unavailable())?;
     if proof_key.is_none()
-        && std::env::var("XMESH_INTEGRATION_REQUIRE_PROOF").ok().as_deref() == Some("true")
+        && std::env::var("XMESH_INTEGRATION_REQUIRE_PROOF")
+            .ok()
+            .as_deref()
+            == Some("true")
     {
         return Err(Problem::new(
             StatusCode::UNAUTHORIZED,
