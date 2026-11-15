@@ -144,11 +144,9 @@ window.XMeshSubscriptionStudio = (() => {
   const esc = x => String(x ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const hostnameOK = v => !v || (v.length <= 253 && /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?)*$/i.test(v));
   const pathOK = v => v.length <= 64 && v.split('/').length <= 9 && /^\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/i.test(v) && !/^\/(?:api|login|dashboard)(?:\/|$)/i.test(v);
-  // Immutable vetted XMesh Sub installer. SHA-256 must match before root execution.
-  const approvedSubInstaller={
-    revision:'51d90ff15ef2a68415e23b325b3a37393b8b97b5',
-    sha256:'19d3049bff7d23a13ad00d06debfd86cfc3fd773ce49a87426e0a9723566579b'
-  };
+  // The operator copies ONE command. The official signed apt keyring is
+  // pinned, and the exact installer MUST have GitHub OIDC build provenance
+  // from the trusted main release workflow before first root execution.
   const validInstallParams=(panel,sub,path)=>{
     const valid=host=>typeof host==='string'&&host.includes('.')&&hostnameOK(host)&&
       /^[a-z0-9.-]+$/i.test(host)&&/\.[a-z]{2,}$/i.test(host);
@@ -156,17 +154,59 @@ window.XMeshSubscriptionStudio = (() => {
   };
   const installCommand=(panel,sub,path,token='')=>{
     if(!validInstallParams(panel,sub,path)||!/^[a-f0-9]{64}$/.test(token))return '';
-    const installerUrl='https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/'+approvedSubInstaller.revision+'/install.sh';
-    // A single pasted shell group. The one-time credential is stdin (not argv).
-    // A local tempfile is verified before starting the privileged installer.
     return [
-      '(',
-      '  set -eu',
-      '  xmesh_sub_installer="$(mktemp)"',
-      '  trap \'rm -f "$xmesh_sub_installer"\' EXIT',
-      '  curl --proto \'=https\' --tlsv1.2 -fsSL '+installerUrl+' -o "$xmesh_sub_installer"',
-      "  printf '"+approvedSubInstaller.sha256+"  %s\\n' \"$xmesh_sub_installer\" | sha256sum --check --status || { echo 'XMesh Sub: installer SHA-256 mismatch' >&2; exit 1; }",
-      '  sudo bash "$xmesh_sub_installer" --panel https://'+panel+' --domain '+sub+' --path '+path+" --enroll-token-stdin <<'XMESH_ENROLL_TOKEN'",
+      "(",
+      "  set -euo pipefail",
+      "  xmesh_dir=\"$(mktemp -d)\"",
+      "  trap 'rm -rf \"$xmesh_dir\"' EXIT",
+      "  sudo apt-get update -qq",
+      "  sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y ca-certificates curl python3",
+      "  curl --proto '=https' --tlsv1.2 -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o \"$xmesh_dir/gh-keyring.gpg\"",
+      "  printf '6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b  %s\\n' \"$xmesh_dir/gh-keyring.gpg\" | sha256sum --check --status",
+      "  sudo install -Dm644 \"$xmesh_dir/gh-keyring.gpg\" /etc/apt/keyrings/githubcli-archive-keyring.gpg",
+      "  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\\n' \"$(dpkg --print-architecture)\" | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null",
+      "  sudo apt-get update -qq",
+      "  sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y gh",
+      "  xmesh_gh_version=\"$(gh version | head -n1 | awk '{print $3}')\"",
+      "  python3 -c 'import re,sys; m=re.fullmatch(r\"([0-9]+)\\.([0-9]+)\\.([0-9]+)\",sys.argv[1]); assert m and tuple(map(int,m.groups()))>=(2,102,0),\"GitHub CLI 2.102.0+ required\"' \"$xmesh_gh_version\"",
+      "  curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 -H 'Accept: application/vnd.github+json' https://api.github.com/repos/TriplexCorp/XMesh-Sub/commits/main -o \"$xmesh_dir/commit.json\"",
+      "  xmesh_sha=\"$(python3 -c 'import json,re,sys; s=json.load(sys.stdin)[\"sha\"]; assert re.fullmatch(\"[a-f0-9]{40}\",s),\"Invalid release SHA\"; print(s)' < \"$xmesh_dir/commit.json\")\"",
+      "  curl --proto '=https' --tlsv1.2 -fsSL --max-time 40 \"https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/$xmesh_sha/release_verify.py\" -o \"$xmesh_dir/release_verify.py\"",
+      "  python3 - \"$xmesh_dir/release_verify.py\" \"$xmesh_dir/provenance.jsonl\" <<'XMESH_VERIFY_BOOTSTRAP'",
+      "import hashlib,json,pathlib,ssl,sys,urllib.request,urllib.parse",
+      "file=pathlib.Path(sys.argv[1])",
+      "digest=hashlib.sha256(file.read_bytes()).hexdigest()",
+      "class NoRedirect(urllib.request.HTTPRedirectHandler):",
+      "    def redirect_request(self,req,fp,code,msg,headers,newurl):return None",
+      "opener=urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl.create_default_context()),NoRedirect())",
+      "def fetch(url,limit):",
+      "    with opener.open(urllib.request.Request(url,headers={\"Accept\":\"application/vnd.github+json\",\"User-Agent\":\"XMesh-Sub-Bootstrap/1\"}),timeout=25) as response:",
+      "        data=response.read(limit+1)",
+      "    if len(data)>limit:raise ValueError(\"Attestation oversized\")",
+      "    return data",
+      "index=json.loads(fetch(\"https://api.github.com/repos/TriplexCorp/XMesh-Sub/attestations/sha256:\"+digest,256*1024))",
+      "entries=index.get(\"attestations\") if isinstance(index,dict) else None",
+      "if not isinstance(entries,list) or not 1<=len(entries)<=30:raise ValueError(\"No public attestation\")",
+      "bundles=[]",
+      "for entry in entries[:12]:",
+      "    if not isinstance(entry,dict):continue",
+      "    bundle=entry.get(\"bundle\")",
+      "    if bundle is None:",
+      "        link=entry.get(\"bundle_url\")",
+      "        if not isinstance(link,str):continue",
+      "        url=urllib.parse.urlparse(link)",
+      "        host=(url.hostname or \"\").lower()",
+      "        if (url.scheme!=\"https\" or url.username or url.password or url.port not in (None,443) or not (host.endswith(\".blob.core.windows.net\") or host.endswith(\".githubusercontent.com\"))):raise ValueError(\"Untrusted bundle URL\")",
+      "        bundle=json.loads(fetch(link,256*1024))",
+      "    if isinstance(bundle,dict) and \"verificationMaterial\" in bundle and \"dsseEnvelope\" in bundle:bundles.append(bundle)",
+      "if not bundles:raise ValueError(\"No verified bundle\")",
+      "pathlib.Path(sys.argv[2]).write_text(\"\".join(json.dumps(x,separators=(\",\",\":\"))+\"\\n\" for x in bundles))",
+      "XMESH_VERIFY_BOOTSTRAP",
+      "  gh attestation verify \"$xmesh_dir/release_verify.py\" --bundle \"$xmesh_dir/provenance.jsonl\" --repo TriplexCorp/XMesh-Sub --cert-identity 'https://github.com/TriplexCorp/XMesh-Sub/.github/workflows/attested-release.yml@refs/heads/main' --source-ref refs/heads/main --source-digest \"$xmesh_sha\" --deny-self-hosted-runners >/dev/null",
+      "  mkdir -m 700 \"$xmesh_dir/revision\"",
+      "  python3 \"$xmesh_dir/release_verify.py\" stage \"$xmesh_sha\" \"$xmesh_dir/revision\"",
+      '  sudo bash "$xmesh_dir/revision/install.sh" --release-sha "$xmesh_sha" --panel https://'+panel+
+        ' --domain '+sub+' --path '+path+" --enroll-token-stdin <<'XMESH_ENROLL_TOKEN'",
       token,
       'XMESH_ENROLL_TOKEN',
       ')'
