@@ -828,9 +828,9 @@ window.XMeshSubscriptionStudio = (() => {
       previewBody.className='subscription-studio-preview subscription-public';
       while(previewHost.firstChild)previewBody.appendChild(previewHost.firstChild);
       for(const href of [
-        '/subscription-studio.css?v=studio-refresh-20261116',
+        '/subscription-studio.css?v=ef56ab78cd90',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=studio-refresh-20261116'
+        '/subscription-public.css?v=ab78cd90ef12'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
