@@ -72,6 +72,8 @@ services:
       PANEL_UPDATE_STATUS: /run/xmesh/panel-update-status
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
+      # Enable only after all legacy integration tokens are reissued with a proof key.
+      XMESH_INTEGRATION_REQUIRE_PROOF: ${XMESH_INTEGRATION_REQUIRE_PROOF:-false}
       XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
       XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
       XSP_V2_P0D_AGENT_MIGRATION: ${XSP_V2_P0D_AGENT_MIGRATION:-}
