@@ -435,7 +435,7 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
         .try_get("proof_public_key")
         .map_err(|_| Problem::unavailable())?;
     if proof_key.is_none()
-        && std::env::var("XMESH_INTEGRATION_REQUIRE_PROOF").as_deref() == Ok("true")
+        && std::env::var("XMESH_INTEGRATION_REQUIRE_PROOF").ok().as_deref() == Some("true")
     {
         return Err(Problem::new(
             StatusCode::UNAUTHORIZED,
