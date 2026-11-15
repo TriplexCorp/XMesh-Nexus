@@ -60,14 +60,14 @@ fn validate_signature(
     path: &str,
     body: &[u8],
     headers: &HeaderMap,
-) -> Result<&'static str, Problem> {
+) -> Result<String, Problem> {
     let timestamp = single_header(headers, "x-xmesh-proof-ts")?;
     let nonce = single_header(headers, "x-xmesh-proof-nonce")?;
     let signature_hex = single_header(headers, "x-xmesh-proof-sig")?;
     let now = now_ms() / 1000;
     let timestamp_value = timestamp.parse::<i64>().map_err(|_| denied())?;
     if timestamp != timestamp_value.to_string()
-        || timestamp_value.saturating_sub(now).abs() > CLOCK_SKEW_SECONDS
+        || timestamp_value.abs_diff(now) > CLOCK_SKEW_SECONDS as u64
         || !lowercase_hex(&nonce, 32)
         || !lowercase_hex(&signature_hex, 128)
     {
@@ -83,7 +83,7 @@ fn validate_signature(
     )
     .map_err(|_| denied())?;
     // The verified nonce is returned separately to store only a hash in Redis.
-    Ok(Box::leak(nonce.into_boxed_str()))
+    Ok(nonce)
 }
 
 /// The incoming request has already passed token validation. A stolen bearer
