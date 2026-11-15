@@ -15,6 +15,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "При изменении режима несовместимые поля будут очищены.": "Incompatible fields will be cleared when you change the mode.",
     "Сейчас: {mode}. Автоматический режим, packet-up или stream-up.": "Current: {mode}. Auto, packet-up or stream-up mode.",
     "Путь / HTTP Host": "Path / HTTP Host",
     "Путь подключения и отдельный заголовок Host.": "Connection path and a separate Host header.",
