@@ -25,33 +25,20 @@ assert(!studio.pathOK('//s'));
 const token='a'.repeat(64);
 const install=studio.installCommand('panel.example.org','sub.example.org','/s',token);
 assert.equal(studio.installCommand('panel.example.org','sub.example.org','/s'),'','No token must produce no command');
-assert(install.includes('https://api.github.com/repos/TriplexCorp/XMesh-Sub/commits/main'),
-  'Discover the latest release commit without trusting mutable raw files');
-assert(install.includes('githubcli-archive-keyring.gpg'),
-  'Install the signed official GitHub CLI for verification');
-assert(install.includes('6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b'),
-  'Official GitHub CLI signing keyring must be pinned by SHA-256');
-assert(install.includes('gh attestation verify'),
-  'Never run the installer without successful build provenance');
-assert(install.includes('--cert-identity') && install.includes('--source-digest "$xmesh_sha"'),
-  'Bind the installer to exact commit and trusted release workflow identity');
-assert(install.includes('--release-sha "$xmesh_sha"'),
-  'The privileged installer must independently verify exact release commit');
-assert(install.includes('--bundle "$xmesh_dir/provenance.jsonl"'),
-  'Public Sigstore bundle must be verified offline without a GitHub login');
-assert(!install.includes('gh auth login') && !install.includes('GH_TOKEN'),
-  'A clean VPS must never need a personal GitHub credential');
-const verifierMatch=/<<'XMESH_VERIFY_BOOTSTRAP'\n([\s\S]*?)\nXMESH_VERIFY_BOOTSTRAP\n/.exec(install);
-assert(verifierMatch,'A fixed self-contained public bundle bootstrap must be present');
-const verifierSyntax=require('node:child_process').spawnSync('python3',['-c',
-  'import ast,sys; ast.parse(sys.stdin.read())'],{input:verifierMatch[1],encoding:'utf8'});
-assert.equal(verifierSyntax.status,0,
-  'The embedded no-login verifier must be valid Python: '+verifierSyntax.stderr);
-assert(!install.includes('/51d90ff15ef2a68415e23b325b3a37393b8b97b5/'),
-  'Obsolete Bearer-auth installer must not be offered');
-assert(install.includes("--enroll-token-stdin <<'XMESH_ENROLL_TOKEN'"),'One-time secret must be provided through stdin');
-assert(!install.includes('--enroll-token '+token),'Credential must not occur in argv');
-assert(install.includes('\n'+token+'\nXMESH_ENROLL_TOKEN'),'Token must be supplied as heredoc body only');
+// The tiny command must pin immutable bootstrap source, not execute mutable main.
+assert.match(install,/https:\/\/raw\.githubusercontent\.com\/TriplexCorp\/XMesh-Sub\/[0-9a-f]{40}\/bootstrap\.sh/);
+assert(install.includes('6fca4eb0e0388e6ec5e6817e9a8d58942935aaa2'),
+  'Pin to the reviewed and attested main release that contains bootstrap.sh');
+assert(install.includes("curl --proto '=https' --tlsv1.2 -fsSL"),
+  'Short installer must enforce verified HTTPS transport');
+assert(install.includes('f="$(mktemp)"') && install.includes("trap 'rm -f"),
+  'Bootstrap must be downloaded to a unique temporary file and cleaned up');
+assert(install.includes('sudo bash "$f" --panel https://panel.example.org --domain sub.example.org --path /s'),
+  'Run only the pinned script with validated non-secret arguments');
+assert(install.length<470,'Installation command is still too long: '+install.length);
+assert(!install.includes(token),'Never expose a pairing token in shell history or URL');
+assert(!install.includes('/main/bootstrap.sh'),'Unpinned mutable bootstrap is forbidden');
+assert(!install.includes('--enroll-token'),'Token must be entered privately via tty, never argv or here-doc');
 const checkShell=require('node:child_process').spawnSync('bash',['-n'],{input:install,encoding:'utf8'});
 assert.equal(checkShell.status,0,'Generated installer must be valid Bash: '+checkShell.stderr);
 assert.equal(studio.installCommand('panel.example.org','panel.example.org','/s'),'');
@@ -71,6 +58,7 @@ const [view,init]=studio.create({
 assert.equal(typeof init,'function');
 assert.match(view,/data-sub-install-command/);
 assert.match(view,/data-sub-install-copy/);
+assert.match(view,/data-sub-token-copy/,'Single-use pairing code must have a dedicated copy action');
 assert.match(view,/data-sub-enroll/,'One-command managed installation must be discoverable');
 assert.match(view,/class="subscription-sub-install-actions"/,'The one-command generator belongs to the install step');
 assert.match(view,/Создать команду установки/,'Install must begin by generating a managed command');
@@ -209,7 +197,9 @@ assert.match(src,/subApi\.enroll\(\)/,'Pairing must call real protected API');
 assert.match(src,/subApi\.status\(\)/,'Status must call real protected API');
 assert.match(src,/subApi\.update\(\)/,'Update must queue an authenticated action');
 assert.match(src,/enrollmentToken=result\.enrollmentToken/,'Pairing code must be ephemeral UI state');
-assert.match(src,/--enroll-token-stdin/,'Managed install must pass the one-time code through stdin');
+assert.match(src,/SUB_BOOTSTRAP_REVISION/,'Managed install must pin its trusted bootstrap revision');
+assert.match(src,/data-sub-token-copy/,'Pairing token must never be embedded in command text');
+assert.match(src,/mirrorTokens\.get\(id\)/,'Mirror pairing codes must be separately copied');
 assert(src.includes('if(copy)copy.disabled=!managedCommand;'),
   'Copy must be disabled until the entire authenticated installer is available');
 assert(src.includes('Date.now()>=enrollmentExpiresAt'),

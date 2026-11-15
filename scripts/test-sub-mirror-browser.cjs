@@ -63,7 +63,12 @@ const assert=require('node:assert/strict');
     const code=page.locator('.subscription-mirror-card').last().locator('.subscription-mirror-command code');
     await code.waitFor();
     assert((await code.textContent()).includes('sub3.example.org'),'Install must target selected mirror only');
-    assert((await code.textContent()).includes('--release-sha'),'Every Sub install must verify release provenance');
+    assert((await code.textContent()).includes('/bootstrap.sh'),'Every Sub install must use pinned short bootstrap');
+    assert((await code.textContent()).includes('/6fca4eb0e0388e6ec5e6817e9a8d58942935aaa2/'),
+      'Mirror must use immutable audited launcher');
+    assert(!(await code.textContent()).includes('c'.repeat(64)),'Mirror secret cannot leak to console');
+    assert(await page.locator('.subscription-mirror-card').last().locator('[data-mirror-action="copy-token"]').isVisible(),
+      'Each mirror must expose separate one-time code copy');
     await page.locator('.subscription-mirror-card').last().locator('[data-mirror-action="remove"]').click();
     await page.waitForFunction(()=>document.querySelectorAll('.subscription-mirror-card').length===1);
     const bounds=await page.evaluate(()=>{

@@ -144,9 +144,11 @@ window.XMeshSubscriptionStudio = (() => {
   const esc = x => String(x ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const hostnameOK = v => !v || (v.length <= 253 && /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?)*$/i.test(v));
   const pathOK = v => v.length <= 64 && v.split('/').length <= 9 && /^\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/i.test(v) && !/^\/(?:api|login|dashboard)(?:\/|$)/i.test(v);
-  // The operator copies ONE command. The official signed apt keyring is
-  // pinned, and the exact installer MUST have GitHub OIDC build provenance
-  // from the trusted main release workflow before first root execution.
+  // Bootstrap is pinned to a reviewed immutable Sub Git commit. It pulls
+  // and verifies the attested *latest* main release before privileged install.
+  // The one-use enrollment secret is never copied into commands or shell
+  // history; bootstrap asks for it via hidden /dev/tty input.
+  const SUB_BOOTSTRAP_REVISION='6fca4eb0e0388e6ec5e6817e9a8d58942935aaa2';
   const validInstallParams=(panel,sub,path)=>{
     const valid=host=>typeof host==='string'&&host.includes('.')&&hostnameOK(host)&&
       /^[a-z0-9.-]+$/i.test(host)&&/\.[a-z]{2,}$/i.test(host);
@@ -154,63 +156,10 @@ window.XMeshSubscriptionStudio = (() => {
   };
   const installCommand=(panel,sub,path,token='')=>{
     if(!validInstallParams(panel,sub,path)||!/^[a-f0-9]{64}$/.test(token))return '';
-    return [
-      "(",
-      "  set -euo pipefail",
-      "  xmesh_dir=\"$(mktemp -d)\"",
-      "  trap 'rm -rf \"$xmesh_dir\"' EXIT",
-      "  sudo apt-get update -qq",
-      "  sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y ca-certificates curl python3",
-      "  curl --proto '=https' --tlsv1.2 -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o \"$xmesh_dir/gh-keyring.gpg\"",
-      "  printf '6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b  %s\\n' \"$xmesh_dir/gh-keyring.gpg\" | sha256sum --check --status",
-      "  sudo install -Dm644 \"$xmesh_dir/gh-keyring.gpg\" /etc/apt/keyrings/githubcli-archive-keyring.gpg",
-      "  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\\n' \"$(dpkg --print-architecture)\" | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null",
-      "  sudo apt-get update -qq",
-      "  sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y gh",
-      "  xmesh_gh_version=\"$(gh version | head -n1 | awk '{print $3}')\"",
-      "  python3 -c 'import re,sys; m=re.fullmatch(r\"([0-9]+)\\.([0-9]+)\\.([0-9]+)\",sys.argv[1]); assert m and tuple(map(int,m.groups()))>=(2,102,0),\"GitHub CLI 2.102.0+ required\"' \"$xmesh_gh_version\"",
-      "  curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 -H 'Accept: application/vnd.github+json' https://api.github.com/repos/TriplexCorp/XMesh-Sub/commits/main -o \"$xmesh_dir/commit.json\"",
-      "  xmesh_sha=\"$(python3 -c 'import json,re,sys; s=json.load(sys.stdin)[\"sha\"]; assert re.fullmatch(\"[a-f0-9]{40}\",s),\"Invalid release SHA\"; print(s)' < \"$xmesh_dir/commit.json\")\"",
-      "  curl --proto '=https' --tlsv1.2 -fsSL --max-time 40 \"https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/$xmesh_sha/release_verify.py\" -o \"$xmesh_dir/release_verify.py\"",
-      "  python3 - \"$xmesh_dir/release_verify.py\" \"$xmesh_dir/provenance.jsonl\" <<'XMESH_VERIFY_BOOTSTRAP'",
-      "import hashlib,json,pathlib,ssl,sys,urllib.request,urllib.parse",
-      "file=pathlib.Path(sys.argv[1])",
-      "digest=hashlib.sha256(file.read_bytes()).hexdigest()",
-      "class NoRedirect(urllib.request.HTTPRedirectHandler):",
-      "    def redirect_request(self,req,fp,code,msg,headers,newurl):return None",
-      "opener=urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl.create_default_context()),NoRedirect())",
-      "def fetch(url,limit):",
-      "    with opener.open(urllib.request.Request(url,headers={\"Accept\":\"application/vnd.github+json\",\"User-Agent\":\"XMesh-Sub-Bootstrap/1\"}),timeout=25) as response:",
-      "        data=response.read(limit+1)",
-      "    if len(data)>limit:raise ValueError(\"Attestation oversized\")",
-      "    return data",
-      "index=json.loads(fetch(\"https://api.github.com/repos/TriplexCorp/XMesh-Sub/attestations/sha256:\"+digest,256*1024))",
-      "entries=index.get(\"attestations\") if isinstance(index,dict) else None",
-      "if not isinstance(entries,list) or not 1<=len(entries)<=30:raise ValueError(\"No public attestation\")",
-      "bundles=[]",
-      "for entry in entries[:12]:",
-      "    if not isinstance(entry,dict):continue",
-      "    bundle=entry.get(\"bundle\")",
-      "    if bundle is None:",
-      "        link=entry.get(\"bundle_url\")",
-      "        if not isinstance(link,str):continue",
-      "        url=urllib.parse.urlparse(link)",
-      "        host=(url.hostname or \"\").lower()",
-      "        if (url.scheme!=\"https\" or url.username or url.password or url.port not in (None,443) or not (host.endswith(\".blob.core.windows.net\") or host.endswith(\".githubusercontent.com\"))):raise ValueError(\"Untrusted bundle URL\")",
-      "        bundle=json.loads(fetch(link,256*1024))",
-      "    if isinstance(bundle,dict) and \"verificationMaterial\" in bundle and \"dsseEnvelope\" in bundle:bundles.append(bundle)",
-      "if not bundles:raise ValueError(\"No verified bundle\")",
-      "pathlib.Path(sys.argv[2]).write_text(\"\".join(json.dumps(x,separators=(\",\",\":\"))+\"\\n\" for x in bundles))",
-      "XMESH_VERIFY_BOOTSTRAP",
-      "  gh attestation verify \"$xmesh_dir/release_verify.py\" --bundle \"$xmesh_dir/provenance.jsonl\" --repo TriplexCorp/XMesh-Sub --cert-identity 'https://github.com/TriplexCorp/XMesh-Sub/.github/workflows/attested-release.yml@refs/heads/main' --source-ref refs/heads/main --source-digest \"$xmesh_sha\" --deny-self-hosted-runners >/dev/null",
-      "  mkdir -m 700 \"$xmesh_dir/revision\"",
-      "  python3 \"$xmesh_dir/release_verify.py\" stage \"$xmesh_sha\" \"$xmesh_dir/revision\"",
-      '  sudo bash "$xmesh_dir/revision/install.sh" --release-sha "$xmesh_sha" --panel https://'+panel+
-        ' --domain '+sub+' --path '+path+" --enroll-token-stdin <<'XMESH_ENROLL_TOKEN'",
-      token,
-      'XMESH_ENROLL_TOKEN',
-      ')'
-    ].join('\n');
+    const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Sub/'+SUB_BOOTSTRAP_REVISION+'/bootstrap.sh';
+    return "( set -e; f=\"$(mktemp)\"; trap 'rm -f \"$f\"' EXIT; "+
+      "curl --proto '=https' --tlsv1.2 -fsSL "+url+" -o \"$f\"; "+
+      'sudo bash "$f" --panel https://'+panel+' --domain '+sub+' --path '+path+' )';
   };
   const field = (name,label,value,help,opts) => '<label class="f subscription-field"><span>'+label+'</span>'+
     (opts && opts.area ? '<textarea name="'+name+'" rows="'+(opts.rows||2)+'" maxlength="'+(opts.max||240)+'"'+(opts.placeholder?' placeholder="'+esc(opts.placeholder)+'"':'')+'>'+esc(value)+'</textarea>' :
@@ -244,6 +193,7 @@ window.XMeshSubscriptionStudio = (() => {
       globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
       shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
       copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+      key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9 2 2-3 3 2 2-3 3-2-2-3 3"/>',
       refresh:'<path d="M20 11a8 8 0 0 0-14-5L4 8M4 4v4h4M4 13a8 8 0 0 0 14 5l2-2M20 20v-4h-4"/>',
       terminal:'<rect x="2.5" y="3.5" width="19" height="17" rx="2"/><path d="m7 9 3 3-3 3M12 16h5"/>',
       external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/>',
@@ -644,9 +594,10 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="subscription-sub-step"><span class="subscription-sub-step-index">02</span><div><b>Установите XMesh Sub</b>',
       '<p>Создайте одну команду и выполните её на чистом VPS. Она установит шлюз, подключит управляющий агент и зарегистрирует сервер в Nexus.</p>',
       '<div class="subscription-sub-install-actions"><button type="button" class="btn" data-sub-enroll>'+studioGlyph('terminal')+'Создать команду установки</button>',
-      '<button type="button" class="gh" data-sub-install-copy disabled>'+studioGlyph('copy')+'Скопировать команду</button></div>',
+      '<button type="button" class="gh" data-sub-install-copy disabled>'+studioGlyph('copy')+'Скопировать команду</button>',
+      '<button type="button" class="gh" data-sub-token-copy disabled>'+studioGlyph('key')+'Скопировать код привязки</button></div>',
       '<div class="subscription-sub-install-command" data-state="empty" hidden><code data-sub-install-command>Создайте команду установки</code></div>',
-      '<small data-sub-install-note role="status" aria-live="polite">Привязка встроена в установку. Ключ действителен 60 минут.</small>',
+      '<small data-sub-install-note role="status" aria-live="polite">Команда не содержит секретов. При запуске вставьте одноразовый код в скрытый запрос на VPS.</small>',
       '</div><span class="subscription-step-symbol">'+studioGlyph('server')+'</span></section>',
       '<section class="subscription-sub-step"><span class="subscription-sub-step-index">03</span><div><b>Проверьте доступность</b>',
       '<p>После установки откройте адрес проверки. Ответ <code>ok</code> подтверждает работу HTTPS-шлюза, но не выдачу реальной подписки.</p>',
@@ -1118,20 +1069,24 @@ window.XMeshSubscriptionStudio = (() => {
       const agentVersion=form.querySelector('[data-sub-agent-version]');
       const agentSeen=form.querySelector('[data-sub-agent-seen]');
       const agentDetail=form.querySelector('[data-sub-agent-detail]');
+      let agentError='';
       const showAgent=()=>{
         if(!agentState||!agentDetail)return;
         const status=latestAgentStatus;
         const online=Boolean(status?.online&&status?.domainMatches);
         const enrolled=Boolean(status?.enrolled);
         agentState.dataset.state=online?'ready':enrolled?'dirty':'empty';
-        agentState.textContent=online?'На связи':enrolled?'Нет связи':'Не подключён';
         const lastSeen=Number(status?.lastSeen||0);
+        agentState.textContent=online?'На связи':enrolled?(lastSeen>0?'Нет связи':'Ожидаем связь'):'Не подключён';
         const last=lastSeen>0?new Date(lastSeen*1000).toLocaleString():'—';
         if(agentVersion)agentVersion.textContent=enrolled&&status?.version?String(status.version):'—';
         if(agentSeen)agentSeen.textContent=enrolled?last:'—';
-        const info=online?'Версия '+(status.version||'неизвестна')+' · последняя связь '+last:
-          enrolled?'Связь не установлена. Последняя активность: '+last:
-          'Создайте установочную команду выше и выполните её на VPS. Агент подключится автоматически.';
+        const info=agentError?'Ошибка проверки: '+agentError:
+          online?'Версия '+(status.version||'неизвестна')+' · последняя связь '+last:
+          enrolled&&!status?.domainMatches?'Домен привязанного сервера отличается от сохранённого домена подписок. Требуется повторная привязка.':
+          enrolled&&lastSeen>0?'Агент ранее выходил на связь. Последняя активность: '+last:
+          enrolled?'Агент привязан. Ожидаем первый подписанный ответ от VPS.':
+          'Создайте команду установки выше и выполните её на VPS. Агент подключится автоматически.';
         const stage=status?.update?.stage;
         const elapsed=Math.max(0,Date.now()/1000-Number(status?.update?.updatedAt||0));
         const activeJob=(stage==='queued'&&elapsed<1800)||(stage==='running'&&elapsed<3600);
@@ -1146,8 +1101,8 @@ window.XMeshSubscriptionStudio = (() => {
       const refreshAgent=async()=>{
         if(!subApi?.status||statusBusy)return;
         statusBusy=true;showAgent();
-        try{latestAgentStatus=await subApi.status();}
-        catch(error){agentDetail.textContent='Не удалось получить состояние: '+(error.message||'API');}
+        try{latestAgentStatus=await subApi.status();agentError='';}
+        catch(error){agentError=error.message||'API';}
         finally{statusBusy=false;showAgent();}
       };
       if(enrollmentButton)enrollmentButton.addEventListener('click',async()=>{
@@ -1169,7 +1124,7 @@ window.XMeshSubscriptionStudio = (() => {
           enrollmentToken=result.enrollmentToken;
           enrollmentExpiresAt=Date.now()+seconds*1000;
           updateInstall(read());
-          notify('Единая команда готова. Скопируйте её и выполните на VPS.');
+          notify('Установка готова. Скопируйте команду и отдельный одноразовый код привязки.');
         }catch(error){notify('Не удалось создать команду: '+(error.message||'API'));}
         finally{enrollmentBusy=false;updateInstall(read());}
       });
@@ -1208,6 +1163,7 @@ window.XMeshSubscriptionStudio = (() => {
         const url=ready?'https://'+d.subscriptionDomain+'/healthz':'';
         const code=form.querySelector('[data-sub-install-command]');
         const copy=form.querySelector('[data-sub-install-copy]');
+        const tokenCopy=form.querySelector('[data-sub-token-copy]');
         const note=form.querySelector('[data-sub-install-note]');
         const state=form.querySelector('[data-sub-install-state]');
         const health=form.querySelector('[data-sub-health-url]');
@@ -1217,6 +1173,7 @@ window.XMeshSubscriptionStudio = (() => {
         const commandGroup=form.querySelector('.subscription-sub-install-command');
         if(code)code.textContent=managedCommand||(dirty?'Сначала сохраните настройки подписок.':ready?'Создайте команду установки выше.':'Укажите отдельный домен подписок и корректный путь.');
         if(copy)copy.disabled=!managedCommand;
+        if(tokenCopy)tokenCopy.disabled=!managedCommand;
         if(commandGroup){commandGroup.hidden=!managedCommand;commandGroup.dataset.state=managedCommand?'ready':'empty';}
         if(healthCopy)healthCopy.disabled=!ready;
         if(publicCopy)publicCopy.disabled=!ready;
@@ -1225,9 +1182,9 @@ window.XMeshSubscriptionStudio = (() => {
           state.textContent=dirty?'Не сохранено':managedCommand?'Команда готова':ready?'Ожидает команды':'Требуется настройка';
         }
         if(note)note.textContent=dirty?'Сначала сохраните изменённые адрес и путь.':
-          managedCommand?'Это единая команда установки и привязки. Код действует до '+new Date(enrollmentExpiresAt).toLocaleTimeString()+'. Не публикуйте команду: она содержит одноразовый секрет.':
+          managedCommand?'Скопируйте команду и отдельный код привязки. Введите код в скрытом запросе на VPS. Срок действия кода — 60 минут.':
           expired?'Срок действия команды истёк. Создайте новую команду.':
-          ready?'Нажмите «Создать команду установки». В ней будет одноразовый ключ для автоматического подключения агента.':
+          ready?'Создайте команду. Одноразовый код будет доступен отдельной кнопкой и не попадёт в историю команд.':
           'Нужны корректные разные домены панели и подписок.';
         if(health)health.textContent=url||'Укажите домен подписок';
         if(link){
@@ -1298,8 +1255,9 @@ window.XMeshSubscriptionStudio = (() => {
             '<button type="button" class="gh subscription-mirror-remove" data-mirror-action="remove"'+(mirrorBusy.has(mirror.id)?' disabled':'')+' aria-label="Удалить зеркало">'+
               'Удалить</button></div>'+
             (command?'<div class="subscription-mirror-command"><div><b>Команда для нового VPS</b>'+
-              '<button type="button" class="gh" data-mirror-action="copy-command">'+studioGlyph('copy')+'Скопировать</button></div>'+
-              '<code>'+esc(command)+'</code><small>Одноразовый ключ. Не пересылайте эту команду другим.</small></div>':'')+
+              '<button type="button" class="gh" data-mirror-action="copy-command">'+studioGlyph('copy')+'Команда</button>'+
+              '<button type="button" class="gh" data-mirror-action="copy-token">'+studioGlyph('key')+'Код привязки</button></div>'+
+              '<code>'+esc(command)+'</code><small>На VPS запустите команду и вставьте отдельный одноразовый код в скрытый запрос.</small></div>':'')+
             '</article>';
         }).join('');
       };
@@ -1361,6 +1319,11 @@ window.XMeshSubscriptionStudio = (() => {
           if(command)void copyStudioValue(command,'Команда зеркала скопирована');
           return;
         }
+        if(type==='copy-token'){
+          const code=mirrorTokens.get(id);
+          if(mirrorCommand(mirror)&&code)void copyStudioValue(code.value,'Одноразовый код зеркала скопирован');
+          return;
+        }
         if(type==='remove'&&!window.confirm('Удалить зеркало «'+mirror.name+'»? Его агент сразу потеряет доступ к Nexus.'))return;
         if(type==='enroll'&&(!pathOK(savedInstall.path)||
           read().subscriptionPath!==savedInstall.path)){
@@ -1376,7 +1339,7 @@ window.XMeshSubscriptionStudio = (() => {
             if(!Number.isInteger(ttl)||ttl<60||ttl>3600)throw Error('Недопустимый срок действия команды.');
             mirrorTokens.set(id,{value:result.enrollmentToken,expiresAt:Date.now()+ttl*1000,
               path:savedInstall.path});
-            notify('Команда зеркала создана. Выполните её на отдельном чистом VPS.');
+            notify('Готово. Скопируйте команду и отдельный код привязки зеркала.');
           }else if(type==='update'){
             await subApi.updateMirror(id);
             notify('Зеркалу отправлено обновление.');
@@ -1777,6 +1740,12 @@ window.XMeshSubscriptionStudio = (() => {
         const link=form.querySelector('[data-sub-health-link]');
         if(!link?.href||link.hidden)return;
         copyStudioValue(link.href,'Адрес проверки скопирован');
+      });
+      form.querySelector('[data-sub-token-copy]')?.addEventListener('click',()=>{
+        if(!updateInstall(read())||!enrollmentToken||Date.now()>=enrollmentExpiresAt){
+          notify('Сначала создайте новый код привязки.');return;
+        }
+        void copyStudioValue(enrollmentToken,'Одноразовый код привязки скопирован');
       });
       form.querySelector('[data-sub-install-copy]').addEventListener('click',async()=>{
         const command=updateInstall(read());
