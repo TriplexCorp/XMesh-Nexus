@@ -193,6 +193,7 @@ window.XMeshSubscriptionStudio = (() => {
       globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
       shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
       copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+      key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9 2 2-3 3 2 2-3 3-2-2-3 3"/>',
       refresh:'<path d="M20 11a8 8 0 0 0-14-5L4 8M4 4v4h4M4 13a8 8 0 0 0 14 5l2-2M20 20v-4h-4"/>',
       terminal:'<rect x="2.5" y="3.5" width="19" height="17" rx="2"/><path d="m7 9 3 3-3 3M12 16h5"/>',
       external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/>',
@@ -1068,20 +1069,24 @@ window.XMeshSubscriptionStudio = (() => {
       const agentVersion=form.querySelector('[data-sub-agent-version]');
       const agentSeen=form.querySelector('[data-sub-agent-seen]');
       const agentDetail=form.querySelector('[data-sub-agent-detail]');
+      let agentError='';
       const showAgent=()=>{
         if(!agentState||!agentDetail)return;
         const status=latestAgentStatus;
         const online=Boolean(status?.online&&status?.domainMatches);
         const enrolled=Boolean(status?.enrolled);
         agentState.dataset.state=online?'ready':enrolled?'dirty':'empty';
-        agentState.textContent=online?'На связи':enrolled?'Нет связи':'Не подключён';
         const lastSeen=Number(status?.lastSeen||0);
+        agentState.textContent=online?'На связи':enrolled?(lastSeen>0?'Нет связи':'Ожидаем связь'):'Не подключён';
         const last=lastSeen>0?new Date(lastSeen*1000).toLocaleString():'—';
         if(agentVersion)agentVersion.textContent=enrolled&&status?.version?String(status.version):'—';
         if(agentSeen)agentSeen.textContent=enrolled?last:'—';
-        const info=online?'Версия '+(status.version||'неизвестна')+' · последняя связь '+last:
-          enrolled?'Связь не установлена. Последняя активность: '+last:
-          'Создайте установочную команду выше и выполните её на VPS. Агент подключится автоматически.';
+        const info=agentError?'Ошибка проверки: '+agentError:
+          online?'Версия '+(status.version||'неизвестна')+' · последняя связь '+last:
+          enrolled&&!status?.domainMatches?'Домен привязанного сервера отличается от сохранённого домена подписок. Требуется повторная привязка.':
+          enrolled&&lastSeen>0?'Агент ранее выходил на связь. Последняя активность: '+last:
+          enrolled?'Агент привязан. Ожидаем первый подписанный ответ от VPS.':
+          'Создайте команду установки выше и выполните её на VPS. Агент подключится автоматически.';
         const stage=status?.update?.stage;
         const elapsed=Math.max(0,Date.now()/1000-Number(status?.update?.updatedAt||0));
         const activeJob=(stage==='queued'&&elapsed<1800)||(stage==='running'&&elapsed<3600);
@@ -1096,8 +1101,8 @@ window.XMeshSubscriptionStudio = (() => {
       const refreshAgent=async()=>{
         if(!subApi?.status||statusBusy)return;
         statusBusy=true;showAgent();
-        try{latestAgentStatus=await subApi.status();}
-        catch(error){agentDetail.textContent='Не удалось получить состояние: '+(error.message||'API');}
+        try{latestAgentStatus=await subApi.status();agentError='';}
+        catch(error){agentError=error.message||'API';}
         finally{statusBusy=false;showAgent();}
       };
       if(enrollmentButton)enrollmentButton.addEventListener('click',async()=>{
