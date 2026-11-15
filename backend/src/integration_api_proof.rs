@@ -37,6 +37,13 @@ fn single_header(headers: &HeaderMap, name: &'static str) -> Result<String, Prob
     Ok(value.to_owned())
 }
 
+// Source-of-truth URI installed by axum's Router before any nest strips
+// prefixes. Missing OriginalUri is a hard authentication failure.
+fn external_path_and_query(parts: &axum::http::request::Parts) -> Result<&str, Problem> {
+    let original = parts.extensions.get::<OriginalUri>().ok_or_else(denied)?;
+    Ok(original.0.path_and_query().map_or("/", |path| path.as_str()))
+}
+
 fn lowercase_hex(value: &str, len: usize) -> bool {
     value.len() == len
         && value
@@ -114,10 +121,8 @@ pub(super) async fn constrain(
         )
     })?;
     // Nested axum routers strip their mount prefixes from Request::uri.
-    // Verify the exact external URI that the integration client signed.
-    // Never reconstruct this from an untrusted forwarded URL/header.
-    let original = parts.extensions.get::<OriginalUri>().ok_or_else(denied)?;
-    let path = original.0.path_and_query().map_or("/", |p| p.as_str());
+    // Verify the exact external URI, never untrusted forwarded URL headers.
+    let path = external_path_and_query(&parts)?;
     let nonce = validate_signature(
         proof_key,
         token_hash,
@@ -223,6 +228,34 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn nested_router_must_use_full_external_uri_and_query() {
+        let mut request = Request::builder()
+            .method(Method::GET)
+            // axum's inner route sees only this stripped URI.
+            .uri("/users?limit=1")
+            .body(Body::empty())
+            .unwrap();
+        let original = "/api/v1/integrations/users?limit=1".parse().unwrap();
+        request.extensions_mut().insert(OriginalUri(original));
+        let (parts, _body) = request.into_parts();
+        assert_eq!(parts.uri.path(), "/users");
+        assert_eq!(
+            external_path_and_query(&parts).unwrap(),
+            "/api/v1/integrations/users?limit=1"
+        );
+
+        // A missing authoritative URI must fail closed, not accept the
+        // stripped path as a substitute or trust a spoofed header.
+        let (parts, _) = Request::builder()
+            .uri("/users?limit=1")
+            .header("x-original-uri", "/api/v1/integrations/users?limit=1")
+            .body(Body::empty())
+            .unwrap()
+            .into_parts();
+        assert!(external_path_and_query(&parts).is_err());
     }
 
     #[test]
