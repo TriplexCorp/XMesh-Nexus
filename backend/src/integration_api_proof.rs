@@ -1,7 +1,7 @@
 //! Sender-constrained Integration API tokens.
 //! An opaque bearer is insufficient when a token has a registered Ed25519 key.
 //! Proofs cover exact method/path+query/body, token digest, timestamp and nonce.
-//! This is a deterministic XMesh PoP contract, not the DPoP RFC JWT format.
+//! This is a deterministic `XMesh` `PoP` contract, not the DPoP RFC `JWT` format.
 use super::{Problem, now_ms};
 use crate::AppState;
 use axum::{
@@ -16,7 +16,7 @@ const BODY_LIMIT: usize = 64 * 1024;
 const CLOCK_SKEW_SECONDS: u64 = 60;
 const REPLAY_TTL_SECONDS: u64 = 180;
 
-fn denied() -> Problem {
+const fn denied() -> Problem {
     Problem::new(
         StatusCode::UNAUTHORIZED,
         "invalid_request_proof",
@@ -226,7 +226,7 @@ mod tests {
         assert!(!lowercase_hex("AA", 2));
         assert!(!lowercase_hex("gg", 2));
         assert!(!lowercase_hex("", 32));
-        assert_eq!(
+        assert!(
             proof_message(
                 &"a".repeat(64),
                 &Method::GET,
@@ -236,8 +236,7 @@ mod tests {
                 b""
             )
             .len()
-                > 110,
-            true
+                > 110
         );
     }
 }
