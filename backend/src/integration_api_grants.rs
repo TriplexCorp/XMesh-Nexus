@@ -165,8 +165,15 @@ pub(super) async fn grant(
     principal.allow_scope("entitlements:grant")?;
     principal.allow_user(id)?;
     // Owner-approved caps survive stolen or compromised integration credentials.
-    if principal.max_grant_days.is_some_and(|cap| body.days > i64::from(cap)) {
-        return Err(Problem::new(StatusCode::FORBIDDEN,"grant_cap_exceeded","Grant exceeds integration limit"));
+    if principal
+        .max_grant_days
+        .is_some_and(|cap| body.days > i64::from(cap))
+    {
+        return Err(Problem::new(
+            StatusCode::FORBIDDEN,
+            "grant_cap_exceeded",
+            "Grant exceeds integration limit",
+        ));
     }
     if !(1..=3650).contains(&body.days)
         || body
