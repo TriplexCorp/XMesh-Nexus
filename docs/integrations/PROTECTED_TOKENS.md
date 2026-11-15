@@ -106,7 +106,7 @@ For example, the following signing function uses only Python's standard
 library and OpenSSL (not a third-party SDK):
 
 ```python
-import hashlib, os, subprocess, time
+import hashlib, os, subprocess, tempfile, time
 
 def proof_headers(method: str, path_and_query: str, bearer: str,
                   exact_body: bytes, private_pem: str) -> dict:
@@ -118,10 +118,15 @@ def proof_headers(method: str, path_and_query: str, bearer: str,
         hashlib.sha256(exact_body).hexdigest(),
     ]
     message = "\n".join(fields).encode("utf-8")
-    signature = subprocess.run(
-        ["openssl", "pkeyutl", "-sign", "-rawin", "-inkey", private_pem],
-        input=message, capture_output=True, check=True,
-    ).stdout.hex()
+    # OpenSSL Ed25519 one-shot signing needs seekable input.
+    with tempfile.NamedTemporaryFile() as temporary:
+        temporary.write(message)
+        temporary.flush()
+        signature = subprocess.run(
+            ["openssl", "pkeyutl", "-sign", "-rawin",
+             "-inkey", private_pem, "-in", temporary.name],
+            capture_output=True, check=True,
+        ).stdout.hex()
     return {
         "Authorization": "Bearer " + bearer,
         "X-XMesh-Proof-Ts": timestamp,
