@@ -21,7 +21,13 @@ const root=async(page,theme)=>{
   start();
  });
 };
-const rgb=s=>{const v=s.match(/\d+(?:\.\d+)?/g);if(!v||v.length<3)throw Error('Cannot parse color: '+s);return v.slice(0,3).map(Number)};
+const rgb=s=>{
+ const srgb=/^color\\(srgb\\s+([.\\d]+)\\s+([.\\d]+)\\s+([.\\d]+)/.exec(s);
+ if(srgb)return srgb.slice(1,4).map(v=>Number(v)*255);
+ const rgba=/^rgba?\\(\\s*([.\\d]+)[, ]+([.\\d]+)[, ]+([.\\d]+)/.exec(s);
+ if(rgba)return rgba.slice(1,4).map(Number);
+ throw Error('Unexpected CSS color: '+s);
+};
 const lum=c=>rgb(c).map(x=>{const v=x/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((acc,x,i)=>acc+x*[.2126,.7152,.0722][i],0);
 const contrast=(a,b)=>{const l1=lum(a),l2=lum(b);return (Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05)};
 (async()=>{
@@ -38,7 +44,10 @@ const contrast=(a,b)=>{const l1=lum(a),l2=lum(b);return (Math.max(l1,l2)+.05)/(M
     assert.equal(await page.locator('#tb-admins-count').textContent(),'2 / 50',
       'Admin count must update immediately');
     const geometry=await page.evaluate(()=>({
-      excess:Math.max(document.documentElement.scrollWidth,document.body.scrollWidth)-innerWidth,
+      excess:Math.max(
+        document.querySelector('.tb-workspace').scrollWidth-document.querySelector('.tb-workspace').clientWidth,
+        document.querySelector('.tb-workspace').getBoundingClientRect().right-innerWidth
+      ),
       cols:getComputedStyle(document.querySelector('.tb-status-grid')).gridTemplateColumns.split(' ').length,
       enable:getComputedStyle(document.querySelector('.tb-enable-row')).display
     }));
