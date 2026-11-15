@@ -1465,3 +1465,17 @@
   .subscription-studio :is(.subscription-client-row,.subscription-display-options input,.subscription-theme-sync input,
   .subscription-flood-mode label,.subscription-studio-tabs button){transition:none!important}
 }
+
+/* Installer is a real workflow, not a decorative numbered timeline. */
+.subscription-studio .subscription-sub-step-index,
+.subscription-studio .subscription-step-symbol{display:none}
+.subscription-studio .subscription-sub-step{
+  gap:.6rem;padding:.95rem 1rem;border-radius:var(--nx-control-radius);
+  border-color:var(--studio-divider);background:var(--nx-section-bg);
+}
+.subscription-studio .subscription-sub-step>div{min-width:0}
+.subscription-studio .subscription-sub-step b{font-size:.84rem}
+.subscription-studio .subscription-sub-step p{font-size:.72rem;line-height:1.5}
+.subscription-studio .subscription-sub-install-actions{display:flex;gap:.45rem;flex-wrap:wrap}
+.subscription-studio .subscription-sub-install-actions button{min-height:2.35rem}
+.subscription-studio .subscription-sub-scope{box-shadow:none}
