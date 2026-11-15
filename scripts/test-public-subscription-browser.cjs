@@ -80,15 +80,24 @@ async function dismissDialog(page,dialog,opener){
      assert(icon.mask.includes('data:image/svg+xml,'),name+' icon must be an embedded SVG mask');
    }
    assert.equal(await page.locator('#subscription-link-card,#toggle-link').count(),0,'No link reveal UI');
-   const g=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth,body:innerWidth,title:parseFloat(getComputedStyle(document.querySelector('h1')).fontSize),minTap:Math.min(...[...document.querySelectorAll('.subscription-cabinet-tab:not([hidden]),.subscription-preview-languages a,.subscription-preview-cta')].map(el=>el.getBoundingClientRect().height))}));
-   assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=30,'Readable heading');assert(g.minTap>=44,'Touch target too small');
+   const g=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth,body:innerWidth,title:parseFloat(getComputedStyle(document.querySelector('.experience-plan-name')).fontSize),minTap:Math.min(...[...document.querySelectorAll('.subscription-cabinet-tab:not([hidden]),.subscription-preview-languages a,.subscription-preview-cta')].map(el=>el.getBoundingClientRect().height))}));
+   assert(g.overflow<=g.body+1,JSON.stringify(g));assert(g.title>=23,'Readable plan heading');assert(g.minTap>=44,'Touch target too small');
    assert.equal(await page.locator('.experience-owner-name').innerText(),'demo_user','The bearer page shows the scoped subscription owner');
    assert.equal(await page.locator('.experience-plan-name').innerText(),'VPN Access','A configured plan is shown without fabricated marketing benefits');
    assert.equal(await page.locator('.experience-plan-symbol .experience-plan-mark').getAttribute('src'),
      await page.locator('.subscription-public-brand-identity .subscription-preview-logo').getAttribute('src'),
      'Brand identity in the header and tariff card must be the same image');
    assert.equal(await page.locator('.experience-connect-steps').count(),0,'Remove redundant three-step onboarding');
-   assert.equal(await page.locator('.experience-owner [data-subscription-expiry]').count(),1,'Expiry belongs to the owner card');
+   assert.equal(await page.locator('.experience-plan-expiry [data-subscription-expiry]').count(),1,
+     'Expiry is integrated into the plan card, not the account card');
+   assert.equal(await page.locator('.experience-owner [data-subscription-expiry]').count(),0,
+     'Account card must not duplicate expiry');
+   assert(await page.locator('.experience-plan-heading .subscription-preview-ok').isVisible(),
+     'Real subscription state is displayed next to the actual plan name');
+   assert(await page.locator('.subscription-preview-hero').isHidden(),
+     'Active subscription has no redundant Your Subscription hero');
+   assert(await page.locator('.experience-plan-expiry .experience-days').isVisible(),
+     'The plan card displays a real countdown');
    assert.equal(await page.locator('.experience-account [data-subscription-traffic]').count(),1,'Traffic remains in the usage summary');
    assert.equal(await page.locator('.experience-shortcuts strong').count(),4,'Available shortcuts have visible labels');assert.equal(await page.locator('.experience-quick-platforms button').count(),6);assert.equal(await page.locator('.experience-server-panel h2').innerText(),lang==='en'?'Usage by server':'Трафик по серверам');
    assert.equal(await page.locator('[role="tab"]').count(),0,'No tab navigation');assert(await page.locator('.experience-start').isVisible());assert(await page.locator('[data-setup-section="connect"]').isVisible());assert.equal(await page.locator('#copy-link').count(),0,'Only one copy button');
@@ -142,6 +151,8 @@ async function dismissDialog(page,dialog,opener){
   assert.equal(await page.locator('[role=progressbar]').getAttribute('aria-valuenow'),'34.5');checks++;
   for(const [state,title]of [['EXPIRED','Your subscription has expired'],['LIMITED','Data allowance reached'],['DISABLED','Subscription paused'],['ON_HOLD','Ready for your first connection']]){
    await page.goto(base+'/?lang=en&state='+state);await page.waitForFunction(()=>document.querySelector('h1').textContent!=='Subscription active');assert.equal(await page.locator('h1').innerText(),title);
+   assert(await page.locator('.subscription-preview-hero').isVisible(),
+     'Non-active subscriptions must retain the actionable state explanation');
    if(state!=='ON_HOLD'){assert(await page.locator('[data-setup-section="connect"]').isHidden());assert(await page.locator('.experience-start').isHidden());assert(await page.locator('.experience-shortcuts').isHidden());assert.equal(await page.locator('.experience-dashboard').count(),1);}
    checks++;
   }
@@ -190,6 +201,14 @@ async function dismissDialog(page,dialog,opener){
   assert.equal(await studio.locator('[data-subscription-logo]').getAttribute('src'),'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAFUlEQVR4nGPUOLHgPwMUMDEgARQOAFzRApXxCG5qAAAAAElFTkSuQmCC');
   assert.equal(await studio.locator('.experience-plan-mark').getAttribute('src'),'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAFUlEQVR4nGPUOLHgPwMUMDEgARQOAFzRApXxCG5qAAAAAElFTkSuQmCC');
   assert.equal(await studio.locator('[data-subscription-logo-symbol]').isHidden(),true);
+  assert(await studio.locator('.subscription-preview-hero').isHidden(),
+    'Studio and public portal both hide the redundant active hero');
+  assert.equal(await studio.locator('.experience-plan-expiry [data-subscription-expiry]').count(),1,
+    'Studio and public portal share one plan/expiry composition');
+  assert(await studio.locator('.experience-plan-heading .subscription-preview-ok').isVisible(),
+    'Status is adjacent to the plan title in both renderers');
+  assert.equal(await studio.locator('.experience-server-panel .portal-donut-chart').count(),1,
+    'Live preview retains the same interactive server donut as the public portal');
   assert.match(await studio.locator('.portal-donut-center b').innerText(),/^12.4 /);
   assert(!/[А-Яа-яЁё]/.test(await studio.innerText()),'Studio English preview has untranslated copy');
   assert(await studio.locator('.portal-app-disclosure').evaluate(el=>!el.open));

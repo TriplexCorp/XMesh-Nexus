@@ -828,7 +828,7 @@ window.XMeshSubscriptionStudio = (() => {
       for(const href of [
         '/subscription-studio.css?v=262af6d1ee44',
         '/subscription-surface.css?v=0a79377d5733',
-        '/subscription-public.css?v=4d4bfd6beeb3'
+        '/subscription-public.css?v=87451212a4bc'
       ]){
         const link=document.createElement('link');
         link.rel='stylesheet';link.href=href;previewShadow.appendChild(link);
