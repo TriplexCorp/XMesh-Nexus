@@ -19,6 +19,8 @@ assert.match(auth,/All new API tokens require an Ed25519 proofPublicKey/,'New se
 assert.match(auth,/VerifyingKey::from_bytes/,'Public keys must be validated at issuance');
 assert.match(auth,/proof::constrain/,'Every protected request must carry a verified proof');
 assert.match(auth,/maxCreatesPerDay/,'Owner must see issued account caps');
+assert.match(auth,/XMESH_INTEGRATION_REQUIRE_PROOF/,'Legacy token cutover must be explicitly controllable');
+assert.match(read('compose.yaml'),/XMESH_INTEGRATION_REQUIRE_PROOF/,'Runtime must expose strict cutover control');
 assert.match(proof,/proof_message\(/,'Signed canonical request binding required');
 assert.match(proof,/Sha256::digest\(body\)/,'HTTP body hash must be signed');
 assert.match(proof,/path_and_query\(\)/,'Signed URI includes exact query string');
