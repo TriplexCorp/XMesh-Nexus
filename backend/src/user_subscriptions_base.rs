@@ -2156,7 +2156,8 @@ fn portal_theme_changes(settings: &Value) -> Vec<(&'static str, String)> {
 fn portal_favicon() -> String {
     format!(
         "data:image/svg+xml;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(include_str!("../../frontend/favicon.svg"))
+        base64::engine::general_purpose::STANDARD
+            .encode(include_str!("../../frontend/favicon.svg"))
     )
 }
 
