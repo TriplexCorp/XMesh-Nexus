@@ -144,4 +144,68 @@ invokeExpert('xhttp');
 assert.deepEqual(dialogTitles,['XHTTP · expert server inbound'],
  'The existing XHTTP server expert entry must remain unchanged');
 
-console.log('XRAY Studio enterprise: shell, theme, keyboard navigation, inspector safety, responsive layout and cache keys OK');
+// Exercise clean/RAW XHTTP using the real capture dispatcher and complete
+// device profile save path, not just checking for a visible toolbar button.
+const runCleanXhttp=async()=>{
+ const cases=[
+  {raw:'{}',expect:'new'},
+  {raw:JSON.stringify({inbounds:[{tag:'raw-test',protocol:'vless',listen:'127.0.0.1',port:443,
+   settings:{users:[],decryption:'none'},streamSettings:{network:'raw',security:'tls',tlsSettings:{certificates:[]}}}]}),expect:'convert'}
+ ];
+ for(const sample of cases){
+  const field={value:sample.raw,dispatchEvent(){}},messages=[],calls=[];
+  const root={querySelector(selector){
+   if(selector==='[data-v="source"]')return field;
+   if(selector==='[data-tool-status]')return {set textContent(value){messages.push(value)}};
+   return null;
+  }};
+  let handler;
+  const win={
+   XMeshXhttpStrict:{normalizeForMode(){},validateSettings:()=>[],validateAdvanced:()=>[]},
+   XMeshStudioDialogs:{
+    confirm:async spec=>{calls.push(spec.title);return true},
+    request:async spec=>{
+     calls.push(spec.title);
+     if(spec.title==='Профили устройств')return {device:'iOS',preset:'ios'};
+     if(spec.title==='XHTTP · iOS')return Object.fromEntries(spec.fields.map(f=>[f.name,String(f.value??'')]));
+     throw Error('Unexpected dialog: '+spec.title);
+    }
+   },
+   addEventListener(type,fn){if(type==='click')handler=fn}
+  };
+  new Function('window','Event',expertSource)(win,class SyntheticEvent{constructor(type){this.type=type}});
+  const button={dataset:{tool:'xhttp-device'},closest:()=>root};
+  handler({target:{closest:selector=>selector.includes('data-tool="xhttp-device"')?button:null},
+   preventDefault(){},stopImmediatePropagation(){}});
+  await new Promise(resolve=>setImmediate(resolve));
+  const doc=JSON.parse(field.value),ib=doc.inbounds[0];
+  assert.equal(ib.streamSettings.network,'xhttp','Device editor must initialize real XHTTP transport');
+  assert.equal(ib.xmesh.xhttpDeviceProfiles.iOS.mode,'packet-up','iOS must persist in JSON');
+  assert.equal(ib.xmesh.xhttpDeviceProfiles.iOS.xmux.maxConnections,'3-6','XMUX values must persist');
+  assert(calls.some(title=>title.includes('XHTTP')),'Explicit change must be confirmed');
+  if(sample.expect==='new'){
+   assert.equal(ib.listen,'127.0.0.1','Fresh XHTTP inbound must never open a public listener');
+   assert.equal(ib.settings.users.length,0,'No credentials are created implicitly');
+   assert.equal(doc.outbounds[0].protocol,'freedom');
+  }else{
+   assert.equal(ib.streamSettings.security,'tls','Converting RAW to XHTTP must preserve TLS');
+   assert.deepEqual(ib.streamSettings.tlsSettings.certificates,[]);
+  }
+ }
+ // A cancellation on a clean document must leave the source byte-for-byte intact.
+ const untouched={value:'{}'},root={querySelector:q=>q==='[data-v="source"]'?untouched:null};
+ let handler;
+ const win={
+  XMeshXhttpStrict:{normalizeForMode(){},validateSettings:()=>[],validateAdvanced:()=>[]},
+  XMeshStudioDialogs:{confirm:async()=>false,request:async()=>{throw Error('Confirmation bypassed')}},
+  addEventListener(type,fn){if(type==='click')handler=fn}
+ };
+ new Function('window','Event',expertSource)(win,class SyntheticEvent{constructor(type){this.type=type}});
+ const b={dataset:{tool:'xhttp-device'},closest:()=>root};
+ handler({target:{closest:sel=>sel.includes('data-tool="xhttp-device"')?b:null},preventDefault(){},stopImmediatePropagation(){}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(untouched.value,'{}','Cancelling clean config setup must not modify JSON');
+};
+runCleanXhttp()
+ .then(()=>console.log('XRAY Studio enterprise: shell, XHTTP clean/RAW persistence, security and sizing passed'))
+ .catch(error=>{console.error(error);process.exitCode=1});
