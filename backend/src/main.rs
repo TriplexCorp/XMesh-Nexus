@@ -70,7 +70,7 @@ mod xsp_v2_wire_tests;
 use axum::{
     Json, Router,
     body::Bytes,
-    extract::{Extension, Path, Query, Request, State},
+    extract::{DefaultBodyLimit, Extension, Path, Query, Request, State},
     http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -530,8 +530,14 @@ fn application_router(state: AppState) -> Router {
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
         .route("/sub-server/claim", post(sub_server::claim))
-        .route("/sub-server/agent/poll", post(sub_server::poll))
-        .route("/sub-server/agent/report", post(sub_server::report))
+        .route(
+            "/sub-server/agent/poll",
+            post(sub_server::poll).layer(DefaultBodyLimit::max(16_384)),
+        )
+        .route(
+            "/sub-server/agent/report",
+            post(sub_server::report).layer(DefaultBodyLimit::max(16_384)),
+        )
         .route("/metrics/ingest", post(ingest_node_metrics))
         .route("/node/heartbeat", post(node_runtime::heartbeat))
         .route("/node/restart/poll", post(node_runtime::poll_restart))
