@@ -317,6 +317,35 @@ pub async fn revoke_token(
     Ok(Json(json!({"revoked":true,"tokenId":id})))
 }
 
+// Only validated request proofs may spend the per-token budget. A leaked
+// Bearer without its signing key must not be able to exhaust this budget.
+async fn throttle_token(state: &AppState, token_id: i64) -> Result<(), Problem> {
+    let minute = now_ms().div_euclid(60_000);
+    let mut redis = state.redis.clone();
+    let count: i64 = redis::cmd("EVAL")
+        .arg(RATE_SCRIPT)
+        .arg(1)
+        .arg(format!("xmesh:int:rl:v1:{token_id}:{minute}"))
+        .query_async(&mut redis)
+        .await
+        .map_err(|_|Problem::unavailable())?;
+    if count > REDIS_RATE_LIMIT_PER_MINUTE {
+        return Err(Problem::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "rate_limited",
+            "Rate limit exceeded",
+        ));
+    }
+    let _ = sqlx::query(
+        "UPDATE integration_tokens SET last_used_at=NOW()
+         WHERE id=$1 AND (last_used_at IS NULL OR last_used_at<NOW()-INTERVAL '5 minutes')",
+    )
+    .bind(token_id)
+    .execute(&state.pool)
+    .await;
+    Ok(())
+}
+
 pub(super) async fn require_service(
     State(state): State<AppState>,
     mut request: Request,
@@ -339,6 +368,9 @@ pub(super) async fn require_service(
                 Ok(request) => request,
                 Err(error) => return error.into_response(),
             };
+            if let Err(err) = throttle_token(&state, principal.token_id).await {
+                return err.into_response();
+            }
             request.extensions_mut().insert(principal);
             let mut response = next.run(request).await;
             response.headers_mut().insert(
@@ -447,30 +479,6 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
     let client_id: i64 = row
         .try_get("client_id")
         .map_err(|_| Problem::unavailable())?;
-    let now_minute = now_ms().div_euclid(60_000);
-    let key = format!("xmesh:int:rl:v1:{token_id}:{now_minute}");
-    let mut redis = state.redis.clone();
-    let requests = redis::cmd("EVAL")
-        .arg(RATE_SCRIPT)
-        .arg(1)
-        .arg(key)
-        .query_async::<i64>(&mut redis)
-        .await
-        .map_err(|_| Problem::unavailable())?;
-    if requests > REDIS_RATE_LIMIT_PER_MINUTE {
-        return Err(Problem::new(
-            StatusCode::TOO_MANY_REQUESTS,
-            "rate_limited",
-            "Rate limit exceeded",
-        ));
-    }
-    let _ = sqlx::query(
-        "UPDATE integration_tokens SET last_used_at=NOW()
-         WHERE id=$1 AND (last_used_at IS NULL OR last_used_at<NOW()-INTERVAL '5 minutes')",
-    )
-    .bind(token_id)
-    .execute(&state.pool)
-    .await;
     Ok(ServicePrincipal {
         token_id,
         client_id,
