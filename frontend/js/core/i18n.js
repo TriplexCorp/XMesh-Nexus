@@ -15,6 +15,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Создайте команду установки выше и выполните её на VPS. Агент подключится автоматически.": "Generate the installer command above and run it on the VPS. The agent will connect automatically.",
     "Ошибка проверки:": "Status check failed:",
     "Агент ранее выходил на связь. Последняя активность:": "The agent previously connected. Last seen:",
     "Ожидаем связь": "Awaiting heartbeat",
