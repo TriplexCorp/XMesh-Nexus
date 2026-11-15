@@ -249,7 +249,8 @@ window.XMeshSubscriptionStudio = (() => {
       external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/>',
       calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/>',
       tag:'<path d="M11 3H4a1 1 0 0 0-1 1v7l9 9a2 2 0 0 0 3 0l5-5a2 2 0 0 0 0-3l-9-9Z"/><circle cx="7.5" cy="7.5" r="1"/>',
-      info:'<circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/>'
+      info:'<circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/>',
+      plus:'<path d="M12 5v14M5 12h14"/>'
     };
     return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(paths[name]||paths.server)+'</svg>';
   };
