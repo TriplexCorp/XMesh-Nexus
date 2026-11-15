@@ -667,6 +667,188 @@ pub async fn report(
     Ok(Json(json!({"ok":true})))
 }
 
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateMirror {
+    name: String,
+    domain: String,
+}
+
+pub async fn create_mirror(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CreateMirror>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let name = body.name.trim();
+    let domain = body.domain.trim().to_ascii_lowercase();
+    if name.is_empty() || name.chars().count() > 48 || name.chars().any(char::is_control) {
+        return Err(api_error("Название зеркала должно содержать от 1 до 48 символов."));
+    }
+    if !valid_domain(&domain) || domain == current_domain(&state).await? {
+        return Err(api_error("Укажите отдельный домен зеркала, отличный от основного."));
+    }
+    let id = random_hex()[..32].to_owned();
+    // Serialize fleet-size checks, including concurrent owner tabs.
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(215434201)")
+        .execute(&mut *tx)
+        .await?;
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sub_mirrors")
+        .fetch_one(&mut *tx)
+        .await?;
+    if count >= MAX_MIRRORS {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Можно добавить не более 16 зеркал."));
+    }
+    let occupied: Option<String> =
+        sqlx::query_scalar("SELECT id FROM sub_mirrors WHERE domain=$1")
+            .bind(&domain)
+            .fetch_optional(&mut *tx)
+            .await?;
+    if occupied.is_some() {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Зеркало с таким доменом уже существует."));
+    }
+    sqlx::query("INSERT INTO sub_mirrors(id,name,domain) VALUES($1,$2,$3)")
+        .bind(&id)
+        .bind(name)
+        .bind(&domain)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    audit(&state.pool, &actor.username, "sub.mirror.create", None, None,
+        json!({"mirrorId":id,"domain":domain})).await;
+    Ok(Json(json!({"id":id,"name":name,"domain":domain,"enrolled":false,"online":false})))
+}
+
+pub async fn list_mirrors(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let records: Vec<MirrorRecord> =
+        sqlx::query_as("SELECT id,name,domain,public_key FROM sub_mirrors ORDER BY created_at,id")
+            .fetch_all(&state.pool)
+            .await?;
+    let mut conn = state.redis.clone();
+    let mut mirrors = Vec::with_capacity(records.len());
+    for (id,name,domain,key) in records {
+        let heartbeat: Option<String> = redis::cmd("GET")
+            .arg(scoped_key(Some(&id), HEARTBEAT))
+            .query_async(&mut conn).await.map_err(|_| backend_error())?;
+        let heartbeat: Value = heartbeat.and_then(|v| serde_json::from_str(&v).ok())
+            .unwrap_or(Value::Null);
+        let last_seen = heartbeat.get("lastSeen").and_then(Value::as_u64).unwrap_or(0);
+        let update: Option<String> = redis::cmd("GET")
+            .arg(scoped_key(Some(&id), UPDATE_STATUS))
+            .query_async(&mut conn).await.map_err(|_| backend_error())?;
+        let update: Value = update.and_then(|v| serde_json::from_str(&v).ok())
+            .unwrap_or(Value::Null);
+        let enrolled = key.is_some();
+        let online = enrolled && last_seen > 0 && now().saturating_sub(last_seen) <= 90;
+        mirrors.push(json!({
+            "id":id, "name":name, "domain":domain,
+            "enrolled":enrolled,"online":online,"domainMatches":true,
+            "lastSeen":last_seen,
+            "version":heartbeat.get("version").and_then(Value::as_str).unwrap_or(""),
+            "update":update
+        }));
+    }
+    Ok(Json(json!({"mirrors":mirrors, "maxMirrors":MAX_MIRRORS})))
+}
+
+pub async fn delete_mirror(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let (_,_,domain,_) = mirror_by_id(&state.pool,&id).await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Зеркало не найдено."))?;
+    let removed: Option<String> =
+        sqlx::query_scalar("DELETE FROM sub_mirrors WHERE id=$1 RETURNING id")
+            .bind(&id).fetch_optional(&state.pool).await?;
+    if removed.is_none() {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "Зеркало не найдено."));
+    }
+    let mut conn = state.redis.clone();
+    let _: i64 = redis::cmd("DEL")
+        .arg(scoped_key(Some(&id), HEARTBEAT))
+        .arg(scoped_key(Some(&id), PENDING_UPDATE))
+        .arg(scoped_key(Some(&id), CURRENT_UPDATE))
+        .arg(scoped_key(Some(&id), UPDATE_STATUS))
+        .query_async(&mut conn).await.map_err(|_| backend_error())?;
+    audit(&state.pool,&actor.username,"sub.mirror.delete",None,None,
+        json!({"mirrorId":id,"domain":domain})).await;
+    Ok(Json(json!({"ok":true})))
+}
+
+pub async fn issue_mirror_enrollment(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let (_,_,domain,_) = mirror_by_id(&state.pool,&id).await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Зеркало не найдено."))?;
+    let token = random_hex();
+    let mut conn = state.redis.clone();
+    redis::cmd("SET")
+        .arg(format!("{ENROLL_PREFIX}{}", sha256_hex(&token)))
+        .arg(format!("{MIRROR_ENROLL_TAG}{id}"))
+        .arg("EX").arg(ENROLL_TTL_SECONDS)
+        .query_async::<String>(&mut conn).await.map_err(|_| backend_error())?;
+    audit(&state.pool,&actor.username,"sub.mirror.enrollment.issue",None,None,
+        json!({"mirrorId":id,"domain":domain})).await;
+    Ok(Json(json!({"enrollmentToken":token,"expiresInSeconds":ENROLL_TTL_SECONDS,
+        "domain":domain,"mirrorId":id})))
+}
+
+pub async fn request_mirror_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let (_,_,domain,key) = mirror_by_id(&state.pool,&id).await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Зеркало не найдено."))?;
+    if key.is_none() {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Сначала подключите зеркало."));
+    }
+    let mut conn = state.redis.clone();
+    let hb: Option<String> = redis::cmd("GET")
+        .arg(scoped_key(Some(&id), HEARTBEAT))
+        .query_async(&mut conn).await.map_err(|_| backend_error())?;
+    let hb: Value = hb.and_then(|v| serde_json::from_str(&v).ok())
+        .unwrap_or(Value::Null);
+    let last = hb.get("lastSeen").and_then(Value::as_u64).unwrap_or(0);
+    if last == 0 || now().saturating_sub(last) > 90 {
+        return Err(ApiError::new(StatusCode::CONFLICT,"Зеркало не в сети."));
+    }
+    let current: Option<String> = redis::cmd("GET")
+        .arg(scoped_key(Some(&id), CURRENT_UPDATE))
+        .query_async(&mut conn).await.map_err(|_| backend_error())?;
+    if current.is_some() {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Обновление зеркала уже выполняется."));
+    }
+    let job = random_hex()[..32].to_owned();
+    let pending: Option<String> = redis::cmd("SET")
+        .arg(scoped_key(Some(&id), PENDING_UPDATE))
+        .arg(&job).arg("NX").arg("EX").arg(1800)
+        .query_async(&mut conn).await.map_err(|_| backend_error())?;
+    if pending.is_none() {
+        return Err(ApiError::new(StatusCode::CONFLICT,"Обновление уже в очереди."));
+    }
+    let status = json!({"jobId":job,"stage":"queued","updatedAt":now()});
+    redis::cmd("SET")
+        .arg(scoped_key(Some(&id), UPDATE_STATUS))
+        .arg(status.to_string()).arg("EX").arg(86400)
+        .query_async::<String>(&mut conn).await.map_err(|_| backend_error())?;
+    audit(&state.pool,&actor.username,"sub.mirror.update.request",None,None,
+        json!({"mirrorId":id,"domain":domain})).await;
+    Ok(Json(status))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
