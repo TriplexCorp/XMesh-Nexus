@@ -305,12 +305,12 @@ pub(super) async fn require_service(
         Ok(principal) => {
             // Proof is checked on the exact wire body and URI before handlers
             // can perform any action. Reject stale/replayed/unsigned requests.
-            let constrained = proof::constrain(
+            let mut request = match proof::constrain(
                 &state, request, &principal.token_hash,
                 principal.proof_public_key.as_deref(), principal.token_id
-            ).await;
-            let Ok(mut request) = constrained else {
-                return constrained.err().expect("proof error").into_response();
+            ).await {
+                Ok(request) => request,
+                Err(error) => return error.into_response(),
             };
             request.extensions_mut().insert(principal);
             let mut response = next.run(request).await;
