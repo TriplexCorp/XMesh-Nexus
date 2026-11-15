@@ -557,7 +557,7 @@ assert.match(view,/class="subscription-content-switch" role="switch" name="flood
  'Flood protection uses the same accessible switch as other settings');
 assert.match(css,/\.subscription-client-row:not\(\.subscription-client-custom\)/,
  'Client settings have a compact dedicated editor layout');
-assert.match(css,/\.subscription-sub-step-index\{display:none\}/,
+assert.match(css,/\.subscription-sub-step-index,\s*\.subscription-studio \.subscription-step-symbol\{display:none\}/,
  'Installer steps must not have oversized numeric badges');
 const portalActionsCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
 assert.match(portalActionsCss,/Shared public page \+ Studio preview: controls must never leak text/,
