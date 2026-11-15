@@ -13,7 +13,7 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
 
 const BODY_LIMIT: usize = 64 * 1024;
-const CLOCK_SKEW_SECONDS: i64 = 60;
+const CLOCK_SKEW_SECONDS: u64 = 60;
 const REPLAY_TTL_SECONDS: u64 = 180;
 
 fn denied() -> Problem {
@@ -67,7 +67,7 @@ fn validate_signature(
     let now = now_ms() / 1000;
     let timestamp_value = timestamp.parse::<i64>().map_err(|_| denied())?;
     if timestamp != timestamp_value.to_string()
-        || timestamp_value.abs_diff(now) > CLOCK_SKEW_SECONDS as u64
+        || timestamp_value.abs_diff(now) > CLOCK_SKEW_SECONDS
         || !lowercase_hex(&nonce, 32)
         || !lowercase_hex(&signature_hex, 128)
     {
