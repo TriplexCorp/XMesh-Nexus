@@ -129,9 +129,14 @@ assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*position:static[^}]*z
 assert.match(css,/@media \(max-width:900px\)[\s\S]*?\.host-connection-workspace,\.host-preview-workspace\{grid-template-columns:minmax\(0,1fr\)/,'Narrow task workspaces must stack');
 assert.match(css,/@media \(max-width:560px\)[\s\S]*?\.host-connect-fields,\.host-public-fields,\.host-advanced-fields\{grid-template-columns:minmax\(0,1fr\)/,'Phone fields must keep usable widths');
 
-// User Details keeps a stable tab frame while adapting to viewport and zoom.
-assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:clamp\(64rem,54vw,100rem\)[\s\S]*?height:min\(clamp\(38\.5rem,64dvh,49rem\),calc\(100dvh - 2rem\)\)[\s\S]*?max-block-size:calc\(100dvh - 2rem\)/,
- 'User Details must use the viewport-responsive width and bounded desktop height');
+// User Details uses a wider viewport-bounded dialog with adaptive height.
+assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:clamp\(72rem,72vw,112rem\)[\s\S]*?height:min\(clamp\(38\.5rem,64dvh,49rem\),calc\(100dvh - 2rem\)\)[\s\S]*?max-block-size:calc\(100dvh - 2rem\)/,
+ 'User Details must widen without overflowing a desktop viewport');
+assert.match(css,/@media\s*\(min-width:1100px\)[\s\S]*?dialog#dlg\.user-modal:has\([\s\S]*?data-user-editor-tab="traffic"[\s\S]*?76dvh/,
+ 'Traffic tab must gain usable vertical space');
+assert.match(css,/@media\s*\(min-width:1100px\)[\s\S]*?data-user-editor-tab="routing"[\s\S]*?58dvh/,
+ 'Routing and devices tabs should remain compact');
+
 assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?opacity \.34s[\s\S]*?transform \.50s[\s\S]*?overlay \.50s allow-discrete/,
  'User Details must retain its accessible premium open/close motion');
 assert.match(css,/dialog#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:100%[\s\S]*?max-block-size:100%[\s\S]*?display:grid[\s\S]*?grid-template-rows:auto auto auto minmax\(0,1fr\) auto auto auto[\s\S]*?border:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
@@ -156,7 +161,7 @@ assert.ok(canonicalDialogsCss.includes('@media(min-width:1100px) and (max-width:
  canonicalDialogsCss.includes('height:min(clamp(36rem,70dvh,47rem),calc(100dvh - 2rem));'),
  'Normal desktop workspaces may use the taller form, without making 768px tablet dialogs oversized');
 assert.ok(canonicalDialogsCss.includes('@media(min-width:2800px) and (max-height:1300px)') &&
- canonicalDialogsCss.includes('--dialog-width:78rem;') &&
+ canonicalDialogsCss.includes('--dialog-width:88rem;') &&
  canonicalDialogsCss.includes('zoom:1.28;') &&
  canonicalDialogsCss.includes('height:min(clamp(38.5rem,70dvh,49rem),82dvh);'),
  'Short wide zoomed-out screens must get a bounded and legible workspace');
