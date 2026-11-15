@@ -16,12 +16,13 @@ assert.match(enroll,/consumed_at=NOW\(\)/);
 // exact route/body/time/nonce with its Ed25519 key. A leftover Bearer-based
 // CSRF exception produced 403 after a successful enrollment, every 20 sec.
 const subGuard=source.slice(source.indexOf('async fn csrf_guard('),source.indexOf('async fn csrf_guard(')+4700);
+const signedHelper=source.slice(source.indexOf('fn signed_sub_agent_request('),source.indexOf('async fn csrf_guard('));
 assert.match(subGuard,/\/api\/v1\/sub-server\/agent\/poll/);
-assert.match(subGuard,/x-xmesh-sub-signature/);
-assert.match(subGuard,/x-xmesh-sub-timestamp/);
-assert.match(subGuard,/x-xmesh-sub-nonce/);
-assert.match(subGuard,/get\(header::AUTHORIZATION\)\.is_none\(\)/,
- 'Do not accept Bearer tokens on Ed25519 agent routes');
-assert.doesNotMatch(subGuard,/starts_with\("Bearer "\)/,
- 'The agent CSRF exception must no longer require legacy Bearer auth');
+assert.match(subGuard,/signed_sub_agent_request\(request\.headers\(\)\)/);
+for(const header of ['x-xmesh-sub-signature','x-xmesh-sub-timestamp','x-xmesh-sub-nonce'])
+ assert(signedHelper.includes(header),'Missing Sub signature header shape: '+header);
+assert.match(signedHelper,/contains_key\(header::AUTHORIZATION\)/,
+ 'Ed25519 agent requests must not send legacy Bearer authorization');
+assert.doesNotMatch(signedHelper,/starts_with\("Bearer "\)/,
+ 'Agent CSRF exception must never require Bearer credentials');
 console.log('Machine-only enrollment and Sub Ed25519 CSRF scope: OK');
