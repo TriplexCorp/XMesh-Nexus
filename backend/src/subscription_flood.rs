@@ -156,7 +156,7 @@ pub async fn enforce(state: &AppState, token: &str) -> Option<Response> {
             token_digest(token)
         ))
         .arg(format!("xmesh:subscription:flood:stats:{interval}"))
-        .arg(config.token_per_minute.saturating_add(10))
+        .arg(config.token_per_minute)
         .arg(MAX_TOKEN_BUCKETS_PER_MINUTE)
         .arg(&config.mode)
         .query_async(&mut conn)
