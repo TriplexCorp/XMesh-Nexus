@@ -1098,7 +1098,7 @@ body.subscription-public{margin:0;min-height:100dvh;background:var(--portal-bg,#
 }
 .subscription-public .experience-dashboard .subscription-public-primary-action>
   :is(#connect-link,#toggle-qr,[data-subscription-copy],[data-subscription-qr])::before{
-  display:block;width:22px;height:22px;flex:none;
+  display:block;width:24px;height:24px;flex:none;
 }
 .subscription-public .experience-dashboard .subscription-public-primary-action>[hidden],
 .subscription-public .experience-dashboard .subscription-preview-quick>[hidden]{display:none!important}
