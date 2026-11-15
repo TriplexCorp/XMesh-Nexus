@@ -150,6 +150,75 @@ def next_unused_totp(secret, last_step):
     return totp_for_step(secret, step), step
 
 
+def sub_agent_api(route, bearer, payload, proof=False, proof_headers=None):
+    """Send raw HTTP bytes to the disposable Nexus, never the Sub public URL."""
+    data = json.dumps(payload, separators=(",", ":")).encode()
+    headers = {"Authorization": "Bearer " + bearer, "Content-Type": "application/json"}
+    if proof:
+        if proof_headers is None:
+            when = str(int(time.time()))
+            nonce = os.urandom(16).hex()
+            token_hash = hashlib.sha256(bearer.encode()).hexdigest()
+            message = ("xmesh-sub-proof-v1\n" + token_hash +
+                       "\nPOST\n/api/v1/sub-server/agent/" + route +
+                       "\n" + when + "\n" + nonce + "\n" +
+                       hashlib.sha256(data).hexdigest()).encode()
+            with tempfile.NamedTemporaryFile(prefix="xmesh-sub-ci-sign-") as message_file:
+                message_file.write(message)
+                message_file.flush()
+                signature = subprocess.run([
+                    "openssl", "pkeyutl", "-sign", "-rawin",
+                    "-inkey", PROOF_KEY_FILE, "-in", message_file.name,
+                ], capture_output=True, check=True).stdout.hex()
+            proof_headers = {
+                "X-XMesh-Proof-Ts": when,
+                "X-XMesh-Proof-Nonce": nonce,
+                "X-XMesh-Proof-Sig": signature,
+            }
+        headers.update(proof_headers)
+    req = Request(BASE + "/api/v1/sub-server/agent/" + route,
+                  data=data, headers=headers, method="POST")
+    try:
+        response = urlopen(req, timeout=20)
+    except HTTPError as error:
+        response = error
+    with response:
+        return response.status, (json.loads(response.read()) if response.status == 200 else None), headers
+
+
+def test_sub_agent_proof(owner_cookie):
+    """Prove valid manager requests work; stolen tokens and replays don't."""
+    status, enrollment, _ = api("POST", "/sub-server/enrollment", {}, owner_cookie)
+    check(status, 200, "issue Sub pairing code for bound agent")
+    assert enrollment["enrollmentToken"]
+    claim = Request(
+        BASE + "/api/v1/sub-server/claim",
+        data=json.dumps({
+            "enrollmentToken": enrollment["enrollmentToken"],
+            "domain": "sub.example.com",
+            "proofPublicKey": PROOF_PUBLIC_KEY,
+        }).encode(),
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urlopen(claim, timeout=20) as response:
+        assert response.status == 200
+        token = json.loads(response.read())["agentToken"]
+    check(sub_agent_api("poll",token,{"version":"0.4.0"})[0], 401,
+          "stolen Sub agent bearer cannot poll without private key")
+    status, payload, proof_headers = sub_agent_api(
+        "poll", token, {"version":"0.4.0"}, proof=True)
+    check(status, 200, "signed Sub agent poll succeeds")
+    assert payload["command"] == "none"
+    check(sub_agent_api("poll",token,{"version":"0.4.0"},
+                       proof=True,proof_headers=proof_headers)[0], 401,
+          "replayed agent proof nonce rejected by Redis")
+    check(sub_agent_api("poll",token,{"version":"0.4.1"},
+                       proof=True,proof_headers=proof_headers)[0], 401,
+          "signed agent proof cannot be reused for modified request body")
+    status, _, _ = sub_agent_api("poll",token,{"version":"0.4.1"},proof=True)
+    check(status, 200, "fresh signed Sub agent poll accepted")
+
+
 def test_scoped_integration_api(owner_cookie, secret, user_id):
     """E2E with real PostgreSQL and Redis; only disposable CI objects."""
     check(service_api("GET", "/capabilities")[0], 401, "service API requires Bearer")
@@ -866,6 +935,7 @@ def main():
         "subscriptionProfileWebPageUrl": "",
         "subscriptionSupportUrl": "https://t.me/ci_support"
     }, owner_cookie)[0], 200, "configure portal metadata for API smoke test")
+    test_sub_agent_proof(owner_cookie)
     status, new_sub, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
     check(status, 200, "retrieve personal subscription URL after settings update")
     personal_page = new_sub["url"] + "?view=portal"
