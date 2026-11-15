@@ -8,8 +8,8 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use rand_core::{OsRng, RngCore};
 use ed25519_dalek::VerifyingKey;
+use rand_core::{OsRng, RngCore};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -33,8 +33,13 @@ const ENABLED_SCOPES: &[&str] = &[
 ];
 const TOKEN_PREFIX: &str = "xmni_v1_";
 const MUTATING_SCOPES: &[&str] = &[
-    "users:write", "users:create", "users:update", "quotas:write",
-    "squads:members:write", "telegram:assign", "entitlements:grant",
+    "users:write",
+    "users:create",
+    "users:update",
+    "quotas:write",
+    "squads:members:write",
+    "telegram:assign",
+    "entitlements:grant",
 ];
 const REDIS_RATE_LIMIT_PER_MINUTE: i64 = 120;
 const RATE_SCRIPT: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],90) end; return n";
@@ -118,30 +123,57 @@ pub async fn create_token(
     scopes.dedup();
     let requires_proof = scopes.iter().any(|s| MUTATING_SCOPES.contains(&s.as_str()));
     let proof_key = if let Some(ref input) = body.proof_public_key {
-        if input.len()!=64 || input.bytes().any(|b|!b.is_ascii_hexdigit() || b.is_ascii_uppercase()) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid proofPublicKey (32-byte Ed25519 public key, lowercase hex)"));
+        if input.len() != 64
+            || input
+                .bytes()
+                .any(|b| !b.is_ascii_hexdigit() || b.is_ascii_uppercase())
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid proofPublicKey (32-byte Ed25519 public key, lowercase hex)",
+            ));
         }
-        let decoded = hex::decode(input).map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid proofPublicKey"))?;
-        let array: [u8;32] = decoded.as_slice().try_into().map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid proofPublicKey"))?;
-        VerifyingKey::from_bytes(&array).map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid Ed25519 proofPublicKey"))?;
+        let decoded = hex::decode(input)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid proofPublicKey"))?;
+        let array: [u8; 32] = decoded
+            .as_slice()
+            .try_into()
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid proofPublicKey"))?;
+        VerifyingKey::from_bytes(&array).map_err(|_| {
+            ApiError::new(StatusCode::BAD_REQUEST, "Invalid Ed25519 proofPublicKey")
+        })?;
         Some(decoded)
     } else {
         None
     };
     if requires_proof && proof_key.is_none() {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST,
-            "Mutating API scopes require a sender-constrained Ed25519 proofPublicKey"));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Mutating API scopes require a sender-constrained Ed25519 proofPublicKey",
+        ));
     }
-    if body.max_grant_days.is_some_and(|v|!(1..=3650).contains(&v))
-       || body.max_creates_per_day.is_some_and(|v|!(1..=1000).contains(&v)) {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid operation limits"));
+    if body
+        .max_grant_days
+        .is_some_and(|v| !(1..=3650).contains(&v))
+        || body
+            .max_creates_per_day
+            .is_some_and(|v| !(1..=1000).contains(&v))
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid operation limits",
+        ));
     }
-    let grant_limit = if scopes.iter().any(|s|s=="entitlements:grant") {
+    let grant_limit = if scopes.iter().any(|s| s == "entitlements:grant") {
         Some(body.max_grant_days.unwrap_or(30))
-    } else {None};
-    let creates_limit = if scopes.iter().any(|s|s=="users:create") {
+    } else {
+        None
+    };
+    let creates_limit = if scopes.iter().any(|s| s == "users:create") {
         Some(body.max_creates_per_day.unwrap_or(20))
-    } else {None};
+    } else {
+        None
+    };
     let mut allowed = body.allowed_user_ids;
     if body.all_users == allowed.is_some() {
         return Err(ApiError::new(
@@ -306,9 +338,14 @@ pub(super) async fn require_service(
             // Proof is checked on the exact wire body and URI before handlers
             // can perform any action. Reject stale/replayed/unsigned requests.
             let mut request = match proof::constrain(
-                &state, request, &principal.token_hash,
-                principal.proof_public_key.as_deref(), principal.token_id
-            ).await {
+                &state,
+                request,
+                &principal.token_hash,
+                principal.proof_public_key.as_deref(),
+                principal.token_id,
+            )
+            .await
+            {
                 Ok(request) => request,
                 Err(error) => return error.into_response(),
             };
@@ -438,10 +475,16 @@ async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<ServicePr
         allowed_user_ids: row
             .try_get("allowed_user_ids")
             .map_err(|_| Problem::unavailable())?,
-        proof_public_key: row.try_get("proof_public_key").map_err(|_|Problem::unavailable())?,
+        proof_public_key: row
+            .try_get("proof_public_key")
+            .map_err(|_| Problem::unavailable())?,
         token_hash: digest,
-        max_grant_days: row.try_get("max_grant_days").map_err(|_|Problem::unavailable())?,
-        max_creates_per_day: row.try_get("max_creates_per_day").map_err(|_|Problem::unavailable())?,
+        max_grant_days: row
+            .try_get("max_grant_days")
+            .map_err(|_| Problem::unavailable())?,
+        max_creates_per_day: row
+            .try_get("max_creates_per_day")
+            .map_err(|_| Problem::unavailable())?,
     })
 }
 
