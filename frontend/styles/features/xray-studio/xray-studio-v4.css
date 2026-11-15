@@ -1511,3 +1511,114 @@ dialog.xm-studio-modal.xm-studio-modal--xhttp.xm-studio-modal--cards{
  .xm-studio-modal--xhttp .xm-studio-modal-cardchoices{grid-template-columns:1fr}
  .xm-studio-modal h2{font-size:1.3rem}
 }
+
+/* XRAY STUDIO v2: responsive action sheets with fixed readable type.
+   The host panel scales rems, so dialog typography must not shrink with it. */
+dialog.xm-studio-modal{
+ font-size:14px;line-height:1.5;
+ border-radius:16px;
+ max-height:calc(100dvh - 24px);
+ scrollbar-gutter:stable;
+}
+dialog.xm-studio-modal.xm-studio-modal--compact,
+dialog.xm-studio-modal.xm-studio-modal--xhttp.xm-studio-modal--compact{
+ --dialog-width:550px;
+ width:min(550px,calc(100vw - 24px));
+ inline-size:min(550px,calc(100vw - 24px));
+}
+dialog.xm-studio-modal.xm-studio-modal--xhttp:not(.xm-studio-modal--cards):not(.xm-studio-modal--preview):not(.xm-studio-modal--compact){
+ width:min(850px,calc(100vw - 24px));
+ inline-size:min(850px,calc(100vw - 24px));
+}
+dialog.xm-studio-modal.xm-studio-modal--xhttp.xm-studio-modal--preview{
+ width:min(1280px,calc(100vw - 24px));
+ inline-size:min(1280px,calc(100vw - 24px));
+}
+dialog.xm-studio-modal.xm-studio-modal--xhttp.xm-studio-modal--cards.xm-studio-modal--preview{
+ width:min(1340px,calc(100vw - 24px));
+ inline-size:min(1340px,calc(100vw - 24px));
+}
+.xm-studio-modal .xm-studio-modal-shell{padding:22px 24px 18px}
+.xm-studio-modal .xm-studio-modal-head{gap:13px;padding-bottom:17px}
+.xm-studio-modal .xm-studio-modal-mark{width:42px;height:42px;border-radius:12px}
+.xm-studio-modal .xm-studio-modal-mark svg{width:22px;height:22px}
+.xm-studio-modal .xm-studio-modal-eyebrow{font-size:11px;letter-spacing:.085em}
+.xm-studio-modal h2{font-size:22px;line-height:1.26;margin:5px 0 7px}
+.xm-studio-modal .xm-studio-modal-copy p{font-size:13px;line-height:1.55;max-width:780px}
+.xm-studio-modal .xm-studio-modal-close{width:36px;height:36px;border-radius:10px}
+.xm-studio-modal .xm-studio-modal-label{font-size:13px;line-height:1.42}
+.xm-studio-modal :is(input,select,textarea):not([type=hidden]){
+ min-height:46px;padding:10px 12px;font-size:14px;line-height:1.4;
+ border-radius:10px;
+}
+.xm-studio-modal textarea{min-height:160px}
+.xm-studio-modal .xm-studio-modal-fields{gap:16px 14px;margin-top:18px}
+.xm-studio-modal .xm-studio-modal-help,
+.xm-studio-modal .xm-studio-modal-error,
+.xm-studio-modal .xm-studio-modal-global-error{font-size:12px;line-height:1.5}
+.xm-studio-modal .xm-studio-modal-choice{
+ min-height:94px;border-radius:12px;padding:15px;
+ gap:8px;transition:border-color .16s,background .16s,box-shadow .16s;
+}
+.xm-studio-modal .xm-studio-modal-choice strong{font-size:14px;line-height:1.35}
+.xm-studio-modal .xm-studio-modal-choice small{font-size:12px;line-height:1.45}
+.xm-studio-modal .xm-studio-modal-footer{
+ gap:10px;margin-top:20px;padding:15px 0 0;
+ position:sticky;bottom:0;z-index:2;
+ background:var(--nx-panel-bg);
+}
+.xm-studio-modal .xm-studio-modal-footer button{
+ min-height:45px;padding:10px 18px;font-size:14px;
+ border-radius:10px;
+}
+.xm-studio-modal .xm-studio-modal-accept{min-width:125px}
+.xm-studio-modal--preview .xm-studio-modal-content{
+ grid-template-columns:minmax(0,1.7fr) minmax(260px,.86fr);
+ gap:20px;margin-top:18px;
+}
+.xm-studio-modal--preview .xm-studio-modal-preview{
+ padding:18px;border-radius:12px;
+}
+.xm-studio-modal--preview .xm-studio-modal-preview h3{
+ margin:0 0 7px;font-size:15px;line-height:1.3;
+}
+.xm-studio-modal-preview-hint{
+ color:var(--mu,#9bacc0);font-size:12px;line-height:1.55;
+ margin:0 0 12px;
+}
+.xm-studio-modal .xm-studio-modal-preview-code{
+ padding:13px;font-size:12px;line-height:1.55;
+ border-radius:10px;max-height:48dvh;
+}
+.xm-studio-modal--xhttp .xm-studio-modal-cardchoices{
+ grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+}
+.xm-studio-modal--compact .xm-studio-modal-fields{grid-template-columns:1fr}
+.xm-studio-modal--compact .xm-studio-modal-field{grid-column:1/-1}
+.xm-studio-modal--compact .xm-studio-modal-head{padding-right:42px}
+.xm-studio-modal--xhttp .xm-studio-modal-head{padding:16px 50px 17px 17px}
+@media(min-width:1660px){
+ .xm-studio-modal--xhttp .xm-studio-modal-cardchoices{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+ }
+}
+@media(max-width:930px){
+ .xm-studio-modal--preview .xm-studio-modal-content{grid-template-columns:1fr;gap:16px}
+ .xm-studio-modal--preview .xm-studio-modal-preview{position:static}
+ .xm-studio-modal .xm-studio-modal-preview-code{max-height:180px}
+}
+@media(max-width:670px){
+ dialog.xm-studio-modal{max-height:calc(100dvh - 12px);width:calc(100vw - 12px);max-width:calc(100vw - 12px)}
+ dialog.xm-studio-modal.xm-studio-modal--xhttp,
+ dialog.xm-studio-modal.xm-studio-modal--xhttp.xm-studio-modal--cards,
+ dialog.xm-studio-modal.xm-studio-modal--xhttp.xm-studio-modal--preview,
+ dialog.xm-studio-modal.xm-studio-modal--compact{width:calc(100vw - 12px);inline-size:calc(100vw - 12px)}
+ .xm-studio-modal .xm-studio-modal-shell{padding:13px 14px}
+ .xm-studio-modal .xm-studio-modal-head{padding-bottom:12px}
+ .xm-studio-modal--xhttp .xm-studio-modal-head{padding:12px 41px 12px 12px}
+ .xm-studio-modal .xm-studio-modal-fields{grid-template-columns:1fr}
+ .xm-studio-modal .xm-studio-modal-field{grid-column:1/-1}
+ .xm-studio-modal--xhttp .xm-studio-modal-cardchoices{grid-template-columns:1fr}
+ .xm-studio-modal .xm-studio-modal-choice{min-height:74px}
+ .xm-studio-modal h2{font-size:20px}
+}
