@@ -7,7 +7,9 @@ function request(spec={}){
   const active=document.activeElement;
   const dlg=document.createElement('dialog');
   const realityDialog=spec.eyebrow==='XRAY STUDIO / REALITY'||spec.title==='Настройка REALITY';
-  dlg.className='xm-studio-modal'+(spec.fields?.some(field=>field.type==='cards')?' xm-studio-modal--cards':'')+(realityDialog?' xm-studio-modal--reality':'');
+  const xhttpDialog=String(spec.eyebrow||'').startsWith('XRAY STUDIO / XHTTP') && Boolean(spec.fields?.length);
+  const hasPreview=typeof spec.preview==='function';
+  dlg.className='xm-studio-modal'+(spec.fields?.some(field=>field.type==='cards')?' xm-studio-modal--cards':'')+(realityDialog?' xm-studio-modal--reality':'')+(xhttpDialog?' xm-studio-modal--xhttp':'')+(hasPreview?' xm-studio-modal--preview':'');
   dlg.setAttribute('aria-labelledby','xm-studio-modal-title');
   dlg.setAttribute('aria-describedby','xm-studio-modal-description');
   const shell=document.createElement('form');
@@ -72,6 +74,7 @@ function request(spec={}){
       control.value=button.dataset.choice;
       for(const item of buttons)item.setAttribute('aria-pressed',String(item===button));
       err.hidden=true;globalErr.hidden=true;
+      refreshPreview?.();
      });
      buttons.push(button);choices.append(button);
     }
@@ -80,7 +83,36 @@ function request(spec={}){
    if(field.help)wrap.append(help);
    wrap.append(err);grid.append(wrap);controls.set(field.name,{control,err,field});
   });
-  if(fields.length)shell.append(grid);
+  // Preview mirrors the current fields. It is read-only and never writes
+  // to the editor until the user explicitly submits a validated action.
+  let refreshPreview=null;
+  if(hasPreview){
+   const content=make('div','xm-studio-modal-content');
+   const aside=make('aside','xm-studio-modal-preview');
+   const heading=make('h3','',spec.previewLabel||'Что будет записано');
+   const pre=make('pre','xm-studio-modal-preview-code');
+   pre.setAttribute('aria-live','polite');
+   aside.append(heading,pre);
+   refreshPreview=()=>{
+    const values={};
+    for(const [name,item] of controls)values[name]=item.control.value;
+    try{
+     const result=spec.preview(values);
+     pre.textContent=typeof result==='string'?result:JSON.stringify(result,null,2);
+     aside.setAttribute('data-preview-state','ready');
+    }catch(error){
+     pre.textContent=error?.message||'Проверьте параметры';
+     aside.setAttribute('data-preview-state','invalid');
+    }
+   };
+   for(const item of controls.values()){
+    item.control.addEventListener('input',refreshPreview);
+    item.control.addEventListener('change',refreshPreview);
+   }
+   if(fields.length)content.append(grid);
+   content.append(aside);
+   shell.append(content);
+  }else if(fields.length)shell.append(grid);
   if(spec.notice){const notice=make('div','xm-studio-modal-notice',spec.notice);shell.append(notice)}
   const globalErr=make('p','xm-studio-modal-global-error');globalErr.hidden=true;globalErr.setAttribute('role','alert');shell.append(globalErr);
   const footer=make('div','xm-studio-modal-footer');
@@ -116,6 +148,7 @@ function request(spec={}){
   });
   document.body.append(dlg);
   try{dlg.showModal()}catch(e){dlg.remove();resolve(null);return}
+  refreshPreview?.();
   const preferred=fields.length?controls.get(fields[0].name)?.control:primary;
   if(fields[0]?.type==='cards')grid.querySelector('.xm-studio-modal-choice[aria-pressed="true"]')?.focus();
   else preferred?.focus();

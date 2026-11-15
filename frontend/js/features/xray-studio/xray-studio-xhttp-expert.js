@@ -43,8 +43,15 @@
   const source=sourceOf(root);if(!source)throw Error('JSON источник XRAY STUDIO не найден');
   let doc;try{doc=JSON.parse(source.value)}catch(error){throw Error('Исправьте JSON: '+error.message)}
   const list=Array.isArray(doc.inbounds)?doc.inbounds:[],raw=root.querySelector('[data-tool-inbound]')?.value??root.querySelector('[data-field="inboundSelect"]')?.value??'0',index=Number(raw);
-  if(!Number.isInteger(index)||index<0||index>=list.length)throw Error('Некорректно выбран inbound');
-  return {source,index,tag:list[index]?.tag??null,inbound:list[index]};
+  if(!doc||typeof doc!=='object'||Array.isArray(doc)||doc.inbounds!=null&&!Array.isArray(doc.inbounds))
+   throw Error('Корень JSON должен содержать массив inbounds');
+  if(!Number.isInteger(index)||index<0||(list.length&&index>=list.length))throw Error('Некорректно выбран inbound');
+  if(!list.length){
+   const draft={tag:'vless-xhttp',listen:'127.0.0.1',port:443,protocol:'vless',
+    settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}};
+   return {source,index:0,tag:draft.tag,inbound:draft,newInbound:true};
+  }
+  return {source,index,tag:list[index]?.tag??null,inbound:list[index],newInbound:false};
  }
  function ensure(inbound){
   const stream=inbound.streamSettings??={};stream.network='xhttp';
@@ -61,14 +68,36 @@
  function setOrDelete(obj,key,value){if(value===''||value==null)delete obj[key];else obj[key]=value}
  function commit(root,sel,mutator,label){
   const source=sourceOf(root);let doc;try{doc=JSON.parse(source.value)}catch{throw Error('Исправьте JSON перед настройкой XHTTP')}
+  if(!doc||typeof doc!=='object'||Array.isArray(doc)||doc.inbounds!=null&&!Array.isArray(doc.inbounds))
+   throw Error('Некорректная структура inbounds');
+  if(sel.newInbound&&(doc.inbounds?.length||0))throw Error('Конфигурация изменилась. Повторите действие.');
+  if(sel.newInbound)doc.inbounds=[clone(sel.inbound)];
   const inbound=doc.inbounds?.[sel.index];if(!inbound||inbound.tag!==sel.tag)throw Error('Inbound изменился. Откройте XHTTP заново.');
   mutator(inbound,doc);const settings=ensure(inbound),api=strict();api.normalizeForMode(settings,String(settings.mode||'auto'),'server');
   const errors=api.validateSettings(settings,'server');if(errors.length)throw Error(errors[0]);
-  source.value=JSON.stringify(doc,null,2);source.dispatchEvent(new Event('input',{bubbles:true}));source.dispatchEvent(new Event('change',{bubbles:true}));setStatus(root,label);
+  if(sel.newInbound&&doc.outbounds==null)doc.outbounds=[{tag:'direct',protocol:'freedom'}];
+  source.value=JSON.stringify(doc,null,2);
+  source.dispatchEvent(new Event('input',{bubbles:true}));
+  source.dispatchEvent(new Event('change',{bubbles:true}));
+  setStatus(root,label+' · JSON изменён — сохраните профиль');
  }
  async function ask(spec){const api=dialogs();if(!api?.request)throw Error('Диалоговый модуль XRAY STUDIO не загружен');return api.request(spec)}
  async function openExpert(root,directAction){
   const sel=selection(root),x=ensure(clone(sel.inbound)),mode=String(x.mode||'auto'),e=snapshot(x);
+  if(sel.newInbound||sel.inbound.streamSettings?.network!=='xhttp'){
+   const api=dialogs();
+   if(!api?.confirm)throw Error('Диалоговый модуль XRAY STUDIO не загружен');
+   const confirmed=await api.confirm({
+    eyebrow:'XRAY STUDIO / XHTTP',
+    title:sel.newInbound?'Создать XHTTP inbound?':'Перевести inbound на XHTTP?',
+    description:sel.newInbound
+     ?'Для пустой конфигурации будет создан безопасный VLESS/XHTTP inbound на 127.0.0.1. Для внешнего доступа настройте пользователей и адрес отдельно.'
+     :'У выбранного inbound изменится транспорт на XHTTP. TLS/REALITY сохранится. Проверьте совместимость подключений.',
+    confirmLabel:'Продолжить',
+    notice:'Исходный JSON изменится только после подтверждения конкретного параметра.'
+   });
+   if(!confirmed)return;
+  }
   const choices=[
    option('mode','Режим XHTTP',`Текущий: ${mode}. auto / packet-up / stream-up / stream-one.`),
    option('basic','Path / Host','Маршрут и отдельный HTTP Host.'),
@@ -83,7 +112,7 @@
   if(mode==='packet-up'||mode==='auto')choices.push(option('packet','PACKET-UP · server','scMaxEachPostBytes и scMaxBufferedPosts.'));
   if(mode==='stream-up'||mode==='auto')choices.push(option('stream','STREAM-UP · server','scStreamUpServerSecs.'));
   choices.push(option('server','Server response / limits','noSSEHeader и serverMaxHeaderBytes.'),option('advanced','Строгий server JSON','Полный SplitHTTPConfig с role/mode validation.'));
-  const action=directAction==='device'?{action:'device'}:await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · expert server inbound',description:'Поля соответствуют актуальному SplitHTTPConfig Xray-core. Client-only параметры намеренно не предлагаются.',confirmLabel:'Открыть',selectFirst:false,fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]});if(!action)return;
+  const action=directAction==='device'?{action:'device'}:await ask({eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · expert server inbound',description:'Выберите раздел и нажмите «Открыть». Параметры попадут в JSON только после подтверждения в редакторе. Client-only настройки находятся в профилях устройств.',confirmLabel:'Открыть',selectFirst:false,previewLabel:'Текущая серверная конфигурация',preview:values=>({раздел:choices.find(item=>item.value===values.action)?.label||'Выберите раздел',подсказка:'Карточка только открывает редактор — JSON пока не изменён',xhttpSettings:x}),fields:[{name:'action',label:'Раздел',type:'cards',wide:true,options:choices}]});if(!action)return;
 
   if(action.action==='device'){
    const names=['iOS','Android','Windows','macOS','Linux','Auto'];
@@ -143,7 +172,7 @@
     if(mode!=='packet-up'&&(out.scMaxEachPostBytes!=null||out.scMinPostsIntervalMs!=null))throw Error('POST tuning применим только к packet-up');
     return out;
    };
-   const edited=await ask({eyebrow:'XRAY STUDIO / XHTTP CLIENTS',title:'XHTTP · '+choice.device,description:'Готовый пресет можно редактировать. Конфликт XMUX maxConnections/maxConcurrency или параметры не того режима будут отклонены.',confirmLabel:'Сохранить профиль',fields,validate:v=>{try{create(v);return ''}catch(err){return err.message}}});if(!edited)return;
+   const edited=await ask({eyebrow:'XRAY STUDIO / XHTTP CLIENTS',title:'XHTTP · '+choice.device,description:'Профиль записывается в xmesh.xhttpDeviceProfiles и применяется к клиентской подписке для выбранной ОС. Серверные настройки не содержат клиентский XMUX.',confirmLabel:'Сохранить профиль',previewLabel:'Что попадёт в клиентскую подписку',preview:values=>({платформа:choice.device,xmesh:{xhttpDeviceProfiles:{[choice.device]:create(values)}}}),fields,validate:v=>{try{create(v);return ''}catch(err){return err.message}}});if(!edited)return;
    const profile=create(edited);
    commit(root,sel,ib=>{
      ib.xmesh??={};ib.xmesh.xhttpDeviceProfiles??={};
