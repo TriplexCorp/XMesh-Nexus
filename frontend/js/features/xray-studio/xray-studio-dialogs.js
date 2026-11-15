@@ -9,7 +9,14 @@ function request(spec={}){
   const realityDialog=spec.eyebrow==='XRAY STUDIO / REALITY'||spec.title==='Настройка REALITY';
   const xhttpDialog=String(spec.eyebrow||'').startsWith('XRAY STUDIO / XHTTP') && Boolean(spec.fields?.length);
   const hasPreview=typeof spec.preview==='function';
-  dlg.className='xm-studio-modal'+(spec.fields?.some(field=>field.type==='cards')?' xm-studio-modal--cards':'')+(realityDialog?' xm-studio-modal--reality':'')+(xhttpDialog?' xm-studio-modal--xhttp':'')+(hasPreview?' xm-studio-modal--preview':'');
+  const fields=Array.isArray(spec.fields)?spec.fields:[];
+  const cards=fields.some(field=>field.type==='cards');
+  const compact=!cards&&!hasPreview&&fields.length<=1;
+  dlg.className='xm-studio-modal'+(cards?' xm-studio-modal--cards':'')+
+   (realityDialog?' xm-studio-modal--reality':'')+
+   (xhttpDialog?' xm-studio-modal--xhttp':'')+
+   (hasPreview?' xm-studio-modal--preview':'')+
+   (compact?' xm-studio-modal--compact':'');
   dlg.setAttribute('aria-labelledby','xm-studio-modal-title');
   dlg.setAttribute('aria-describedby','xm-studio-modal-description');
   const shell=document.createElement('form');
@@ -29,17 +36,16 @@ function request(spec={}){
   head.append(mark,text);
   const close=make('button','xm-studio-modal-close','×');close.type='button';close.setAttribute('aria-label','Закрыть окно');
   head.append(close);shell.append(head);
-  const fields=Array.isArray(spec.fields)?spec.fields:[];
   const grid=make('div','xm-studio-modal-fields');
   const controls=new Map();
   fields.forEach(field=>{
    const wrap=make('label','xm-studio-modal-field'+(field.wide?' is-wide':''));
    const label=make('span','xm-studio-modal-label',field.label||field.name);
-   const cards=field.type==='cards';
-    const control=cards?document.createElement('input'):field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
-    if(cards){control.type='hidden';}
+   const isCards=field.type==='cards';
+    const control=isCards?document.createElement('input'):field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
+    if(isCards){control.type='hidden';}
    control.name=field.name;
-   if(!cards&&field.type!=='select'&&field.type!=='textarea')control.type=field.type||'text';
+   if(!isCards&&field.type!=='select'&&field.type!=='textarea')control.type=field.type||'text';
    control.autocomplete='off';
    if(field.placeholder)control.placeholder=field.placeholder;
    if(field.min!=null)control.min=String(field.min);
@@ -59,7 +65,7 @@ function request(spec={}){
    const err=make('small','xm-studio-modal-error');err.setAttribute('role','alert');err.hidden=true;
    control.addEventListener('input',()=>{err.hidden=true;control.removeAttribute('aria-invalid');globalErr.hidden=true});
    wrap.append(label,control);
-   if(cards){
+   if(isCards){
     const buttons=[];
     const choices=make('div','xm-studio-modal-cardchoices');choices.setAttribute('role','group');choices.setAttribute('aria-label',field.label||field.name);
     for(const option of field.options||[]){
@@ -92,7 +98,11 @@ function request(spec={}){
    const heading=make('h3','',spec.previewLabel||'Что будет записано');
    const pre=make('pre','xm-studio-modal-preview-code');
    pre.setAttribute('aria-live','polite');
-   aside.append(heading,pre);
+   aside.append(heading);
+   if(spec.previewHint){
+    aside.append(make('p','xm-studio-modal-preview-hint',spec.previewHint));
+   }
+   aside.append(pre);
    refreshPreview=()=>{
     const values={};
     for(const [name,item] of controls)values[name]=item.control.value;
@@ -101,7 +111,12 @@ function request(spec={}){
      pre.textContent=typeof result==='string'?result:JSON.stringify(result,null,2);
      aside.setAttribute('data-preview-state','ready');
     }catch(error){
-     pre.textContent=error?.message||'Проверьте параметры';
+     const raw=error?.message||'Проверьте параметры';
+     const i18n=window.XMeshI18n;
+     const translated=i18n?.getLanguage?.()==='en'?i18n.translate(raw):raw;
+     pre.textContent=i18n?.getLanguage?.()==='en'&&/[А-Яа-яЁё]/u.test(translated)
+      ?'Invalid parameters. Check the form fields.'
+      :translated;
      aside.setAttribute('data-preview-state','invalid');
     }
    };
@@ -119,8 +134,19 @@ function request(spec={}){
   const secondary=make('button','xm-studio-modal-cancel',spec.cancelLabel||'Отмена');secondary.type='button';
   const primary=make('button','xm-studio-modal-accept'+(spec.danger?' is-danger':''),spec.confirmLabel||'Продолжить');primary.type='submit';
   footer.append(secondary,primary);shell.append(footer);dlg.append(shell);
+  // The global locale translator intentionally skips <pre>/<code> to protect
+  // JSON, so refresh preview diagnostics explicitly on RU/EN changes.
+  const syncLocale=()=>refreshPreview?.();
+  document.addEventListener('xmesh:locale-changed',syncLocale);
   let ended=false;
-  const finish=value=>{if(ended)return;ended=true;dlg.close();dlg.remove();try{active?.focus?.({preventScroll:true})}catch{}resolve(value)};
+  const finish=value=>{
+   if(ended)return;
+   ended=true;
+   document.removeEventListener('xmesh:locale-changed',syncLocale);
+   dlg.close();dlg.remove();
+   try{active?.focus?.({preventScroll:true})}catch{}
+   resolve(value);
+  };
   close.addEventListener('click',()=>finish(null));
   secondary.addEventListener('click',()=>finish(null));
   dlg.addEventListener('cancel',ev=>{ev.preventDefault();finish(null)});
