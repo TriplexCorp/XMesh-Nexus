@@ -32,15 +32,6 @@ const ENABLED_SCOPES: &[&str] = &[
     "entitlements:grant",
 ];
 const TOKEN_PREFIX: &str = "xmni_v1_";
-const MUTATING_SCOPES: &[&str] = &[
-    "users:write",
-    "users:create",
-    "users:update",
-    "quotas:write",
-    "squads:members:write",
-    "telegram:assign",
-    "entitlements:grant",
-];
 const REDIS_RATE_LIMIT_PER_MINUTE: i64 = 120;
 const RATE_SCRIPT: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],90) end; return n";
 
@@ -121,7 +112,6 @@ pub async fn create_token(
     let mut scopes = body.scopes;
     scopes.sort_unstable();
     scopes.dedup();
-    let requires_proof = scopes.iter().any(|s| MUTATING_SCOPES.contains(&s.as_str()));
     let proof_key = if let Some(ref input) = body.proof_public_key {
         if input.len() != 64
             || input
@@ -146,10 +136,10 @@ pub async fn create_token(
     } else {
         None
     };
-    if requires_proof && proof_key.is_none() {
+    if proof_key.is_none() {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
-            "Mutating API scopes require a sender-constrained Ed25519 proofPublicKey",
+            "All new API tokens require an Ed25519 proofPublicKey",
         ));
     }
     if body
