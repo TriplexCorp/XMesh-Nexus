@@ -156,7 +156,10 @@ assert.match(app,/\/api\/v1\/sub-server\/enrollment/);
 assert.match(app,/\/api\/v1\/sub-server\/update/);
 const control=fs.readFileSync('backend/src/sub_server.rs','utf8');
 assert.match(control,/require_owner\(&actor\)/,'Management must be owner-only');
-assert.match(control,/subtle::ConstantTimeEq/,'Agent tokens require constant-time comparison');
+assert.match(control,/VerifyingKey::from_bytes/,'Ed25519 public key must authenticate Sub agents');
+assert.match(control,/agent_canonical\(/,'Sub agent signature must bind request route and body');
+assert.match(control,/arg\("NX"\)/,'Sub agent nonces must be single-use');
+assert.doesNotMatch(control,/strip_prefix\("Bearer /,'Legacy bearer agent authentication must be removed');
 assert.match(control,/GETDEL/,'Single-use enrollment and jobs must be atomic');
 assert(control.includes('ENROLL_TTL_SECONDS: u64 = 3600'),
   'Fresh VPS installation needs time to install Docker before consuming the code');

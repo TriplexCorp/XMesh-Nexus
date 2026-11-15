@@ -3,16 +3,17 @@
 use crate::{ApiError, AppState, audit, auth, read_settings, require_owner};
 use axum::{
     Json,
+    body::Bytes,
     extract::{Extension, State},
     http::{HeaderMap, StatusCode, header},
 };
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use rand_core::{OsRng, RngCore};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::time::{SystemTime, UNIX_EPOCH};
-use subtle::ConstantTimeEq;
 
 const ENROLL_PREFIX: &str = "xmesh:sub:enroll:";
 // A fresh VPS may install Docker and Compose before exchanging its one-time code.
@@ -25,6 +26,8 @@ const CREDENTIAL_KEY: &str = "sub_server_agent";
 const SUB_AGENT_RATE_PER_MINUTE: i64 = 30;
 const SUB_AUTH_GLOBAL_PER_MINUTE: i64 = 3000;
 const SUB_CLAIM_GLOBAL_PER_MINUTE: i64 = 300;
+const MAX_AGENT_BODY_BYTES: usize = 4096;
+const MAX_CLOCK_SKEW_SECONDS: u64 = 120;
 const RATE_LUA: &str = "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],90) end; return n";
 
 async fn consume_budget(state: &AppState, key: &str, limit: i64) -> Result<(), ApiError> {
@@ -106,51 +109,124 @@ async fn credential(pool: &PgPool) -> Result<Option<Value>, ApiError> {
             .await?,
     )
 }
-async fn authorize(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
-    let fail = || ApiError::new(StatusCode::UNAUTHORIZED, "Недействительный ключ XMesh Sub.");
-    // A manager is a machine client. Browser cookies and forwarded identities
-    // must never authenticate this admin-capable channel.
+fn valid_lower_hex(input: &str, size: usize) -> bool {
+    input.len() == size
+        && input
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+}
+
+fn agent_canonical(route: &str, timestamp: &str, nonce: &str, body: &[u8]) -> String {
+    format!(
+        "XMESH-SUB1\nPOST\n/api/v1/sub-server/agent/{route}\n{timestamp}\n{nonce}\n{}\n",
+        hex::encode(Sha256::digest(body))
+    )
+}
+
+fn unique_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
+    let mut values = headers.get_all(name).iter();
+    let first = values.next()?.to_str().ok()?;
+    if values.next().is_some() {
+        return None;
+    }
+    Some(first)
+}
+
+async fn authorize(
+    state: &AppState,
+    headers: &HeaderMap,
+    raw_body: &[u8],
+    route: &str,
+) -> Result<(), ApiError> {
+    let fail = || {
+        ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Недействительная подпись XMesh Sub.",
+        )
+    };
+    // No Bearer fallback. The private Ed25519 key never leaves the Sub VPS.
+    // Browser cookies and forwarded identities cannot authenticate this channel.
     if headers.contains_key(header::COOKIE)
         || headers.contains_key(header::ORIGIN)
         || headers.contains_key("sec-fetch-site")
+        || headers.contains_key(header::AUTHORIZATION)
     {
         return Err(fail());
     }
-    let mut values = headers.get_all(header::AUTHORIZATION).iter();
-    let raw = values
-        .next()
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix("Bearer "))
-        .ok_or_else(fail)?;
-    if values.next().is_some() {
-        return Err(fail());
+    if raw_body.len() > MAX_AGENT_BODY_BYTES {
+        return Err(ApiError::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Запрос агента слишком большой.",
+        ));
     }
-    if !is_hex(raw, 64) || raw.bytes().any(|c| c.is_ascii_uppercase()) {
-        return Err(fail());
-    }
-    let minute = now() / 60;
     consume_budget(
         state,
-        &format!("xmesh:sub:auth:global:{minute}"),
+        &format!("xmesh:sub:auth:global:{}", now() / 60),
         SUB_AUTH_GLOBAL_PER_MINUTE,
     )
     .await?;
-    let token_hash = sha256_hex(raw);
+
+    let timestamp = unique_header(headers, "x-xmesh-sub-timestamp")
+        .filter(|s| !s.is_empty() && s.len() <= 16 && s.bytes().all(|b| b.is_ascii_digit()))
+        .filter(|s| s.len() == 1 || !s.starts_with('0'))
+        .ok_or_else(fail)?;
+    let epoch = timestamp.parse::<u64>().map_err(|_| fail())?;
+    if epoch.abs_diff(now()) > MAX_CLOCK_SKEW_SECONDS {
+        return Err(fail());
+    }
+    let nonce = unique_header(headers, "x-xmesh-sub-nonce")
+        .filter(|s| valid_lower_hex(s, 32))
+        .ok_or_else(fail)?;
+    let signature_hex = unique_header(headers, "x-xmesh-sub-signature")
+        .filter(|s| valid_lower_hex(s, 128))
+        .ok_or_else(fail)?;
+
+    let settings = credential(&state.pool).await?.ok_or_else(fail)?;
+    let public_key = settings
+        .get("publicKey")
+        .and_then(Value::as_str)
+        .filter(|s| valid_lower_hex(s, 64))
+        .ok_or_else(fail)?;
+    let public_bytes: [u8; 32] = hex::decode(public_key)
+        .map_err(|_| fail())?
+        .try_into()
+        .map_err(|_| fail())?;
+    let verifier = VerifyingKey::from_bytes(&public_bytes).map_err(|_| fail())?;
+    let signature_bytes: [u8; 64] = hex::decode(signature_hex)
+        .map_err(|_| fail())?
+        .try_into()
+        .map_err(|_| fail())?;
+    verifier
+        .verify(
+            agent_canonical(route, timestamp, nonce, raw_body).as_bytes(),
+            &Signature::from_bytes(&signature_bytes),
+        )
+        .map_err(|_| fail())?;
+
     consume_budget(
         state,
-        &format!("xmesh:sub:auth:token:{minute}:{token_hash}"),
+        &format!(
+            "xmesh:sub:auth:key:{}:{}",
+            now() / 60,
+            sha256_hex(public_key)
+        ),
         SUB_AGENT_RATE_PER_MINUTE,
     )
     .await?;
-    let settings = credential(&state.pool).await?.ok_or_else(fail)?;
-    let stored = settings
-        .get("hash")
-        .and_then(Value::as_str)
-        .and_then(|s| hex::decode(s).ok())
-        .filter(|v| v.len() == 32)
-        .ok_or_else(fail)?;
-    let computed: [u8; 32] = Sha256::digest(raw.as_bytes()).into();
-    if !bool::from(stored.as_slice().ct_eq(computed.as_slice())) {
+    // Atomic, expiring nonce state: even a valid intercepted signature
+    // cannot be replayed, including on another agent endpoint.
+    let replay_key = format!("xmesh:sub:nonce:{}:{nonce}", sha256_hex(public_key));
+    let mut conn = state.redis.clone();
+    let inserted: Option<String> = redis::cmd("SET")
+        .arg(&replay_key)
+        .arg("1")
+        .arg("NX")
+        .arg("EX")
+        .arg(300)
+        .query_async(&mut conn)
+        .await
+        .map_err(|_| backend_error())?;
+    if inserted.is_none() {
         return Err(fail());
     }
     Ok(())
@@ -191,13 +267,20 @@ pub async fn issue_enrollment(
 pub struct Claim {
     enrollment_token: String,
     domain: String,
+    public_key: String,
 }
 
 pub async fn claim(
     State(state): State<AppState>,
     Json(body): Json<Claim>,
 ) -> Result<Json<Value>, ApiError> {
-    if !is_hex(&body.enrollment_token, 64)
+    if !valid_lower_hex(&body.public_key, 64)
+        || hex::decode(&body.public_key)
+            .ok()
+            .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
+            .and_then(|bytes| VerifyingKey::from_bytes(&bytes).ok())
+            .is_none()
+        || !is_hex(&body.enrollment_token, 64)
         || !valid_domain(&body.domain)
         || body
             .enrollment_token
@@ -237,13 +320,12 @@ pub async fn claim(
             "Код подключения истёк или уже использован.",
         ));
     }
-    let token = random_hex();
     sqlx::query(
         "INSERT INTO app_settings (key,value) VALUES ($1,$2) \
          ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()",
     )
     .bind(CREDENTIAL_KEY)
-    .bind(json!({"hash":sha256_hex(&token),"domain":domain}))
+    .bind(json!({"publicKey":body.public_key,"domain":domain}))
     .execute(&state.pool)
     .await?;
     // A prior agent may still have a heartbeat from its rotated token.
@@ -254,7 +336,7 @@ pub async fn claim(
         .query_async(&mut conn)
         .await
         .map_err(|_| backend_error())?;
-    Ok(Json(json!({"agentToken":token})))
+    Ok(Json(json!({"ok":true})))
 }
 
 pub async fn status(
@@ -387,9 +469,11 @@ pub struct Poll {
 pub async fn poll(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(body): Json<Poll>,
+    body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    authorize(&state, &headers).await?;
+    authorize(&state, &headers, &body, "poll").await?;
+    let body: Poll =
+        serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый запрос агента."))?;
     if body.version.is_empty()
         || body.version.len() > 40
         || !body
@@ -450,9 +534,11 @@ pub struct Report {
 pub async fn report(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(body): Json<Report>,
+    body: Bytes,
 ) -> Result<Json<Value>, ApiError> {
-    authorize(&state, &headers).await?;
+    authorize(&state, &headers, &body, "report").await?;
+    let body: Report =
+        serde_json::from_slice(&body).map_err(|_| api_error("Недопустимый отчёт Sub-сервера."))?;
     if !is_hex(&body.job_id, 32)
         || !matches!(body.stage.as_str(), "running" | "completed" | "failed")
         || body.detail.len() > 160
@@ -503,10 +589,56 @@ mod tests {
     fn strict_token_and_domain_rules() {
         assert!(is_hex(&"a".repeat(64), 64));
         assert!(!is_hex("a;command", 64));
+        assert!(valid_lower_hex(&"a".repeat(64), 64));
+        assert!(!valid_lower_hex(&"A".repeat(64), 64));
         assert!(valid_domain("uk.free-tier.shop"));
         assert!(!valid_domain("127.0.0.1"));
         assert!(!valid_domain("localhost"));
         assert!(!valid_domain("sub.example.com:443"));
         assert!(!valid_domain("sub.example.com@evil.test"));
+    }
+    #[test]
+    fn agent_signature_binds_route_timestamp_nonce_and_exact_body() {
+        use ed25519_dalek::{Signer, SigningKey};
+        let key = SigningKey::from_bytes(&[7u8; 32]);
+        let payload = br#"{"version":"1.0.0"}"#;
+        let nonce = "a".repeat(32);
+        let signed = agent_canonical("poll", "1794710000", &nonce, payload);
+        let sig = key.sign(signed.as_bytes());
+        // Independently generated OpenSSL 3 Ed25519 interoperability vector.
+        assert_eq!(
+            hex::encode(key.verifying_key().to_bytes()),
+            "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"
+        );
+        assert_eq!(
+            hex::encode(sig.to_bytes()),
+            "a13c20fe26aa66f7b1465d4e0cfbcfe2a0975f350b30767095d493af881596da2932527c84b9809b74d3bcdc5286a527cc2d5aa1661b4b66744882270b562d03"
+        );
+        let verify = key.verifying_key();
+        assert!(verify.verify(signed.as_bytes(), &sig).is_ok());
+        assert!(
+            verify
+                .verify(
+                    agent_canonical("report", "1794710000", &nonce, payload).as_bytes(),
+                    &sig
+                )
+                .is_err()
+        );
+        assert!(
+            verify
+                .verify(
+                    agent_canonical("poll", "1794710000", &nonce, b"{}").as_bytes(),
+                    &sig
+                )
+                .is_err()
+        );
+        assert!(
+            verify
+                .verify(
+                    agent_canonical("poll", "1794710001", &nonce, payload).as_bytes(),
+                    &sig
+                )
+                .is_err()
+        );
     }
 }
