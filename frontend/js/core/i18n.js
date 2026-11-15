@@ -15,6 +15,11 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Ожидаем связь": "Awaiting heartbeat",
+    "Агент привязан. Ожидаем первый подписанный ответ от VPS.": "Agent paired. Waiting for the first signed heartbeat from the VPS.",
+    "Домен привязанного сервера отличается от сохранённого домена подписок. Требуется повторная привязка.": "The paired server domain differs from the saved subscription domain. Pair the agent again.",
+    "Агент ранее выходил на связь. Последняя активность: ": "The agent previously connected. Last seen: ",
+    "Ошибка проверки: ": "Status check failed: ",
     "Скопировать код привязки": "Copy pairing code",
     "Команда не содержит секретов. При запуске вставьте одноразовый код в скрытый запрос на VPS.": "The command contains no secrets. When running it, paste the one-time code into the hidden prompt on the VPS.",
     "Установка готова. Скопируйте команду и отдельный одноразовый код привязки.": "Installation is ready. Copy the command and the separate one-time pairing code.",
