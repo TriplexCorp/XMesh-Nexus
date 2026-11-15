@@ -161,8 +161,21 @@ pub async fn enforce(state: &AppState, token: &str) -> Option<Response> {
         .arg(&config.mode)
         .query_async(&mut conn)
         .await;
-    // Fail open for availability if Redis cannot be reached; never cache or
-    // propagate the bearer token via diagnostics.
+    // Fail CLOSED when the rate-limit backend is unavailable. A Redis outage
+    // must not silently turn public subscription endpoints into unlimited APIs.
+    if verdict.is_err() {
+        let mut response = (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Subscription protection is temporarily unavailable.",
+        ).into_response();
+        response.headers_mut().insert(
+            header::RETRY_AFTER, HeaderValue::from_static("30")
+        );
+        response.headers_mut().insert(
+            header::CACHE_CONTROL, HeaderValue::from_static("private, no-store")
+        );
+        return Some(response);
+    }
     if matches!(verdict, Ok(1)) && config.mode == "protect" {
         let mut response = (
             StatusCode::TOO_MANY_REQUESTS,
