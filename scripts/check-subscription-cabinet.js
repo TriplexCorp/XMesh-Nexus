@@ -17,7 +17,7 @@ const [preview]=context.XMeshSubscriptionStudio.create({},async()=>{},()=>{},{us
 // The admin Studio may have workspace tabs, but the *public customer portal*
 // still has one-page onboarding without tabs or duplicate navigation.
 const previewStart=preview.indexOf('<div class="subscription-studio-preview subscription-public"');
-const previewEnd=preview.indexOf('<div class="subscription-studio-stats"',previewStart);
+const previewEnd=preview.indexOf('<div class="subscription-servers-page"',previewStart);
 assert(previewStart>=0&&previewEnd>previewStart,'Find the customer-facing preview inside admin Studio');
 assert.match(preview,/data-substudio-tab="servers"/,'Admin Studio may have a separate server workspace');
 const customerPreview=preview.slice(previewStart,previewEnd);
