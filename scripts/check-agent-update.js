@@ -74,6 +74,9 @@ function cmpVersion(a,b){
 }
 function runtimeSurface(path){
   if(path==='AGENT_VERSION') return false;
+  // This configures only the Nexus *panel host* (apt, ACME, Nginx, HAProxy).
+  // It does not install, update or change the versioned node Agent runtime.
+  if(path==='deploy/install-panel-host.sh') return false;
   if(path==='backend/src/node_runtime.rs' || path==='backend/src/node_runtime_p0d_staged.rs') return true;
   if(path.startsWith('deploy/')){
     if(path.endsWith('.md')) return false;
@@ -82,6 +85,13 @@ function runtimeSurface(path){
   }
   return false;
 }
+
+assert.equal(runtimeSurface('deploy/install-panel-host.sh'),false,
+  'Panel-host-only setup must not force a node Agent version bump');
+assert.equal(runtimeSurface('deploy/node-control-agent.sh'),true,
+  'Node-control runtime must remain protected by mandatory version bumps');
+assert.equal(runtimeSurface('deploy/update-node-control-agent.sh'),true,
+  'Agent updater changes must remain protected by mandatory version bumps');
 
 // Machine-enforced release policy: once the base branch has AGENT_VERSION,
 // deployed runtime/control-contract changes cannot reuse the previous version.
