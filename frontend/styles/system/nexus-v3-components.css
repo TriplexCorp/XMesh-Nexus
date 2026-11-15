@@ -2,7 +2,9 @@
  * Every component consumes the same foundation material and interaction tokens. */
 button{min-height:var(--nx-control-h-sm);border-radius:var(--nx-control-radius);transition:background-color var(--nx-duration),border-color var(--nx-duration),color var(--nx-duration)}
 button:disabled{opacity:.5;cursor:not-allowed}
-button:not(:disabled):hover{background:var(--nx-hover-bg)}
+/* Neutral fallback only: use zero specificity so filled/save actions retain their
+ * feature-defined background and contrast on hover (including XRAY modal Save). */
+:where(button:not(:disabled):hover){background:var(--nx-hover-bg)}
 button svg{flex:none}
 .ic{width:1.1rem;height:1.1rem;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .mu{color:var(--mu)}.er{color:var(--er)}
