@@ -4,7 +4,7 @@ use crate::{ApiError, AppState, audit, auth, read_settings, require_owner};
 use axum::{
     Json,
     body::Bytes,
-    extract::{Extension, State},
+    extract::{Extension, Path, State},
     http::{HeaderMap, StatusCode, header},
 };
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -23,6 +23,9 @@ const PENDING_UPDATE: &str = "xmesh:sub:update:pending";
 const CURRENT_UPDATE: &str = "xmesh:sub:update:current";
 const UPDATE_STATUS: &str = "xmesh:sub:update:status";
 const CREDENTIAL_KEY: &str = "sub_server_agent";
+const MAX_MIRRORS: i64 = 16;
+const MIRROR_ENROLL_TAG: &str = "mirror:";
+
 const SUB_AGENT_RATE_PER_MINUTE: i64 = 30;
 const SUB_AUTH_GLOBAL_PER_MINUTE: i64 = 3000;
 const SUB_CLAIM_GLOBAL_PER_MINUTE: i64 = 300;
@@ -109,6 +112,32 @@ async fn credential(pool: &PgPool) -> Result<Option<Value>, ApiError> {
             .await?,
     )
 }
+
+type MirrorRecord = (String, String, String, Option<String>);
+
+async fn mirror_by_id(pool: &PgPool, id: &str) -> Result<Option<MirrorRecord>, ApiError> {
+    if !valid_lower_hex(id, 32) {
+        return Err(api_error("Недопустимый идентификатор зеркала."));
+    }
+    let row = sqlx::query_as::<_, MirrorRecord>(
+        "SELECT id,name,domain,public_key FROM sub_mirrors WHERE id=$1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row)
+}
+
+fn scoped_key(mirror_id: Option<&str>, base: &str) -> String {
+    match mirror_id {
+        Some(id) => format!(
+            "xmesh:sub:mirror:{id}:{}",
+            base.strip_prefix("xmesh:sub:").unwrap_or(base)
+        ),
+        None => base.to_owned(),
+    }
+}
+
 fn valid_lower_hex(input: &str, size: usize) -> bool {
     input.len() == size
         && input
