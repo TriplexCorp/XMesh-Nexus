@@ -436,15 +436,21 @@ async fn subscription_link(
     let data = match crate::user_subscriptions::service_subscription_status(state, id).await {
         Ok(data) => data,
         Err(err) if err.status == axum::http::StatusCode::NOT_FOUND => {
-            return api.send(
-                chat,
-                locale::tr(api.language, "Пользователь не найден.", "User not found."),
-                menu_buttons(),
-            ).await;
+            return api
+                .send(
+                    chat,
+                    locale::tr(api.language, "Пользователь не найден.", "User not found."),
+                    menu_buttons(),
+                )
+                .await;
         }
         Err(_) => return Err("database_unavailable"),
     };
-    let Some(url) = data.get("url").and_then(Value::as_str).filter(|url| valid_bot_subscription_url(url)) else {
+    let Some(url) = data
+        .get("url")
+        .and_then(Value::as_str)
+        .filter(|url| valid_bot_subscription_url(url))
+    else {
         return api.send(
             chat,
             locale::tr(
@@ -470,7 +476,11 @@ async fn subscription_link(
     .map_err(|_| "database_unavailable")?;
     let message = format!(
         "{} <code>#{id}</code>\n\n<code>{}</code>\n\n{}",
-        locale::tr(api.language, "🔗 <b>Ссылка подписки</b>", "🔗 <b>Subscription link</b>"),
+        locale::tr(
+            api.language,
+            "🔗 <b>Ссылка подписки</b>",
+            "🔗 <b>Subscription link</b>"
+        ),
         escape(url),
         locale::tr(
             api.language,
@@ -482,10 +492,17 @@ async fn subscription_link(
         chat,
         &message,
         buttons(vec![vec![
-            (locale::tr(api.language, "👤 Карточка", "👤 User details"), format!("v:user:{id}")),
-            (locale::tr(api.language, "🏠 Меню", "🏠 Menu"), "v:menu".into()),
+            (
+                locale::tr(api.language, "👤 Карточка", "👤 User details"),
+                format!("v:user:{id}"),
+            ),
+            (
+                locale::tr(api.language, "🏠 Меню", "🏠 Menu"),
+                "v:menu".into(),
+            ),
         ]]),
-    ).await
+    )
+    .await
 }
 
 fn valid_confirmation_action(action: &str) -> bool {
@@ -514,11 +531,13 @@ async fn create_confirmation(
         .await
         .map_err(|_| "database_unavailable")?;
         let Some(name) = name else {
-            return api.send(
-                chat,
-                locale::tr(api.language, "Пользователь не найден.", "User not found."),
-                menu_buttons(),
-            ).await;
+            return api
+                .send(
+                    chat,
+                    locale::tr(api.language, "Пользователь не найден.", "User not found."),
+                    menu_buttons(),
+                )
+                .await;
         };
         Some(name)
     } else {
@@ -540,7 +559,11 @@ async fn create_confirmation(
     let text = if let Some(name) = target_username {
         format!(
             "{}\n\n<b>{}</b> · <code>#{user_id}</code>\n\n{}",
-            locale::tr(api.language, "🗑 <b>Безвозвратное удаление</b>", "🗑 <b>Permanent deletion</b>"),
+            locale::tr(
+                api.language,
+                "🗑 <b>Безвозвратное удаление</b>",
+                "🗑 <b>Permanent deletion</b>"
+            ),
             escape(&name),
             locale::tr(
                 api.language,
@@ -549,7 +572,11 @@ async fn create_confirmation(
             ),
         )
     } else {
-        let verb = if action == "enable" { "включить" } else { "отключить" };
+        let verb = if action == "enable" {
+            "включить"
+        } else {
+            "отключить"
+        };
         format!(
             "⚠️ <b>Подтверждение действия</b>\n\nВы действительно хотите <b>{verb}</b> пользователя <code>#{user_id}</code>?\n\nПодтверждение действует 60 секунд и может быть использовано только один раз."
         )
@@ -790,7 +817,9 @@ async fn consume_confirmation(
         return handle_extra_confirmation(api, state, chat, admin_id, nonce, row, tx).await;
     }
     if action == "delete" {
-        let snapshot: Option<String> = row.try_get("username").map_err(|_| "database_unavailable")?;
+        let snapshot: Option<String> = row
+            .try_get("username")
+            .map_err(|_| "database_unavailable")?;
         let expected = snapshot.as_deref().ok_or("invalid_command")?;
         if !delete_confirmed_user(&mut tx, admin_id, nonce, user_id, expected).await? {
             drop(tx);
@@ -805,18 +834,20 @@ async fn consume_confirmation(
             ).await;
         }
         tx.commit().await.map_err(|_| "database_unavailable")?;
-        return api.send(
-            chat,
-            locale::tr(
-                api.language,
-                "✅ Пользователь удалён. Персональная подписка отозвана.",
-                "✅ User deleted. Their personal subscription was revoked.",
-            ),
-            buttons(vec![
-                vec![("👥 Пользователи", "v:users".into())],
-                vec![("🏠 Меню", "v:menu".into())],
-            ]),
-        ).await;
+        return api
+            .send(
+                chat,
+                locale::tr(
+                    api.language,
+                    "✅ Пользователь удалён. Персональная подписка отозвана.",
+                    "✅ User deleted. Their personal subscription was revoked.",
+                ),
+                buttons(vec![
+                    vec![("👥 Пользователи", "v:users".into())],
+                    vec![("🏠 Меню", "v:menu".into())],
+                ]),
+            )
+            .await;
     }
     if !matches!(action.as_str(), "enable" | "disable") {
         return Err("invalid_command");
@@ -1273,10 +1304,16 @@ mod tests {
     }
     #[test]
     fn only_complete_https_subscription_urls_are_sent() {
-        assert!(valid_bot_subscription_url("https://sub.example.org/s/abc123"));
+        assert!(valid_bot_subscription_url(
+            "https://sub.example.org/s/abc123"
+        ));
         assert!(!valid_bot_subscription_url(""));
         assert!(!valid_bot_subscription_url("/s/private"));
-        assert!(!valid_bot_subscription_url("http://sub.example.org/s/token"));
-        assert!(!valid_bot_subscription_url("https://user:pass@example.org/s/token"));
+        assert!(!valid_bot_subscription_url(
+            "http://sub.example.org/s/token"
+        ));
+        assert!(!valid_bot_subscription_url(
+            "https://user:pass@example.org/s/token"
+        ));
     }
 }
