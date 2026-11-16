@@ -85,6 +85,14 @@ assert.match(main,/get\(user_subscriptions::portal_route\)[\s\S]*?uri_budget_gua
   'Public custom URLs must have a route-local URI size limit');
 assert.match(flood,/pub async fn uri_budget_guard\(/,
   'Public URI/query budget must run before Query extractor allocation');
+assert.match(flood,/CONFIG_REFRESH_LOCK: tokio::sync::Mutex/,
+  'Subscription flood policy refresh must have a single-flight lock');
+assert.match(flood,/fn recent_config\(\) -> Option<FloodConfig>/,
+  'Public requests must use a local short-lived policy snapshot');
+assert.match(flood,/pub async fn invalidate_cache\(/,
+  'Owner policy changes must invalidate the policy cache');
+assert.match(main,/subscription_flood::invalidate_cache\(&state\)\.await/,
+  'Owner settings updates must invalidate cached flood policy');
 assert.match(flood,/static PUBLIC_REQUESTS: AtomicU64/,
   'An operator-independent process-wide emergency budget must exist');
 assert.match(flood,/static INVALID_REQUESTS: AtomicU64/,
