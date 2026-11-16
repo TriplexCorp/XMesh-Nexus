@@ -3614,8 +3614,9 @@ async function main() {
         const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
         const q=s=>d.querySelector(s),primary=q('.host-primary-panel'),advanced=q('.host-advanced-panel'),preview=q('.host-editor-side'),body=q('.host-editor-layout');
         return{dialog:box(d),primary:box(primary),advanced:box(advanced),preview:box(preview),assignment:box(q('.host-assignment-panel')),body:box(body),footer:box(q('.act')),port:box(q('[name="port"]')),country:box(q('[name="countryCode"]')),address:box(q('[name="address"]')),publicFields:box(q('.host-public-fields')),bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,copyValues:[...d.querySelectorAll('[data-host-copy-value]')].map(el=>el.dataset.hostCopyValue),icons:[primary,advanced,preview].map(p=>!!p.querySelector('.node-form-section-title svg')),choices:[...d.querySelectorAll('.ms label')].map(el=>el),
-          columnGaps:[q('.host-public-panel').getBoundingClientRect().top-primary.getBoundingClientRect().bottom,advanced.getBoundingClientRect().top-q('.host-assignment-panel').getBoundingClientRect().bottom,preview.getBoundingClientRect().top-q('.host-health-panel').getBoundingClientRect().bottom],
-          columnOffsets:[q('.host-public-panel').getBoundingClientRect().x-primary.getBoundingClientRect().x,advanced.getBoundingClientRect().x-q('.host-assignment-panel').getBoundingClientRect().x,preview.getBoundingClientRect().x-q('.host-health-panel').getBoundingClientRect().x],
+          columnGaps:[advanced.getBoundingClientRect().top-primary.getBoundingClientRect().bottom,q('.host-public-panel').getBoundingClientRect().top-q('.host-assignment-panel').getBoundingClientRect().bottom,preview.getBoundingClientRect().top-q('.host-health-panel').getBoundingClientRect().bottom],
+          columnOffsets:[advanced.getBoundingClientRect().x-primary.getBoundingClientRect().x,q('.host-public-panel').getBoundingClientRect().x-q('.host-assignment-panel').getBoundingClientRect().x,preview.getBoundingClientRect().x-q('.host-health-panel').getBoundingClientRect().x],
+          scrollReachable:(()=>{const before=body.scrollTop;if(body.scrollHeight<=body.clientHeight+1)return true;body.scrollTop=body.scrollHeight;const ok=body.scrollTop>0&&body.scrollTop>=body.scrollHeight-body.clientHeight-2;body.scrollTop=before;return ok})(),
           labelFont:parseFloat(getComputedStyle(q('.host-public-panel .f>span:first-child')).fontSize),
           headingFont:parseFloat(getComputedStyle(q('.host-public-panel .node-form-section-title')).fontSize),
           fieldIconOffsets:[...d.querySelectorAll('.host-icon-field')].map(el=>{const glyph=el.querySelector('.host-control-glyph');const control=el.querySelector('.xm-select-trigger')||el.querySelector('input:not([type=hidden]),textarea,select');if(!glyph||!control)return null;const a=glyph.getBoundingClientRect(),b=control.getBoundingClientRect();return b.height&&a.height?Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2):null}).filter(x=>x!==null)};
@@ -3641,7 +3642,11 @@ async function main() {
           'Host editor typography must stay readable, not revert to microtext: '+JSON.stringify(g));
         assert(g.fieldIconOffsets.length>=8&&g.fieldIconOffsets.every(delta=>delta<=3),
           'Control icons must be vertically centered against the actual fields: '+JSON.stringify(g.fieldIconOffsets));
-        assert(g.bodyScroll<=g.bodyClient+1,'Desktop Host editor must fit without scrolling: '+JSON.stringify(g));
+        // Readable type takes precedence over squeezing ~9 assigned nodes and
+        // two complete forms into 514px. The dialog footer remains fixed and
+        // all controls must be reachable using the central content scroller.
+        assert(g.scrollReachable,'Large Host editor must scroll its central content while keeping the footer visible: '+JSON.stringify(g));
+        assert(g.bodyScroll<=g.bodyClient*2.35,'Host editor content must remain compact rather than growing into a long empty sheet: '+JSON.stringify(g));
         assert(g.copyValues.includes('/host-preview/'+('long-segment-'.repeat(24))),
           'Long connection paths must stay copyable untruncated');
       }else {
