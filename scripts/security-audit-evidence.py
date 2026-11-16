@@ -154,7 +154,7 @@ elif sys.argv[1] == "dependencies":
         "packages": [{"name": name, "severity": item.get("severity"),
                       "range": item.get("range"), "fixAvailable": item.get("fixAvailable")}
                      for name, item in npm.get("vulnerabilities", {}).items()]})
-    run("install-govulncheck", ["go", "install", "golang.org/x/vuln/cmd/govulncheck@v1.1.4"],
+    run("install-govulncheck", ["go", "install", "golang.org/x/vuln/cmd/govulncheck@v1.9.0"],
         timeout=900)
     govuln = Path(subprocess.check_output(["go", "env", "GOPATH"], text=True).strip()) / "bin/govulncheck"
     if govuln.is_file():
