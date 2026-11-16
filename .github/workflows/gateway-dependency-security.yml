@@ -1,0 +1,52 @@
+name: XSP product gateway dependency security
+on:
+  pull_request:
+    paths:
+      - 'deploy/xsp-v2-product-gateway/**'
+      - 'scripts/check-agent-update.js'
+      - '.github/workflows/gateway-dependency-security.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gateway-go-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: deploy/xsp-v2-product-gateway
+    steps:
+      - name: Check out exact source without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Go 1.27.4
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.27.4'
+          cache-dependency-path: deploy/xsp-v2-product-gateway/go.sum
+      - name: Resolve pinned dependencies and expose only checksum metadata
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          go mod tidy
+          go mod verify
+          echo 'GATEWAY_GO_MOD_BEGIN'
+          cat go.mod
+          echo 'GATEWAY_GO_MOD_END'
+          echo 'GATEWAY_GO_SUM_BEGIN'
+          cat go.sum
+          echo 'GATEWAY_GO_SUM_END'
+          git diff --exit-code -- go.mod go.sum
+      - name: Compile and test exactly committed module graph
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          go test -mod=readonly ./...
+          go build -mod=readonly -trimpath ./...
+      - name: Assess reachable dependencies using pinned Go vulnerability scanner
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          "$(go env GOPATH)/bin/govulncheck" ./...
