@@ -152,12 +152,7 @@ fn admit(counter: &AtomicU64, limit: u32) -> bool {
             1
         };
         let next = (epoch << 32) | u64::from(count);
-        match counter.compare_exchange_weak(
-            previous,
-            next,
-            Ordering::Relaxed,
-            Ordering::Relaxed,
-        ) {
+        match counter.compare_exchange_weak(previous, next, Ordering::Relaxed, Ordering::Relaxed) {
             Ok(_) => return count <= limit,
             Err(actual) => previous = actual,
         }
