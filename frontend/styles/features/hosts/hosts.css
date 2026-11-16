@@ -487,6 +487,29 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
   }
 }
 
+/* Short desktop viewport: reclaim shell chrome and whitespace before
+   allowing a scrollable form. All controls and whole preview remain visible. */
+@media (min-width:1200px) and (max-width:1499px) and (max-height:900px){
+  dialog#dlg.host-wide{
+    max-height:calc(100dvh - 1rem);max-block-size:calc(100dvh - 1rem);
+  }
+  dialog#dlg.host-wide>form.box{
+    max-height:calc(100dvh - 1rem);max-block-size:calc(100dvh - 1rem);
+  }
+  dialog#dlg.host-wide>form.box>.act{padding-top:3px}
+  #dlg.host-wide .host-editor-layout{
+    gap:.28rem;padding:.05rem .12rem .08rem;
+  }
+  #dlg.host-wide .host-editor-card{padding:.37rem .52rem;gap:.29rem}
+  #dlg.host-wide .host-editor-heading{padding-bottom:0}
+  #dlg.host-wide .host-heading-title p{margin-top:.14rem}
+  #dlg.host-wide .host-advanced-panel .host-advanced-actions>details>summary,
+  #dlg.host-wide .host-advanced-panel .host-advanced-actions>[data-host-clear-overrides]{
+    min-height:2rem;
+  }
+  #dlg.host-wide .host-editor-side{gap:.14rem}
+}
+
 /* Host directory · compact Nexus cards. Shared system tokens own all material
    choices (solid, glass and raised); this feature only defines composition. */
 .host-directory{display:grid;gap:var(--nx-page-gap);align-content:start;min-width:0;container:host-directory / inline-size}
