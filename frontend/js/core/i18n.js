@@ -17,6 +17,7 @@ window.XMeshI18n=(()=>{
   const dict=new Map(Object.entries({
     "Добавьте новую публичную точку доступа в XMesh Nexus": "Add a new public endpoint to XMesh Nexus",
     "Создать хост": "Create host",
+    "Статус и предпросмотр": "Status and preview",
     "Статус / Проверка": "Status / Validation",
     "Дополнительные параметры подключения": "Additional connection settings",
     "Назначение и предпросмотр": "Assignment and preview",
