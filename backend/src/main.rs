@@ -801,9 +801,9 @@ async fn main() -> anyhow::Result<()> {
     let subscription_key: [u8; 32] = subscription_bytes
         .try_into()
         .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY length is invalid"))?;
-    let initial_settings = read_settings(&pool)
-        .await
-        .map_err(|error| anyhow::anyhow!("Cannot load subscription route: {}", error.safe_message()))?;
+    let initial_settings = read_settings(&pool).await.map_err(|error| {
+        anyhow::anyhow!("Cannot load subscription route: {}", error.safe_message())
+    })?;
     let subscription_path = user_subscriptions::configured_public_path(&initial_settings);
     let state = AppState {
         pool,
