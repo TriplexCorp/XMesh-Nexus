@@ -147,7 +147,9 @@ fn admit(counter: &AtomicU64, limit: u32) -> bool {
     let mut previous = counter.load(Ordering::Relaxed);
     loop {
         let count = if previous >> 32 == epoch {
-            (previous as u32).saturating_add(1)
+            u32::try_from(previous & u64::from(u32::MAX))
+                .unwrap_or_default()
+                .saturating_add(1)
         } else {
             1
         };
@@ -373,7 +375,7 @@ mod tests {
         assert!(admit(&counter, 2));
         assert!(admit(&counter, 2));
         assert!(!admit(&counter, 2));
-        assert_eq!(counter.load(Ordering::Relaxed) as u32, 3);
+        assert_eq!(counter.load(Ordering::Relaxed) & u64::from(u32::MAX), 3);
         assert_eq!(MAX_PUBLIC_URI_PATH_BYTES, 160);
         assert_eq!(MAX_PUBLIC_URI_QUERY_BYTES, 2_048);
     }
