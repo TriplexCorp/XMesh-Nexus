@@ -994,10 +994,24 @@ mod tests {
                     .write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1])
                     .unwrap();
             } else {
-                writer.start_file("xray", options()).unwrap();
+                // zip::ZipWriter rejects duplicate names while *writing*, so
+                // produce two unique equal-length names then alter the ZIP
+                // directory/local headers, not the data or CRC.
+                writer.start_file("zzzz", options()).unwrap();
                 writer.write_all(b"duplicate").unwrap();
             }
-            writer.finish().unwrap().into_inner()
+            let mut archive = writer.finish().unwrap().into_inner();
+            if !oversized_note {
+                let mut renamed = 0;
+                for i in 0..=archive.len() - 4 {
+                    if archive[i..i + 4].eq(b"zzzz") {
+                        archive[i..i + 4].copy_from_slice(b"xray");
+                        renamed += 1;
+                    }
+                }
+                assert_eq!(renamed, 2, "local and central names must both be changed");
+            }
+            archive
         };
         let target =
             std::env::temp_dir().join(format!("xmesh-zip-budget-{}", uuid::Uuid::new_v4()));
@@ -1010,7 +1024,7 @@ mod tests {
             );
             let error = unpack_release(&bytes, &target).await.unwrap_err();
             assert!(
-                error.contains("size budget") || error.contains("duplicate"),
+                error.contains("size budget") || error.to_ascii_lowercase().contains("duplicate"),
                 "{error}"
             );
         }
