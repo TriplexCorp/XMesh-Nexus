@@ -4,20 +4,32 @@
 use crate::{ApiError, AppState, auth};
 use axum::{
     Json,
-    extract::{Extension, State},
+    extract::{Extension, Request, State},
     http::{HeaderValue, StatusCode, header},
+    middleware::Next,
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 const CONFIG_CACHE: &str = "xmesh:subscription:flood:config";
 const CACHE_SECONDS: u64 = 10;
 // Bound untrusted random bearer-token cardinality in Redis. Beyond this
 // threshold skip per-token keys (but still monitor) to preserve availability.
 const MAX_TOKEN_BUCKETS_PER_MINUTE: u64 = 20_000;
+// Emergency, process-local ceilings are independent of the operator's
+// monitor/off toggle and bound work BEFORE Redis or PostgreSQL can be touched.
+const MAX_PUBLIC_REQUESTS_PER_MINUTE: u32 = 60_000;
+const MAX_INVALID_REQUESTS_PER_MINUTE: u32 = 10_000;
+const MAX_PUBLIC_URI_PATH_BYTES: usize = 160;
+const MAX_PUBLIC_URI_QUERY_BYTES: usize = 2_048;
+static PUBLIC_REQUESTS: AtomicU64 = AtomicU64::new(0);
+static INVALID_REQUESTS: AtomicU64 = AtomicU64::new(0);
 const LUA: &str = r"
 local total = redis.call('INCR',KEYS[1])
 if total == 1 then redis.call('EXPIRE',KEYS[1],75) end
@@ -128,18 +140,82 @@ fn minute() -> u64 {
         .as_secs()
         / 60
 }
+// Store a minute epoch and a saturating counter in one atomic word so
+// rollover and concurrency cannot reset the protection spuriously.
+fn admit(counter: &AtomicU64, limit: u32) -> bool {
+    let epoch = minute().min(u64::from(u32::MAX));
+    let mut previous = counter.load(Ordering::Relaxed);
+    loop {
+        let count = if previous >> 32 == epoch {
+            (previous as u32).saturating_add(1)
+        } else {
+            1
+        };
+        let next = (epoch << 32) | u64::from(count);
+        match counter.compare_exchange_weak(
+            previous,
+            next,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => return count <= limit,
+            Err(actual) => previous = actual,
+        }
+    }
+}
+
+fn unavailable_response(code: StatusCode, retry: &'static str) -> Response {
+    let mut response = code.into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+        .headers_mut()
+        .insert(header::RETRY_AFTER, HeaderValue::from_static(retry));
+    response
+}
+
+/// A malformed token or non-matching custom path must never reach the DB or
+/// allocate a Redis key. Beyond the fixed local budget even 404s become 429s.
+pub fn reject_invalid() -> Response {
+    if !admit(&INVALID_REQUESTS, MAX_INVALID_REQUESTS_PER_MINUTE) {
+        return unavailable_response(StatusCode::TOO_MANY_REQUESTS, "60");
+    }
+    (StatusCode::NOT_FOUND, "Subscription not found").into_response()
+}
+
+pub fn valid_token(token: &str) -> bool {
+    token.len() == 64
+        && token
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+}
+
+/// Route-local budget runs before `Query<HashMap<...>>` extraction. A body
+/// limit does not limit the URI/query or header parsing allocations.
+pub async fn uri_budget_guard(request: Request, next: Next) -> Response {
+    if request.uri().path().len() > MAX_PUBLIC_URI_PATH_BYTES
+        || request
+            .uri()
+            .query()
+            .is_some_and(|query| query.len() > MAX_PUBLIC_URI_QUERY_BYTES)
+    {
+        return unavailable_response(StatusCode::URI_TOO_LONG, "60");
+    }
+    next.run(request).await
+}
+
 fn token_digest(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
 }
 pub async fn enforce(state: &AppState, token: &str) -> Option<Response> {
-    // Other malformed tokens will still receive the usual 404 from the
-    // subscription handler, with no Redis key allocated.
-    if token.len() != 64
-        || !token
-            .bytes()
-            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
-    {
-        return None;
+    // Check the hard ceiling before any Redis or database work. The operator
+    // can tune per-token limits but cannot disable this emergency guard.
+    if !valid_token(token) {
+        return Some(reject_invalid());
+    }
+    if !admit(&PUBLIC_REQUESTS, MAX_PUBLIC_REQUESTS_PER_MINUTE) {
+        return Some(unavailable_response(StatusCode::TOO_MANY_REQUESTS, "60"));
     }
     let config = current(state).await;
     if !config.enabled {
@@ -283,6 +359,30 @@ mod tests {
             assert!(config.validate().is_err(), "ip={ip}, token={token}");
         }
     }
+    #[test]
+    fn rejects_malformed_tokens_without_redis_or_database() {
+        assert!(valid_token(&"a".repeat(64)));
+        assert!(valid_token(&"0123456789abcdef".repeat(4)));
+        for token in ["", "short", "ABC", "a/b", "../", "-", "abc%2f", "z"] {
+            assert!(!valid_token(token));
+        }
+        assert!(!valid_token(&"A".repeat(64)));
+        assert!(!valid_token(&"g".repeat(64)));
+        assert!(!valid_token(&"a".repeat(65)));
+        assert!(!valid_token(&"a".repeat(63)));
+    }
+
+    #[test]
+    fn local_budget_has_a_fixed_cardinality_and_atomic_counter() {
+        let counter = AtomicU64::new(0);
+        assert!(admit(&counter, 2));
+        assert!(admit(&counter, 2));
+        assert!(!admit(&counter, 2));
+        assert_eq!(counter.load(Ordering::Relaxed) as u32, 3);
+        assert_eq!(MAX_PUBLIC_URI_PATH_BYTES, 160);
+        assert_eq!(MAX_PUBLIC_URI_QUERY_BYTES, 2_048);
+    }
+
     #[test]
     fn script_binds_keyspace_and_sets_ttls() {
         assert!(LUA.contains("EXPIRE"));
