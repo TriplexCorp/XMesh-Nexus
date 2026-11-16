@@ -396,6 +396,50 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
   #dlg.host-wide .host-editor-card{align-self:start;min-height:0}
 }
 
+/* Compact narrow-desktop client editor: three readable field columns.
+ * Reallocate horizontal space before reducing typography or hiding fields.
+ * All three actions remain fully visible, and expanded disclosures may scroll. */
+@media (min-width:1200px) and (max-width:1499px) and (max-height:900px){
+  #dlg.host-wide .host-advanced-panel{gap:.25rem}
+  #dlg.host-wide .host-advanced-panel .host-advanced-heading{
+    display:flex;flex-wrap:nowrap;align-items:center;gap:.4rem;
+  }
+  #dlg.host-wide .host-advanced-heading .node-form-section-title{
+    flex:0 0 auto;white-space:nowrap;
+    padding-bottom:0;margin:0;border-bottom:0;
+    font-size:.82rem;
+  }
+  #dlg.host-wide .host-advanced-heading>.node-ip-hint{
+    min-width:0;flex:1 1 auto;font-size:.66rem;line-height:1.19;
+  }
+  #dlg.host-wide .host-advanced-panel .host-advanced-fields{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:.19rem .36rem;
+  }
+  #dlg.host-wide .host-advanced-panel .host-advanced-fields>.f{
+    gap:.1rem;
+  }
+  #dlg.host-wide .host-advanced-panel .host-advanced-fields>.f>span:first-child{
+    font-size:.69rem;line-height:1.16;
+  }
+  #dlg.host-wide .host-advanced-panel .host-advanced-actions{
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+    align-items:stretch;gap:.22rem;margin:0;padding-top:.28rem;
+  }
+  #dlg.host-wide .host-advanced-actions>[data-host-clear-overrides]{
+    grid-column:auto;min-height:2.4rem;
+    font-size:.68rem;line-height:1.14;padding:.27rem .4rem;
+  }
+  #dlg.host-wide .host-advanced-actions>details{
+    width:100%;max-width:100%;min-width:0;
+  }
+  #dlg.host-wide .host-advanced-actions>details>summary{
+    min-height:2.4rem;
+    font-size:.66rem;line-height:1.13;padding:.27rem .35rem;gap:.2rem;
+  }
+  #dlg.host-wide .host-advanced-actions>details[open]{grid-column:1/-1}
+}
+
 /* Host directory · compact Nexus cards. Shared system tokens own all material
    choices (solid, glass and raised); this feature only defines composition. */
 .host-directory{display:grid;gap:var(--nx-page-gap);align-content:start;min-width:0;container:host-directory / inline-size}
