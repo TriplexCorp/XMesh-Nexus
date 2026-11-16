@@ -33,6 +33,12 @@ def run(label, argv, cwd=None, timeout=900):
     statuses.append({"tool": label, "exitCode": code,
                      "elapsedSeconds": round(time.monotonic() - started, 2)})
     print(json.dumps(statuses[-1]), flush=True)
+    if label == "cargo-audit" and code:
+        # Toolchain diagnostics only; never print source matches or raw scanner logs.
+        for line in log.read_text(errors="replace").splitlines():
+            if ("rustc " in line or "requires rust" in line or
+                    "is not supported" in line or "failed to compile" in line):
+                print("AUDIT_CARGO_DIAGNOSTIC " + json.dumps(line), flush=True)
     return code
 
 
@@ -243,6 +249,9 @@ if sys.argv[1] == "dependencies":
         if bom.get("bomFormat") != "CycloneDX" or not bom.get("specVersion"):
             statuses.append({"tool": "validate-sbom:" + slug, "exitCode": 125})
 save("scanner-statuses.json", statuses)
+# Only the explicitly sanitized reports are emitted for remote review.
+for report in sorted(OUT.glob("*.redacted.json")):
+    print("AUDIT_REDACTED_REPORT " + report.name + " " + report.read_text().replace("\n", ""), flush=True)
 # Preserve all exit codes. Findings are not silently converted into a security pass.
 print("AUDIT_STATUS_SUMMARY " + json.dumps(statuses, sort_keys=True), flush=True)
 if any(item["exitCode"] != 0 for item in statuses):

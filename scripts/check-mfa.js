@@ -33,7 +33,7 @@ assert.match(rust,/password_is_valid/,'TOTP enrollment/disable must require pass
 assert.match(rust,/last_used_step/,'TOTP codes must not be reusable');
 assert.match(rust,/recoveryCodes/,'Recovery codes must be displayed only at first enrollment');
 assert.match(rust,/WHERE admin_id=\$1 AND token_hash<>/,'Existing other sessions should be revoked on enabling');
-assert.match(auth,/mfa::enabled\(\s*&state,\s*admin_id\s*\)/);
+assert.match(auth,/mfa::enabled\(\s*&?state,\s*admin_id\s*\)/);
 assert.match(admins,/DELETE FROM panel_mfa_challenges WHERE admin_id=\$1/,
  'Credential changes must revoke any outstanding password-verified MFA challenge');
 assert.match(admins,/hashed\.is_some\(\) \|\| role != current_role \|\| !new_active/,
