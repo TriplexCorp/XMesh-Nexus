@@ -125,8 +125,10 @@ assert.match(feature,/form.addEventListener\('invalid'/,
   'Native validation must reveal controls inside optional disclosures');
 assert.match(app,/bindHostEditor\(form\)/,
   'The real Host form must bind single-page interactions');
-assert.match(css,/#dlg\.host-wide \.host-editor-layout\{[\s\S]*?grid-template-areas:"connection connection assignment" "public client health" "public client preview"/,
-  'Desktop must use balanced concept grid without stacked oversized left cards');
+assert.match(css,/#dlg\.host-wide \.host-editor-layout\{[\s\S]*?grid-template-areas:"connection assignment health" "public client preview"/,
+  'Desktop must place all six panels in two compact rows without oversized grid spans');
+assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?grid-template-rows:repeat\(6,max-content\)/,
+  'Mobile Host editor must give each panel a distinct, non-overlapping grid row');
 assert.doesNotMatch(html,/host-editor-main-column|host-editor-primary-column|host-editor-client-column|host-editor-sidebar/,
   'All Host sections must be direct grid children, without unused wrapper layers');
 assert.doesNotMatch(css,/display\s*:\s*contents/,
