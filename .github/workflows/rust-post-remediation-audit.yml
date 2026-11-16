@@ -1,0 +1,63 @@
+name: Rust post-remediation full Cargo audit
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/rust-post-remediation-audit.yml'
+      - 'backend/Cargo.toml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cargo-audit-resolved-graph:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact Nexus revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Use stable Rust with exact backend manifest
+        run: |
+          set -Eeuo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo generate-lockfile --manifest-path backend/Cargo.toml
+          test -s backend/Cargo.lock
+      - name: Install pinned cargo-audit 0.23.0
+        run: |
+          set -Eeuo pipefail
+          cargo install cargo-audit --version 0.23.0 --locked
+      - name: Strict full resolved-graph advisory audit (no ignored findings)
+        run: |
+          set -Eeuo pipefail
+          cargo audit --json --file backend/Cargo.lock > "$RUNNER_TEMP/cargo-audit.json"
+      - name: Print normalized advisory inventory, even on audit failure
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path(os.environ["RUNNER_TEMP"],"cargo-audit.json")
+          if not p.exists() or not p.stat().st_size:
+              print("No JSON advisory report produced; audit could not complete")
+          else:
+              try:
+                  data=json.loads(p.read_text())
+              except Exception as exc:
+                  print(f"Invalid audit report; do not assume clean: {exc}")
+              else:
+                  advisories=data.get("vulnerabilities",{}).get("list",[])
+                  print(f"Full Cargo audit returned {len(advisories)} vulnerability records")
+                  for entry in advisories:
+                      a=entry.get("advisory",{})
+                      package=entry.get("package",{})
+                      print("ADVISORY",a.get("id"),"crate",package.get("name"),"version",package.get("version"))
+                  print("Scanner outcome is authoritative; absence of findings here does not override failed CI")
+          PY
+      - name: Retain exact scanner evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nexus-post-remediation-cargo-audit
+          path: ${{ runner.temp }}/cargo-audit.json
+          if-no-files-found: warn
+          retention-days: 14
