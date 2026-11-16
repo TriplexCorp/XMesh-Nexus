@@ -1,4 +1,4 @@
-# Supply-chain evidence — collection in progress
+# Supply-chain evidence — collected, triage incomplete
 
 Pinned snapshots and source/module inventory are in REPOSITORY_INVENTORY.md. Tool binary versions and literal SHA-256 digests are in TOOL_PINS.json. The installer accepts only official GitHub release sources, verifies the archive checksum before parsing and extracts only the named regular binary. Semgrep/Bandit top-level versions are pinned; the actual Python transitive environment is retained.
 
@@ -35,3 +35,21 @@ First retained artifact links: [SAST](https://github.com/TriplexCorp/XMesh-Nexus
 Sub action pinning draft #18 passed its CI. Runtime SDK advisory updates, full secret candidate adjudication, SAST parse-error review and production image coverage remain open.
 
 Rust evidence collection was adjusted to run the capability-dropped container as the runner UID/GID and keep Cargo home in its writable private report mount. This avoids relying on root DAC override for runner-owned source/report directories. Toolchain is aligned with Rust 1.100 used by CI; the next scan remains required to establish success.
+
+## Manual advisory applicability notes
+
+GO-2026-6859 describes concurrent HTTP/1 response-header writes when MaxBytesReader is exceeded. A scoped repository code search found no MaxBytesReader reference, and the reviewed gateway reads bounded bodies using io.LimitReader, so broad derived HTTP-symbol traces alone do not establish that crash in XMesh.
+
+GO-2026-5004 requires pgx's non-default simple protocol, a dollar-quoted SQL literal containing placeholder-like text and attacker-controlled corresponding values. The reviewed gateway main source contains neither an explicit simple-protocol mode nor dollar-quoted SQL. DSN/operator configuration and indirect usage still require review before a final disposition. x/text Nickname/invalid-UTF8 iterator conditions likewise need usage verification. No scanner severity was converted into a confirmed High/Critical without these prerequisites.
+
+## Latest Rust result (supersedes earlier collection failure)
+
+At `ea184737`, dependency job [133081499235](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43801161952/job/133081499235) successfully installed cargo-audit 0.23.0 and audited the generated lock. Exit 1 now represents five advisories, not missing JSON: RUSTSEC-2026-0459 (libsqlite3-sys 0.37.0) and RUSTSEC-2026-0429/0367/0369/0368 (zip 2.6.1). Full upstream CVSS strings are retained in the redacted report and are not assigned as XMesh impact scores.
+
+The ZIP advisories describe extract()/stream-extract symlink allocation, permissions and path behavior. The reviewed `backend/src/core.rs` uses manual allowlisted entry reads, rejects path separators and symlinks and does not call extract(). Its read_to_end before the binary-size check still warrants a separate decompression-budget review. The generated lock includes optional SQLx SQLite resolution; production Cargo features explicitly select PostgreSQL with SQLx defaults disabled. An active-feature/deployed-binary dependency tree is required before classifying SQLite as a production exposure.
+
+The latest generated lock is retained as evidence, not committed as a production lock without verifying the Docker Rust 1.99.1 build and all feature combinations. Current source/image SBOMs include this richer resolution.
+
+Latest dependency/SBOM artifact: https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43801161952/artifacts/14196034811
+ZIP SHA-256: `a42e3c7b17190e56346cd32f69a78a5e26db11c9aed19bd3db74694bf026e67e`.
+Retention remains 14 days. All aggregate scanner jobs remain failing while advisory candidates/triage are open; nothing was ignored to produce a green result.

@@ -64,3 +64,7 @@ Revoked product-node authentication was checked in source: inactive product stat
 ### Advisory triage caution
 
 govulncheck JSON mode returned zero even with advisory records. The collector now separately records a nonzero triage status whenever records exist. Broad derived-symbol call traces can overstate a specific vulnerable use (for example a MaxBytesReader concurrency condition); do not classify a production High merely because an HTTP helper appears in a trace. Confirmed module versions, actual API use and exploit prerequisites must be considered together.
+
+### H-08 — core archive decompression budget
+
+`backend/src/core.rs::unpack_release` rejects unknown names, paths and symlinks, but reads selected entries into memory before checking the Xray executable's size. Review streaming limits, resource files and duplicate entries in a disposable test. This is currently a source observation in an authenticated official-release update path, not a demonstrated anonymous ZIP-upload exploit. No unsafe generic extract() call was found in the reviewed path.

@@ -1,0 +1,133 @@
+{
+  "date": "2026-11-16",
+  "status": "incomplete-checkpoint",
+  "scope": [
+    "TriplexCorp/XMesh-Nexus",
+    "TriplexCorp/XMesh-Node",
+    "TriplexCorp/XMesh-Sub"
+  ],
+  "sources": {
+    "XMesh-Nexus": "4aa18331e537d6a1eacd747d58af55041748abf0",
+    "XMesh-Node": "1f4744d19177056bd9ffa6ca2009975805050936",
+    "XMesh-Sub": "6fca4eb0e0388e6ec5e6817e9a8d58942935aaa2"
+  },
+  "runtimeVerifiedRevision": "ea184737eb1e3d08f9ad6bfff72ad7137aba0211",
+  "prs": [
+    {
+      "repo": "XMesh-Nexus",
+      "number": 493,
+      "status": "draft-unmerged"
+    },
+    {
+      "repo": "XMesh-Sub",
+      "number": 18,
+      "status": "draft-unmerged",
+      "ci": "success"
+    }
+  ],
+  "scanners": {
+    "semgrep": {
+      "nexus": {
+        "candidates": 13,
+        "parseErrors": 3
+      },
+      "node": {
+        "candidates": 0,
+        "parseErrors": 0
+      },
+      "sub": {
+        "candidates": 0,
+        "parseErrors": 0
+      }
+    },
+    "bandit": {
+      "nexus": 607,
+      "node": 106,
+      "sub": 22
+    },
+    "gitleaksHistory": {
+      "nexus": 79,
+      "node": 2,
+      "sub": 4
+    },
+    "cargoAudit": {
+      "version": "0.23.0",
+      "completed": true,
+      "advisories": [
+        {
+          "id": "RUSTSEC-2026-0459",
+          "package": "libsqlite3-sys",
+          "version": "0.37.0",
+          "cvss": "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:P/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N",
+          "patched": [
+            ">=0.39.0"
+          ]
+        },
+        {
+          "id": "RUSTSEC-2026-0429",
+          "package": "zip",
+          "version": "2.6.1",
+          "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "patched": [
+            ">=9.0.0"
+          ]
+        },
+        {
+          "id": "RUSTSEC-2026-0367",
+          "package": "zip",
+          "version": "2.6.1",
+          "cvss": "CVSS:3.1/AV:L/AC:L/PR:L/UI:R/S:U/C:H/I:H/A:H",
+          "patched": [
+            ">=9.0.0"
+          ]
+        },
+        {
+          "id": "RUSTSEC-2026-0369",
+          "package": "zip",
+          "version": "2.6.1",
+          "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:H",
+          "patched": [
+            ">=9.0.0"
+          ]
+        },
+        {
+          "id": "RUSTSEC-2026-0368",
+          "package": "zip",
+          "version": "2.6.1",
+          "cvss": null,
+          "patched": [
+            ">=9.0.0"
+          ]
+        }
+      ]
+    },
+    "npmBrowserTooling": {
+      "completed": true,
+      "advisories": 0
+    },
+    "govulncheck": {
+      "completed": true,
+      "jsonExitZeroDoesNotClearFindings": true,
+      "triage": "open"
+    }
+  },
+  "sbom": {
+    "format": "CycloneDX",
+    "sourceRepositories": 3,
+    "selectedRuntimeImages": 3,
+    "fullProductionImageCoverage": false,
+    "artifact": "https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43801161952/artifacts/14196034811",
+    "zipSha256": "a42e3c7b17190e56346cd32f69a78a5e26db11c9aed19bd3db74694bf026e67e",
+    "retentionDays": 14
+  },
+  "remaining": [
+    "full API negative matrix",
+    "dependency/secret/SAST candidate triage",
+    "Node/Sub compromise dynamics",
+    "quota races and offline limits",
+    "IPv6 peer identity and origin limits",
+    "fresh VPS install and interrupted upgrade/recovery",
+    "adversarial browser inputs",
+    "bounded fuzzing and fault injection"
+  ]
+}

@@ -19,3 +19,7 @@
 ## Workflow rules
 
 Separate working branches/PRs per repository when runtime or workflow changes are confirmed. Coordinate version/Agent bumps only when the changed release contract requires them. Do not remove features or disable CI to pass. Keep sensitive exploit details in private advisories if a confirmed High/Critical requires it. Preserve all remaining coverage explicitly; an interim checkpoint is not completion.
+
+Latest scanner step is now triage rather than fixing a failed Rust invocation. Establish active SQLx features, validate ZIP extraction bounds/upgrade compatibility, assess actual Node SDK/runtime advisory conditions, and preserve the generated lock/SBOM artifact before its retention expires. Device HWID and physical-device/credential-cloning guarantees must be documented separately.
+
+Track the Host dialog overflow assertion separately; original browser CI remains failing. The independent security matrix target exists so that layout failure cannot prevent signed-node and actual RBAC/MFA/scoped-token checks. Record its result and investigate any security failure before approval.

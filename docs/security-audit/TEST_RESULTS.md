@@ -42,3 +42,17 @@ Sub draft #18: installer CI 133079425263 passed the pinned-workflow regression, 
 At candidate `630d841`, committed rustfmt and strict default-feature Clippy passed; experimental crypto formatting/Clippy and cross-language selected tests passed. The Rust job was still building its Docker image when observed; dependent integration jobs must still finish. Sub CI remains green. The failed Rust scan may be caused by running a capability-dropped root against runner-owned mounted directories; the collector now uses the runner UID/GID with a writable private Cargo home and the current CI Rust generation. Verify the next result rather than treating this diagnosis as proof.
 
 Default Rust job 133079691042 subsequently completed successfully including Docker build. Crypto job 133079690363 completed successfully. The next audit-only evidence/report commit does not change runtime code, but its own PR checks remain required.
+
+## Latest verified runtime and scanner evidence
+
+Candidate runtime code at `ea184737`: default Rust tests/strict Clippy/Docker build passed; crypto tests/strict Clippy passed; isolated signer image/ACL/Unix-socket E2E passed; repeated baseline/candidate login resources passed. Browser, VLESS, CLI, update and remaining source-contract checks passed. API authentication integration job 133082939408 was still running at this ledger update and is not counted as passed yet.
+
+Rust dependency collection now ran successfully and returned five advisories; this supersedes earlier tool failure. All three source CycloneDX SBOMs and three selected runtime image SBOMs were generated. Semgrep parse errors and advisory/secret candidates remain unresolved; dependency and SAST aggregate jobs intentionally remain nonzero. See SUPPLY_CHAIN.md for artifact identities and applicability cautions.
+
+Sub #18 full installer CI: https://github.com/TriplexCorp/XMesh-Sub/actions/runs/43800524479 (success). Manager tests 15, limiter tests 5, release-verifier tests 5 and new workflow tests 4 passed, along with shell and rendered-Caddy checks.
+
+## Browser job failure and independent API coverage
+
+Job 133082939408 ended with 292 browser checks passed and one Host dialog overflow assertion at 1920x1080; its English browser audit passed 43 checks. Because signed-node/RBAC/MFA steps followed that browser step in the existing job, they were skipped. Do not count them as passed or weaken the browser assertion.
+
+The audit resource workflow now has an additional fresh `security` matrix target running the existing real signed-node and RBAC/MFA/scoped-token/revocation integration scripts against its own disposable API/PostgreSQL/Redis. It does not skip or change the original browser CI. This target is pending execution at this checkpoint; exact final evidence will be attached to draft #493.

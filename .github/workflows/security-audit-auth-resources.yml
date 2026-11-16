@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [baseline, candidate]
+        target: [baseline, candidate, security]
     env:
       ADMIN_USERNAME: audit-owner
       COOKIE_SECURE: "false"
@@ -69,12 +69,27 @@ jobs:
           done
           exit 1
       - name: Measure baseline or enforce regression
+        if: matrix.target != 'security'
         shell: bash
         run: |
           set -Eeuo pipefail
           mode=()
           if [[ '${{ matrix.target }}' == baseline ]]; then mode=(--observe); fi
           python3 scripts/security-audit-login-resources.py "${mode[@]}" --output "$RUNNER_TEMP/xmesh-audit-artifacts/login-${{ matrix.target }}.json"
+      - name: Verify signatures, scoped API access, RBAC, MFA and revocation
+        if: matrix.target == 'security'
+        shell: bash
+        env:
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          ALL_PROXY: ""
+          NO_PROXY: "127.0.0.1,localhost,::1"
+        run: |
+          set -Eeuo pipefail
+          test "$XMESH_AUDIT_DISPOSABLE" = 1
+          test "$XMESH_TEST_URL" = http://127.0.0.1:8080
+          python3 scripts/test-node-auth-integration.py
+          python3 scripts/test-auth-integration.py
       - name: Retain sanitized bounded measurements
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

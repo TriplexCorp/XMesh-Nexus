@@ -16,3 +16,5 @@ The audit is incomplete. No absence-of-vulnerability conclusion follows from the
 No production change is requested for the draft login fix until review/CI complete. Its eventual rollout is Nexus-only with existing configuration/API contracts. Operators should retain documented network isolation and supported TLS settings; no manual origin key/provisioning workaround was introduced.
 
 Executed evidence additionally confirms old Node router Go/Alpine versions and advisory-bearing gateway/Agent/container reports. These remain open for applicability assessment and coordinated dependency remediation. Source and selected image SBOMs now exist; Rust dependency scan and full image coverage remain incomplete.
+
+Device slots are based on a client-provided HWID. They are not hardware attestation and do not independently prevent cloning already-issued VPN credentials between physical devices. Stronger physical-device guarantees would require a separately designed credential/identity lifecycle; no breaking API change was introduced in this checkpoint.
