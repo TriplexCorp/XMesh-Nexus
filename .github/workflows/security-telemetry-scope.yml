@@ -1,0 +1,71 @@
+name: Security - signed Node telemetry object scope
+on:
+  pull_request:
+    paths:
+      - 'backend/src/main.rs'
+      - 'backend/src/telemetry_scope.rs'
+      - 'scripts/test-node-auth-integration.py'
+      - 'scripts/test-telemetry-scope-integration.py'
+      - '.github/workflows/security-telemetry-scope.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  object-scope:
+    name: Signed telemetry isolation (disposable PostgreSQL)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ADMIN_USERNAME: audit-owner
+      COOKIE_SECURE: "false"
+      PANEL_DOMAIN: ci.example.invalid
+      DASHBOARD_PATH: /dashboard/security-telemetry-disposable
+      XMESH_AUDIT_DISPOSABLE: "1"
+      XMESH_AUDIT_TELEMETRY_SCOPE: "1"
+      XMESH_TEST_URL: http://127.0.0.1:8080
+      COMPOSE_PROJECT_NAME: xmesh-telemetry-scope
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      NO_PROXY: 127.0.0.1,localhost,::1
+    steps:
+      - name: Check out exact proposed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Generate throwaway secrets for isolated services
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for name in POSTGRES_PASSWORD APP_DB_PASSWORD REDIS_PASSWORD ADMIN_PASSWORD TOTP_ENCRYPTION_KEY SUBSCRIPTION_ENCRYPTION_KEY XSP_V2_PRODUCT_INTERNAL_TOKEN; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          done
+          mkdir -p deploy/runtime
+          printf '%s\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
+          chmod 0666 deploy/runtime/dashboard-path
+      - name: Build isolated API and backing stores
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker compose up --build -d db redis panel
+          for i in $(seq 1 120); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/health/ready >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker compose logs --tail=120 panel
+          exit 1
+      - name: Verify signed Node can meter only its assigned users and inbounds
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$XMESH_AUDIT_DISPOSABLE" = 1
+          test "$XMESH_TEST_URL" = http://127.0.0.1:8080
+          python3 scripts/test-telemetry-scope-integration.py
+      - name: Collect diagnostics on failure
+        if: failure()
+        run: docker compose logs --tail=180
+      - name: Destroy isolated services and volumes
+        if: always()
+        run: docker compose down --volumes --remove-orphans

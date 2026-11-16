@@ -253,7 +253,17 @@ def main():
         profile_config={
             "inbounds":[{"tag":"DE_VLESS","listen":"127.0.0.1","port":28351,
                          "protocol":"vless","settings":{"decryption":"none","clients":[]},
-                         "streamSettings":{"network":"tcp","security":"none"}}],
+                         "streamSettings":{"network":"tcp","security":"none"}},
+                        # Managed dual-inbound topology permits TCP proxy + Hysteria2,
+                        # not two competing TCP proxy inbounds. Cert paths are
+                        # disposable external-path fixtures; no ACME/network issuance.
+                        {"tag":"CDN_DE","listen":"127.0.0.1","port":28352,
+                         "protocol":"hysteria","settings":{"version":2,"users":[]},
+                         "streamSettings":{"network":"hysteria","security":"tls",
+                                           "tlsSettings":{"alpn":["h3"],"certificates":[{
+                                               "certificateFile":"/tmp/xmesh-ci-hysteria-cert.pem",
+                                               "keyFile":"/tmp/xmesh-ci-hysteria-key.pem"
+                                           }]}}}],
             "outbounds":[{"tag":"direct","protocol":"freedom"}],
             "routing":{"rules":[]}
         }
@@ -263,7 +273,7 @@ def main():
         assert_status(code,201,"create XRAY STUDIO profile for node policy test")
         profile_id=profile["id"]
         code,squad,_=request("POST","/collections/squads",
-            {"name":"CI autonomous squad","inb":["DE_VLESS"]},
+            {"name":"CI autonomous squad","inb":["DE_VLESS","CDN_DE"]},
             cookie=cookie,origin=BASE)
         assert_status(code,201,"create inbound assignment for policy test")
         squad_id=squad["id"]
@@ -326,7 +336,7 @@ def main():
         serialized=json.dumps(desired["config"],sort_keys=True,
                               separators=(",",":"),ensure_ascii=False).encode()
         assert policy["configSha256"]==hashlib.sha256(serialized).hexdigest()
-        assert desired["config"]["inbounds"][1]["tag"]=="xmesh_stats_in"
+        assert any(inbound["tag"]=="xmesh_stats_in" for inbound in desired["config"]["inbounds"])
         der=(bytes.fromhex("302a300506032b6570032100")+
              bytes.fromhex(desired["policyPublicKey"]))
         policy_file=Path(directory)/"policy.json"
@@ -384,6 +394,67 @@ def main():
             hdr={"X-XMesh-Timestamp":str(stamp),"X-XMesh-Nonce":unique,
                  "X-XMesh-Signature":sig.hex()}
             return request("POST","/metrics/ingest",sample,headers=hdr)
+
+        # Scoped negative check on a disposable API. A valid Ed25519 machine
+        # identity is not permission to attribute bytes to unrelated users,
+        # or to impersonate a different inbound for an assigned user.
+        if os.environ.get("XMESH_AUDIT_TELEMETRY_SCOPE") == "1":
+            assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
+            assert BASE == "http://127.0.0.1:8080"
+            code, isolated, _ = request("POST", "/collections/squads",
+                {"name":"Disposable telemetry isolated scope","inb":["AUDIT_ISOLATED_ONLY"]},
+                cookie=cookie, origin=BASE)
+            assert_status(code, 201, "create telemetry isolation squad")
+            isolated_user = None
+            try:
+                code, isolated_user, _ = request("POST", "/collections/users",
+                    {"username":"audit_telemetry_unassigned","squads":[isolated["id"]],
+                     "hold":True,"holdDays":30,"limit":1.0},
+                    cookie=cookie, origin=BASE)
+                assert_status(code, 201, "create telemetry isolation user")
+                bad_user = isolated_user["id"]
+                code, _, _ = signed_post("/metrics/ingest", {
+                    "node_id":node,"userStatsStatus":"verified",
+                    "userStatsAtMs":int(time.time()*1000),
+                    "userTraffic":[{"userId":bad_user,"uplinkBytes":1024,"downlinkBytes":1024}]
+                })
+                assert_status(code, 403, "signed node cannot meter another user's scope")
+
+                # A mixed batch must not update the valid waiting user either.
+                code, _, _ = signed_post("/metrics/ingest", {
+                    "node_id":node,"userStatsStatus":"verified",
+                    "userStatsAtMs":int(time.time()*1000)+1,
+                    "userTraffic":[
+                        {"userId":pending_id,"uplinkBytes":32,"downlinkBytes":48},
+                        {"userId":bad_user,"uplinkBytes":2048,"downlinkBytes":2048}
+                    ]
+                })
+                assert_status(code, 403, "signed mixed-scope batch rejected atomically")
+                code, _, _ = signed_post("/metrics/ingest", {
+                    "node_id":node,"userStatsStatus":"verified",
+                    "userStatsAtMs":int(time.time()*1000)+2,
+                    "userInboundTraffic":[
+                        {"userId":user_id,"inboundTag":"AUDIT_ISOLATED_ONLY",
+                         "uplinkBytes":8,"downlinkBytes":8}
+                    ]
+                })
+                assert_status(code, 403, "signed inbound not provisioned on node rejected")
+
+                code, listing, _ = request("GET", "/collections/users", cookie=cookie)
+                assert_status(code, 200, "read telemetry isolation results")
+                observed = next(x for x in listing["items"] if x["id"] == bad_user)
+                pending = next(x for x in listing["items"] if x["id"] == pending_id)
+                assert observed.get("hold") is True and observed.get("firstConnectedAt") is None, (
+                    "Unassigned telemetry must not start an unrelated subscription")
+                assert pending.get("hold") is True and pending.get("firstConnectedAt") is None, (
+                    "Mixed telemetry request must be atomic for assigned users")
+                print("PASS: signed telemetry user and inbound scope enforced before mutation")
+            finally:
+                if isolated_user is not None:
+                    request("DELETE",f'/collections/users/{isolated_user["id"]}',
+                            cookie=cookie,origin=BASE)
+                request("DELETE",f'/collections/squads/{isolated["id"]}',
+                        cookie=cookie,origin=BASE)
 
         first_sample_earliest=int(time.time()*1000)-5000
         assert_status(report_signed((50,90),(25,35),
