@@ -193,10 +193,17 @@ pub async fn login(
         ));
     }
     // Reject excess work before settings, Redis or PostgreSQL are accessed.
-    let admission = reserve_login_work()?;
+    login_with_admission(&state, body, reserve_login_work()?).await
+}
+
+async fn login_with_admission(
+    state: &AppState,
+    body: LoginRequest,
+    admission: OwnedSemaphorePermit,
+) -> Result<(StatusCode, HeaderMap, Json<Value>), ApiError> {
     let policy = crate::security::get_policy(&state.pool).await?;
     let (username_key, locked) = check_login_limits(
-        &state,
+        state,
         &body.username,
         policy.login_attempts,
         policy.lockout_minutes,
@@ -220,7 +227,7 @@ pub async fn login(
                 ),
             ));
         }
-        record_failed_login(&state, &username_key).await?;
+        record_failed_login(state, &username_key).await?;
         return Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "Неверный логин или пароль.",
@@ -244,7 +251,7 @@ pub async fn login(
                 ),
             ));
         }
-        record_failed_login(&state, &username_key).await?;
+        record_failed_login(state, &username_key).await?;
         return Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "Неверный логин или пароль.",
@@ -274,8 +281,8 @@ pub async fn login(
             "Учётная запись изменилась. Войдите снова.",
         ));
     }
-    if crate::mfa::enabled(&state, admin_id).await? {
-        let challenge = crate::mfa::new_challenge_in_transaction(&state, &mut tx, admin_id).await?;
+    if crate::mfa::enabled(state, admin_id).await? {
+        let challenge = crate::mfa::new_challenge_in_transaction(state, &mut tx, admin_id).await?;
         tx.commit().await?;
         return Ok((
             StatusCode::OK,
@@ -286,9 +293,9 @@ pub async fn login(
         ));
     }
     let response =
-        issue_session_in_transaction(&state, &mut tx, admin_id, &username, &role).await?;
+        issue_session_in_transaction(state, &mut tx, admin_id, &username, &role).await?;
     tx.commit().await?;
-    clear_failed_login(&state, &username_key).await?;
+    clear_failed_login(state, &username_key).await?;
     Ok(response)
 }
 
@@ -631,14 +638,16 @@ mod resource_tests {
     #[tokio::test]
     async fn cancelling_http_observer_does_not_release_running_cpu_work() {
         let pool = Arc::new(Semaphore::new(1));
-        let admission = Arc::clone(&pool).try_acquire_owned().unwrap();
         let (started_tx, started_rx) = tokio::sync::oneshot::channel();
         let (release_tx, release_rx) = std::sync::mpsc::sync_channel(1);
-        let worker = tokio::spawn(run_login_work(admission, move || {
-            let _ = started_tx.send(());
-            release_rx.recv().unwrap();
-            Ok(false)
-        }));
+        let worker = tokio::spawn(run_login_work(
+            Arc::clone(&pool).try_acquire_owned().unwrap(),
+            move || {
+                let _ = started_tx.send(());
+                release_rx.recv().unwrap();
+                Ok(false)
+            },
+        ));
         started_rx.await.unwrap();
         worker.abort();
         let _ = worker.await;
