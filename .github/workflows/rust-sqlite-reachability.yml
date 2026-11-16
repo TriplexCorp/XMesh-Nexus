@@ -1,0 +1,69 @@
+name: Rust production SQLite reachability
+on:
+  pull_request:
+    paths:
+      - 'backend/Cargo.toml'
+      - '.github/workflows/rust-sqlite-reachability.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/Cargo.toml'
+      - '.github/workflows/rust-sqlite-reachability.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  production-runtime-graph:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact revision without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install current stable Rust
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo --version
+      - name: Assert PostgreSQL-only production SQLx manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import pathlib, tomllib
+          manifest=tomllib.loads(pathlib.Path("backend/Cargo.toml").read_text())
+          sqlx=manifest["dependencies"]["sqlx"]
+          features=set(sqlx["features"])
+          if sqlx.get("default-features") is not False or "postgres" not in features:
+              raise SystemExit("SQLx must select PostgreSQL only, with default features disabled")
+          if any("sqlite" in feature.lower() or "mysql" in feature.lower() for feature in features):
+              raise SystemExit(f"Unexpected SQLx SQLite/MySQL feature: {features}")
+          print("Verified: production manifest explicitly selects PostgreSQL without SQLite features")
+          PY
+      - name: Check actual runtime dependency tree, not full advisory lock inventory
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # Runtime edges exclude build and dev dependencies. An advisory in a
+          # Cargo audit lockfile alone is not proof that SQLite runs in the API.
+          cargo tree --manifest-path backend/Cargo.toml --no-default-features \
+            --target x86_64-unknown-linux-gnu --edges normal --format '{p}' \
+            > "$RUNNER_TEMP/production-runtime-tree.txt"
+          if grep -Eq '(^|[[:space:]])(libsqlite3-sys|sqlx-sqlite|rusqlite) v[0-9]' "$RUNNER_TEMP/production-runtime-tree.txt"; then
+            echo 'FAIL: SQLite dependency present in default production runtime graph' >&2
+            grep -E '(libsqlite3-sys|sqlx-sqlite|rusqlite)' "$RUNNER_TEMP/production-runtime-tree.txt" >&2
+            exit 1
+          fi
+          grep -E 'sqlx(-postgres|-core)? v' "$RUNNER_TEMP/production-runtime-tree.txt" | head -20 || true
+          echo 'PASS: no SQLite driver or libsqlite3-sys in normal production runtime edges'
+      - name: Save scoped dependency evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nexus-rust-production-runtime-tree
+          path: ${{ runner.temp }}/production-runtime-tree.txt
+          if-no-files-found: warn
+          retention-days: 14
