@@ -329,8 +329,12 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
   #dlg.host-wide .host-connect-fields,
   #dlg.host-wide .host-public-fields,
   #dlg.host-wide .host-advanced-fields{gap:.38rem .58rem}
-  #dlg.host-wide .host-assignment-panel .ms{max-height:3.25rem}
-  #dlg.host-wide .host-resolved-line{min-height:1.54rem;padding:.15rem .52rem}
+  #dlg.host-wide .host-assignment-panel .ms{max-height:3.1rem}
+  #dlg.host-wide .host-resolved-line{
+    min-height:1.25rem;padding:.1rem .48rem;
+    line-height:1.19;font-size:.66rem;
+  }
+  #dlg.host-wide .host-resolved-line>b{font-size:.68rem}
   #dlg.host-wide .host-preview-disclaimer{font-size:.64rem;line-height:1.25}
   #dlg.host-wide .host-heading-emblem{width:2.3rem;height:2.3rem}
 }
