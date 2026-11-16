@@ -292,8 +292,7 @@ async fn login_with_admission(
             })),
         ));
     }
-    let response =
-        issue_session_in_transaction(state, &mut tx, admin_id, &username, &role).await?;
+    let response = issue_session_in_transaction(state, &mut tx, admin_id, &username, &role).await?;
     tx.commit().await?;
     clear_failed_login(state, &username_key).await?;
     Ok(response)
