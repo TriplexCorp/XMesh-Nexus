@@ -3613,7 +3613,12 @@ async function main() {
       const g=await page.locator('#dlg').evaluate(d=>{
         const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
         const q=s=>d.querySelector(s),primary=q('.host-primary-panel'),advanced=q('.host-advanced-panel'),preview=q('.host-editor-side'),body=q('.host-editor-layout');
-        return{dialog:box(d),primary:box(primary),advanced:box(advanced),preview:box(preview),assignment:box(q('.host-assignment-panel')),body:box(body),footer:box(q('.act')),port:box(q('[name="port"]')),country:box(q('[name="countryCode"]')),address:box(q('[name="address"]')),publicFields:box(q('.host-public-fields')),bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,copyValues:[...d.querySelectorAll('[data-host-copy-value]')].map(el=>el.dataset.hostCopyValue),icons:[primary,advanced,preview].map(p=>!!p.querySelector('.node-form-section-title svg')),choices:[...d.querySelectorAll('.ms label')].map(el=>el)};
+        return{dialog:box(d),primary:box(primary),advanced:box(advanced),preview:box(preview),assignment:box(q('.host-assignment-panel')),body:box(body),footer:box(q('.act')),port:box(q('[name="port"]')),country:box(q('[name="countryCode"]')),address:box(q('[name="address"]')),publicFields:box(q('.host-public-fields')),bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,copyValues:[...d.querySelectorAll('[data-host-copy-value]')].map(el=>el.dataset.hostCopyValue),icons:[primary,advanced,preview].map(p=>!!p.querySelector('.node-form-section-title svg')),choices:[...d.querySelectorAll('.ms label')].map(el=>el),
+          columnGaps:[q('.host-public-panel').getBoundingClientRect().top-primary.getBoundingClientRect().bottom,advanced.getBoundingClientRect().top-q('.host-assignment-panel').getBoundingClientRect().bottom,preview.getBoundingClientRect().top-q('.host-health-panel').getBoundingClientRect().bottom],
+          columnOffsets:[q('.host-public-panel').getBoundingClientRect().x-primary.getBoundingClientRect().x,advanced.getBoundingClientRect().x-q('.host-assignment-panel').getBoundingClientRect().x,preview.getBoundingClientRect().x-q('.host-health-panel').getBoundingClientRect().x],
+          labelFont:parseFloat(getComputedStyle(q('.host-public-panel .f>span:first-child')).fontSize),
+          headingFont:parseFloat(getComputedStyle(q('.host-public-panel .node-form-section-title')).fontSize),
+          fieldIconOffsets:[...d.querySelectorAll('.host-icon-field')].map(el=>{const glyph=el.querySelector('.host-control-glyph');const control=el.querySelector('.xm-select-trigger')||el.querySelector('input:not([type=hidden]),textarea,select');if(!glyph||!control)return null;const a=glyph.getBoundingClientRect(),b=control.getBoundingClientRect();return b.height&&a.height?Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2):null}).filter(x=>x!==null)};
       });
       await screenshot(page,'host-one-page-'+width+'x'+height);
       await page.keyboard.press('Escape');
@@ -3628,6 +3633,14 @@ async function main() {
         assert(g.choices.length>=5,'Node assignment fleet must remain complete');
         assert(Math.abs(g.assignment.y-g.primary.y)<=2,'Top-right assignment must align with connection panel');
         assert(g.preview.x>=g.advanced.right,'Live preview must occupy its own compact grid column');
+        assert(g.columnOffsets.every(delta=>Math.abs(delta)<=2),
+          'Each stacked column must retain the same left edge: '+JSON.stringify(g.columnOffsets));
+        assert(g.columnGaps.every(gap=>gap>=0&&gap<=22),
+          'Independent stacks must not create empty shared-row space: '+JSON.stringify(g.columnGaps));
+        assert(g.labelFont>=12.5&&g.headingFont>=14,
+          'Host editor typography must stay readable, not revert to microtext: '+JSON.stringify(g));
+        assert(g.fieldIconOffsets.length>=8&&g.fieldIconOffsets.every(delta=>delta<=3),
+          'Control icons must be vertically centered against the actual fields: '+JSON.stringify(g.fieldIconOffsets));
         assert(g.bodyScroll<=g.bodyClient+1,'Desktop Host editor must fit without scrolling: '+JSON.stringify(g));
         assert(g.copyValues.includes('/host-preview/'+('long-segment-'.repeat(24))),
           'Long connection paths must stay copyable untruncated');
