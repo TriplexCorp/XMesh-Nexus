@@ -592,10 +592,7 @@ fn application_router(state: AppState) -> Router {
         .route("/login.html", get(|| async { StatusCode::NOT_FOUND }))
         .route("/dashboard/{slug}", get(security::dashboard_entry))
         .route("/{part1}/{token}", public_subscription.clone())
-        .route(
-            "/{part1}/{part2}/{token}",
-            public_subscription.clone(),
-        )
+        .route("/{part1}/{part2}/{token}", public_subscription.clone())
         .route(
             "/{part1}/{part2}/{part3}/{token}",
             public_subscription.clone(),
@@ -804,7 +801,8 @@ async fn main() -> anyhow::Result<()> {
     let subscription_key: [u8; 32] = subscription_bytes
         .try_into()
         .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY length is invalid"))?;
-    let subscription_path = user_subscriptions::configured_public_path(&read_settings(&pool).await?);
+    let subscription_path =
+        user_subscriptions::configured_public_path(&read_settings(&pool).await?);
     let state = AppState {
         pool,
         redis,
