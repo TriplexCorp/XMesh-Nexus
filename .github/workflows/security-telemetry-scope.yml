@@ -5,6 +5,7 @@ on:
       - 'backend/src/main.rs'
       - 'backend/src/telemetry_scope.rs'
       - 'scripts/test-node-auth-integration.py'
+      - 'scripts/test-telemetry-scope-integration.py'
       - '.github/workflows/security-telemetry-scope.yml'
   workflow_dispatch:
 permissions:
@@ -61,7 +62,7 @@ jobs:
           set -Eeuo pipefail
           test "$XMESH_AUDIT_DISPOSABLE" = 1
           test "$XMESH_TEST_URL" = http://127.0.0.1:8080
-          python3 scripts/test-node-auth-integration.py
+          python3 scripts/test-telemetry-scope-integration.py
       - name: Collect diagnostics on failure
         if: failure()
         run: docker compose logs --tail=180
