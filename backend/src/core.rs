@@ -1012,7 +1012,9 @@ mod tests {
                 writer.write_all(b"valid-notes").unwrap();
                 // Non-allowlisted nested files must never be extracted, even
                 // when a valid xray executable is present in the archive.
-                writer.start_file("nested/untrusted.conf", options()).unwrap();
+                writer
+                    .start_file("nested/untrusted.conf", options())
+                    .unwrap();
                 writer.write_all(b"must-not-be-written").unwrap();
             }
             writer.finish().unwrap().into_inner()
