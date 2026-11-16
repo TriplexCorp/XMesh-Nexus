@@ -32,3 +32,13 @@ Evidence workflow initially failed workflow validation before any scanner ran: r
 ## Not yet performed
 
 Fresh VPS installs/rollback, complete role/object authorization negatives, browser XSS adversarial inputs, all subscription states with a real VPN client, database/Redis outage injection, quota races/offline synchronization, sustained bounded fuzz campaigns, origin and IPv6 Docker behavior. See REMEDIATION_PLAN.md for reproducible next work.
+
+## Executed scanner / Sub update
+
+SAST and dependency jobs 133078918822/133078919121 completed with nonzero aggregate status: findings and an unsuccessful Rust audit remain unresolved. Three source SBOMs and three runtime image SBOMs were generated and retained. govulncheck JSON exit zero was found insufficient to clear findings; manual triage is required. See SUPPLY_CHAIN.md.
+
+Sub draft #18: installer CI 133079425263 passed the pinned-workflow regression, shell tests, manager/limiter tests, release-verifier negative tests and rendered Caddy validation. No main publication or production update was performed.
+
+At candidate `630d841`, committed rustfmt and strict default-feature Clippy passed; experimental crypto formatting/Clippy and cross-language selected tests passed. The Rust job was still building its Docker image when observed; dependent integration jobs must still finish. Sub CI remains green. The failed Rust scan may be caused by running a capability-dropped root against runner-owned mounted directories; the collector now uses the runner UID/GID with a writable private Cargo home and the current CI Rust generation. Verify the next result rather than treating this diagnosis as proof.
+
+Default Rust job 133079691042 subsequently completed successfully including Docker build. Crypto job 133079690363 completed successfully. The next audit-only evidence/report commit does not change runtime code, but its own PR checks remain required.

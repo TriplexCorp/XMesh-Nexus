@@ -38,3 +38,29 @@ Only limited confirmed behavior is recorded below. No confirmed P0/P1 has been e
 | H-07 | Nexus | Cargo.lock absent from baseline executable project | Resolve dependency evidence; assess deterministic build/update compatibility before committing a lock |
 
 Revoked product-node authentication was checked in source: inactive product state is rejected without falling through to legacy identity. An initial suspicion of a revocation bypass was not supported and is not reported as a finding.
+
+## XMESH-AUD-003 — mutable release publisher Actions
+
+- Repository: XMesh-Sub; `.github/workflows/attested-release.yml` checkout/attest and `.github/workflows/ci.yml` checkout.
+- Priority: P3 supply-chain hardening; no publisher compromise demonstrated.
+- Confirmed: workflow references used mutable v4 tags. A later tag movement could change executable publisher code without a source edit.
+- Fix: pin the currently resolved full action commits, disable persisted CI checkout credentials, retain read-only contents and main-only attestation publishing.
+- Regression: `tests/test-workflow-security.py` rejects tags/branches and checks publisher trigger and source-verification constraints.
+- PR: https://github.com/TriplexCorp/XMesh-Sub/pull/18 (draft, unmerged).
+- Verification: Sub installer CI job 133079425263 passed, including the new tests and existing signed manager/limiter/release verifier/rendered Caddy checks.
+- CVSS v4.0: not assigned; prevention of hypothetical action-tag compromise, not a confirmed exploitable product vulnerability.
+
+## XMESH-AUD-004 — obsolete Node router build/runtime baseline
+
+- Repository: XMesh-Node; `Dockerfile:2` and `Dockerfile:8`, root `go.mod:3`.
+- Priority: P2 dependency/runtime maintenance finding; advisory exploit severity is not inherited from scanner labels.
+- Confirmed: rebuilding the committed Dockerfile produced Go 1.23.12 and Alpine 3.21.10; Trivy identifies the latter as end-of-support and lists Go advisories in the compiled artifact.
+- Verification: actual Docker build, exported binary govulncheck and image Trivy/Syft in evidence job 133078919121.
+- Impact: outdated runtime embeds known affected library versions. Whether individual advisories are reachable under XMesh usage is still under manual review; static symbol traces are not a working exploit.
+- Recommended fix: coordinated supported Go SDK/runtime update, full router race/build/config checks and repeated binary/image scans; preserve Node release/version policy.
+- Regression/PR: not yet prepared. No Node runtime was modified.
+- CVSS v4.0: not scored pending applicability/impact analysis.
+
+### Advisory triage caution
+
+govulncheck JSON mode returned zero even with advisory records. The collector now separately records a nonzero triage status whenever records exist. Broad derived-symbol call traces can overstate a specific vulnerable use (for example a MaxBytesReader concurrency condition); do not classify a production High merely because an HTTP helper appears in a trace. Confirmed module versions, actual API use and exploit prerequisites must be considered together.

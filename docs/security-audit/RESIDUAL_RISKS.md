@@ -14,3 +14,5 @@ The audit is incomplete. No absence-of-vulnerability conclusion follows from the
 - Historical branch divergence and earlier security documents do not establish fixes are present or protections work today.
 
 No production change is requested for the draft login fix until review/CI complete. Its eventual rollout is Nexus-only with existing configuration/API contracts. Operators should retain documented network isolation and supported TLS settings; no manual origin key/provisioning workaround was introduced.
+
+Executed evidence additionally confirms old Node router Go/Alpine versions and advisory-bearing gateway/Agent/container reports. These remain open for applicability assessment and coordinated dependency remediation. Source and selected image SBOMs now exist; Rust dependency scan and full image coverage remain incomplete.

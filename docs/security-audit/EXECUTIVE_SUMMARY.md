@@ -21,7 +21,9 @@ SAST, dependency and source/container SBOM collection is implemented with redact
 | Repository | Confirmed Critical | Confirmed High | Medium | Low | Fix prepared | Remaining assurance work |
 |---|---:|---:|---:|---:|---|---|
 | XMesh-Nexus | 0 observed* | 0 observed* | 1 provisional resource finding | 1 hardening | 2 related changes in draft #493 | API/scans/quotas/installation/cross-component tests |
-| XMesh-Node | 0 observed* | 0 observed* | not established | not established | none yet | agent/update/identity/runtime dependency review |
-| XMesh-Sub | 0 observed* | 0 observed* | not established | not established | none yet | origin/IPv6/manager/update/installation tests |
+| XMesh-Node | 0 observed* | 0 observed* | 1 runtime maintenance | not established | none yet | agent/update/identity/runtime dependency review |
+| XMesh-Sub | 0 observed* | 0 observed* | not established | 1 publisher hardening | draft #18, CI passed | origin/IPv6/manager/update/installation tests |
 
 *Counts mean findings observed so far, not absence of undiscovered vulnerabilities. Medium/Low entries describe limited confirmed behavior; denial-of-service impact remains unproven. See FINDINGS.md for assessment and CVSS limits.
+
+Updated checkpoint: source/container SBOM generation and SAST/Go/npm/image scans have executed; advisory and secret-candidate triage is incomplete and Rust dependency scanning failed. See SUPPLY_CHAIN.md for exact counts and caveats. Sub publisher pinning is separately prepared in draft #18 with passing CI. Old Node router SDK/runtime is a confirmed maintenance gap, not a demonstrated Critical exploit.

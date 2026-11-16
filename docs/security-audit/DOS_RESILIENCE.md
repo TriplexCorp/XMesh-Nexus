@@ -17,3 +17,5 @@ A legal 1024-byte password may expand sixfold in JSON; 8 KiB preserves that case
 ## Remaining tests
 
 Instrument SQL/Redis command counts for malformed token, unsupported method, encoded token, long query and random format-valid token requests; prove rejection order rather than inferring it solely from source. Exercise disabled settings, Redis failure, cache stampede, multi-replica totals, IPv4-mapped and alternate IPv6 /64 identities. Measure readiness and unauthenticated machine-route costs with at most bounded local concurrency. Inspect regexes/JSON nesting and serialization separately; no completed ReDoS/fuzz campaign is claimed.
+
+PostgreSQL pool source review: default maximum 20 connections (DB_MAX_CONNECTIONS configurable), minimum one, ten-second acquisition timeout, 600-second idle timeout, 30-minute lifetime. These bounds do not replace request admission or a DB statement timeout; outage/waiter behavior remains untested.

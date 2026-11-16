@@ -35,10 +35,8 @@ def run(label, argv, cwd=None, timeout=900):
     print(json.dumps(statuses[-1]), flush=True)
     if label == "cargo-audit" and code:
         # Toolchain diagnostics only; never print source matches or raw scanner logs.
-        for line in log.read_text(errors="replace").splitlines():
-            if ("rustc " in line or "requires rust" in line or
-                    "is not supported" in line or "failed to compile" in line):
-                print("AUDIT_CARGO_DIAGNOSTIC " + json.dumps(line), flush=True)
+        for line in log.read_text(errors="replace").splitlines()[-30:]:
+            print("AUDIT_CARGO_DIAGNOSTIC " + json.dumps(line), flush=True)
     return code
 
 
@@ -125,12 +123,13 @@ elif sys.argv[1] == "dependencies":
     # Only public source/cache/report directories are mounted. No host credentials,
     # Docker socket, system directory, or production state enters the container.
     run("cargo-audit", ["docker", "run", "--rm", "--cap-drop=ALL",
+        "--user", str(os.getuid()) + ":" + str(os.getgid()),
         "--security-opt=no-new-privileges", "--memory=4g", "--cpus=2",
-        "-e", "CARGO_BUILD_JOBS=2", "-v", str(nexus) + ":/src",
-        "-v", str(cache) + ":/usr/local/cargo/registry",
+        "-e", "CARGO_BUILD_JOBS=2", "-e", "CARGO_HOME=/reports/cargo-home",
+        "-v", str(nexus) + ":/src",
         "-v", str(PRIVATE) + ":/reports", "-w", "/src/backend",
-        "rust:1.99.1-bookworm", "sh", "-c",
-        "cargo generate-lockfile && cargo install cargo-audit --locked && cargo audit --version > /reports/cargo-audit.version.txt && cargo audit --json > /reports/cargo-audit.json"],
+        "rust:1.100-bookworm", "sh", "-c",
+        "export PATH=/reports/cargo-home/bin:$PATH; cargo generate-lockfile && cargo install cargo-audit --locked && cargo audit --version > /reports/cargo-audit.version.txt && cargo audit --json > /reports/cargo-audit.json"],
         timeout=1800)
     if (PRIVATE / "cargo-audit.version.txt").is_file():
         (OUT / "cargo-audit-version.txt").write_bytes((PRIVATE / "cargo-audit.version.txt").read_bytes())
@@ -184,6 +183,9 @@ elif sys.argv[1] == "dependencies":
                 elif "config" in item:
                     objects.append({"scannerConfig": item["config"]})
             save(label + "-govulncheck.redacted.json", objects)
+            if any("osv" in item for item in objects):
+                statuses.append({"tool": label + "-advisory-triage", "exitCode": 1,
+                                 "note": "JSON mode exit zero does not clear findings"})
     for repo, source in sources.items():
         slug = REPOS[repo]
         run(slug + "-source-sbom", [str(TOOLS / "syft"), "scan", "dir:" + str(source),
@@ -220,6 +222,8 @@ elif sys.argv[1] == "dependencies":
                 elif "config" in item:
                     objects.append({"scannerConfig": item["config"]})
             save("node-production-binary-govulncheck.redacted.json", objects)
+            if any("osv" in item for item in objects):
+                statuses.append({"tool": "node-production-binary-advisory-triage", "exitCode": 1})
     images = [("node-router-runtime", "xmesh-audit-router:local"),
               ("sub-caddy-runtime", "caddy:2"), ("sub-python-runtime", "python:3.12-alpine")]
     for label, image in images:
