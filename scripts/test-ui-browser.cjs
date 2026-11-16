@@ -3576,7 +3576,7 @@ async function main() {
       assert.equal(focus.shadow,'none','Text fields must not add a second focus shadow');
       await screenshot(page,`audit-focus-host-${width}`);
       assert.equal(await page.locator('[data-host-editor-tab]').count(),0,'One-page editor must not contain task tabs');
-      for(const zone of ['host-primary-panel','host-public-panel','host-advanced-panel','host-assignment-panel','host-editor-side'])
+      for(const zone of ['host-primary-panel','host-public-panel','host-advanced-panel','host-assignment-panel','host-health-panel','host-editor-side'])
         assert(await page.locator('.'+zone).isVisible(),'All Host sections must be visible: '+zone);
       for(const [name,value] of [['xhttpMode','packet-up'],['tlsVerification','insecure']])
         await page.locator('[name="'+name+'"]').evaluate((input,v)=>{input.value=v;input.dispatchEvent(new Event('change',{bubbles:true}))},value);
