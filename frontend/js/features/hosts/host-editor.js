@@ -87,16 +87,19 @@ window.XMeshHostEditor=(() => {
             '<div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
             '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small>'+
           '</section>'+
-          '<section class="host-editor-card host-editor-side" aria-label="Предпросмотр клиентского подключения">'+
-            '<div class="node-form-section-title">'+ic('globe')+'<span>Предпросмотр</span></div>'+
-            '<div class="host-resolved" data-host-resolved></div>'+
+          '<section class="host-editor-card host-health-panel">'+
+            '<div class="node-form-section-title">'+ic('activity')+'<span>Статус / Проверка</span></div>'+
             '<div class="host-preview-status">'+
               '<p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p>'+
               '<p class="host-validation" data-host-warnings role="status" hidden></p>'+
               '<button type="button" class="gh sm" data-host-repair hidden></button>'+
               '<button type="button" class="gh sm" data-host-link-profile hidden></button>'+
-              '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p>'+
             '</div>'+
+          '</section>'+
+          '<section class="host-editor-card host-editor-side" aria-label="Предпросмотр клиентского подключения">'+
+            '<div class="node-form-section-title">'+ic('globe')+'<span>Предпросмотр</span></div>'+
+            '<div class="host-resolved" data-host-resolved></div>'+
+            '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p>'+
           '</section>'+
         '</aside>'+
       '</div>';
