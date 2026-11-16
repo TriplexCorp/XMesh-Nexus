@@ -116,7 +116,9 @@ assert.equal((html.match(/role="tab"/g)||[]).length,0,
   'Host creation must not hide fields behind any task tabs');
 assert(!html.includes(' inert') && !html.includes('data-active="false"'),
   'Core host controls must remain immediately interactive; decorative icons may be aria-hidden');
-assert.match(html,/class="host-icon-field"/,'Host controls include semantic, decorative SVG glyph slots');
+assert.match(html,/class="f host-icon-field"/,'Host controls include semantic, decorative SVG glyph slots');
+assert((html.match(/host-control-glyph/g)||[]).length>=12,
+ 'Host editor must not silently lose its SVG icon slots');
 assert.match(app,/class="host-heading-emblem"/,'Host title restores the concept emblem');
 assert.match(app,/Создать хост/,'New Host has an explicit create action');
 assert.match(feature,/form.addEventListener\('invalid'/,
