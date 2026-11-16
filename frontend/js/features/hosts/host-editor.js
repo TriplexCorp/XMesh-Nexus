@@ -61,6 +61,7 @@ window.XMeshHostEditor=(() => {
       const clientFields=['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].filter(k=>f(k)).map(k=>field(f(k),typeof o[k]==='object'&&o[k]!==null?JSON.stringify(o[k],null,2):o[k]||'')).join('');
       return '<div class="host-editor-layout" data-host-single-page>'+
         '<div class="host-editor-main-column">'+
+          '<div class="host-editor-primary-column">'+
           '<section class="host-editor-card host-primary-panel" aria-label="Подключение">'+
             '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
             '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
@@ -69,6 +70,8 @@ window.XMeshHostEditor=(() => {
             '<div class="node-form-section-title">'+ic('globe')+'<span>Публичная точка</span></div>'+
             '<div class="host-public-fields">'+basic+'</div>'+(window.XMeshRemarkPicker?.markup()||'')+
           '</section>'+
+          '</div>'+
+          '<div class="host-editor-client-column">'+
           '<section class="host-editor-card host-advanced host-advanced-panel" aria-label="Параметры клиента">'+
             '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Параметры клиента</span></div>'+
               '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
@@ -81,12 +84,13 @@ window.XMeshHostEditor=(() => {
                 '<p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details>'+
             '</div>'+
           '</section>'+
-        '</div>'+
-        '<aside class="host-editor-sidebar" aria-label="Назначение и предпросмотр">'+
           '<section class="host-editor-card host-assignment-panel">'+
             '<div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
             '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small>'+
           '</section>'+
+          '</div>'+
+        '</div>'+
+        '<aside class="host-editor-sidebar" aria-label="Статус и предпросмотр">'+
           '<section class="host-editor-card host-health-panel">'+
             '<div class="node-form-section-title">'+ic('activity')+'<span>Статус / Проверка</span></div>'+
             '<div class="host-preview-status">'+
