@@ -314,6 +314,13 @@ async function dismissDialog(page,dialog,opener){
   assert.equal(await page.locator('.subscription-server-management').count(),1,'Management is a standalone card');
   assert.equal(await page.locator('.subscription-server-provisioning').count(),1,'Installation is a standalone card');
   assert.equal(await page.locator('.subscription-sub-step').count(),3,'Installer renders three compact step cards');
+  const installerWidths=await page.locator('.subscription-sub-step').evaluateAll(steps=>
+    steps.map(step=>({step:step.getBoundingClientRect().width,
+      content:step.querySelector(':scope > div')?.getBoundingClientRect().width||0,
+      tracks:getComputedStyle(step).gridTemplateColumns})));
+  assert(installerWidths.every(({step,content})=>content>=step*.74),
+    'Installer content must occupy the full card, not a leftover number/icon track: '+
+    JSON.stringify(installerWidths));
   assert(await page.locator('[data-sub-public-copy]').isDisabled(),'No copyable public template before domain is saved');
   assert(await page.locator('[data-sub-health-copy]').isDisabled(),'Health address copy requires saved domain');
   assert(await page.locator('.subscription-sub-install-command').isHidden(),
@@ -326,6 +333,8 @@ async function dismissDialog(page,dialog,opener){
       overflow:document.documentElement.scrollWidth>innerWidth+1};
   });
   assert(!desktop.overflow,'Desktop cards may not overflow horizontally');
+  assert(installerWidths.every(({content})=>content>250),
+    'Install instructions must remain readable on the actual desktop browser');
   assert(desktop.installation.top>=Math.min(desktop.address.top,desktop.management.top)-2,
     'Installation should remain in the server workspace beneath or alongside the management cards');
   await page.screenshot({path:path.join(out,'studio-server-cards-desktop.png'),fullPage:true,animations:'disabled'});
