@@ -325,7 +325,7 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
 #dlg.host-wide .host-editor-layout{
   display:grid;
   grid-template-columns:minmax(0,1.02fr) minmax(0,1.12fr) minmax(0,1fr);
-  grid-template-rows:minmax(0,max-content);
+  grid-template-rows:max-content;
   grid-template-areas:none;
   gap:clamp(.65rem,.8vw,1.1rem);
   align-content:start;align-items:start;
@@ -338,6 +338,11 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
   gap:clamp(.65rem,.8vw,1.1rem);
   min-width:0;
 }
+/* Explicit desktop placement prevents auto-flow from reusing an occupied
+   grid row when responsive columns collapse. */
+#dlg.host-wide .host-editor-column-primary{grid-column:1;grid-row:1}
+#dlg.host-wide .host-editor-column-middle{grid-column:2;grid-row:1}
+#dlg.host-wide .host-editor-column-preview{grid-column:3;grid-row:1}
 #dlg.host-wide .host-editor-column>.host-editor-card{
   grid-area:auto;
   min-width:0;
@@ -558,10 +563,13 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
 @media(max-width:1199px){
   #dlg.host-wide .host-editor-layout{
     grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-rows:repeat(2,max-content);
     grid-template-areas:none;
   }
+  #dlg.host-wide .host-editor-column-primary{grid-column:1;grid-row:1}
+  #dlg.host-wide .host-editor-column-middle{grid-column:2;grid-row:1}
   #dlg.host-wide .host-editor-column-preview{
-    grid-column:1/-1;
+    grid-column:1/-1;grid-row:2;
     grid-template-columns:repeat(2,minmax(0,1fr));
     align-items:start;
   }
@@ -569,14 +577,17 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
 @media(max-width:760px){
   #dlg.host-wide .host-editor-layout{
     grid-template-columns:minmax(0,1fr);
+    grid-template-rows:repeat(3,max-content);
     grid-template-areas:none;gap:.7rem;
   }
   #dlg.host-wide .host-editor-column,
   #dlg.host-wide .host-editor-column-preview{
-    grid-column:1;
     grid-template-columns:minmax(0,1fr);
     gap:.7rem;
   }
+  #dlg.host-wide .host-editor-column-primary{grid-column:1;grid-row:1}
+  #dlg.host-wide .host-editor-column-middle{grid-column:1;grid-row:2}
+  #dlg.host-wide .host-editor-column-preview{grid-column:1;grid-row:3}
   #dlg.host-wide .host-editor-column>.host-editor-card{padding:.8rem}
   #dlg.host-wide .host-connect-fields,
   #dlg.host-wide .host-public-fields,
