@@ -170,9 +170,9 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
 }
 
 
-/* PR #491 follow-up: concept-faithful, single-surface desktop composition.
- * The three wrappers are structural only; semantic sections are grid items.
- * Every field stays in DOM and short viewports keep a controlled scroll fallback. */
+/* PR #491 follow-up: concept-faithful single-surface editor.
+ * The six semantic sections are direct grid children with no empty wrappers.
+ * All fields remain in DOM; short viewports retain controlled scrolling. */
 #dlg.host-wide .host-editor-layout{
   display:grid;
   grid-template-columns:minmax(0,1.06fr) minmax(0,1.06fr) minmax(18rem,.86fr);
@@ -182,9 +182,6 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
   gap:.72rem;
   padding:.12rem .18rem .35rem;
   overflow-x:hidden;overflow-y:auto;
-}
-#dlg.host-wide :is(.host-editor-main-column,.host-editor-primary-column,.host-editor-client-column,.host-editor-sidebar){
-  display:contents;
 }
 #dlg.host-wide .host-primary-panel{grid-area:connection}
 #dlg.host-wide .host-public-panel{grid-area:public}
