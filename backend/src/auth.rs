@@ -62,7 +62,6 @@ async fn verify_login_password_async(
     .await
 }
 
-
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct AuthUser {
     pub id: i64,
