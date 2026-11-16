@@ -64,6 +64,19 @@ assert.match(portalRoutes,/pub async fn serve\([\s\S]*?valid_token\(&token\)[\s\
   'Direct feed handler must reject malformed tokens before expensive work');
 assert.match(portalRoutes,/pub async fn portal\([\s\S]*?valid_token\(&token\)[\s\S]*?wants_feed/,
   'Portal handler must reject malformed tokens before UA negotiations');
+const portalHandler=portalRoutes.slice(
+  portalRoutes.indexOf('pub async fn portal('),
+  portalRoutes.indexOf('pub async fn portal_route('));
+assert.ok(portalHandler.indexOf('subscription_flood::enforce(') <
+  portalHandler.indexOf('subscription_user_agent::wants_feed('),
+  'Portal must enforce the request budget before potentially expensive UA parsing');
+assert.ok(handler.indexOf('subscription_flood::enforce(') <
+  handler.indexOf('subscription_user_agent::wants_feed('),
+  'Custom portal must enforce the request budget before parsing UA');
+assert.doesNotMatch(portalHandler,/return serve\(State\(state\)/,
+  'Portal must not charge the same request twice when serving client data');
+assert.match(portalRoutes,/async fn serve_authorized\(/,
+  'Portal and subscription feed must share one post-budget serving function');
 assert.match(main,/pub subscription_path: std::sync::Arc<std::sync::RwLock<String>>/,
   'Custom subscription route needs a hot read-only path snapshot');
 assert.match(main,/object\.contains_key\("subscriptionPath"\)/,
