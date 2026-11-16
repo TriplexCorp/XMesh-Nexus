@@ -49,7 +49,6 @@ fn github_release_request(client: &reqwest::Client, url: &str) -> reqwest::Reque
     request
 }
 
-
 #[derive(Clone, Debug, Serialize)]
 pub struct CoreStatus {
     pub desired_version: String,
