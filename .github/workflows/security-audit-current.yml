@@ -1,0 +1,88 @@
+name: Security audit - current XMesh production snapshots
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/security-audit-current.yml'
+      - 'scripts/security-audit-evidence.py'
+      - 'scripts/security-audit-install-tools.py'
+      - 'docs/security-audit/TOOL_PINS.json'
+      - 'docs/security-audit/CURRENT_STATUS.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence:
+    name: Collect ${{ matrix.mode }} evidence (not security approval)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [sast, dependencies]
+    env:
+      AUDIT_TOOL_MANIFEST: ${{ github.workspace }}/docs/security-audit/TOOL_PINS.json
+      SEMGREP_SEND_METRICS: "off"
+      SEMGREP_ENABLE_VERSION_CHECK: "0"
+    steps:
+      - name: Check out audit harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Check out only the permitted Nexus snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: TriplexCorp/XMesh-Nexus
+          ref: 5f2e6cc7c9f07102849906faca312908b20261ae
+          path: audit-sources/nexus
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out only the permitted Node snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 647adcf7af326b205fce12545fb5d75a20bb8191
+          path: audit-sources/node
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out only the permitted Sub snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: TriplexCorp/XMesh-Sub
+          ref: 17be0aab84ec04412ef490fcaa0953181b3e4262
+          path: audit-sources/sub
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select disposable runner tool directory
+        shell: bash
+        run: echo "AUDIT_TOOLS=$RUNNER_TEMP/xmesh-audit-tools" >> "$GITHUB_ENV"
+      - name: Install exact checksum-verified binary tools
+        run: python3 scripts/security-audit-install-tools.py
+      - name: Prepare pinned SAST tools in a private virtualenv
+        if: matrix.mode == 'sast'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m venv "$AUDIT_TOOLS/python"
+          "$AUDIT_TOOLS/python/bin/python" -m pip install --disable-pip-version-check --no-input semgrep==1.185.0 bandit==1.9.4
+      - name: Select the declared production Agent Go SDK
+        if: matrix.mode == 'dependencies'
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.27.4'
+          cache: false
+      - name: Collect evidence with all tool exit codes preserved
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          python3 -m py_compile scripts/security-audit-evidence.py scripts/security-audit-install-tools.py
+          python3 scripts/security-audit-evidence.py '${{ matrix.mode }}'
+      - name: Retain only sanitized reports and standard SBOMs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xmesh-current-audit-${{ matrix.mode }}
+          path: ${{ runner.temp }}/xmesh-audit-evidence/
+          if-no-files-found: warn
+          retention-days: 14
