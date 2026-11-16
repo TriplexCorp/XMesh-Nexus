@@ -1918,6 +1918,7 @@ async fn patch_settings(
     validate_settings_announcements(object)?;
     validate_settings_integrations(object)?;
     let subscription_path_changed = object.contains_key("subscriptionPath");
+    let subscription_flood_changed = object.contains_key("subscriptionFlood");
 
     // A public hostname must never simultaneously belong to the primary Sub
     // gateway and a separately enrolled mirror identity.
@@ -1953,6 +1954,9 @@ async fn patch_settings(
             .subscription_path
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = new_path;
+    }
+    if subscription_flood_changed {
+        subscription_flood::invalidate_cache(&state).await;
     }
     audit(
         &state.pool,
