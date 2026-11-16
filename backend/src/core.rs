@@ -859,6 +859,13 @@ async fn read_installed_version(root: &Path) -> Option<String> {
     target.file_name()?.to_str().map(ToOwned::to_owned)
 }
 
+fn record_release_entry_name(seen: &mut HashSet<String>, name: &str) -> Result<(), String> {
+    if !seen.insert(name.to_owned()) {
+        return Err(format!("Xray release archive contains duplicate {name}"));
+    }
+    Ok(())
+}
+
 // Bound actual decompressed output, not just ZIP metadata or compressed bytes.
 // A malicious central directory may claim a small size for highly compressible data.
 fn read_bounded_release_entry(
@@ -909,9 +916,7 @@ async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> 
             {
                 continue;
             }
-            if !seen.insert(name.clone()) {
-                return Err(format!("Xray release archive contains duplicate {name}"));
-            }
+            record_release_entry_name(&mut seen, &name)?;
             let remaining = MAX_RELEASE_UNPACK_BYTES.saturating_sub(total_unpacked);
             let limit = max_file_bytes.min(remaining);
             let declared = entry.size();
@@ -948,7 +953,7 @@ mod tests {
     use super::{
         MAX_RELEASE_NOTE_BYTES, ghcr_manifest_status, normalize_version, official_xray_image_tag,
         parse_ech_output, parse_vless_encryption_output, read_bounded_release_entry,
-        unpack_release, validate_ech_public_name,
+        record_release_entry_name, unpack_release, validate_ech_public_name,
     };
 
     #[test]
@@ -977,51 +982,54 @@ mod tests {
         );
     }
 
+    #[test]
+    fn duplicate_release_entry_names_are_rejected() {
+        let mut seen = std::collections::HashSet::new();
+        record_release_entry_name(&mut seen, "xray").unwrap();
+        assert!(record_release_entry_name(&mut seen, "xray").is_err());
+        record_release_entry_name(&mut seen, "geosite.dat").unwrap();
+        assert!(record_release_entry_name(&mut seen, "geosite.dat").is_err());
+    }
+
     #[tokio::test]
-    async fn release_zip_rejects_compressed_entry_bombs_and_duplicate_names() {
-        use base64::{Engine as _, engine::general_purpose::STANDARD};
+    async fn release_zip_enforces_decompression_budget_and_accepts_valid_archive() {
         use std::io::{Cursor, Write};
 
-        // This tiny valid fixture was created with Python's stdlib zipfile:
-        // two regular deflated files, both named "xray". zip::ZipWriter
-        // intentionally refuses to write repeated names, so it cannot
-        // construct the negative case itself.
-        const DUPLICATE_ENTRY_ZIP: &str = "UEsDBBQAAAAIAI4wcF20dGX5DAAAAAoAAAAEAAAAeHJheUvLLCou0a0oSqwEAFBLAwQUAAAACACOMHBdLnPQig0AAAALAAAABAAAAHhyYXkrTk3Oz0vRrShKrAQAUEsBAhQDFAAAAAgAjjBwXbR0ZfkMAAAACgAAAAQAAAAAAAAAAAAAAIABAAAAAHhyYXlQSwECFAMUAAAACACOMHBdLnPQig0AAAALAAAABAAAAAAAAAAAAAAAgAEuAAAAeHJheVBLBQYAAAAAAgACAGQAAABdAAAAAAA=";
-
-        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
-        let options = || {
-            zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Deflated)
+        let create_archive = |oversized_note: bool| {
+            let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+            let options = || {
+                zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Deflated)
+            };
+            writer.start_file("xray", options()).unwrap();
+            writer.write_all(b"synthetic-test-xray").unwrap();
+            writer.start_file("README.md", options()).unwrap();
+            if oversized_note {
+                writer
+                    .write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1])
+                    .unwrap();
+            } else {
+                writer.write_all(b"valid-notes").unwrap();
+            }
+            writer.finish().unwrap().into_inner()
         };
-        writer.start_file("xray", options()).unwrap();
-        writer.write_all(b"synthetic-test-xray").unwrap();
-        writer.start_file("README.md", options()).unwrap();
-        writer
-            .write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1])
-            .unwrap();
-        let compressed_bomb = writer.finish().unwrap().into_inner();
 
         let target =
             std::env::temp_dir().join(format!("xmesh-zip-budget-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&target).unwrap();
-        for (name, bytes) in [
-            ("oversized", compressed_bomb),
-            ("duplicate", STANDARD.decode(DUPLICATE_ENTRY_ZIP).unwrap()),
-        ] {
-            assert!(
-                bytes.len() < 64 * 1024,
-                "fixture must remain highly compressed"
-            );
-            let error = unpack_release(&bytes, &target).await.unwrap_err();
-            assert!(
-                error.to_ascii_lowercase().contains(if name == "duplicate" {
-                    "duplicate"
-                } else {
-                    "size budget"
-                }),
-                "{name}: {error}"
-            );
-        }
+
+        let valid = create_archive(false);
+        unpack_release(&valid, &target).await.unwrap();
+        assert_eq!(std::fs::read(target.join("xray")).unwrap(), b"synthetic-test-xray");
+        assert_eq!(std::fs::read(target.join("README.md")).unwrap(), b"valid-notes");
+
+        let oversized = create_archive(true);
+        assert!(
+            oversized.len() < 64 * 1024,
+            "adversarial fixture must remain highly compressed"
+        );
+        let error = unpack_release(&oversized, &target).await.unwrap_err();
+        assert!(error.contains("size budget"), "{error}");
         std::fs::remove_dir_all(target).unwrap();
     }
 
