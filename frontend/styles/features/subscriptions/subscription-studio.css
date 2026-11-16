@@ -1469,11 +1469,38 @@
 /* Installer is a real workflow, not a decorative numbered timeline. */
 .subscription-studio .subscription-sub-step-index,
 .subscription-studio .subscription-step-symbol{display:none}
+.subscription-studio .subscription-sub-steps{
+  display:grid;grid-template-columns:minmax(0,1fr);width:100%;min-width:0;
+}
 .subscription-studio .subscription-sub-step{
-  gap:.6rem;padding:.95rem 1rem;border-radius:var(--nx-control-radius);
+  display:grid;
+  /* Both decoration columns are hidden in Studio. A leftover 2.55rem
+     first track previously squeezed every instruction into ~40 pixels. */
+  grid-template-columns:minmax(0,1fr);
+  gap:.5rem;padding:.9rem 1rem;
+  width:100%;min-width:0;box-sizing:border-box;
+  border-radius:var(--nx-control-radius);
   border-color:var(--studio-divider);background:var(--nx-section-bg);
 }
-.subscription-studio .subscription-sub-step>div{min-width:0}
+.subscription-studio .subscription-sub-step>div{
+  grid-column:1/-1;width:100%;min-width:0;max-width:100%;
+  overflow-wrap:normal;
+}
+.subscription-studio .subscription-sub-step :is(p,small){
+  max-width:100%;min-width:0;white-space:normal;
+  overflow-wrap:break-word;word-break:normal;
+}
+.subscription-studio .subscription-sub-install-actions{
+  display:flex;align-items:center;flex-wrap:wrap;gap:.45rem;min-width:0;
+}
+.subscription-studio .subscription-sub-install-actions button{
+  min-width:0;white-space:normal;overflow-wrap:normal;
+}
+.subscription-studio .subscription-sub-install-command{min-width:0;max-width:100%}
+.subscription-studio .subscription-sub-verify{width:100%;min-width:0}
+.subscription-studio .subscription-sub-verify code{
+  min-width:min(100%,12rem);overflow-wrap:anywhere;word-break:normal;
+}
 .subscription-studio .subscription-sub-step b{font-size:.84rem}
 .subscription-studio .subscription-sub-step p{font-size:.72rem;line-height:1.5}
 .subscription-studio .subscription-sub-install-actions{display:flex;gap:.45rem;flex-wrap:wrap}

@@ -72,13 +72,13 @@ const html=editor({profileId:1,tag:'vless-main-2',remark:'🇳🇱',
  address:'example.net',port:443,nodes:[5]}, fspec);
 const sections=[...html.matchAll(/<section class="([^"]+)"/g)].map(x=>x[1]);
 assert.deepEqual(sections,[
- 'host-editor-main host-primary-panel',
- 'host-assignment-panel',
- 'host-advanced host-advanced-panel',
- 'host-client-group',
- 'host-client-group',
- 'host-editor-side'
-],'Each task must preserve its semantic editing sections.');
+ 'host-editor-card host-primary-panel',
+ 'host-editor-card host-public-panel',
+ 'host-editor-card host-advanced host-advanced-panel',
+ 'host-editor-card host-assignment-panel',
+ 'host-editor-card host-health-panel',
+ 'host-editor-card host-editor-side'
+],'All five semantic editing zones must be present together in a single page.');
 for(const key of names){
  const occurrences=html.split('name="'+key+'"').length-1;
  assert.equal(occurrences,1,'Input '+key+' must occur exactly once');
@@ -87,10 +87,12 @@ for(const action of ['data-host-node-preset','data-host-count','data-host-resolv
   'data-host-runtime','data-host-clear-overrides']){
  assert(html.includes(action),'Missing working host editor action '+action);
 }
-assert(!html.includes('<details class="host-advanced'),'Existing transport and security overrides must remain visible');
-assert.equal((html.match(/class="host-client-group"/g)||[]).length,2,'Client fields must have Transport and Security groupings');
-assert.match(html,/class="host-advanced-groups"/,'Both groups must remain inside the same Host form');
-assert(html.includes('host-client-settings'),'Expert client metadata must have its own disclosure');
+assert.equal((html.match(/class="host-advanced-fields"/g)||[]).length,1,
+  'Client overrides must occupy a single compact two-column editor');
+assert.match(html,/class="host-extra-settings"/,
+  'Additional overrides must stay accessible in an inline disclosure');
+assert.match(html,/class="host-client-settings"/,
+  'Expert JSON metadata must remain reachable in an inline disclosure');
 assert.match(feature, /\['remark','address','port','countryCode','serverDescription'\]/, 'Optional description follows the public endpoint without breaking field pairs');
 assert.match(html,/name="serverDescription"/,'The Host editor must expose the optional description field');
 assert(!html.includes('host-description-hint')&&!html.includes('Описание сервера показывается'),'Host form must not show redundant description hints');
@@ -106,29 +108,36 @@ assert(updated.includes('name="profileId" value="2"'),'The factory must not reta
 assert.equal(JSON.stringify(DB),snapshot,'Rendering must not mutate application collections');
 
 
-// Host tasks deliberately replace the old three-column desktop presentation.
-assert.equal((html.match(/role="tab" /g)||[]).length,3,'Hosts need exactly three task tabs');
-for(const key of ['connection','client','preview']){
- assert(html.includes('aria-controls="host-panel-'+key+'"'),'Tab must identify its panel');
- assert(html.includes('aria-labelledby="host-tab-'+key+'"'),'Panel must identify its tab');
-}
-assert.equal((html.match(/aria-selected="true"/g)||[]).length,1,'Only one task may be selected');
-assert.equal((html.match(/ aria-hidden="true" inert/g)||[]).length,2,'Inactive tasks must be inaccessible');
-assert.match(feature,/form.addEventListener\('invalid'/,'Native errors must reveal their task before focus');
-assert.match(feature,/ArrowLeft.*ArrowRight.*Home.*End/,'Tabs need standard keyboard navigation');
-assert.match(app,/bindHostEditor\(form\)/,'The real form must install task interactions');
-assert.match(css,/\.host-editor-panes\s*\{[^}]*display:grid[^}]*overflow:auto/,'The task frame must own scrolling');
-assert.match(css,/\.host-resolved\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,'Preview must fill the canvas rather than leaving an empty right sidebar');
-assert.match(css,/\.host-advanced-groups\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,'Client fields must use two readable desktop groups');
-assert.match(css,/\[data-host-editor-pane\]\s*\{[^}]*grid-area:1\/1/,'All tasks must share one intrinsic frame');
-assert.match(css,/\[data-host-editor-pane\]\[data-active=false\][^}]*visibility:hidden;pointer-events:none;max-height:100%;overflow:clip/,'Inactive tasks must reserve geometry without extending the scroll area');
-assert.match(css,/#dlg\.host-wide\s*\{[^}]*--dialog-width:80rem/,'Hosts must use a readable dialog width');
-assert.match(css,/#dlg\.host-wide>form\.box\s*\{[\s\S]*?grid-template-rows:auto minmax\(0,1fr\) auto auto[\s\S]*?overflow:hidden/,'The shell must reserve a shrinkable body and visible footer');
-assert.match(css,/#dlg\.host-wide>form\.box>\.host-editor-layout\s*\{[^}]*overflow:hidden/,'The tab rail must stay outside the scrolling task frame');
-assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*position:static[^}]*z-index:auto/,'Footer must not cover fields');
-assert.match(css,/@media \(max-width:900px\)[\s\S]*?\.host-connection-workspace,\.host-preview-workspace\{grid-template-columns:minmax\(0,1fr\)/,'Narrow task workspaces must stack');
-assert.match(css,/@media \(max-width:560px\)[\s\S]*?\.host-connect-fields,\.host-public-fields,\.host-advanced-fields\{grid-template-columns:minmax\(0,1fr\)/,'Phone fields must keep usable widths');
-
+// One page is the canonical editor, not a wizard. Keep all fields once and
+// preserve all existing adapters, keyboard validation and copying actions.
+assert.match(html,/data-host-single-page/,
+  'Host editor must expose the one-page layout');
+assert.equal((html.match(/role="tab"/g)||[]).length,0,
+  'Host creation must not hide fields behind any task tabs');
+assert(!html.includes(' inert')&&!html.includes('aria-hidden="true"'),
+  'Core host controls must remain immediately interactive');
+assert.match(feature,/form.addEventListener\('invalid'/,
+  'Native validation must reveal controls inside optional disclosures');
+assert.match(app,/bindHostEditor\(form\)/,
+  'The real Host form must bind single-page interactions');
+assert.match(css,/\.host-editor-layout\{[\s\S]*?grid-template-columns:minmax\(0,1\.7fr\) minmax\(17rem,\.92fr\)/,
+  'Desktop Host editor must have a main form and live sidebar');
+assert.match(css,/\.host-editor-main-column,\.host-editor-sidebar\{display:grid/,
+  'Both columns must group content without blank task panes');
+assert.match(css,/\.host-resolved\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
+  'Right-side preview uses single-column rows instead of a wide empty canvas');
+assert.match(css,/#dlg\.host-wide\s*\{[^}]*--dialog-width:80rem/,
+  'Host retains a bounded readable desktop dialog width');
+assert.match(css,/#dlg\.host-wide>form\.box\s*\{[\s\S]*?grid-template-rows:auto minmax\(0,1fr\) auto auto[\s\S]*?overflow:hidden/,
+  'Shell retains a visible footer outside the central scroller');
+assert.match(css,/#dlg\.host-wide>form\.box>\.host-editor-layout\s*\{[^}]*overflow-y:auto/,
+  'Only the content surface may scroll on short or mobile viewports');
+assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*position:static[^}]*z-index:auto/,
+  'Save actions must remain fixed in the modal footer');
+assert.match(css,/@media\(max-width:1050px\)[\s\S]*?\.host-editor-layout\{grid-template-columns:minmax\(0,1fr\)/,
+  'Narrow Host editor stacks columns without horizontal overflow');
+assert.match(css,/@media\(max-width:520px\)[\s\S]*?\.host-connect-fields,\.host-public-fields,\.host-advanced-fields,\.host-extra-fields\{grid-template-columns:minmax\(0,1fr\)/,
+  'Phone fields must stay readable');
 // User Details uses a wider viewport-bounded dialog with adaptive height.
 assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:clamp\(72rem,72vw,112rem\)[\s\S]*?height:min\(clamp\(38\.5rem,64dvh,49rem\),calc\(100dvh - 2rem\)\)[\s\S]*?max-block-size:calc\(100dvh - 2rem\)/,
  'User Details must widen without overflowing a desktop viewport');

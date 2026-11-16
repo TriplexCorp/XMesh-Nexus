@@ -15,6 +15,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Статус / Проверка": "Status / Validation",
+    "Дополнительные параметры подключения": "Additional connection settings",
+    "Назначение и предпросмотр": "Assignment and preview",
+    "Предпросмотр клиентского подключения": "Client connection preview",
     "Выберите доступные клиенты и при необходимости добавьте ссылки на установку.": "Choose the available clients and optionally add installation links.",
     "Настроить ссылку": "Configure link",
     "Фильтрация запросов": "Request rate limiting",
