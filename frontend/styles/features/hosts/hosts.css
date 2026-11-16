@@ -462,6 +462,29 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
   #dlg.host-wide .host-editor-side .host-preview-disclaimer{
     margin-top:0;padding-top:.22rem;line-height:1.13;
   }
+  /* Paired compact preview facts use the wide third column without a tall
+     single-file list. Full values remain in DOM and copy buttons unchanged. */
+  #dlg.host-wide .host-editor-side .host-resolved{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  #dlg.host-wide .host-editor-side .host-resolved-line{
+    display:grid;grid-template-columns:minmax(0,1fr);
+    justify-items:stretch;gap:.1rem;
+    padding:.14rem .38rem;min-height:2.4rem;
+    border-right:1px solid var(--nx-separator);
+    min-width:0;
+  }
+  #dlg.host-wide .host-editor-side .host-resolved-line>span{
+    font-size:.65rem;line-height:1.06;
+    white-space:nowrap;text-overflow:ellipsis;overflow:hidden;
+  }
+  #dlg.host-wide .host-editor-side .host-resolved-line>b{
+    justify-content:space-between;gap:.16rem;
+    font-size:.68rem;line-height:1.12;
+  }
+  #dlg.host-wide .host-editor-side .host-value-copy{
+    min-height:1.35rem;width:1.35rem;padding:.13rem;
+  }
 }
 
 /* Host directory · compact Nexus cards. Shared system tokens own all material
