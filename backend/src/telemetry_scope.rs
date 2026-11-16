@@ -19,9 +19,9 @@ fn forbidden() -> ApiError {
 fn node_profile_id(node: &Value) -> Option<i64> {
     node.get("profileId")
         .and_then(|value| {
-            value.as_i64().or_else(|| {
-                value.as_str().and_then(|text| text.parse::<i64>().ok())
-            })
+            value
+                .as_i64()
+                .or_else(|| value.as_str().and_then(|text| text.parse::<i64>().ok()))
         })
         .filter(|id| *id > 0)
 }
@@ -33,14 +33,23 @@ fn configured_proxy_tags(profile: &Value) -> Result<HashSet<String>, ApiError> {
     } else {
         source.clone()
     };
-    let allowed_protocols = ["vless", "vmess", "trojan", "shadowsocks", "hysteria", "masque"];
+    let allowed_protocols = [
+        "vless",
+        "vmess",
+        "trojan",
+        "shadowsocks",
+        "hysteria",
+        "masque",
+    ];
     let tags = config
         .get("inbounds")
         .and_then(Value::as_array)
         .ok_or_else(forbidden)?
         .iter()
         .filter(|inbound| {
-            inbound.get("protocol").and_then(Value::as_str)
+            inbound
+                .get("protocol")
+                .and_then(Value::as_str)
                 .is_some_and(|protocol| allowed_protocols.contains(&protocol))
                 && inbound.get("settings").is_some_and(Value::is_object)
         })
@@ -157,9 +166,7 @@ pub async fn verify(
         }
     }
     for sample in inbound_traffic {
-        if !assigned_tags(sample.user_id, &user_squads, &squad_tags)
-            .contains(&sample.inbound_tag)
-        {
+        if !assigned_tags(sample.user_id, &user_squads, &squad_tags).contains(&sample.inbound_tag) {
             return Err(forbidden());
         }
     }
@@ -180,7 +187,10 @@ mod tests {
             {"tag":"CDN_DE","protocol":"vless","settings":{"clients":[]}}
         ]}).to_string()});
         let tags = configured_proxy_tags(&profile).unwrap();
-        assert_eq!(tags, HashSet::from(["DE_VLESS".to_owned(), "CDN_DE".to_owned()]));
+        assert_eq!(
+            tags,
+            HashSet::from(["DE_VLESS".to_owned(), "CDN_DE".to_owned()])
+        );
         assert!(node_profile_id(&json!({"profileId":"51"})) == Some(51));
         assert!(node_profile_id(&json!({"profileId":"not-a-number"})).is_none());
     }
