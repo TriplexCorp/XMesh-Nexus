@@ -918,7 +918,12 @@ async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> 
             let mut entry = archive
                 .by_index(index)
                 .map_err(|e| format!("Could not read ZIP entry: {e}"))?;
-            let name = entry.name().to_owned();
+            // zip 9 validates and decodes the filename lazily. A malformed
+            // allowed entry is not safe to silently reinterpret or extract.
+            let name = entry
+                .name()
+                .map_err(|e| format!("Invalid ZIP entry name: {e}"))?
+                .into_owned();
             if !entry.is_file() || name.contains('/') || name.contains('\\') {
                 continue;
             }
