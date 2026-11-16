@@ -989,11 +989,13 @@ mod tests {
         const DUPLICATE_ENTRY_ZIP: &str = "UEsDBBQAAAAIAI4wcF20dGX5DAAAAAoAAAAEAAAAeHJheUvLLCou0a0oSqwEAFBLAwQUAAAACACOMHBdLnPQig0AAAALAAAABAAAAHhyYXkrTk3Oz0vRrShKrAQAUEsBAhQDFAAAAAgAjjBwXbR0ZfkMAAAACgAAAAQAAAAAAAAAAAAAAIABAAAAAHhyYXlQSwECFAMUAAAACACOMHBdLnPQig0AAAALAAAABAAAAAAAAAAAAAAAgAEuAAAAeHJheVBLBQYAAAAAAgACAGQAAABdAAAAAAA=";
 
         let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
-        writer.start_file("xray", options).unwrap();
+        let options = || {
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated)
+        };
+        writer.start_file("xray", options()).unwrap();
         writer.write_all(b"synthetic-test-xray").unwrap();
-        writer.start_file("README.md", options).unwrap();
+        writer.start_file("README.md", options()).unwrap();
         writer
             .write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1])
             .unwrap();
