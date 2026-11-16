@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::{
     io::{Cursor, Read},
     os::unix::fs::{PermissionsExt, symlink},
@@ -22,6 +22,32 @@ use zip::ZipArchive;
 
 const RELEASES_URL: &str = "https://api.github.com/repos/XTLS/Xray-core/releases?per_page=30";
 const MAX_RELEASE_BYTES: usize = 120 * 1024 * 1024;
+const MAX_XRAY_UNPACK_BYTES: usize = 100 * 1024 * 1024;
+const MAX_GEO_UNPACK_BYTES: usize = 96 * 1024 * 1024;
+const MAX_RELEASE_NOTE_BYTES: usize = 2 * 1024 * 1024;
+const MAX_RELEASE_UNPACK_BYTES: usize = 240 * 1024 * 1024;
+
+// Only the official, fixed Xray release API may receive this optional token.
+// Ordinary installations work anonymously. CI injects a short-lived read-only
+// GITHUB_API_TOKEN to avoid GitHub's shared-runner unauthenticated rate limit.
+fn github_release_request(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
+    let request = client
+        .get(url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json");
+    if !url.starts_with("https://api.github.com/repos/XTLS/Xray-core/releases?") {
+        return request;
+    }
+    if let Ok(token) = std::env::var("XMESH_GITHUB_API_TOKEN")
+        && !token.is_empty()
+        && token.len() <= 1024
+        && token
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return request.bearer_auth(token);
+    }
+    request
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct CoreStatus {
@@ -361,10 +387,7 @@ impl CoreManager {
             let url = format!(
                 "https://api.github.com/repos/XTLS/Xray-core/releases?per_page=100&page={page}"
             );
-            let batch = self
-                .client
-                .get(&url)
-                .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            let batch = github_release_request(&self.client, &url)
                 .timeout(Duration::from_secs(20))
                 .send()
                 .await
@@ -675,9 +698,7 @@ impl CoreManager {
     }
 
     async fn fetch_releases(&self) -> Result<Vec<GithubRelease>, String> {
-        self.client
-            .get(RELEASES_URL)
-            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        github_release_request(&self.client, RELEASES_URL)
             .send()
             .await
             .map_err(|e| format!("Could not reach GitHub releases API: {e}"))?
@@ -855,6 +876,35 @@ async fn read_installed_version(root: &Path) -> Option<String> {
     target.file_name()?.to_str().map(ToOwned::to_owned)
 }
 
+fn record_release_entry_name(seen: &mut HashSet<String>, name: &str) -> Result<(), String> {
+    if !seen.insert(name.to_owned()) {
+        return Err(format!("Xray release archive contains duplicate {name}"));
+    }
+    Ok(())
+}
+
+// Bound actual decompressed output, not just ZIP metadata or compressed bytes.
+// A malicious central directory may claim a small size for highly compressible data.
+fn read_bounded_release_entry(
+    reader: &mut impl Read,
+    declared_size: u64,
+    max_bytes: usize,
+    name: &str,
+) -> Result<Vec<u8>, String> {
+    if declared_size > max_bytes as u64 {
+        return Err(format!("Xray release entry {name} exceeds its size budget"));
+    }
+    let mut contents = Vec::new();
+    reader
+        .take(max_bytes as u64 + 1)
+        .read_to_end(&mut contents)
+        .map_err(|e| format!("Could not extract {name}: {e}"))?;
+    if contents.len() > max_bytes {
+        return Err(format!("Xray release entry {name} exceeds its size budget"));
+    }
+    Ok(contents)
+}
+
 async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> {
     let data = bytes.to_vec();
     let destination = destination.to_path_buf();
@@ -862,6 +912,8 @@ async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> 
         let mut archive = ZipArchive::new(Cursor::new(data))
             .map_err(|e| format!("Downloaded Xray-core archive is not a valid ZIP: {e}"))?;
         let mut found_binary = false;
+        let mut seen = HashSet::new();
+        let mut total_unpacked = 0usize;
         for index in 0..archive.len() {
             let mut entry = archive
                 .by_index(index)
@@ -870,23 +922,25 @@ async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> 
             if !entry.is_file() || name.contains('/') || name.contains('\\') {
                 continue;
             }
-            if !matches!(
-                name.as_str(),
-                "xray" | "geoip.dat" | "geosite.dat" | "LICENSE" | "README.md"
-            ) {
-                continue;
-            }
+            let max_file_bytes = match name.as_str() {
+                "xray" => MAX_XRAY_UNPACK_BYTES,
+                "geoip.dat" | "geosite.dat" => MAX_GEO_UNPACK_BYTES,
+                "LICENSE" | "README.md" => MAX_RELEASE_NOTE_BYTES,
+                _ => continue,
+            };
             if let Some(mode) = entry.unix_mode()
                 && mode & 0o170_000 == 0o120_000
             {
                 continue;
             }
-            let mut contents = Vec::new();
-            entry
-                .read_to_end(&mut contents)
-                .map_err(|e| format!("Could not extract {name}: {e}"))?;
+            record_release_entry_name(&mut seen, &name)?;
+            let remaining = MAX_RELEASE_UNPACK_BYTES.saturating_sub(total_unpacked);
+            let limit = max_file_bytes.min(remaining);
+            let declared = entry.size();
+            let contents = read_bounded_release_entry(&mut entry, declared, limit, &name)?;
+            total_unpacked += contents.len();
             if name == "xray" {
-                if contents.is_empty() || contents.len() > 100 * 1024 * 1024 {
+                if contents.is_empty() {
                     return Err("Extracted Xray-core binary has an invalid size".to_owned());
                 }
                 found_binary = true;
@@ -914,9 +968,102 @@ fn chrono_free_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ghcr_manifest_status, normalize_version, official_xray_image_tag, parse_ech_output,
-        parse_vless_encryption_output, validate_ech_public_name,
+        MAX_RELEASE_NOTE_BYTES, ghcr_manifest_status, normalize_version, official_xray_image_tag,
+        parse_ech_output, parse_vless_encryption_output, read_bounded_release_entry,
+        record_release_entry_name, unpack_release, validate_ech_public_name,
     };
+
+    #[test]
+    fn bounded_release_entry_enforces_declared_and_actual_sizes() {
+        use std::io::Cursor;
+        let mut oversized_claim = Cursor::new(vec![0_u8; 4]);
+        assert!(read_bounded_release_entry(&mut oversized_claim, 5, 4, "README.md").is_err());
+        assert_eq!(
+            oversized_claim.position(),
+            0,
+            "reject oversized claim before decompression"
+        );
+
+        let mut incorrect_claim = Cursor::new(vec![7_u8; 12]);
+        assert!(read_bounded_release_entry(&mut incorrect_claim, 1, 4, "README.md").is_err());
+        assert_eq!(
+            incorrect_claim.position(),
+            5,
+            "read at most limit + 1 bytes"
+        );
+
+        let mut valid = Cursor::new(vec![7_u8; 4]);
+        assert_eq!(
+            read_bounded_release_entry(&mut valid, 4, 4, "README.md").unwrap(),
+            vec![7_u8; 4]
+        );
+    }
+
+    #[test]
+    fn duplicate_release_entry_names_are_rejected() {
+        let mut seen = std::collections::HashSet::new();
+        record_release_entry_name(&mut seen, "xray").unwrap();
+        assert!(record_release_entry_name(&mut seen, "xray").is_err());
+        record_release_entry_name(&mut seen, "geosite.dat").unwrap();
+        assert!(record_release_entry_name(&mut seen, "geosite.dat").is_err());
+    }
+
+    #[tokio::test]
+    async fn release_zip_enforces_decompression_budget_and_accepts_valid_archive() {
+        use std::io::{Cursor, Write};
+
+        let create_archive = |oversized_note: bool| {
+            let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+            let options = || {
+                zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Deflated)
+            };
+            writer.start_file("xray", options()).unwrap();
+            writer.write_all(b"synthetic-test-xray").unwrap();
+            writer.start_file("README.md", options()).unwrap();
+            if oversized_note {
+                writer
+                    .write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1])
+                    .unwrap();
+            } else {
+                writer.write_all(b"valid-notes").unwrap();
+                // Non-allowlisted nested files must never be extracted, even
+                // when a valid xray executable is present in the archive.
+                writer
+                    .start_file("nested/untrusted.conf", options())
+                    .unwrap();
+                writer.write_all(b"must-not-be-written").unwrap();
+            }
+            writer.finish().unwrap().into_inner()
+        };
+
+        let target =
+            std::env::temp_dir().join(format!("xmesh-zip-budget-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&target).unwrap();
+
+        let valid = create_archive(false);
+        unpack_release(&valid, &target).await.unwrap();
+        assert_eq!(
+            std::fs::read(target.join("xray")).unwrap(),
+            b"synthetic-test-xray"
+        );
+        assert_eq!(
+            std::fs::read(target.join("README.md")).unwrap(),
+            b"valid-notes"
+        );
+
+        assert!(!target.join("nested").exists());
+        assert!(!target.join("untrusted.conf").exists());
+
+        let oversized = create_archive(true);
+        assert!(
+            oversized.len() < 64 * 1024,
+            "adversarial fixture must remain highly compressed"
+        );
+        let error = unpack_release(&oversized, &target).await.unwrap_err();
+        assert!(error.contains("size budget"), "{error}");
+        std::fs::remove_dir_all(target).unwrap();
+    }
 
     #[test]
     fn ech_public_name_is_validated_as_a_domain_not_shell_input() {

@@ -60,6 +60,9 @@ services:
       # its XRAY STUDIO security=tls profile without manual mode toggles.
       PANEL_ACME_EMAIL: ${PANEL_ACME_EMAIL:-}
       CORE_DATA_DIR: /var/lib/xmesh/core
+      # Optional for audited release API calls in CI; ordinary VPS installs
+      # use the public unauthenticated GitHub endpoint by default.
+      XMESH_GITHUB_API_TOKEN: ${XMESH_GITHUB_API_TOKEN:-}
       DATABASE_URL: postgresql://xmesh_app:${APP_DB_PASSWORD:?Run ./install.sh first}@db:5432/xmesh
       REDIS_URL: redis://:${REDIS_PASSWORD:?Run ./install.sh first}@redis:6379/0
       DB_MAX_CONNECTIONS: ${DB_MAX_CONNECTIONS:-20}
