@@ -27,6 +27,29 @@ const MAX_GEO_UNPACK_BYTES: usize = 96 * 1024 * 1024;
 const MAX_RELEASE_NOTE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_RELEASE_UNPACK_BYTES: usize = 240 * 1024 * 1024;
 
+// Only the official, fixed Xray release API may receive this optional token.
+// Ordinary installations work anonymously. CI injects a short-lived read-only
+// GITHUB_API_TOKEN to avoid GitHub's shared-runner unauthenticated rate limit.
+fn github_release_request(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
+    let request = client
+        .get(url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json");
+    if !url.starts_with("https://api.github.com/repos/XTLS/Xray-core/releases?") {
+        return request;
+    }
+    if let Ok(token) = std::env::var("XMESH_GITHUB_API_TOKEN")
+        && !token.is_empty()
+        && token.len() <= 1024
+        && token
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return request.bearer_auth(token);
+    }
+    request
+}
+
+
 #[derive(Clone, Debug, Serialize)]
 pub struct CoreStatus {
     pub desired_version: String,
@@ -365,10 +388,7 @@ impl CoreManager {
             let url = format!(
                 "https://api.github.com/repos/XTLS/Xray-core/releases?per_page=100&page={page}"
             );
-            let batch = self
-                .client
-                .get(&url)
-                .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            let batch = github_release_request(&self.client, &url)
                 .timeout(Duration::from_secs(20))
                 .send()
                 .await
@@ -679,9 +699,7 @@ impl CoreManager {
     }
 
     async fn fetch_releases(&self) -> Result<Vec<GithubRelease>, String> {
-        self.client
-            .get(RELEASES_URL)
-            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        github_release_request(&self.client, RELEASES_URL)
             .send()
             .await
             .map_err(|e| format!("Could not reach GitHub releases API: {e}"))?
