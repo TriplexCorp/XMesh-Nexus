@@ -801,8 +801,10 @@ async fn main() -> anyhow::Result<()> {
     let subscription_key: [u8; 32] = subscription_bytes
         .try_into()
         .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY length is invalid"))?;
-    let subscription_path =
-        user_subscriptions::configured_public_path(&read_settings(&pool).await?);
+    let initial_settings = read_settings(&pool)
+        .await
+        .map_err(|error| anyhow::anyhow!("Cannot load subscription route: {}", error.safe_message()))?;
+    let subscription_path = user_subscriptions::configured_public_path(&initial_settings);
     let state = AppState {
         pool,
         redis,
@@ -1915,6 +1917,7 @@ async fn patch_settings(
     validate_settings_presentation(object)?;
     validate_settings_announcements(object)?;
     validate_settings_integrations(object)?;
+    let subscription_path_changed = object.contains_key("subscriptionPath");
 
     // A public hostname must never simultaneously belong to the primary Sub
     // gateway and a separately enrolled mirror identity.
@@ -1944,7 +1947,7 @@ async fn patch_settings(
     .fetch_one(&state.pool)
     .await?;
     let settings: Value = row.try_get("value")?;
-    if object.contains_key("subscriptionPath") {
+    if subscription_path_changed {
         let new_path = user_subscriptions::configured_public_path(&settings);
         *state
             .subscription_path
