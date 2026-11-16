@@ -191,7 +191,7 @@ mod tests {
             tags,
             HashSet::from(["DE_VLESS".to_owned(), "CDN_DE".to_owned()])
         );
-        assert!(node_profile_id(&json!({"profileId":"51"})) == Some(51));
+        assert_eq!(node_profile_id(&json!({"profileId":"51"})), Some(51));
         assert!(node_profile_id(&json!({"profileId":"not-a-number"})).is_none());
     }
 
