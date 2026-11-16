@@ -253,6 +253,9 @@ def main():
         profile_config={
             "inbounds":[{"tag":"DE_VLESS","listen":"127.0.0.1","port":28351,
                          "protocol":"vless","settings":{"decryption":"none","clients":[]},
+                         "streamSettings":{"network":"tcp","security":"none"}},
+                        {"tag":"CDN_DE","listen":"127.0.0.1","port":28352,
+                         "protocol":"vless","settings":{"decryption":"none","clients":[]},
                          "streamSettings":{"network":"tcp","security":"none"}}],
             "outbounds":[{"tag":"direct","protocol":"freedom"}],
             "routing":{"rules":[]}
@@ -263,7 +266,7 @@ def main():
         assert_status(code,201,"create XRAY STUDIO profile for node policy test")
         profile_id=profile["id"]
         code,squad,_=request("POST","/collections/squads",
-            {"name":"CI autonomous squad","inb":["DE_VLESS"]},
+            {"name":"CI autonomous squad","inb":["DE_VLESS","CDN_DE"]},
             cookie=cookie,origin=BASE)
         assert_status(code,201,"create inbound assignment for policy test")
         squad_id=squad["id"]
@@ -326,7 +329,7 @@ def main():
         serialized=json.dumps(desired["config"],sort_keys=True,
                               separators=(",",":"),ensure_ascii=False).encode()
         assert policy["configSha256"]==hashlib.sha256(serialized).hexdigest()
-        assert desired["config"]["inbounds"][1]["tag"]=="xmesh_stats_in"
+        assert any(inbound["tag"]=="xmesh_stats_in" for inbound in desired["config"]["inbounds"])
         der=(bytes.fromhex("302a300506032b6570032100")+
              bytes.fromhex(desired["policyPublicKey"]))
         policy_file=Path(directory)/"policy.json"
