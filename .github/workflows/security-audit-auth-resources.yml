@@ -80,6 +80,7 @@ jobs:
         if: matrix.target == 'security'
         shell: bash
         env:
+          XMESH_AUDIT_TELEMETRY_SCOPE: "1"
           HTTP_PROXY: ""
           HTTPS_PROXY: ""
           ALL_PROXY: ""

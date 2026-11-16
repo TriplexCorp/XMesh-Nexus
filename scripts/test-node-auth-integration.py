@@ -385,6 +385,40 @@ def main():
                  "X-XMesh-Signature":sig.hex()}
             return request("POST","/metrics/ingest",sample,headers=hdr)
 
+        # Scoped audit negative: a valid machine identity is not user authorization.
+        if os.environ.get("XMESH_AUDIT_TELEMETRY_SCOPE") == "1":
+            assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
+            assert BASE == "http://127.0.0.1:8080"
+            code, isolated, _ = request("POST", "/collections/squads",
+                {"name":"Disposable audit isolated scope","inb":["AUDIT_ISOLATED_ONLY"]},
+                cookie=cookie, origin=BASE)
+            assert_status(code, 201, "create isolated audit scope")
+            isolated_user = None
+            try:
+                code, isolated_user, _ = request("POST", "/collections/users",
+                    {"username":"audit_unassigned_scope","squads":[isolated["id"]],
+                     "hold":True,"holdDays":30,"limit":1.0},
+                    cookie=cookie, origin=BASE)
+                assert_status(code, 201, "create isolated audit user")
+                code, _, _ = signed_post("/metrics/ingest", {
+                    "node_id":node,"userStatsStatus":"verified",
+                    "userStatsAtMs":int(time.time()*1000),
+                    "userTraffic":[{"userId":isolated_user["id"],
+                                    "uplinkBytes":1024,"downlinkBytes":1024}]})
+                assert code in (201,400,403,422), "Unexpected telemetry response"
+                code, listing, _ = request("GET", "/collections/users", cookie=cookie)
+                assert_status(code, 200, "read isolated audit user")
+                observed = next(x for x in listing["items"] if x["id"]==isolated_user["id"])
+                assert observed.get("hold") is True, (
+                    "Telemetry object authorization regression: unrelated user changed")
+                print("PASS: unrelated user remains unchanged by signed telemetry")
+            finally:
+                if isolated_user is not None:
+                    request("DELETE",f'/collections/users/{isolated_user["id"]}',
+                            cookie=cookie,origin=BASE)
+                request("DELETE",f'/collections/squads/{isolated["id"]}',
+                        cookie=cookie,origin=BASE)
+
         first_sample_earliest=int(time.time()*1000)-5000
         assert_status(report_signed((50,90),(25,35),
                       pending_counter=(0,0),initial_counter=(19,25))[0],
