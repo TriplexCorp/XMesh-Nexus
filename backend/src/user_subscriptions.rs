@@ -24,6 +24,26 @@ mod device_limits;
 
 pub use base::{migrate_legacy_ciphertexts, provision_new_user, revoke, rotate_credentials};
 
+/// Only the canonical, administrator-validated path is kept in memory.
+/// Invalid public URLs must not trigger a PostgreSQL settings read.
+pub fn configured_public_path(settings: &Value) -> String {
+    settings
+        .get("subscriptionPath")
+        .and_then(Value::as_str)
+        .filter(|path| path.starts_with('/'))
+        .unwrap_or("/s")
+        .trim_end_matches('/')
+        .to_owned()
+}
+
+fn validate_custom_route<'a>(path: &'a str, configured: &str) -> Option<&'a str> {
+    let (prefix, token) = path.rsplit_once('/')?;
+    if prefix != configured || !crate::subscription_flood::valid_token(token) {
+        return None;
+    }
+    Some(token)
+}
+
 /// Protected by Integration API middleware before this internal accessor is invoked.
 pub async fn service_subscription_status(state: &AppState, id: i64) -> Result<Value, ApiError> {
     base::service_subscription_status(state, id).await
@@ -226,9 +246,23 @@ pub async fn serve(
     headers: HeaderMap,
     Query(options): Query<HashMap<String, String>>,
 ) -> Result<Response, ApiError> {
+    if !crate::subscription_flood::valid_token(&token) {
+        return Ok(crate::subscription_flood::reject_invalid());
+    }
     if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
         return Ok(rejected);
     }
+    serve_authorized(state, token, headers, options).await
+}
+
+/// Called only after a single shared token and rate-budget check. Portal
+/// content negotiation must not account for one refresh twice.
+async fn serve_authorized(
+    state: AppState,
+    token: String,
+    headers: HeaderMap,
+    options: HashMap<String, String>,
+) -> Result<Response, ApiError> {
     let fingerprint = token_fingerprint(&state, &token).await?;
     let request_headers = headers.clone();
     let response = base::serve(
@@ -263,13 +297,18 @@ pub async fn portal(
     headers: HeaderMap,
     Query(options): Query<HashMap<String, String>>,
 ) -> Result<Response, ApiError> {
+    if !crate::subscription_flood::valid_token(&token) {
+        return Ok(crate::subscription_flood::reject_invalid());
+    }
+    // The budget applies before even client User-Agent parsing. A feed and
+    // an HTML portal are one public request, not two independent refreshes.
+    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
+        return Ok(rejected);
+    }
     let wants_feed = crate::subscription_user_agent::wants_feed(&headers, &options)
         .map_err(|message| ApiError::new(StatusCode::BAD_REQUEST, message))?;
     if wants_feed {
-        return serve(State(state), Path(token), headers, Query(options)).await;
-    }
-    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
-        return Ok(rejected);
+        return serve_authorized(state, token, headers, options).await;
     }
     base::portal(State(state), Path(token), headers, Query(options)).await
 }
@@ -280,36 +319,27 @@ pub async fn portal_route(
     headers: HeaderMap,
     Query(options): Query<HashMap<String, String>>,
 ) -> Result<Response, ApiError> {
-    let (prefix, token) = uri
-        .path()
-        .rsplit_once('/')
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Subscription not found"))?;
-    let settings = crate::read_settings(&state.pool).await?;
-    let configured = settings
-        .get("subscriptionPath")
-        .and_then(Value::as_str)
-        .filter(|path| path.starts_with('/'))
-        .unwrap_or("/s")
-        .trim_end_matches('/');
-    if prefix != configured {
-        return Err(ApiError::new(
-            StatusCode::NOT_FOUND,
-            "Subscription not found",
-        ));
+    // Before touching Redis, PostgreSQL, or the UA negotiator, validate the
+    // actual route against an in-memory snapshot of Subscription Studio's path.
+    // Long URIs are rejected earlier by the route-local URI middleware.
+    let token = {
+        let configured = state
+            .subscription_path
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(token) = validate_custom_route(uri.path(), &configured) else {
+            return Ok(crate::subscription_flood::reject_invalid());
+        };
+        token.to_owned()
+    };
+
+    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
+        return Ok(rejected);
     }
     let wants_feed = crate::subscription_user_agent::wants_feed(&headers, &options)
         .map_err(|message| ApiError::new(StatusCode::BAD_REQUEST, message))?;
     if wants_feed {
-        return serve(
-            State(state),
-            Path(token.to_owned()),
-            headers,
-            Query(options),
-        )
-        .await;
-    }
-    if let Some(rejected) = crate::subscription_flood::enforce(&state, token).await {
-        return Ok(rejected);
+        return serve_authorized(state, token, headers, options).await;
     }
     base::portal_route(State(state), OriginalUri(uri), headers, Query(options)).await
 }
@@ -318,6 +348,38 @@ pub async fn portal_route(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn custom_routes_reject_random_names_and_bad_tokens_without_database_reads() {
+        let token = "a".repeat(64);
+        let configured = configured_public_path(&json!({"subscriptionPath":"/a/b/c"}));
+        assert_eq!(configured, "/a/b/c");
+        assert_eq!(configured_public_path(&json!({})), "/s");
+        assert_eq!(
+            validate_custom_route(&format!("/a/b/c/{token}"), &configured),
+            Some(token.as_str())
+        );
+        assert_eq!(
+            validate_custom_route(&format!("/a/b/x/{token}"), &configured),
+            None
+        );
+        assert_eq!(
+            validate_custom_route(&format!("/a/b/c/{}", "A".repeat(64)), &configured),
+            None
+        );
+        assert_eq!(
+            validate_custom_route("/a/b/c/not-a-token", &configured),
+            None
+        );
+        assert_eq!(
+            validate_custom_route(&format!("/s/{token}"), &configured),
+            None
+        );
+        assert_eq!(
+            validate_custom_route(&format!("/api/v1/{token}"), &configured),
+            None
+        );
+    }
 
     #[test]
     fn default_fingerprint_is_materialized_without_overwriting_host_choice() {

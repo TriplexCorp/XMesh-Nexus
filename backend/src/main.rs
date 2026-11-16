@@ -217,6 +217,9 @@ pub struct AppState {
     pub totp_key: Option<[u8; 32]>,
     pub subscription_key: [u8; 32],
     pub node_policy_signer: std::sync::Arc<node_policy::PolicySigner>,
+    // Snapshot of the owner-validated custom portal path. Never query
+    // PostgreSQL just to classify untrusted public subscription URLs.
+    pub subscription_path: std::sync::Arc<std::sync::RwLock<String>>,
 }
 
 #[derive(Debug)]
@@ -542,6 +545,8 @@ fn application_router(state: AppState) -> Router {
     // ABSENT from production builds (default features). It stays 404 until
     // XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only is explicitly set.
 
+    let public_subscription = get(user_subscriptions::portal_route)
+        .layer(middleware::from_fn(subscription_flood::uri_budget_guard));
     let public = Router::new()
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
@@ -564,8 +569,16 @@ fn application_router(state: AppState) -> Router {
         .route("/node/restart/progress", post(node_xray_update::progress))
         .route("/node/desired-config", post(node_runtime::desired_config))
         .route("/node/enroll", post(node_enrollment::claim))
-        .route("/sub/{token}", get(user_subscriptions::serve))
-        .route("/portal/{token}", get(user_subscriptions::portal))
+        .route(
+            "/sub/{token}",
+            get(user_subscriptions::serve)
+                .layer(middleware::from_fn(subscription_flood::uri_budget_guard)),
+        )
+        .route(
+            "/portal/{token}",
+            get(user_subscriptions::portal)
+                .layer(middleware::from_fn(subscription_flood::uri_budget_guard)),
+        )
         .route("/auth/session", get(auth::session))
         .route("/auth/login", post(auth::login))
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
@@ -578,34 +591,31 @@ fn application_router(state: AppState) -> Router {
         .route("/login", get(|| async { StatusCode::NOT_FOUND }))
         .route("/login.html", get(|| async { StatusCode::NOT_FOUND }))
         .route("/dashboard/{slug}", get(security::dashboard_entry))
-        .route("/{part1}/{token}", get(user_subscriptions::portal_route))
-        .route(
-            "/{part1}/{part2}/{token}",
-            get(user_subscriptions::portal_route),
-        )
+        .route("/{part1}/{token}", public_subscription.clone())
+        .route("/{part1}/{part2}/{token}", public_subscription.clone())
         .route(
             "/{part1}/{part2}/{part3}/{token}",
-            get(user_subscriptions::portal_route),
+            public_subscription.clone(),
         )
         .route(
             "/{part1}/{part2}/{part3}/{part4}/{token}",
-            get(user_subscriptions::portal_route),
+            public_subscription.clone(),
         )
         .route(
             "/{part1}/{part2}/{part3}/{part4}/{part5}/{token}",
-            get(user_subscriptions::portal_route),
+            public_subscription.clone(),
         )
         .route(
             "/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{token}",
-            get(user_subscriptions::portal_route),
+            public_subscription.clone(),
         )
         .route(
             "/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{token}",
-            get(user_subscriptions::portal_route),
+            public_subscription.clone(),
         )
         .route(
             "/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{part8}/{token}",
-            get(user_subscriptions::portal_route),
+            public_subscription,
         )
         .nest(
             "/api/v1",
@@ -791,6 +801,10 @@ async fn main() -> anyhow::Result<()> {
     let subscription_key: [u8; 32] = subscription_bytes
         .try_into()
         .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY length is invalid"))?;
+    let initial_settings = read_settings(&pool).await.map_err(|error| {
+        anyhow::anyhow!("Cannot load subscription route: {}", error.safe_message())
+    })?;
+    let subscription_path = user_subscriptions::configured_public_path(&initial_settings);
     let state = AppState {
         pool,
         redis,
@@ -799,6 +813,7 @@ async fn main() -> anyhow::Result<()> {
         totp_key,
         subscription_key,
         node_policy_signer,
+        subscription_path: std::sync::Arc::new(std::sync::RwLock::new(subscription_path)),
     };
     // Old tokens remain valid; only their encrypted display/recovery copy is
     // rewrapped. Keep the old TOTP key until this migration finishes.
@@ -1902,6 +1917,8 @@ async fn patch_settings(
     validate_settings_presentation(object)?;
     validate_settings_announcements(object)?;
     validate_settings_integrations(object)?;
+    let subscription_path_changed = object.contains_key("subscriptionPath");
+    let subscription_flood_changed = object.contains_key("subscriptionFlood");
 
     // A public hostname must never simultaneously belong to the primary Sub
     // gateway and a separately enrolled mirror identity.
@@ -1931,6 +1948,16 @@ async fn patch_settings(
     .fetch_one(&state.pool)
     .await?;
     let settings: Value = row.try_get("value")?;
+    if subscription_path_changed {
+        let new_path = user_subscriptions::configured_public_path(&settings);
+        *state
+            .subscription_path
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = new_path;
+    }
+    if subscription_flood_changed {
+        subscription_flood::invalidate_cache(&state).await;
+    }
     audit(
         &state.pool,
         &actor.username,

@@ -49,4 +49,57 @@ assert.match(protocols,/fn existing_records_keep_legacy_passwords_until_explicit
 assert.match(protocols,/fn rekey_changes_all_protocol_credentials/);
 assert.match(main,/protocol_credentials::provision\(object\)/);
 assert.match(backend,/crate::protocol_credentials::provision\(object\)/);
+// A public bearer URL must not reach PostgreSQL or a dynamic UA negotiator
+// until its entire path and token are validated and its budget is checked.
+const portalRoutes=read('backend/src/user_subscriptions.rs');
+const flood=read('backend/src/subscription_flood.rs');
+const handler=portalRoutes.slice(portalRoutes.indexOf('pub async fn portal_route('),portalRoutes.indexOf('#[cfg(test)]',portalRoutes.indexOf('pub async fn portal_route(')));
+assert.match(handler,/validate_custom_route\(uri\.path\(\), &configured\)/,
+  'Custom public paths must be classified using an in-memory settings snapshot');
+assert.doesNotMatch(handler,/read_settings\(|\.fetch_(?:one|optional|all)\(/,
+  'Untrusted custom-path requests must not query PostgreSQL');
+assert.ok(handler.indexOf('validate_custom_route(')<handler.indexOf('subscription_flood::enforce('),
+  'Custom path/token check must precede Redis enforcement');
+assert.match(portalRoutes,/pub async fn serve\([\s\S]*?valid_token\(&token\)[\s\S]*?subscription_flood::enforce/,
+  'Direct feed handler must reject malformed tokens before expensive work');
+assert.match(portalRoutes,/pub async fn portal\([\s\S]*?valid_token\(&token\)[\s\S]*?wants_feed/,
+  'Portal handler must reject malformed tokens before UA negotiations');
+const portalHandler=portalRoutes.slice(
+  portalRoutes.indexOf('pub async fn portal('),
+  portalRoutes.indexOf('pub async fn portal_route('));
+assert.ok(portalHandler.indexOf('subscription_flood::enforce(') <
+  portalHandler.indexOf('subscription_user_agent::wants_feed('),
+  'Portal must enforce the request budget before potentially expensive UA parsing');
+assert.ok(handler.indexOf('subscription_flood::enforce(') <
+  handler.indexOf('subscription_user_agent::wants_feed('),
+  'Custom portal must enforce the request budget before parsing UA');
+assert.doesNotMatch(portalHandler,/return serve\(State\(state\)/,
+  'Portal must not charge the same request twice when serving client data');
+assert.match(portalRoutes,/async fn serve_authorized\(/,
+  'Portal and subscription feed must share one post-budget serving function');
+assert.match(main,/pub subscription_path: std::sync::Arc<std::sync::RwLock<String>>/,
+  'Custom subscription route needs a hot read-only path snapshot');
+assert.match(main,/object\.contains_key\("subscriptionPath"\)/,
+  'Subscription Studio saves must refresh the hot path');
+assert.match(main,/get\(user_subscriptions::portal_route\)[\s\S]*?uri_budget_guard/,
+  'Public custom URLs must have a route-local URI size limit');
+assert.match(flood,/pub async fn uri_budget_guard\(/,
+  'Public URI/query budget must run before Query extractor allocation');
+assert.match(flood,/CONFIG_REFRESH_LOCK: tokio::sync::Mutex/,
+  'Subscription flood policy refresh must have a single-flight lock');
+assert.match(flood,/fn recent_config\(\) -> Option<FloodConfig>/,
+  'Public requests must use a local short-lived policy snapshot');
+assert.match(flood,/pub async fn invalidate_cache\(/,
+  'Owner policy changes must invalidate the policy cache');
+assert.match(main,/subscription_flood::invalidate_cache\(&state\)\.await/,
+  'Owner settings updates must invalidate cached flood policy');
+assert.match(flood,/static PUBLIC_REQUESTS: AtomicU64/,
+  'An operator-independent process-wide emergency budget must exist');
+assert.match(flood,/static INVALID_REQUESTS: AtomicU64/,
+  'Malformed requests need a separate fixed-size budget');
+assert.match(flood,/if !admit\(&PUBLIC_REQUESTS, MAX_PUBLIC_REQUESTS_PER_MINUTE\)/,
+  'Valid paths must be bounded even when operator protection is disabled');
+assert.doesNotMatch(flood,/X-Forwarded-For|x-forwarded-for/,
+  'Never trust spoofable forwarding headers for rate limiting');
+
 console.log('Subscription key separation, logging redaction, indefinite tokens, rotation contract: PASS');

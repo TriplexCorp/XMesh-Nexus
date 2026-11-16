@@ -81,6 +81,27 @@ def check(status, expected, label):
     print("PASS:", label)
 
 
+def test_public_subscription_preflight():
+    """A bounded set of harmless invalid requests against the disposable CI API."""
+    token = "a" * 64
+
+    def status(path):
+        req = Request(BASE + path, headers={"Accept": "text/html"}, method="GET")
+        try:
+            response = urlopen(req, timeout=10)
+        except HTTPError as error:
+            response = error
+        with response:
+            response.read(128)
+            return response.status
+
+    check(status("/api/v1/sub/invalid"), 404, "invalid direct feed token rejected")
+    check(status("/api/v1/portal/" + "A" * 64), 404, "uppercase portal token rejected")
+    check(status("/not-a-subscription/" + token), 404, "unknown custom subscription route rejected")
+    check(status("/api/v1/sub/" + "a" * 200), 414, "oversized token rejected before URI extraction")
+    check(status("/s/" + token + "?format=" + "x" * 2049), 414, "oversized subscription query rejected")
+
+
 def login(user, password, mfa=False):
     status, data, cookie = api("POST", "/auth/login", {"username": user, "password": password})
     check(status, 200, "login " + user)
@@ -673,6 +694,7 @@ def test_builtin_telegram_admin_bot(owner_cookie, viewer_cookie):
 
 def main():
     owner, owner_cookie = login(USER, PASSWORD)
+    test_public_subscription_preflight()
     owner_id = owner["user"]["id"]
     create = {"username": "ci_viewer", "password": VIEWER_PASSWORD, "role": "viewer"}
 
