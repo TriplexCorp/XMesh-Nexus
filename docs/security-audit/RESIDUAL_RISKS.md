@@ -1,5 +1,7 @@
 # Residual risks and assurance gaps
 
+> **Post-checkpoint update, 2026-11-16:** Legacy statements about the login fix, obsolete Node runtime and unmerged Sub action pins below describe the original snapshot. Their separate remediations now appear on `main` as Nexus #496, Node #83 and Sub #18; Nexus #494 also limits manual ZIP extraction. A confirmed cross-object signed telemetry attribution defect is being remediated through Nexus #495, whose dedicated regression suite has passed but whose full compatibility rollout is still a gate. Remaining priorities include shared inbound tag/profile revocation behavior, legacy integration proof policy, direct Nexus origin access, IPv6 peer identity and real deployment rollback tests. No scanner result was disabled. ProjectHimera is excluded.
+
 The audit is incomplete. No absence-of-vulnerability conclusion follows from the current finding count or CI results.
 
 - Anonymous feed, health and machine endpoints still require complete cost/admission and storage-failure testing.
