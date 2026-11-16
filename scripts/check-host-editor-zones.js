@@ -73,9 +73,9 @@ const html=editor({profileId:1,tag:'vless-main-2',remark:'🇳🇱',
 const sections=[...html.matchAll(/<section class="([^"]+)"/g)].map(x=>x[1]);
 assert.deepEqual(sections,[
  'host-editor-card host-primary-panel',
- 'host-editor-card host-public-panel',
- 'host-editor-card host-assignment-panel',
  'host-editor-card host-advanced host-advanced-panel',
+ 'host-editor-card host-assignment-panel',
+ 'host-editor-card host-public-panel',
  'host-editor-card host-health-panel',
  'host-editor-card host-editor-side'
 ],'All six semantic editing zones must be present together in a single page.');
@@ -126,9 +126,9 @@ assert.match(feature,/form.addEventListener\('invalid'/,
 assert.match(app,/bindHostEditor\(form\)/,
   'The real Host form must bind single-page interactions');
 assert.match(html,/class="host-editor-column host-editor-column-primary"/,
-  'Connection and public endpoint must stack independently');
+  'Connection and client overrides must stack independently');
 assert.match(html,/class="host-editor-column host-editor-column-middle"/,
-  'Assignment and client overrides must stack independently');
+  'Assignment and public endpoint must stack independently');
 assert.match(html,/class="host-editor-column host-editor-column-preview"/,
   'Status and live preview must stack independently');
 assert.equal((html.match(/class="host-editor-column host-editor-column-/g)||[]).length,3,
@@ -139,6 +139,10 @@ assert.match(css,/#dlg\.host-wide \.host-editor-layout\{[\s\S]*?grid-template-ar
   'The active editor must not retain the legacy shared-row geometry');
 assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
   'Mobile layout must stack the three groups without horizontal overflow');
+assert.match(css,/#dlg\.host-wide \.host-editor-column-middle\{grid-column:1;grid-row:2\}/,
+  'Mobile middle stack needs explicit row two, never overlap first');
+assert.match(css,/#dlg\.host-wide \.host-editor-column-preview\{grid-column:1;grid-row:3\}/,
+  'Mobile preview needs explicit row three, never overlap inputs');
 assert.doesNotMatch(html,/host-editor-main-column|host-editor-primary-column|host-editor-client-column|host-editor-sidebar/,
   'Obsolete Host layout wrapper layers must not return');
 assert.doesNotMatch(css,/display\s*:\s*contents/,
