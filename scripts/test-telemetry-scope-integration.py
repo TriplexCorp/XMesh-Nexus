@@ -158,9 +158,9 @@ def main():
         require(code, 200, "inspect users after rejected telemetry")
         for uid in (assigned, unrelated):
             user = next(item for item in listing["items"] if item["id"] == uid)
-            for key, original in baseline[uid].items():
-                assert user.get(key) == original, (
-                    "Unauthorized signed sample mutated user state", uid, key, original, user.get(key))
+            for field, original in baseline[uid].items():
+                assert user.get(field) == original, (
+                    "Unauthorized signed sample mutated user state", uid, field, original, user.get(field))
         print("PASS: rejected telemetry preserved hold, expiry, presence and usage on both accounts")
 
         require(send_signed([{"userId": assigned, "uplinkBytes": 64,
