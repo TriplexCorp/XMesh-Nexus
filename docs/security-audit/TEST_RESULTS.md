@@ -1,13 +1,34 @@
-# Test results — pending first CI cycle
+# Test results — execution ledger
 
-No local commands or scanners have run: the selected Cloud executor is unavailable. Source inspection through the GitHub connector is available.
+## Scope and safeguards
 
-| Test | Exact boundary | State |
-|---|---|---|
-| Repository/ref/file inventory | Three pinned GitHub snapshots, release/tag refs, branch pagination | collected; detailed content review partial |
-| Sub embedded limiter consistency | installer heredoc equals canonical limiter.py | equal under direct source comparison; not a runtime test |
-| Baseline login resource observation | real isolated API/Redis/PostgreSQL, 64 bounded fixture attempts, one async worker | CI queued; not yet evidence |
-| Candidate login regression | work admission, cheap endpoint responsiveness, 8 KiB candidate body budget, maximum escaped-password compatibility | expected to fail before remediation |
-| API authorization, Chromium XSS, quota/offline races, scanners/SBOM, clean VPS | requirements from original audit task | pending; not claimed passed |
+All new dynamic requests targeted loopback in disposable GitHub Actions Compose projects with generated test credentials. The harness rejects non-loopback targets, proxy inheritance and redirects. At most 64 concurrent attempts were sent; project containers and volumes are removed even after failure. Raw secrets and scanner matching text are excluded from retained reports.
 
-The test harness refuses non-loopback HTTP targets, proxies and redirects; it requires XMESH_AUDIT_DISPOSABLE=1 and uses only generated fixture users. It reports aggregate statuses/latencies, never passwords, cookies, feed tokens or real identities. A passing test establishes only its stated boundary.
+## Authentication resource comparison
+
+| Revision / evidence | Attempt statuses | Admission rejected | Liveness failures / worst latency | Padded login / escaped legal password |
+|---|---|---:|---|---|
+| Baseline `4aa1833`, job 133065378324 | 64 × 401 | 0 | 0 / 95.3 ms | 401 / accepted |
+| Initial test-only candidate, job 133065377802 | 64 × 401 | 0 | no outage observed | expected regression failed |
+| Fixed `dc89d14`, job 133069484769 | 5 × 401, 59 × 429 | 59 | 0 / 31.5 ms | 413 / accepted |
+| Follow-up `3feb6d9`, job 133074810571 | regression passed | asserted nonzero | latency/health assertions passed | both compatibility assertions passed |
+
+Baseline run: https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43796173300
+Fixed run: https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43797482027
+Follow-up: https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43799148088
+
+This comparison demonstrates admission behavior, not proof that the baseline could be taken offline. Timing differences are observational and not a benchmark.
+
+New Rust tests cover four-slot admission, valid/invalid password behavior, malformed hash capacity release and cancellation retaining a running worker permit. At `3feb6d9`, all 268 default-feature Rust tests passed; CI subsequently failed Clippy for a 101-line handler and two permit-lifetime warnings. The flow was refactored in `dab138a`; latest full CI results must be recorded before approval. No lint was disabled.
+
+## Existing CI exercised by the audit branch
+
+At `3feb6d9`: CLI, public subscription browser, subscription build, real VLESS TLS client tunnel, managed Xray update, strict bootstrap path regression and source/presence behavioral tests passed. Crypto selected tests passed before the same new-code Clippy errors; full crypto job did not pass. Dependent API authentication and isolated signer E2E jobs were skipped and must not be counted as passed. These existing checks cover their own scenarios, not the entire requested security test matrix.
+
+## Scanner execution
+
+Evidence workflow initially failed workflow validation before any scanner ran: runner temporary-directory selection was moved into a job step in `239f62e`. Do not count prepared commands as completed scans. The collector preserves tool exit codes and fails on findings/tool failures; raw output stays private, retained reports remove secrets and matched code. Record final run IDs/statuses and triage in SUPPLY_CHAIN.md.
+
+## Not yet performed
+
+Fresh VPS installs/rollback, complete role/object authorization negatives, browser XSS adversarial inputs, all subscription states with a real VPN client, database/Redis outage injection, quota races/offline synchronization, sustained bounded fuzz campaigns, origin and IPv6 Docker behavior. See REMEDIATION_PLAN.md for reproducible next work.
