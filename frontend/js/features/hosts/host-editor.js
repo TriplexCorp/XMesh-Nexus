@@ -76,20 +76,20 @@ window.XMeshHostEditor=(() => {
       return '<div class="host-editor-layout" data-host-single-page>'+
           '<div class="host-editor-column host-editor-column-primary">'+
           '<section class="host-editor-card host-primary-panel" aria-label="Подключение">'+
-            '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
+            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('link')+'</span><span>Подключение</span></div>'+
             '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
           '</section>'+
           '<section class="host-editor-card host-public-panel" aria-label="Публичная точка">'+
-            '<div class="node-form-section-title">'+ic('globe')+'<span>Публичная точка</span></div>'+
+            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('globe')+'</span><span>Публичная точка</span></div>'+
             '<div class="host-public-fields">'+basic+'</div>'+(window.XMeshRemarkPicker?.markup()||'')+
           '</section>'+
           '</div><div class="host-editor-column host-editor-column-middle">'+
           '<section class="host-editor-card host-assignment-panel">'+
-            '<div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
+            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('server')+'</span><span>Назначение</span></div>'+
             '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small>'+
           '</section>'+
           '<section class="host-editor-card host-advanced host-advanced-panel" aria-label="Параметры клиента">'+
-            '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Параметры клиента</span></div>'+
+            '<div class="host-advanced-heading"><div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('sliders')+'</span><span>Параметры клиента</span></div>'+
               '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
             '<div class="host-advanced-fields">'+essentialClient+'</div>'+
             '<div class="host-advanced-actions">'+
@@ -102,7 +102,7 @@ window.XMeshHostEditor=(() => {
           '</section>'+
           '</div><div class="host-editor-column host-editor-column-preview">'+
           '<section class="host-editor-card host-health-panel">'+
-            '<div class="node-form-section-title">'+ic('activity')+'<span>Статус / Проверка</span></div>'+
+            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('activity')+'</span><span>Статус / Проверка</span></div>'+
             '<div class="host-preview-status">'+
               '<p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p>'+
               '<p class="host-validation" data-host-warnings role="status" hidden></p>'+
@@ -111,7 +111,7 @@ window.XMeshHostEditor=(() => {
             '</div>'+
           '</section>'+
           '<section class="host-editor-card host-editor-side" aria-label="Предпросмотр клиентского подключения">'+
-            '<div class="node-form-section-title">'+ic('globe')+'<span>Предпросмотр</span></div>'+
+            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('globe')+'</span><span>Предпросмотр</span></div>'+
             '<div class="host-resolved" data-host-resolved></div>'+
             '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p>'+
           '</section>'+
