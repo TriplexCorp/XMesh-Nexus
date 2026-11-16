@@ -77,6 +77,9 @@ function runtimeSurface(path){
   // This configures only the Nexus *panel host* (apt, ACME, Nginx, HAProxy).
   // It does not install, update or change the versioned node Agent runtime.
   if(path==='deploy/install-panel-host.sh') return false;
+  // The XSP-v2 product gateway runs only on the Nexus host. Updating its
+  // Go build cannot change versioned node Agent or the signed updater.
+  if(path.startsWith('deploy/xsp-v2-product-gateway/')) return false;
   if(path==='backend/src/node_runtime.rs' || path==='backend/src/node_runtime_p0d_staged.rs') return true;
   if(path.startsWith('deploy/')){
     if(path.endsWith('.md')) return false;
@@ -86,6 +89,12 @@ function runtimeSurface(path){
   return false;
 }
 
+assert.equal(runtimeSurface('deploy/xsp-v2-product-gateway/go.mod'),false,
+  'Panel-host XSP product gateway modules do not require an unrelated Node Agent version bump');
+assert.equal(runtimeSurface('deploy/xsp-v2-product-gateway/Dockerfile'),false,
+  'Panel-host product gateway Docker image is not the versioned Node Agent');
+assert.equal(runtimeSurface('deploy/update-node-control-agent.sh'),true,
+  'Node updater remains protected by the mandatory Agent version policy');
 assert.equal(runtimeSurface('deploy/install-panel-host.sh'),false,
   'Panel-host-only setup must not force a node Agent version bump');
 assert.equal(runtimeSurface('deploy/node-control-agent.sh'),true,
