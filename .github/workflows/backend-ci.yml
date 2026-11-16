@@ -382,7 +382,10 @@ jobs:
         run: |
           bash -n scripts/test-xsp-v2-ack-epoch-atomicity.sh
           bash scripts/test-xsp-v2-ack-epoch-atomicity.sh
-      - name: Exercise signed node identity, tamper resistance and replay rejection
+      - name: Exercise signed node identity, tamper resistance and cross-scope telemetry rejection
+        env:
+          XMESH_AUDIT_TELEMETRY_SCOPE: "1"
+          XMESH_AUDIT_DISPOSABLE: "1"
         run: python3 scripts/test-node-auth-integration.py
       - name: Exercise real RBAC, MFA and revocation API
         run: python3 scripts/test-auth-integration.py
