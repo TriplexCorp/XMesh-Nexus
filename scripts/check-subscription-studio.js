@@ -548,5 +548,22 @@ assert.match(css,/\[hidden\]\{display:none!important\}/,'Hidden workspace must n
 
 assert.match(src,/navigator\.clipboard\?\.writeText/);
 assert.match(src,/savedInstall\.domain=draft\.subscriptionDomain/);
+// Visual consistency regression: no numbered section badges, Unicode stars or layout-breaking actions.
+assert.doesNotMatch(view,/<div class="subscription-studio-heading"><span>0[1-4]<\/span>/,
+ 'Functional Studio headings should not have decorative sequence numbers');
+assert.doesNotMatch(view,/<span>[✦◈]<\/span>/,
+ 'Studio must use proper SVG symbols rather than arbitrary Unicode star/diamond glyphs');
+assert.match(view,/class="subscription-content-switch" role="switch" name="floodEnabled"/,
+ 'Flood protection uses the same accessible switch as other settings');
+assert.match(css,/\.subscription-client-row:not\(\.subscription-client-custom\)/,
+ 'Client settings have a compact dedicated editor layout');
+assert.match(css,/\.subscription-sub-step-index,\s*\.subscription-studio \.subscription-step-symbol\{display:none\}/,
+ 'Installer steps must not have oversized numeric badges');
+const portalActionsCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
+assert.match(portalActionsCss,/Shared public page \+ Studio preview: controls must never leak text/,
+ 'Public page and preview share the action-overflow fix');
+assert.match(portalActionsCss,/font-size:0!important;line-height:0!important/,
+ 'Icon-only copy/QR controls must never display overflowing labels');
+
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
 console.log('Subscription Studio, separate-domain management and deployment blueprint: OK');

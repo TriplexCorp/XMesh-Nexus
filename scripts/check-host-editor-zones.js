@@ -161,7 +161,7 @@ assert.ok(canonicalDialogsCss.includes('@media(min-width:1100px) and (max-width:
  canonicalDialogsCss.includes('height:min(clamp(36rem,70dvh,47rem),calc(100dvh - 2rem));'),
  'Normal desktop workspaces may use the taller form, without making 768px tablet dialogs oversized');
 assert.ok(canonicalDialogsCss.includes('@media(min-width:2800px) and (max-height:1300px)') &&
- canonicalDialogsCss.includes('--dialog-width:88rem;') &&
+ canonicalDialogsCss.includes('--dialog-width:84rem;') &&
  canonicalDialogsCss.includes('zoom:1.28;') &&
  canonicalDialogsCss.includes('height:min(clamp(38.5rem,70dvh,49rem),82dvh);'),
  'Short wide zoomed-out screens must get a bounded and legible workspace');

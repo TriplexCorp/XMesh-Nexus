@@ -2042,7 +2042,9 @@ dialog#dlg.user-modal .user-pane-settings .user-detail-card>.f>span{
 /* Always keep the Xray ID label, UUID and copy control on one line. At phone
    widths the group may occupy its own overview row, never split the ID itself. */
 #dlg.user-modal .user-identity-row{flex-wrap:nowrap;max-width:100%}
-#dlg.user-modal .user-identity-row>span{flex:0 0 auto;white-space:nowrap}
+/* Match UUID line metrics: inherited body line-height made the one-line label
+   look two lines tall and broke the desktop reference test. */
+#dlg.user-modal .user-identity-row>span{flex:0 0 auto;white-space:nowrap;line-height:1.3}
 #dlg.user-modal .user-identity-row code{white-space:nowrap;min-width:0}
 #dlg.user-modal .user-identity-row .user-id-copy{flex-shrink:0}
 

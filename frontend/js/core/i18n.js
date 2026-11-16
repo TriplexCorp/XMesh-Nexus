@@ -15,6 +15,12 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Выберите доступные клиенты и при необходимости добавьте ссылки на установку.": "Choose the available clients and optionally add installation links.",
+    "Настроить ссылку": "Configure link",
+    "Фильтрация запросов": "Request rate limiting",
+    "Включает контроль частоты обращений к подпискам.": "Enables rate limiting for subscription requests.",
+    "Безопасность шлюза": "Gateway security",
+    "Агент сам обращается к Nexus по HTTPS. Отдельный административный порт не нужен. Установщик проверяется, обновления подписываются, а данные пользователей остаются в Nexus.": "The agent connects to Nexus over HTTPS. No separate administrative port is needed. The installer is verified, updates are signed, and user data stays in Nexus.",
     "Тариф": "Plan",
     "Персональная подписка": "Personal subscription",
     "Свой логотип · сохраняется на сервере": "Custom logo · stored on the server",

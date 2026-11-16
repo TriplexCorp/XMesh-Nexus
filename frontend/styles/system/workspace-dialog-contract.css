@@ -347,7 +347,7 @@ html[data-motion=off] #dlg.user-modal::backdrop{
  * without eating the full physical screen or changing other dialogs. */
 @media(min-width:2800px) and (max-height:1300px){
   dialog#dlg.user-modal{
-    --dialog-width:88rem;
+    --dialog-width:84rem;
     zoom:1.28;
     height:min(clamp(38.5rem,70dvh,49rem),82dvh);
     block-size:min(clamp(38.5rem,70dvh,49rem),82dvh);
@@ -363,11 +363,20 @@ html[data-motion=off] #dlg.user-modal::backdrop{
     block-size:min(clamp(40rem,70dvh,55rem),calc(100dvh - 2rem));
   }
   dialog#dlg.user-modal:has(.user-editor-tabs [data-user-editor-tab="traffic"][aria-selected="true"]){
-    height:min(clamp(42rem,76dvh,52rem),calc(100dvh - 2rem));
-    block-size:min(clamp(42rem,76dvh,52rem),calc(100dvh - 2rem));
+    height:min(clamp(42rem,76dvh,58rem),calc(100dvh - 2rem));
+    block-size:min(clamp(42rem,76dvh,58rem),calc(100dvh - 2rem));
   }
   dialog#dlg.user-modal:has(.user-editor-tabs :is([data-user-editor-tab="routing"],[data-user-editor-tab="dev"])[aria-selected="true"]){
     height:min(clamp(38.5rem,58dvh,44rem),calc(100dvh - 2rem));
     block-size:min(clamp(38.5rem,58dvh,44rem),calc(100dvh - 2rem));
+  }
+}
+
+/* A zoomed-out, ultra-wide but short viewport has no spare vertical room:
+   preserve the normal tab height instead of stretching Traffic beyond it. */
+@media(min-width:2800px) and (max-height:1300px){
+  dialog#dlg.user-modal:has(.user-editor-tabs [data-user-editor-tab="traffic"][aria-selected="true"]){
+    height:min(clamp(40rem,70dvh,55rem),calc(100dvh - 2rem));
+    block-size:min(clamp(40rem,70dvh,55rem),calc(100dvh - 2rem));
   }
 }
