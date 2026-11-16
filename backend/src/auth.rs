@@ -14,9 +14,53 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Row};
+use std::sync::{Arc, LazyLock};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use uuid::Uuid;
 
 const SESSION_COOKIE: &str = "xmesh_session";
+
+const MAX_LOGIN_WORKERS: usize = 4;
+static LOGIN_WORK: LazyLock<Arc<Semaphore>> =
+    LazyLock::new(|| Arc::new(Semaphore::new(MAX_LOGIN_WORKERS)));
+
+fn reserve_login_work() -> Result<OwnedSemaphorePermit, ApiError> {
+    Arc::clone(&LOGIN_WORK).try_acquire_owned().map_err(|_| {
+        ApiError::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Слишком много попыток входа в панель. Повторите позже.",
+        )
+    })
+}
+
+async fn run_login_work(
+    admission: OwnedSemaphorePermit,
+    check: impl FnOnce() -> Result<bool, ApiError> + Send + 'static,
+) -> Result<bool, ApiError> {
+    tokio::task::spawn_blocking(move || {
+        // A cancelled HTTP future must not release capacity while CPU work continues.
+        let _admission = admission;
+        check()
+    })
+    .await
+    .map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Не удалось проверить пароль.",
+        )
+    })?
+}
+
+async fn verify_login_password_async(
+    password: String,
+    password_hash: String,
+    admission: OwnedSemaphorePermit,
+) -> Result<bool, ApiError> {
+    run_login_work(admission, move || {
+        verify_login_password(&password, &password_hash)
+    })
+    .await
+}
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct AuthUser {
@@ -148,9 +192,18 @@ pub async fn login(
             "Неверный логин или пароль.",
         ));
     }
+    // Reject excess work before settings, Redis or PostgreSQL are accessed.
+    login_with_admission(&state, body, reserve_login_work()?).await
+}
+
+async fn login_with_admission(
+    state: &AppState,
+    body: LoginRequest,
+    admission: OwnedSemaphorePermit,
+) -> Result<(StatusCode, HeaderMap, Json<Value>), ApiError> {
     let policy = crate::security::get_policy(&state.pool).await?;
     let (username_key, locked) = check_login_limits(
-        &state,
+        state,
         &body.username,
         policy.login_attempts,
         policy.lockout_minutes,
@@ -174,7 +227,7 @@ pub async fn login(
                 ),
             ));
         }
-        record_failed_login(&state, &username_key).await?;
+        record_failed_login(state, &username_key).await?;
         return Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "Неверный логин или пароль.",
@@ -186,7 +239,8 @@ pub async fn login(
     let password_hash: String = row.try_get("password_hash")?;
     let is_active: bool = row.try_get("is_active")?;
 
-    let verified = verify_login_password(&body.password, &password_hash)?;
+    let verified =
+        verify_login_password_async(body.password, password_hash.clone(), admission).await?;
     if !is_active || !verified {
         if locked {
             return Err(ApiError::new(
@@ -197,7 +251,7 @@ pub async fn login(
                 ),
             ));
         }
-        record_failed_login(&state, &username_key).await?;
+        record_failed_login(state, &username_key).await?;
         return Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "Неверный логин или пароль.",
@@ -227,8 +281,8 @@ pub async fn login(
             "Учётная запись изменилась. Войдите снова.",
         ));
     }
-    if crate::mfa::enabled(&state, admin_id).await? {
-        let challenge = crate::mfa::new_challenge_in_transaction(&state, &mut tx, admin_id).await?;
+    if crate::mfa::enabled(state, admin_id).await? {
+        let challenge = crate::mfa::new_challenge_in_transaction(state, &mut tx, admin_id).await?;
         tx.commit().await?;
         return Ok((
             StatusCode::OK,
@@ -238,10 +292,9 @@ pub async fn login(
             })),
         ));
     }
-    let response =
-        issue_session_in_transaction(&state, &mut tx, admin_id, &username, &role).await?;
+    let response = issue_session_in_transaction(state, &mut tx, admin_id, &username, &role).await?;
     tx.commit().await?;
-    clear_failed_login(&state, &username_key).await?;
+    clear_failed_login(state, &username_key).await?;
     Ok(response)
 }
 
@@ -518,4 +571,92 @@ fn make_session_cookie(
         "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={session_seconds}{}",
         if secure { "; Secure" } else { "" }
     ))
+}
+
+#[cfg(test)]
+mod resource_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn password_work_admission_is_non_waiting_and_bounded() {
+        let permits: Vec<_> = (0..MAX_LOGIN_WORKERS)
+            .map(|_| reserve_login_work().unwrap())
+            .collect();
+        let error = reserve_login_work().unwrap_err();
+        assert_eq!(error.status, StatusCode::TOO_MANY_REQUESTS);
+        drop(permits);
+        assert_eq!(LOGIN_WORK.available_permits(), MAX_LOGIN_WORKERS);
+    }
+
+    #[tokio::test]
+    async fn verification_preserves_correct_and_incorrect_password_results() {
+        let pool = Arc::new(Semaphore::new(1));
+        let password = "disposable-password-resource-check";
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+        assert!(
+            verify_login_password_async(
+                password.to_owned(),
+                hash.clone(),
+                Arc::clone(&pool).try_acquire_owned().unwrap(),
+            )
+            .await
+            .unwrap()
+        );
+        assert!(
+            !verify_login_password_async(
+                "incorrect-password".to_owned(),
+                hash,
+                Arc::clone(&pool).try_acquire_owned().unwrap(),
+            )
+            .await
+            .unwrap()
+        );
+        assert_eq!(pool.available_permits(), 1);
+    }
+
+    #[tokio::test]
+    async fn invalid_hash_releases_worker_capacity() {
+        let pool = Arc::new(Semaphore::new(1));
+        assert!(
+            verify_login_password_async(
+                "disposable-password".to_owned(),
+                "not-a-password-hash".to_owned(),
+                Arc::clone(&pool).try_acquire_owned().unwrap(),
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(pool.available_permits(), 1);
+    }
+
+    #[tokio::test]
+    async fn cancelling_http_observer_does_not_release_running_cpu_work() {
+        let pool = Arc::new(Semaphore::new(1));
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::sync_channel(1);
+        let worker = tokio::spawn(run_login_work(
+            Arc::clone(&pool).try_acquire_owned().unwrap(),
+            move || {
+                let _ = started_tx.send(());
+                release_rx.recv().unwrap();
+                Ok(false)
+            },
+        ));
+        started_rx.await.unwrap();
+        worker.abort();
+        let _ = worker.await;
+        assert_eq!(pool.available_permits(), 0);
+        release_tx.send(()).unwrap();
+        let returned = tokio::time::timeout(Duration::from_secs(5), pool.acquire())
+            .await
+            .unwrap()
+            .unwrap();
+        drop(returned);
+        assert_eq!(pool.available_permits(), 1);
+    }
 }
