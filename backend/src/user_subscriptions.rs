@@ -26,7 +26,7 @@ pub use base::{migrate_legacy_ciphertexts, provision_new_user, revoke, rotate_cr
 
 /// Only the canonical, administrator-validated path is kept in memory.
 /// Invalid public URLs must not trigger a PostgreSQL settings read.
-pub(crate) fn configured_public_path(settings: &Value) -> String {
+pub fn configured_public_path(settings: &Value) -> String {
     settings
         .get("subscriptionPath")
         .and_then(Value::as_str)
