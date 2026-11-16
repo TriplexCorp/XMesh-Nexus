@@ -979,53 +979,45 @@ mod tests {
 
     #[tokio::test]
     async fn release_zip_rejects_compressed_entry_bombs_and_duplicate_names() {
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
         use std::io::{Cursor, Write};
-        let create_archive = |oversized_note: bool| {
-            let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
-            let options = || {
-                zip::write::SimpleFileOptions::default()
-                    .compression_method(zip::CompressionMethod::Deflated)
-            };
-            writer.start_file("xray", options()).unwrap();
-            writer.write_all(b"synthetic-test-xray").unwrap();
-            if oversized_note {
-                writer.start_file("README.md", options()).unwrap();
-                writer
-                    .write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1])
-                    .unwrap();
-            } else {
-                // zip::ZipWriter rejects duplicate names while *writing*, so
-                // produce two unique equal-length names then alter the ZIP
-                // directory/local headers, not the data or CRC.
-                writer.start_file("zzzz", options()).unwrap();
-                writer.write_all(b"duplicate").unwrap();
-            }
-            let mut archive = writer.finish().unwrap().into_inner();
-            if !oversized_note {
-                let mut renamed = 0;
-                for i in 0..=archive.len() - 4 {
-                    if archive[i..i + 4].eq(b"zzzz") {
-                        archive[i..i + 4].copy_from_slice(b"xray");
-                        renamed += 1;
-                    }
-                }
-                assert_eq!(renamed, 2, "local and central names must both be changed");
-            }
-            archive
-        };
+
+        // This tiny valid fixture was created with Python's stdlib zipfile:
+        // two regular deflated files, both named "xray". zip::ZipWriter
+        // intentionally refuses to write repeated names, so it cannot
+        // construct the negative case itself.
+        const DUPLICATE_ENTRY_ZIP: &str = "UEsDBBQAAAAIAI4wcF20dGX5DAAAAAoAAAAEAAAAeHJheUvLLCou0a0oSqwEAFBLAwQUAAAACACOMHBdLnPQig0AAAALAAAABAAAAHhyYXkrTk3Oz0vRrShKrAQAUEsBAhQDFAAAAAgAjjBwXbR0ZfkMAAAACgAAAAQAAAAAAAAAAAAAAIABAAAAAHhyYXlQSwECFAMUAAAACACOMHBdLnPQig0AAAALAAAABAAAAAAAAAAAAAAAgAEuAAAAeHJheVBLBQYAAAAAAgACAGQAAABdAAAAAAA=";
+
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        writer.start_file("xray", options).unwrap();
+        writer.write_all(b"synthetic-test-xray").unwrap();
+        writer.start_file("README.md", options).unwrap();
+        writer
+            .write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1])
+            .unwrap();
+        let compressed_bomb = writer.finish().unwrap().into_inner();
+
         let target =
             std::env::temp_dir().join(format!("xmesh-zip-budget-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&target).unwrap();
-        for oversized in [true, false] {
-            let bytes = create_archive(oversized);
+        for (name, bytes) in [
+            ("oversized", compressed_bomb),
+            ("duplicate", STANDARD.decode(DUPLICATE_ENTRY_ZIP).unwrap()),
+        ] {
             assert!(
                 bytes.len() < 64 * 1024,
                 "fixture must remain highly compressed"
             );
             let error = unpack_release(&bytes, &target).await.unwrap_err();
             assert!(
-                error.contains("size budget") || error.to_ascii_lowercase().contains("duplicate"),
-                "{error}"
+                error.to_ascii_lowercase().contains(if name == "duplicate" {
+                    "duplicate"
+                } else {
+                    "size budget"
+                }),
+                "{name}: {error}"
             );
         }
         std::fs::remove_dir_all(target).unwrap();
