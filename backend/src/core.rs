@@ -1020,8 +1020,14 @@ mod tests {
 
         let valid = create_archive(false);
         unpack_release(&valid, &target).await.unwrap();
-        assert_eq!(std::fs::read(target.join("xray")).unwrap(), b"synthetic-test-xray");
-        assert_eq!(std::fs::read(target.join("README.md")).unwrap(), b"valid-notes");
+        assert_eq!(
+            std::fs::read(target.join("xray")).unwrap(),
+            b"synthetic-test-xray"
+        );
+        assert_eq!(
+            std::fs::read(target.join("README.md")).unwrap(),
+            b"valid-notes"
+        );
 
         let oversized = create_archive(true);
         assert!(
