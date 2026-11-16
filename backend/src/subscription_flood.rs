@@ -13,7 +13,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
-    sync::{RwLock, atomic::{AtomicU64, Ordering}},
+    sync::{
+        RwLock,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -117,10 +120,15 @@ fn remember_config(config: &FloodConfig) {
     let mut snapshot = LOCAL_CONFIG
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    *snapshot = Some((Instant::now() + Duration::from_secs(CACHE_SECONDS), config.clone()));
+    *snapshot = Some((
+        Instant::now() + Duration::from_secs(CACHE_SECONDS),
+        config.clone(),
+    ));
 }
 
-async fn cached_redis_config(conn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<Option<FloodConfig>> {
+async fn cached_redis_config(
+    conn: &mut redis::aio::ConnectionManager,
+) -> redis::RedisResult<Option<FloodConfig>> {
     let saved: Option<String> = redis::cmd("GET")
         .arg(CONFIG_CACHE)
         .query_async(conn)
