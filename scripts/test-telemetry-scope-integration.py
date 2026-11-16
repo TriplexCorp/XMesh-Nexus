@@ -122,8 +122,8 @@ def main():
             raw = json.dumps(payload, separators=(",", ":")).encode()
             stamp = int(time.time())
             nonce = os.urandom(16).hex()
-            canonical = (f"XMESH1\\nPOST\\n/api/v1/metrics/ingest\\n{node_id}\\n"
-                         f"{stamp}\\n{nonce}\\n{hashlib.sha256(raw).hexdigest()}\\n")
+            canonical = (f"XMESH1\nPOST\n/api/v1/metrics/ingest\n{node_id}\n"
+                         f"{stamp}\n{nonce}\n{hashlib.sha256(raw).hexdigest()}\n")
             signed_message.write_bytes(canonical.encode())
             signature = subprocess.check_output(["openssl","pkeyutl","-sign","-rawin",
                 "-inkey",str(key),"-in",str(signed_message)])
