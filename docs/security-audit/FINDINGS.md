@@ -1,6 +1,38 @@
 # Findings and hypotheses
 
-Only limited confirmed behavior is recorded below. No confirmed P0/P1 has been established at this checkpoint. Scanner candidates are not findings until manually validated.
+## Verified continuation — 16 November 2026 (after original checkpoint)
+
+This document originated before the independent fixes below. Statuses later in
+the historical sections refer to that earlier checkpoint, not the current
+GitHub main branches. The ecosystem audit **remains incomplete**.
+
+| ID | Finding / classification | Current evidence |
+|---|---|---|
+| XMESH-AUD-001 / 002 | Login work admission / request-size hardening, not a demonstrated P1 | Nexus [#496](https://github.com/TriplexCorp/XMesh-Nexus/pull/496) **merged** as `5630293468922255bfbfcbc34f1727f71cb54e07`; complete CI passed |
+| XMESH-AUD-003 | Mutable release-publisher action references | Sub [#18](https://github.com/TriplexCorp/XMesh-Sub/pull/18) **merged** as `17be0aab84ec04412ef490fcaa0953181b3e4262`; installer CI passed |
+| XMESH-AUD-004 | Unsupported Go/Alpine Node router image | Node [#83](https://github.com/TriplexCorp/XMesh-Node/pull/83) **merged** as `647adcf7af326b205fce12545fb5d75a20bb8191`; Node CI and real rebuilt-image Trivy High/Critical scan passed. This does not establish absence of all advisories |
+| H-08 | Authenticated official Xray ZIP updates read allowed entries without adequate decompression budgets | Nexus [#494](https://github.com/TriplexCorp/XMesh-Nexus/pull/494) **merged** as `22c1acca6a929e61bb4d834169f7074692738616`; full CI passed, enforcing actual + declared size budgets and duplicate-entry rejection |
+| **XMESH-AUD-005** | **Confirmed object-level authorization failure in signed Node telemetry** | Audit disposable integration accepted signed traffic claiming an unrelated Squad user and changed that user's hold state. Valid Ed25519 signature proved Node identity, **not** authority to select arbitrary users. Nexus [#495](https://github.com/TriplexCorp/XMesh-Nexus/pull/495) implements atomic user/profile/Squad/inbound authorization and positive/negative signed regression tests. Targeted disposable PostgreSQL/API workflow passes; combined CI must pass before merge |
+
+### XMESH-AUD-005 — cross-object signed telemetry attribution
+
+- Priority: **high review priority**, confirmed cross-object integrity impact in a disposable API test; no public anonymous exploit or production fleet compromise has been demonstrated. Do not invent a CVSS or count as remote unauthenticated control.
+- Prerequisite: a valid enrolled Node signing identity and accepted signed metric report.
+- Scope: a compromised Node could claim other user IDs and cause unrelated first-connection subscription activation or potentially influence accounting/quotas. Exact blast radius beyond the confirmed hold-state change requires further fault/compromise testing.
+- Fix under test: [#495](https://github.com/TriplexCorp/XMesh-Nexus/pull/495) checks all user/inbound identifiers against the current Node profile and Squad membership **before** persisting presence, hold, ledger or quota changes. Entire mixed batches are denied rather than partially applied. Signed legitimate counters remain supported.
+- Proof: independent Actions run [43819300948](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43819300948), plus newer scoped reruns. Source and integration result must be reconciled with current `main` after merge.
+- Residual: whether profile tag reuse across different Node assignments, dynamic Squad edits, stale/offline counters or counter resets produce additional attribution holes remains open.
+
+### Advisory applicability without scanner suppression
+
+- `RUSTSEC-2026-0368` and `RUSTSEC-2026-0429` concern the zip crate's `ZipArchive::extract` symlink handling. Current Xray release extraction in `core.rs` iterates selected entries, rejects symlinks and writes bounded allowlisted file bytes itself; repository source search did not locate a call to the vulnerable generic `extract` function. This is **a limited call-path observation**, not a patched dependency or a reason to hide the scanner record.
+- `RUSTSEC-2026-0459` involves local processing of an attacker-controlled SQLite database plus mismatched WAL. Determine whether any bundled SQLite crate is built/used in the production PostgreSQL-only runtime and whether untrusted SQLite databases can be opened. Keep the advisory until build features and affected artifacts are established.
+- Historical Gitleaks fingerprint matches, Bandit subprocess/URL findings and other Rust/Go advisory records require individual review. Never place candidate secret values in this report.
+- ProjectHimera is explicitly excluded from this audit.
+
+## Original evidence checkpoint (historical)
+
+Only limited confirmed behavior was recorded at the initial checkpoint. Scanner candidates are not findings until manually validated.
 
 ## XMESH-AUD-001 — password work lacked explicit admission
 
