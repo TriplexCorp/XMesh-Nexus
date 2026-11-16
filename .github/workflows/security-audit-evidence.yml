@@ -19,7 +19,6 @@ jobs:
       matrix:
         mode: [sast, dependencies]
     env:
-      AUDIT_TOOLS: ${{ runner.temp }}/xmesh-audit-tools
       AUDIT_TOOL_MANIFEST: ${{ github.workspace }}/docs/security-audit/TOOL_PINS.json
       SEMGREP_SEND_METRICS: "off"
       SEMGREP_ENABLE_VERSION_CHECK: "0"
@@ -53,6 +52,9 @@ jobs:
           path: audit-sources/sub
           fetch-depth: 0
           persist-credentials: false
+      - name: Select disposable runner tool directory
+        shell: bash
+        run: echo "AUDIT_TOOLS=$RUNNER_TEMP/xmesh-audit-tools" >> "$GITHUB_ENV"
       - name: Install exact checksum-verified binary tools
         run: python3 scripts/security-audit-install-tools.py
       - name: Prepare pinned SAST tools in a private virtualenv
