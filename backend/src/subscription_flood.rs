@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
-    sync::atomic::{AtomicU64, Ordering},
-    time::{SystemTime, UNIX_EPOCH},
+    sync::{RwLock, atomic::{AtomicU64, Ordering}},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 const CONFIG_CACHE: &str = "xmesh:subscription:flood:config";
@@ -30,6 +30,10 @@ const MAX_PUBLIC_URI_PATH_BYTES: usize = 160;
 const MAX_PUBLIC_URI_QUERY_BYTES: usize = 2_048;
 static PUBLIC_REQUESTS: AtomicU64 = AtomicU64::new(0);
 static INVALID_REQUESTS: AtomicU64 = AtomicU64::new(0);
+// Independent local cache + single-flight refresh. A flood precisely at the
+// ten-second Redis TTL boundary must never stampede PostgreSQL.
+static CONFIG_REFRESH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+static LOCAL_CONFIG: RwLock<Option<(Instant, FloodConfig)>> = RwLock::new(None);
 const LUA: &str = r"
 local total = redis.call('INCR',KEYS[1])
 if total == 1 then redis.call('EXPIRE',KEYS[1],75) end
@@ -99,22 +103,51 @@ pub fn validate_settings(value: &Value) -> Result<(), ApiError> {
     })?;
     parsed.validate()
 }
-pub async fn current(state: &AppState) -> FloodConfig {
-    let mut conn = state.redis.clone();
-    match redis::cmd("GET")
+fn recent_config() -> Option<FloodConfig> {
+    let snapshot = LOCAL_CONFIG
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    snapshot
+        .as_ref()
+        .filter(|(expires, _)| *expires > Instant::now())
+        .map(|(_, config)| config.clone())
+}
+
+fn remember_config(config: &FloodConfig) {
+    let mut snapshot = LOCAL_CONFIG
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    *snapshot = Some((Instant::now() + Duration::from_secs(CACHE_SECONDS), config.clone()));
+}
+
+async fn cached_redis_config(conn: &mut redis::aio::ConnectionManager) -> redis::RedisResult<Option<FloodConfig>> {
+    let saved: Option<String> = redis::cmd("GET")
         .arg(CONFIG_CACHE)
-        .query_async::<Option<String>>(&mut conn)
-        .await
-    {
-        Ok(Some(saved)) => {
-            if let Ok(config) = serde_json::from_str::<FloodConfig>(&saved)
-                && config.validate().is_ok()
-            {
-                return config;
-            }
+        .query_async(conn)
+        .await?;
+    Ok(saved
+        .and_then(|raw| serde_json::from_str::<FloodConfig>(&raw).ok())
+        .filter(|config| config.validate().is_ok()))
+}
+
+pub async fn current(state: &AppState) -> FloodConfig {
+    if let Some(config) = recent_config() {
+        return config;
+    }
+    // The lock is acquired ONLY on expiration. All public requests share the
+    // result, including when Redis SETEX is unavailable, so no SQL stampede.
+    let _refresh = CONFIG_REFRESH_LOCK.lock().await;
+    if let Some(config) = recent_config() {
+        return config;
+    }
+    let mut conn = state.redis.clone();
+    match cached_redis_config(&mut conn).await {
+        Ok(Some(config)) => {
+            remember_config(&config);
+            return config;
         }
         Ok(None) => {}
-        Err(_) => return FloodConfig::default(), // fail open without DB stampede
+        Err(_) => return FloodConfig::default(), // fail-closed at enforce() EVAL
     }
     let setting = crate::read_settings(&state.pool)
         .await
@@ -124,15 +157,30 @@ pub async fn current(state: &AppState) -> FloodConfig {
         .and_then(|v| serde_json::from_value::<FloodConfig>(v).ok())
         .filter(|c| c.validate().is_ok())
         .unwrap_or_default();
-    // Short TTL avoids stale protection settings after an API restart or patch.
     let _ = redis::cmd("SETEX")
         .arg(CONFIG_CACHE)
         .arg(CACHE_SECONDS)
         .arg(serde_json::to_string(&config).unwrap_or_default())
         .query_async::<String>(&mut conn)
         .await;
+    remember_config(&config);
     config
 }
+
+/// Called after a successful owner PATCH; never keep stale policy just
+/// because an attacker is holding open public requests during the update.
+pub async fn invalidate_cache(state: &AppState) {
+    let _refresh = CONFIG_REFRESH_LOCK.lock().await;
+    *LOCAL_CONFIG
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+    let mut conn = state.redis.clone();
+    let _ = redis::cmd("DEL")
+        .arg(CONFIG_CACHE)
+        .query_async::<i64>(&mut conn)
+        .await;
+}
+
 fn minute() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
