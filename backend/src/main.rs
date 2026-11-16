@@ -33,6 +33,7 @@ mod subscription_transport;
 mod subscription_user_agent;
 mod telegram_admin_bot;
 mod telegram_admin_bot_worker;
+mod telemetry_scope;
 mod user_subscriptions;
 mod xhttp_device_profiles;
 #[cfg(feature = "xsp-v2-experimental")]
@@ -3316,6 +3317,17 @@ async fn ingest_node_metrics(
         .as_object_mut()
         .expect("validated metrics object")
         .insert("userStatsAccepted".into(), json!(accept_user_stats));
+
+    // Signature identifies the sender, not the users it may report on.
+    // Reject cross-node user IDs and unauthorized inbound tags before any
+    // presence, hold timer, traffic/quota ledger or sample is persisted.
+    telemetry_scope::verify(
+        &mut telemetry_tx,
+        body.node_id,
+        &user_traffic,
+        &inbound_samples,
+    )
+    .await?;
 
     let sampled_at = persist_node_metric_sample(&mut telemetry_tx, &body, metrics).await?;
 
