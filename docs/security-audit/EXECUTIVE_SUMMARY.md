@@ -10,7 +10,7 @@ Nexus draft [#493](https://github.com/TriplexCorp/XMesh-Nexus/pull/493) bounds l
 
 Disposable real-API comparison: 64 baseline attempts produced 64 × 401 and zero work-admission rejection. The fixed run produced 5 × 401 and 59 × 429, rejected padded JSON with 413 and accepted the legal maximum-length password. Liveness did not fail in either run. A significant baseline DoS was therefore **not demonstrated** and is not classified as a confirmed High/Critical exploit.
 
-Runtime code at `ea184737` passed default Rust tests/strict Clippy/Docker build, experimental crypto tests/Clippy, isolated signer image/ACL/Unix-socket E2E, repeated authentication resource checks, browser/VLESS/CLI/update/source checks. The dependent API job later failed a Host dialog overflow assertion before its security steps ran. Those security scripts are now independently scheduled on a fresh disposable target; no browser assertion was disabled. See TEST_RESULTS.md for exact evidence and limits.
+Runtime code at `ea184737` passed default Rust tests/strict Clippy/Docker build, experimental crypto tests/Clippy, isolated signer image/ACL/Unix-socket E2E, repeated authentication resource checks, browser/VLESS/CLI/update/source checks. The dependent API job later failed a Host dialog overflow assertion before its security steps ran. Those security scripts subsequently passed independently on a fresh disposable target; no browser assertion was disabled. See TEST_RESULTS.md for exact evidence and limits.
 
 Sub draft [#18](https://github.com/TriplexCorp/XMesh-Sub/pull/18) pins release publisher/CI Actions to full commits and adds regression checks retaining main-only publication and provenance verification. Its full installer CI passed. No runtime/API/Agent change or manual key provisioning is required for either prepared patch.
 
@@ -33,3 +33,7 @@ Old Go/Alpine versions in the actual Node router artifact were confirmed. Adviso
 The local executor failed, so source/API inventory used GitHub and real execution used disposable hosted Actions. Clean VPS/systemd/firewall/ACME/recovery qualification remains unavailable. Complete object/function authorization, adverse subscription states with real clients, IPv6 peer identity, Node/Sub compromise dynamics, quota/storage fault injection and adversarial browser/fuzz campaigns remain incomplete.
 
 All 14 requested documents are present, including 135 router/method entries, a trust map and explicit remaining tests. Continue using REMEDIATION_PLAN.md; do not treat this checkpoint or passing existing CI as a completed ecosystem audit.
+
+## Independent security integration — final checkpoint result
+
+At `f6df491`, [isolated security job 133085685995](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43802473626/job/133085685995) passed the actual signed-node identity/tamper/replay and PostgreSQL/Redis RBAC/MFA/scoped-Integration/revocation scripts on fresh disposable state. Its public subscription preflight also verified invalid token, uppercase token, unknown custom route and oversized path/query responses. This establishes the covered negative cases, not every endpoint or rejection-before-storage claim. Baseline/candidate resource jobs, default Rust and crypto jobs passed at that revision. The separate browser layout failure remains visible; no UI assertion was changed.

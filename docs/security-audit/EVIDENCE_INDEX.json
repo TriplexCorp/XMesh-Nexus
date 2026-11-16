@@ -11,7 +11,7 @@
     "XMesh-Node": "1f4744d19177056bd9ffa6ca2009975805050936",
     "XMesh-Sub": "6fca4eb0e0388e6ec5e6817e9a8d58942935aaa2"
   },
-  "runtimeVerifiedRevision": "ea184737eb1e3d08f9ad6bfff72ad7137aba0211",
+  "runtimeVerifiedRevision": "f6df491207223238c401d546ba8cd2de7c69cb17",
   "prs": [
     {
       "repo": "XMesh-Nexus",
@@ -129,5 +129,15 @@
     "fresh VPS install and interrupted upgrade/recovery",
     "adversarial browser inputs",
     "bounded fuzzing and fault injection"
-  ]
+  ],
+  "verifiedChecks": {
+    "loginBaseline": "success",
+    "loginCandidate": "success",
+    "signedNodeAndRBACMFAIntegration": "success",
+    "defaultRustClippyBuild": "success",
+    "experimentalCrypto": "success",
+    "subInstaller": "success",
+    "browserLayout": "failure: one Host dialog overflow assertion; original check retained",
+    "scannerAggregates": "failure: advisories/candidates/parse errors require triage"
+  }
 }

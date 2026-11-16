@@ -55,4 +55,8 @@ Sub #18 full installer CI: https://github.com/TriplexCorp/XMesh-Sub/actions/runs
 
 Job 133082939408 ended with 292 browser checks passed and one Host dialog overflow assertion at 1920x1080; its English browser audit passed 43 checks. Because signed-node/RBAC/MFA steps followed that browser step in the existing job, they were skipped. Do not count them as passed or weaken the browser assertion.
 
-The audit resource workflow now has an additional fresh `security` matrix target running the existing real signed-node and RBAC/MFA/scoped-token/revocation integration scripts against its own disposable API/PostgreSQL/Redis. It does not skip or change the original browser CI. This target is pending execution at this checkpoint; exact final evidence will be attached to draft #493.
+The audit resource workflow now has an additional fresh `security` matrix target running the existing real signed-node and RBAC/MFA/scoped-token/revocation integration scripts against its own disposable API/PostgreSQL/Redis. It does not skip or change the original browser CI. This target subsequently passed at f6df491; see the final checkpoint result below.
+
+## Independent security integration — final checkpoint result
+
+At `f6df491`, [isolated security job 133085685995](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/43802473626/job/133085685995) passed the actual signed-node identity/tamper/replay and PostgreSQL/Redis RBAC/MFA/scoped-Integration/revocation scripts on fresh disposable state. Its public subscription preflight also verified invalid token, uppercase token, unknown custom route and oversized path/query responses. This establishes the covered negative cases, not every endpoint or rejection-before-storage claim. Baseline/candidate resource jobs, default Rust and crypto jobs passed at that revision. The separate browser layout failure remains visible; no UI assertion was changed.
