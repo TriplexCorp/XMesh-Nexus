@@ -1,5 +1,16 @@
 # Remediation and continuation plan
 
+## Release coordination — updated 16 November 2026
+
+This plan is a live audit checklist, **not** a release approval. Original
+checkpoint text below predates the following merged changes.
+
+1. **Priority gate:** finish full Backend CI for signed telemetry [#495](https://github.com/TriplexCorp/XMesh-Nexus/pull/495). Its real disposable signed cross-Squad authorization test passes. Restore CI fixture compatibility with supported managed inbound topologies (one proxy or TCP+Hysteria2), rather than weakening the 403 tests or changing production routing rules. After all checks pass, review and merge against current Nexus `main`; retest revoked/changed Squad memberships, same tag across different profiles, sampled/stale counters and per-user quota isolation.
+2. **Already shipped:** Nexus login admission [#496](https://github.com/TriplexCorp/XMesh-Nexus/pull/496), bounded Xray archive unpack [#494](https://github.com/TriplexCorp/XMesh-Nexus/pull/494), Node supported runtime and actual-image scan [#83](https://github.com/TriplexCorp/XMesh-Node/pull/83), Sub publisher action pinning [#18](https://github.com/TriplexCorp/XMesh-Sub/pull/18). **Do not cherry-pick or remerge these from this audit branch.**
+3. **Source/supply-chain review:** process every SAST/Bandit/Gitleaks candidate and dependency advisory with reachability, environment and current artifact evidence. In particular, investigate zip `extract` advisories (generic helper not used in Xray path), local bundled SQLite+WAL prerequisites and the remaining Go advisory records; record dispositions without suppressing failures.
+4. **Cross-component and install gates:** enforce Sub origin/IPv6 peer semantics, old integration-token least privilege, per-node compromise blast radius, cancellation-safe accounting, fresh VPS install/reboot/interrupted update/rollback. Maintain normal zero-manual-key provisioning and existing strict-PQ release gates.
+5. **Audit branch disposition:** current #493 contains auth work already landed by #496 and historical scanner snapshots. Reconcile against current `main`, preserve source evidence, and produce a documentation-only final audit report or a separately reviewable outstanding code fix. Do not merge this old feature branch wholesale.
+
 ## Immediate review gates
 
 1. Finish latest CI for Nexus draft #493 after the handler/permit-lifetime refactor. Keep all Clippy/security checks enabled.
