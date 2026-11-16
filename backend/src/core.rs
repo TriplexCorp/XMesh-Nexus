@@ -946,9 +946,9 @@ fn chrono_free_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ghcr_manifest_status, normalize_version, official_xray_image_tag, parse_ech_output,
-        parse_vless_encryption_output, read_bounded_release_entry, unpack_release,
-        validate_ech_public_name, MAX_RELEASE_NOTE_BYTES,
+        MAX_RELEASE_NOTE_BYTES, ghcr_manifest_status, normalize_version, official_xray_image_tag,
+        parse_ech_output, parse_vless_encryption_output, read_bounded_release_entry,
+        unpack_release, validate_ech_public_name,
     };
 
     #[test]
@@ -956,11 +956,19 @@ mod tests {
         use std::io::Cursor;
         let mut oversized_claim = Cursor::new(vec![0_u8; 4]);
         assert!(read_bounded_release_entry(&mut oversized_claim, 5, 4, "README.md").is_err());
-        assert_eq!(oversized_claim.position(), 0, "reject oversized claim before decompression");
+        assert_eq!(
+            oversized_claim.position(),
+            0,
+            "reject oversized claim before decompression"
+        );
 
         let mut incorrect_claim = Cursor::new(vec![7_u8; 12]);
         assert!(read_bounded_release_entry(&mut incorrect_claim, 1, 4, "README.md").is_err());
-        assert_eq!(incorrect_claim.position(), 5, "read at most limit + 1 bytes");
+        assert_eq!(
+            incorrect_claim.position(),
+            5,
+            "read at most limit + 1 bytes"
+        );
 
         let mut valid = Cursor::new(vec![7_u8; 4]);
         assert_eq!(
@@ -974,26 +982,37 @@ mod tests {
         use std::io::{Cursor, Write};
         let create_archive = |oversized_note: bool| {
             let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
-            let options = || zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Deflated);
+            let options = || {
+                zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Deflated)
+            };
             writer.start_file("xray", options()).unwrap();
             writer.write_all(b"synthetic-test-xray").unwrap();
             if oversized_note {
                 writer.start_file("README.md", options()).unwrap();
-                writer.write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1]).unwrap();
+                writer
+                    .write_all(&vec![b'x'; MAX_RELEASE_NOTE_BYTES + 1])
+                    .unwrap();
             } else {
                 writer.start_file("xray", options()).unwrap();
                 writer.write_all(b"duplicate").unwrap();
             }
             writer.finish().unwrap().into_inner()
         };
-        let target = std::env::temp_dir().join(format!("xmesh-zip-budget-{}", uuid::Uuid::new_v4()));
+        let target =
+            std::env::temp_dir().join(format!("xmesh-zip-budget-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&target).unwrap();
         for oversized in [true, false] {
             let bytes = create_archive(oversized);
-            assert!(bytes.len() < 64 * 1024, "fixture must remain highly compressed");
+            assert!(
+                bytes.len() < 64 * 1024,
+                "fixture must remain highly compressed"
+            );
             let error = unpack_release(&bytes, &target).await.unwrap_err();
-            assert!(error.contains("size budget") || error.contains("duplicate"), "{error}");
+            assert!(
+                error.contains("size budget") || error.contains("duplicate"),
+                "{error}"
+            );
         }
         std::fs::remove_dir_all(target).unwrap();
     }
