@@ -1,5 +1,7 @@
 # XMesh ecosystem security audit — checkpoint, 2026-11-16
 
+> **Updated 2026-11-16:** The original checkpoint below is historical, not the latest release state. Nexus #496 (Argon2 admission) and #494 (bounded Xray ZIP), Node #83 (supported Go/Alpine + rebuilt-image Trivy), and Sub #18 (pinned publisher actions) have since merged to their respective `main` branches with successful CI. The audit also **confirmed a signed Node telemetry cross-object authorization weakness**: a valid Node signature could claim an unrelated user's traffic and activate that user's hold timer in a disposable integration. The scoped mitigation in Nexus #495 passed its independent positive/negative PostgreSQL/API tests; full CI and merger status must be verified separately. See FINDINGS.md for current tracking. This is **not** a declaration of complete security or independent external review. ProjectHimera remains excluded.
+
 **INCOMPLETE AUDIT. This checkpoint is not security approval.**
 
 Only TriplexCorp/XMesh-Nexus, XMesh-Node and XMesh-Sub were accessed, at the exact commits in REPOSITORY_INVENTORY.md. No other project or production server, DNS, customer database or real subscription was tested or changed. Audit PRs remain draft and unmerged.
