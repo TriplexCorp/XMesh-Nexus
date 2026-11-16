@@ -48,7 +48,9 @@ jobs:
       - name: Verify committed gateway module lock
         run: |
           test -s deploy/xsp-v2-product-gateway/go.sum
-          grep -Fq 'github.com/jackc/pgx/v5 v5.7.6 h1:' deploy/xsp-v2-product-gateway/go.sum
+          pgx_version=$(awk '$1=="require" && $2=="github.com/jackc/pgx/v5" {print $3}' deploy/xsp-v2-product-gateway/go.mod)
+          test -n "$pgx_version"
+          grep -Fq "github.com/jackc/pgx/v5 ${pgx_version} h1:" deploy/xsp-v2-product-gateway/go.sum
           grep -Fq 'COPY go.mod go.sum ./' deploy/xsp-v2-product-gateway/Dockerfile
           grep -Fq 'go build -mod=readonly' deploy/xsp-v2-product-gateway/Dockerfile
       - name: Verify ML-DSA private-key migration and Go/x509 compatibility
