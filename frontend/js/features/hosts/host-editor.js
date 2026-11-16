@@ -79,15 +79,6 @@ window.XMeshHostEditor=(() => {
             '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('link')+'</span><span>Подключение</span></div>'+
             '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
           '</section>'+
-          '<section class="host-editor-card host-public-panel" aria-label="Публичная точка">'+
-            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('globe')+'</span><span>Публичная точка</span></div>'+
-            '<div class="host-public-fields">'+basic+'</div>'+(window.XMeshRemarkPicker?.markup()||'')+
-          '</section>'+
-          '</div><div class="host-editor-column host-editor-column-middle">'+
-          '<section class="host-editor-card host-assignment-panel">'+
-            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('server')+'</span><span>Назначение</span></div>'+
-            '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small>'+
-          '</section>'+
           '<section class="host-editor-card host-advanced host-advanced-panel" aria-label="Параметры клиента">'+
             '<div class="host-advanced-heading"><div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('sliders')+'</span><span>Параметры клиента</span></div>'+
               '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
@@ -99,6 +90,15 @@ window.XMeshHostEditor=(() => {
               '<details class="host-client-settings"><summary>'+ic('code')+'Экспертные настройки JSON</summary>'+
                 '<p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details>'+
             '</div>'+
+          '</section>'+
+          '</div><div class="host-editor-column host-editor-column-middle">'+
+          '<section class="host-editor-card host-assignment-panel">'+
+            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('server')+'</span><span>Назначение</span></div>'+
+            '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small>'+
+          '</section>'+
+          '<section class="host-editor-card host-public-panel" aria-label="Публичная точка">'+
+            '<div class="node-form-section-title"><span class="host-section-icon" aria-hidden="true">'+ic('globe')+'</span><span>Публичная точка</span></div>'+
+            '<div class="host-public-fields">'+basic+'</div>'+(window.XMeshRemarkPicker?.markup()||'')+
           '</section>'+
           '</div><div class="host-editor-column host-editor-column-preview">'+
           '<section class="host-editor-card host-health-panel">'+
