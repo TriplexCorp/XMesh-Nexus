@@ -46,7 +46,7 @@ dialog#dlg.node-wide>form.box{
 }
 
 #dlg.host-wide{
-  --dialog-width:80rem;
+  --dialog-width:86rem;
   width:min(var(--dialog-width),calc(100vw - 2rem));
   inline-size:min(var(--dialog-width),calc(100vw - 2rem));
   min-width:min(80rem,calc(100vw - 2rem));

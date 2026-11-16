@@ -78,7 +78,7 @@ assert.deepEqual(sections,[
  'host-editor-card host-assignment-panel',
  'host-editor-card host-health-panel',
  'host-editor-card host-editor-side'
-],'All five semantic editing zones must be present together in a single page.');
+],'All six semantic editing zones must be present together in a single page.');
 for(const key of names){
  const occurrences=html.split('name="'+key+'"').length-1;
  assert.equal(occurrences,1,'Input '+key+' must occur exactly once');
@@ -114,19 +114,30 @@ assert.match(html,/data-host-single-page/,
   'Host editor must expose the one-page layout');
 assert.equal((html.match(/role="tab"/g)||[]).length,0,
   'Host creation must not hide fields behind any task tabs');
-assert(!html.includes(' inert')&&!html.includes('aria-hidden="true"'),
-  'Core host controls must remain immediately interactive');
+assert(!html.includes(' inert') && !html.includes('data-active="false"'),
+  'Core host controls must remain immediately interactive; decorative icons may be aria-hidden');
+assert.match(html,/class="f host-icon-field"/,'Host controls include semantic, decorative SVG glyph slots');
+assert((html.match(/host-control-glyph/g)||[]).length>=12,
+ 'Host editor must not silently lose its SVG icon slots');
+assert.match(app,/class="host-heading-emblem"/,'Host title restores the concept emblem');
+assert.match(app,/Создать хост/,'New Host has an explicit create action');
 assert.match(feature,/form.addEventListener\('invalid'/,
   'Native validation must reveal controls inside optional disclosures');
 assert.match(app,/bindHostEditor\(form\)/,
   'The real Host form must bind single-page interactions');
-assert.match(css,/\.host-editor-layout\{[\s\S]*?grid-template-columns:minmax\(0,1\.7fr\) minmax\(17rem,\.92fr\)/,
-  'Desktop Host editor must have a main form and live sidebar');
-assert.match(css,/\.host-editor-main-column,\.host-editor-sidebar\{display:grid/,
-  'Both columns must group content without blank task panes');
+assert.match(css,/#dlg\.host-wide \.host-editor-layout\{[\s\S]*?grid-template-areas:"connection assignment health" "public client preview"/,
+  'Desktop must place all six panels in two compact rows without oversized grid spans');
+assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?grid-template-rows:repeat\(6,max-content\)/,
+  'Mobile Host editor must give each panel a distinct, non-overlapping grid row');
+assert.doesNotMatch(html,/host-editor-main-column|host-editor-primary-column|host-editor-client-column|host-editor-sidebar/,
+  'All Host sections must be direct grid children, without unused wrapper layers');
+assert.doesNotMatch(css,/display\s*:\s*contents/,
+  'Design-system contract: Host editor must never rely on display:contents');
+assert.match(css,/#dlg\.host-wide \.host-icon-field>\.host-control-glyph\{/,
+  'Field-level decorative SVGs must be positioned inside their controls');
 assert.match(css,/\.host-resolved\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
   'Right-side preview uses single-column rows instead of a wide empty canvas');
-assert.match(css,/#dlg\.host-wide\s*\{[^}]*--dialog-width:80rem/,
+assert.match(css,/#dlg\.host-wide\s*\{[^}]*--dialog-width:86rem/,
   'Host retains a bounded readable desktop dialog width');
 assert.match(css,/#dlg\.host-wide>form\.box\s*\{[\s\S]*?grid-template-rows:auto minmax\(0,1fr\) auto auto[\s\S]*?overflow:hidden/,
   'Shell retains a visible footer outside the central scroller');

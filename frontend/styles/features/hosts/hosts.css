@@ -6,16 +6,18 @@ dialog.host-wide .host-editor-heading p{margin:.23rem 0 0;color:var(--mu);font-s
 dialog.host-wide .host-editor-heading>[data-x]{display:grid;place-items:center;flex:none;width:var(--xm-close-size);height:var(--xm-close-size);padding:0}
 dialog.host-wide .host-editor-heading>[data-x] svg{width:var(--xm-close-glyph-size);height:var(--xm-close-glyph-size)}
 .host-editor-layout{
- display:grid;grid-template-columns:minmax(0,1.7fr) minmax(17rem,.92fr);
+ display:grid;grid-template-columns:minmax(0,2.02fr) minmax(17rem,.94fr);
  gap:.8rem;align-content:start;align-items:start;
  min-width:0;min-height:0;max-height:100%;
  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
  scrollbar-gutter:stable;padding:.12rem .2rem .3rem;
 }
-.host-editor-main-column,.host-editor-sidebar{display:grid;gap:.7rem;min-width:0;align-content:start}
+.host-editor-main-column,.host-editor-sidebar{display:grid;gap:.62rem;min-width:0;align-content:start}
+.host-editor-main-column{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.host-editor-primary-column,.host-editor-client-column{display:grid;gap:.6rem;min-width:0;align-content:start}
 .host-editor-card{
- display:grid;align-content:start;gap:.57rem;min-width:0;
- padding:.78rem .86rem;border:1px solid var(--nx-border);
+ display:grid;align-content:start;gap:.44rem;min-width:0;
+ padding:.65rem .7rem;border:1px solid var(--nx-border);
  border-radius:var(--nx-section-radius);background:var(--nx-section-bg);
 }
 dialog.host-wide .node-form-section-title{
@@ -29,12 +31,12 @@ dialog.host-wide .node-form-section-title{
 .host-editor-layout .f>span:first-child{font-size:.72rem;line-height:1.28;font-weight:650}
 .host-editor-layout .f :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
  width:100%;max-width:100%;min-width:0;box-sizing:border-box;
- min-height:2.2rem;font-size:.8rem;border-radius:var(--nx-control-radius);
+ min-height:2.02rem;font-size:.78rem;border-radius:var(--nx-control-radius);
 }
 .host-editor-layout .f small{font-size:.67rem;line-height:1.32;color:var(--mu);overflow-wrap:anywhere}
 .host-connect-fields,.host-public-fields,.host-advanced-fields,.host-extra-fields{
  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
- gap:.55rem .65rem;align-items:start;min-width:0;
+ gap:.43rem .55rem;align-items:start;min-width:0;
 }
 .host-connect-fields>.f:first-child{grid-column:1/-1}
 .host-public-fields>.f:has([name="serverDescription"]),
@@ -44,12 +46,12 @@ dialog.host-wide .node-form-section-title{
 .host-assignment-fields>.f:last-child{padding-top:.55rem;border-top:1px solid var(--nx-separator)}
 .host-editor-layout .ms{
  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
- align-items:start;gap:.34rem;min-width:0;max-height:7.1rem;
+ align-items:start;gap:.3rem;min-width:0;max-height:6.2rem;
  overflow:auto;scrollbar-width:thin;
 }
 .host-editor-layout .ms label{
  display:flex;align-items:flex-start;gap:.35rem;min-width:0;
- padding:.37rem .5rem;font-size:.71rem;line-height:1.25;
+ padding:.3rem .43rem;font-size:.7rem;line-height:1.25;
  border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);
  background:var(--nx-control-bg);
 }
@@ -66,8 +68,8 @@ dialog.host-wide .node-form-section-title{
 .host-editor-layout .node-ip-hint{margin:0;font-size:.67rem;line-height:1.37;color:var(--mu);overflow-wrap:anywhere}
 .host-editor-layout .host-advanced-heading>.node-ip-hint{padding-bottom:.45rem}
 .host-advanced-actions{
- display:flex;align-items:center;flex-wrap:wrap;gap:.35rem;
- min-width:0;margin-top:.08rem;padding-top:.52rem;
+ display:flex;align-items:center;flex-wrap:wrap;gap:.3rem;
+ min-width:0;margin-top:.03rem;padding-top:.38rem;
  border-top:1px solid var(--nx-separator);
 }
 .host-advanced-actions>[data-host-clear-overrides]{
@@ -146,7 +148,7 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
  .host-editor-sidebar{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
 }
 @media(max-width:760px){
- .host-editor-sidebar{grid-template-columns:minmax(0,1fr)}
+ .host-editor-main-column,.host-editor-sidebar{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:520px){
  .host-editor-main-column,.host-editor-sidebar{gap:.58rem}
@@ -165,6 +167,347 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
 }
 @media(prefers-reduced-motion:reduce){
  .host-editor-layout :is(button,summary,input,select){transition:none!important}
+}
+
+
+/* PR #491 follow-up: concept-faithful single-surface editor.
+ * The six semantic sections are direct grid children with no empty wrappers.
+ * All fields remain in DOM; short viewports retain controlled scrolling. */
+#dlg.host-wide .host-editor-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.05fr) minmax(0,1.05fr) minmax(17rem,.95fr);
+  /* The first row holds small, independent cards; a large full-width
+     connection card used to force two extra rows and 200px of overflow. */
+  grid-template-areas:"connection assignment health" "public client preview";
+  grid-template-rows:max-content max-content;
+  align-content:start;align-items:start;
+  gap:.72rem;
+  padding:.12rem .18rem .35rem;
+  overflow-x:hidden;overflow-y:auto;
+}
+#dlg.host-wide .host-primary-panel{grid-area:connection}
+#dlg.host-wide .host-public-panel{grid-area:public}
+#dlg.host-wide .host-advanced-panel{grid-area:client}
+#dlg.host-wide .host-assignment-panel{grid-area:assignment}
+#dlg.host-wide .host-health-panel{grid-area:health}
+#dlg.host-wide .host-editor-side{grid-area:preview}
+#dlg.host-wide .host-editor-card{
+  min-width:0;min-height:0;
+  border:1px solid var(--nx-border-strong,var(--nx-border));
+  border-radius:var(--nx-section-radius);
+  background:var(--nx-section-bg);
+  padding:.82rem .9rem;gap:.64rem;
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
+}
+#dlg.host-wide .host-editor-card:focus-within{
+  border-color:color-mix(in srgb,var(--a) 38%,var(--nx-border));
+}
+#dlg.host-wide .node-form-section-title{
+  font-size:.91rem;font-weight:760;line-height:1.3;
+  padding-bottom:.55rem;margin-bottom:.04rem;
+  border-bottom:1px solid var(--nx-separator);
+}
+#dlg.host-wide .node-form-section-title .ic{
+  width:1.12rem;height:1.12rem;color:var(--a);
+}
+#dlg.host-wide .host-advanced-heading>.node-ip-hint{
+  padding:0;color:var(--mu);font-size:.69rem;
+}
+#dlg.host-wide .host-advanced-heading{align-items:flex-start}
+#dlg.host-wide .host-advanced-heading .node-form-section-title{margin:0;flex:1 1 100%}
+#dlg.host-wide .host-connect-fields,
+#dlg.host-wide .host-public-fields,
+#dlg.host-wide .host-advanced-fields{
+  gap:.61rem .72rem;
+}
+#dlg.host-wide .host-public-panel .remark-template-tools{margin-top:.1rem}
+#dlg.host-wide .f{gap:.26rem}
+#dlg.host-wide .f>span:first-child{
+  color:var(--mu);font-size:.75rem;line-height:1.24;font-weight:660;
+}
+#dlg.host-wide .f :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+  min-height:2.32rem;font-size:.82rem;
+}
+#dlg.host-wide .host-icon-field{position:relative}
+#dlg.host-wide .host-icon-field>.host-control-glyph{
+  position:absolute;z-index:2;left:.75rem;top:1.62rem;
+  display:grid;place-items:center;width:1rem;height:1.08rem;
+  pointer-events:none;color:var(--a);
+  opacity:.87;
+}
+#dlg.host-wide .host-icon-field>.host-control-glyph .ic{width:1rem;height:1rem}
+#dlg.host-wide .host-icon-field:focus-within>.host-control-glyph{color:var(--tx);opacity:1}
+#dlg.host-wide .host-icon-field :is(input:not([type="checkbox"]):not([type="radio"]),select){
+  padding-left:2.25rem;
+}
+#dlg.host-wide .host-icon-field :is(.xm-select-shell,.xm-select-trigger,.xm-select-caption){
+  min-width:0;
+}
+#dlg.host-wide .host-icon-field :is(.xm-select-caption,.xm-select-trigger){
+  padding-left:2.17rem;
+}
+#dlg.host-wide .host-assignment-panel{
+  gap:.46rem;
+}
+#dlg.host-wide .host-assignment-fields{gap:.35rem}
+#dlg.host-wide .host-assignment-fields>.f:last-child{
+  padding-top:.43rem;
+}
+#dlg.host-wide .host-assignment-panel .ms{
+  max-height:4.8rem;gap:.22rem;
+}
+#dlg.host-wide .host-assignment-panel .ms label{
+  padding:.25rem .38rem;
+}
+#dlg.host-wide .host-health-panel{
+  gap:.45rem;
+  border-color:color-mix(in srgb,var(--a) 27%,var(--nx-border));
+  background:linear-gradient(130deg,color-mix(in srgb,var(--a) 6%,var(--nx-section-bg)),var(--nx-section-bg));
+}
+#dlg.host-wide .host-preview-status{
+  gap:.35rem;
+}
+#dlg.host-wide .host-editor-side{
+  align-content:start;
+}
+#dlg.host-wide .host-resolved-line{
+  min-height:1.78rem;gap:.48rem;
+  padding:.25rem .58rem;
+  line-height:1.24;font-size:.7rem;
+}
+#dlg.host-wide .host-resolved-line>b{font-size:.73rem}
+#dlg.host-wide .host-resolved{border-radius:var(--nx-control-radius)}
+#dlg.host-wide .host-preview-disclaimer{
+  margin-top:.12rem;padding-top:.4rem;
+  line-height:1.35;
+}
+#dlg.host-wide .host-advanced-actions{
+  margin-top:.1rem;padding-top:.47rem;
+  display:flex;flex-wrap:wrap;gap:.36rem;
+}
+#dlg.host-wide .host-advanced-actions>[data-host-clear-overrides],
+#dlg.host-wide .host-advanced-actions>details>summary{
+  min-height:2.1rem;
+  font-size:.7rem;line-height:1.32;
+}
+#dlg.host-wide .host-advanced-actions>details[open]{flex:1 1 100%}
+#dlg.host-wide .host-editor-heading{
+  display:flex;align-items:center;gap:.82rem;
+  padding-bottom:.15rem;
+}
+#dlg.host-wide .host-heading-emblem{
+  display:grid;place-items:center;flex:none;
+  width:2.7rem;height:2.7rem;
+  border-radius:.86rem;
+  border:1px solid color-mix(in srgb,var(--a) 30%,var(--nx-border));
+  background:color-mix(in srgb,var(--a) 11%,var(--nx-control-bg));
+  color:var(--a);
+}
+#dlg.host-wide .host-heading-emblem .ic{width:1.35rem;height:1.35rem}
+#dlg.host-wide .host-heading-title{min-width:0;flex:1 1 auto}
+#dlg.host-wide .host-heading-title h2{
+  font-size:1.25rem;font-weight:790;line-height:1.2;
+}
+#dlg.host-wide .host-heading-title p{
+  font-size:.77rem;color:var(--mu);margin:.28rem 0 0;
+  line-height:1.32;
+}
+#dlg.host-wide .host-editor-heading [data-x]{
+  margin-left:auto;
+  border-radius:999px;
+}
+#dlg.host-wide .act .btn{display:inline-flex;align-items:center;gap:.38rem}
+#dlg.host-wide .act .btn .ic{width:1rem;height:1rem}
+@media(min-width:1200px) and (max-height:860px){
+  #dlg.host-wide .host-editor-layout{gap:.42rem;grid-template-rows:max-content max-content}
+  #dlg.host-wide .host-editor-card{padding:.54rem .7rem;gap:.38rem}
+  #dlg.host-wide .node-form-section-title{padding-bottom:.36rem;font-size:.86rem}
+  #dlg.host-wide .f{gap:.16rem}
+  #dlg.host-wide .f :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){min-height:2rem}
+  #dlg.host-wide .host-icon-field>.host-control-glyph{top:1.43rem}
+  #dlg.host-wide .host-connect-fields,
+  #dlg.host-wide .host-public-fields,
+  #dlg.host-wide .host-advanced-fields{gap:.38rem .58rem}
+  #dlg.host-wide .host-assignment-panel .ms{max-height:3.1rem}
+  #dlg.host-wide .host-resolved-line{
+    min-height:1.25rem;padding:.1rem .48rem;
+    line-height:1.19;font-size:.66rem;
+  }
+  #dlg.host-wide .host-resolved-line>b{font-size:.68rem}
+  #dlg.host-wide .host-preview-disclaimer{font-size:.64rem;line-height:1.25}
+  #dlg.host-wide .host-heading-emblem{width:2.3rem;height:2.3rem}
+}
+@media(max-width:1199px){
+  #dlg.host-wide .host-editor-layout{
+    grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
+    grid-template-areas:"connection assignment" "public client" "health preview";
+    grid-template-rows:repeat(3,max-content);
+    align-content:start;align-items:start;
+  }
+}
+@media(max-width:760px){
+  #dlg.host-wide .host-editor-layout{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"connection" "public" "client" "assignment" "health" "preview";
+    grid-template-rows:repeat(6,max-content);
+    grid-auto-rows:max-content;align-items:start;
+    gap:.65rem;
+  }
+  #dlg.host-wide .host-editor-card{padding:.75rem}
+  #dlg.host-wide .host-heading-title p{font-size:.72rem}
+}
+
+/* Compact desktop geometry: two purposeful rows without overflow. */
+@media(min-width:1200px) and (max-height:1100px){
+  #dlg.host-wide .host-editor-layout{gap:.48rem}
+  #dlg.host-wide .host-editor-card{padding:.52rem .64rem;gap:.36rem}
+  #dlg.host-wide .node-form-section-title{padding-bottom:.33rem;line-height:1.17}
+  #dlg.host-wide .f{gap:.12rem}
+  #dlg.host-wide .f>span:first-child{font-size:.69rem;line-height:1.12}
+  #dlg.host-wide .f :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){min-height:1.97rem;font-size:.77rem}
+  #dlg.host-wide .host-icon-field>.host-control-glyph{top:1.32rem}
+  #dlg.host-wide .host-connect-fields,
+  #dlg.host-wide .host-public-fields,
+  #dlg.host-wide .host-advanced-fields{gap:.3rem .49rem}
+  #dlg.host-wide .host-assignment-panel{gap:.28rem}
+  #dlg.host-wide .host-assignment-panel .ms{max-height:2.7rem}
+  #dlg.host-wide .host-assignment-fields{gap:.25rem}
+  #dlg.host-wide .host-assignment-fields>.f:last-child{padding-top:.25rem}
+  #dlg.host-wide .host-advanced-heading>.node-ip-hint{font-size:.63rem}
+  #dlg.host-wide .host-advanced-actions{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.24rem;
+    margin-top:0;padding-top:.27rem;
+  }
+  #dlg.host-wide .host-advanced-actions>[data-host-clear-overrides]{
+    grid-column:1/-1;min-height:1.6rem;padding:.18rem .45rem;
+  }
+  #dlg.host-wide .host-advanced-actions>details{width:100%;max-width:100%}
+  #dlg.host-wide .host-advanced-actions>details>summary{
+    padding:.22rem .43rem;min-height:1.7rem;font-size:.65rem;
+  }
+  #dlg.host-wide .host-resolved-line{min-height:1.23rem;padding:.12rem .46rem}
+  #dlg.host-wide .host-preview-disclaimer{font-size:.64rem;line-height:1.22}
+  #dlg.host-wide .host-preview-status{gap:.2rem}
+}
+/* A short viewport has less space than six natural-size panels. Keep all
+   inputs readable and scroll only on mobile, not beneath an overlay. */
+@media(max-width:760px){
+  #dlg.host-wide .host-editor-layout{align-items:start;overflow-y:auto;overscroll-behavior:contain}
+  #dlg.host-wide .host-editor-card{align-self:start;min-height:0}
+}
+
+/* Compact narrow-desktop client editor: three readable field columns.
+ * Reallocate horizontal space before reducing typography or hiding fields.
+ * All three actions remain fully visible, and expanded disclosures may scroll. */
+@media (min-width:1200px) and (max-width:1499px) and (max-height:900px){
+  #dlg.host-wide .host-advanced-panel{gap:.25rem}
+  #dlg.host-wide .host-advanced-panel .host-advanced-heading{
+    display:flex;flex-wrap:nowrap;align-items:center;gap:.4rem;
+  }
+  #dlg.host-wide .host-advanced-heading .node-form-section-title{
+    flex:0 0 auto;white-space:nowrap;
+    padding-bottom:0;margin:0;border-bottom:0;
+    font-size:.82rem;
+  }
+  #dlg.host-wide .host-advanced-heading>.node-ip-hint{
+    min-width:0;flex:1 1 auto;font-size:.66rem;line-height:1.19;
+  }
+  #dlg.host-wide .host-advanced-panel .host-advanced-fields{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:.19rem .36rem;
+  }
+  #dlg.host-wide .host-advanced-panel .host-advanced-fields>.f{
+    gap:.1rem;
+  }
+  #dlg.host-wide .host-advanced-panel .host-advanced-fields>.f>span:first-child{
+    font-size:.69rem;line-height:1.16;
+  }
+  #dlg.host-wide .host-advanced-panel .host-advanced-actions{
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+    align-items:stretch;gap:.22rem;margin:0;padding-top:.28rem;
+  }
+  #dlg.host-wide .host-advanced-actions>[data-host-clear-overrides]{
+    grid-column:auto;min-height:2.4rem;
+    font-size:.68rem;line-height:1.14;padding:.27rem .4rem;
+  }
+  #dlg.host-wide .host-advanced-actions>details{
+    width:100%;max-width:100%;min-width:0;
+  }
+  #dlg.host-wide .host-advanced-actions>details>summary{
+    min-height:2.4rem;
+    font-size:.66rem;line-height:1.13;padding:.27rem .35rem;gap:.2rem;
+  }
+  #dlg.host-wide .host-advanced-actions>details[open]{grid-column:1/-1}
+  /* The preview is the tallest remaining card at 1366×768 because its
+     copy targets set the line height. Keep all values and accessible actions,
+     but use compact desktop-sized hit targets instead of a tall list. */
+  #dlg.host-wide .host-editor-side{gap:.22rem;padding:.4rem .58rem}
+  #dlg.host-wide .host-editor-side .node-form-section-title{
+    padding-bottom:.24rem;
+  }
+  #dlg.host-wide .host-editor-side .host-resolved-line{
+    gap:.22rem;min-height:1.32rem;
+    padding:.06rem .4rem;font-size:.68rem;line-height:1.14;
+  }
+  #dlg.host-wide .host-editor-side .host-resolved-line>b{
+    font-size:.69rem;
+  }
+  #dlg.host-wide .host-editor-side .host-value-copy{
+    box-sizing:border-box;
+    min-height:1.46rem;width:1.46rem;padding:.16rem;
+  }
+  #dlg.host-wide .host-editor-side .host-value-copy svg{
+    width:.82rem;height:.82rem;
+  }
+  #dlg.host-wide .host-editor-side .host-preview-disclaimer{
+    margin-top:0;padding-top:.22rem;line-height:1.13;
+  }
+  /* Paired compact preview facts use the wide third column without a tall
+     single-file list. Full values remain in DOM and copy buttons unchanged. */
+  #dlg.host-wide .host-editor-side .host-resolved{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  #dlg.host-wide .host-editor-side .host-resolved-line{
+    display:grid;grid-template-columns:minmax(0,1fr);
+    justify-items:stretch;gap:.1rem;
+    padding:.14rem .38rem;min-height:2.4rem;
+    border-right:1px solid var(--nx-separator);
+    min-width:0;
+  }
+  #dlg.host-wide .host-editor-side .host-resolved-line>span{
+    font-size:.65rem;line-height:1.06;
+    white-space:nowrap;text-overflow:ellipsis;overflow:hidden;
+  }
+  #dlg.host-wide .host-editor-side .host-resolved-line>b{
+    justify-content:space-between;gap:.16rem;
+    font-size:.68rem;line-height:1.12;
+  }
+  #dlg.host-wide .host-editor-side .host-value-copy{
+    min-height:1.35rem;width:1.35rem;padding:.13rem;
+  }
+}
+
+/* Short desktop viewport: reclaim shell chrome and whitespace before
+   allowing a scrollable form. All controls and whole preview remain visible. */
+@media (min-width:1200px) and (max-width:1499px) and (max-height:900px){
+  dialog#dlg.host-wide{
+    max-height:calc(100dvh - 1rem);max-block-size:calc(100dvh - 1rem);
+  }
+  dialog#dlg.host-wide>form.box{
+    max-height:calc(100dvh - 1rem);max-block-size:calc(100dvh - 1rem);
+  }
+  dialog#dlg.host-wide>form.box>.act{padding-top:3px}
+  #dlg.host-wide .host-editor-layout{
+    gap:.28rem;padding:.05rem .12rem .08rem;
+  }
+  #dlg.host-wide .host-editor-card{padding:.37rem .52rem;gap:.29rem}
+  #dlg.host-wide .host-editor-heading{padding-bottom:0}
+  #dlg.host-wide .host-heading-title p{margin-top:.14rem}
+  #dlg.host-wide .host-advanced-panel .host-advanced-actions>details>summary,
+  #dlg.host-wide .host-advanced-panel .host-advanced-actions>[data-host-clear-overrides]{
+    min-height:2rem;
+  }
+  #dlg.host-wide .host-editor-side{gap:.14rem}
 }
 
 /* Host directory · compact Nexus cards. Shared system tokens own all material
@@ -301,7 +644,7 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
   .host-card-primary-actions{flex:1 1 auto}
   .host-card-order{margin-left:auto}
 }
-.host-advanced-actions{display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:start;gap:.5rem}
+.host-advanced-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem}
 .host-advanced-actions>[data-host-clear-overrides]{min-width:0;white-space:normal}
 .host-client-settings{min-width:0;justify-self:start}
 .host-client-settings[open]{grid-column:1/-1;justify-self:stretch}
@@ -314,7 +657,7 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){
 .host-field-help:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px;border-radius:50%}
 .host-client-settings>summary{font-weight:500;color:var(--mu)}
 
-@media (max-width:560px){.host-advanced-actions{grid-template-columns:minmax(0,1fr)}.host-advanced-actions>[data-host-clear-overrides]{justify-self:start;max-width:100%}}
+@media (max-width:560px){.host-advanced-actions{display:flex;flex-wrap:wrap}.host-advanced-actions>[data-host-clear-overrides]{max-width:100%}}
 
 
 /* Same three catalog density choices as Nodes and Squads. */

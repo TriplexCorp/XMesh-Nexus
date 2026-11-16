@@ -3558,7 +3558,7 @@ async function main() {
     }
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
-    for(const [width,height] of [[1920,1080],[2560,1440],[390,844]]) await checked(`Host redesign with TLS and fleet: ${width}×${height}`,async()=>{
+    for(const [width,height] of [[1366,768],[1440,900],[1920,1080],[2560,1440],[390,844]]) await checked(`Host redesign with TLS and fleet: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
       await navigate('hosts');
       await page.locator('[data-ne="hosts"]').first().click();
@@ -3578,6 +3578,11 @@ async function main() {
       assert.equal(await page.locator('[data-host-editor-tab]').count(),0,'One-page editor must not contain task tabs');
       for(const zone of ['host-primary-panel','host-public-panel','host-advanced-panel','host-assignment-panel','host-health-panel','host-editor-side'])
         assert(await page.locator('.'+zone).isVisible(),'All Host sections must be visible: '+zone);
+      const fieldIcons=await page.locator('.host-icon-field .host-control-glyph svg').count();
+      assert(fieldIcons>=12,'Concept requires real field icons for the endpoint, profile, transport and security; found '+fieldIcons);
+      assert.equal(await page.locator('.host-heading-emblem svg').count(),1,'Host title must render its emblem');
+      assert(await page.locator('.host-heading-title p').isVisible(),'Host title must display its contextual description');
+
       for(const [name,value] of [['xhttpMode','packet-up'],['tlsVerification','insecure']])
         await page.locator('[name="'+name+'"]').evaluate((input,v)=>{input.value=v;input.dispatchEvent(new Event('change',{bubbles:true}))},value);
       assert.equal(JSON.parse(await page.locator('[name="clientXhttpSettings"]').inputValue()).mode,'packet-up','XHTTP override is preserved');
@@ -3616,15 +3621,19 @@ async function main() {
       assert(g.icons.every(Boolean),'All editor zones retain semantic SVG headings');
       assert(g.dialog.y>=0&&g.dialog.bottom<=height+1,'Host dialog stays within viewport');
       assert(g.body.bottom<=g.footer.y+1,'Footer does not overlap the form');
-      if(width>=1920){
-        assert(g.assignment.x>=g.primary.right,'Assignment belongs beside form fields');
-        assert(Math.abs(g.port.y-g.country.y)<=3,'Public inputs share baselines');
-        assert(g.address.width>=g.publicFields.width*.4,'Address remains readable');
-        assert(g.choices.length>=5,'Node fleet is not removed');
-        assert(Math.abs(g.assignment.y-g.primary.y)<=2,'Sidebar top aligns with main form');
-        assert(g.bodyScroll<=g.bodyClient+1,'Desktop form fits without scrolling: '+JSON.stringify(g));
-        assert(g.copyValues.includes('/host-preview/'+('long-segment-'.repeat(24))),'Long path remains copyable');
-      }else assert(g.assignment.y>=g.primary.bottom,'Mobile editor stacks sidebar below the form');
+      if(width>=1200){
+        assert(g.assignment.x>=g.primary.right,'Assignment must occupy the top-right grid column');
+        assert(Math.abs(g.port.y-g.country.y)<=3,'Public form fields must remain precisely aligned');
+        assert(g.address.width>=g.publicFields.width*.4,'Public endpoint field must remain readable');
+        assert(g.choices.length>=5,'Node assignment fleet must remain complete');
+        assert(Math.abs(g.assignment.y-g.primary.y)<=2,'Top-right assignment must align with connection panel');
+        assert(g.preview.x>=g.advanced.right,'Live preview must occupy its own compact grid column');
+        assert(g.bodyScroll<=g.bodyClient+1,'Desktop Host editor must fit without scrolling: '+JSON.stringify(g));
+        assert(g.copyValues.includes('/host-preview/'+('long-segment-'.repeat(24))),
+          'Long connection paths must stay copyable untruncated');
+      }else {
+        assert(g.assignment.y>=g.primary.bottom,'Phone view stacks assignments after the form');
+      }
       return g;
     });
 
