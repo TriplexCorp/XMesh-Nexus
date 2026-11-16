@@ -96,6 +96,11 @@ dialog.host-wide .node-form-section-title{
 .host-client-settings textarea{font-family:var(--font-mono,monospace);min-height:7rem;resize:vertical}
 .host-field-help{color:var(--mu);font-size:.73rem;cursor:help;margin-left:.18rem;font-weight:400}
 .host-field-help:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px;border-radius:50%}
+.host-health-panel{
+ border-color:color-mix(in srgb,var(--a) 28%,var(--nx-border));
+ background:linear-gradient(125deg,color-mix(in srgb,var(--a) 6%,var(--nx-section-bg)),var(--nx-section-bg));
+}
+.host-health-panel .node-form-section-title svg{color:var(--ok,var(--a))}
 .host-resolved{
  display:grid;grid-template-columns:minmax(0,1fr);
  min-width:0;overflow:hidden;border:1px solid var(--nx-border);
