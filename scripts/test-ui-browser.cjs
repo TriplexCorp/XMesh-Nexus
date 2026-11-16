@@ -3575,72 +3575,56 @@ async function main() {
       assert(focus.offset<=0,'Focus must stay inside the control without a detached double contour');
       assert.equal(focus.shadow,'none','Text fields must not add a second focus shadow');
       await screenshot(page,`audit-focus-host-${width}`);
-      await page.locator('[data-host-editor-tab="client"]').click();
-      for(const [name,value] of [['xhttpMode','packet-up'],['tlsVerification','insecure']]){
-        await page.locator(`[name="${name}"]`).evaluate((input,next)=>{input.value=next;input.dispatchEvent(new Event('change',{bubbles:true}))},value);
-      }
-      assert.equal(JSON.parse(await page.locator('[name="clientXhttpSettings"]').inputValue()).mode,'packet-up','XHTTP dropdown must update the persisted client configuration');
-      assert.equal(JSON.parse(await page.locator('[name="clientTlsSettings"]').inputValue()).allowInsecure,true,'Certificate control must update the persisted TLS settings');
-      assert.equal(await page.locator('[name="alpn"]').evaluate(el=>el.tagName),'SELECT','ALPN must be a normal selection control');
-      assert(!(await page.locator('[name="clientTlsSettings"]').isVisible()),'Raw JSON must remain hidden in the expert disclosure');
+      assert.equal(await page.locator('[data-host-editor-tab]').count(),0,'One-page editor must not contain task tabs');
+      for(const zone of ['host-primary-panel','host-public-panel','host-advanced-panel','host-assignment-panel','host-editor-side'])
+        assert(await page.locator('.'+zone).isVisible(),'All Host sections must be visible: '+zone);
+      for(const [name,value] of [['xhttpMode','packet-up'],['tlsVerification','insecure']])
+        await page.locator('[name="'+name+'"]').evaluate((input,v)=>{input.value=v;input.dispatchEvent(new Event('change',{bubbles:true}))},value);
+      assert.equal(JSON.parse(await page.locator('[name="clientXhttpSettings"]').inputValue()).mode,'packet-up','XHTTP override is preserved');
+      assert.equal(JSON.parse(await page.locator('[name="clientTlsSettings"]').inputValue()).allowInsecure,true,'TLS settings are preserved');
+      assert.equal(await page.locator('[name="alpn"]').evaluate(el=>el.tagName),'SELECT','ALPN is a native selector');
+      assert(!(await page.locator('[name="clientTlsSettings"]').isVisible()),'Raw JSON remains in expert disclosure');
+      await page.locator('.host-extra-settings summary').click();
+      assert(await page.locator('[name="fp"]').isVisible(),'Additional overrides are still accessible on the one page');
+      await page.locator('.host-extra-settings summary').click();
       await page.locator('[name="sni"]').fill('override.example.invalid');
       await page.locator('[name="sni"]').dispatchEvent('change');
-      await page.locator('[data-host-editor-tab="preview"]').click();
-      assert((await page.locator('[data-host-resolved]').innerText()).includes('override.example.invalid'),'Live preview must reflect SNI override');
-      await page.locator('[data-host-editor-tab="connection"]').click();
-      await page.locator('[data-host-editor-tab="client"]').click();
-      assert.equal(await page.locator('[name="sni"]').inputValue(),'override.example.invalid','Switching tasks must preserve draft values');
-      assert.equal(JSON.parse(await page.locator('[name="clientXhttpSettings"]').inputValue()).mode,'packet-up','Switching tasks must preserve structured metadata');
+      assert((await page.locator('[data-host-resolved]').innerText()).includes('override.example.invalid'),'Live preview must update beside the form');
       await page.locator('[data-host-clear-overrides]').click();
-      assert.equal(await page.locator('[name="sni"]').inputValue(),'','Reset must clear overrides');
-      await page.locator('[data-host-editor-tab="preview"]').click();
+      assert.equal(await page.locator('[name="sni"]').inputValue(),'','Override reset still works');
       await page.locator('[data-host-copy-value^="/host-preview/"]').click();
-      assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'/host-preview/'+('long-segment-'.repeat(24)),'Copy must preserve the entire long path');
+      assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'/host-preview/'+('long-segment-'.repeat(24)),'Copy retains full path');
       await page.waitForFunction(()=>!document.getElementById('xmesh-feedback-toast')?.matches(':popover-open'));
-      const frame=await page.locator('#dlg').boundingBox();
-      const footer=await page.locator('#dlg .act').boundingBox();
-      for(const key of ['connection','client','preview']){
-        await page.locator(`[data-host-editor-tab="${key}"]`).click();
-        assert.equal(await page.locator('[data-host-editor-pane]:not([inert])').count(),1,'Only one task may accept interaction');
-        const current=await page.locator('#dlg').boundingBox(),actions=await page.locator('#dlg .act').boundingBox();
-        for(const prop of ['x','y','width','height'])assert(Math.abs(current[prop]-frame[prop])<=1.5,'Task switching must preserve dialog '+prop);
-        assert(Math.abs(actions.y-footer.y)<=1.5,'Task switching must not move Save');
-        await screenshot(page,`host-task-${key}-${width}x${height}`);
-      }
-      await page.locator('[data-host-editor-tab="connection"]').focus();
-      await page.keyboard.press('ArrowRight');
-      assert.equal(await page.locator('[data-host-editor-tab="client"]').getAttribute('aria-selected'),'true');
-      await page.keyboard.press('End');
-      assert.equal(await page.locator('[data-host-editor-tab="preview"]').getAttribute('aria-selected'),'true');
-      await page.keyboard.press('Home');
+      const frame=await page.locator('#dlg').boundingBox(),footer=await page.locator('#dlg .act').boundingBox();
       const remark=await page.locator('[name="remark"]').inputValue();
       await page.locator('[name="remark"]').fill('');
-      await page.locator('[data-host-editor-tab="client"]').click();
       await page.locator('#dlg .act .btn').click();
-      await page.waitForSelector('[data-host-editor-tab="connection"][aria-selected="true"]');
-      assert(await page.locator('[name="remark"]').evaluate(input=>input===document.activeElement),'Validation must focus the first invalid control in its task');
+      assert(await page.locator('[name="remark"]').evaluate(input=>input===document.activeElement),'Native validation must focus the first invalid field');
       await page.locator('[name="remark"]').fill(remark);
-      await page.locator('.host-editor-panes').evaluate(body=>{body.scrollTop=0});
+      const current=await page.locator('#dlg').boundingBox(),actions=await page.locator('#dlg .act').boundingBox();
+      for(const prop of ['x','y','width','height'])assert(Math.abs(current[prop]-frame[prop])<=1.5,'Validation preserves dialog '+prop);
+      assert(Math.abs(actions.y-footer.y)<=1.5,'Save actions remain stationary');
+      await page.locator('.host-editor-layout').evaluate(el=>{el.scrollTop=0});
       const g=await page.locator('#dlg').evaluate(d=>{
         const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
-        const q=s=>d.querySelector(s),primary=q('.host-primary-panel'),advanced=q('.host-advanced-panel'),preview=q('.host-editor-side');
-        return{dialog:box(d),primary:box(primary),advanced:box(advanced),preview:box(preview),assignment:box(q('.host-assignment-panel')),body:box(q('.host-editor-layout')),footer:box(q('.act')),port:box(q('[name="port"]')),country:box(q('[name="countryCode"]')),address:box(q('[name="address"]')),publicFields:box(q('.host-public-fields')),bodyScroll:q('.host-editor-panes').scrollHeight,bodyClient:q('.host-editor-panes').clientHeight,copyValues:[...d.querySelectorAll('[data-host-copy-value]')].map(button=>button.dataset.hostCopyValue),icons:[primary,advanced,preview].map(p=>!!p.querySelector('.node-form-section-title svg')),choices:[...d.querySelectorAll('.ms label')].map(box)};
+        const q=s=>d.querySelector(s),primary=q('.host-primary-panel'),advanced=q('.host-advanced-panel'),preview=q('.host-editor-side'),body=q('.host-editor-layout');
+        return{dialog:box(d),primary:box(primary),advanced:box(advanced),preview:box(preview),assignment:box(q('.host-assignment-panel')),body:box(body),footer:box(q('.act')),port:box(q('[name="port"]')),country:box(q('[name="countryCode"]')),address:box(q('[name="address"]')),publicFields:box(q('.host-public-fields')),bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,copyValues:[...d.querySelectorAll('[data-host-copy-value]')].map(el=>el.dataset.hostCopyValue),icons:[primary,advanced,preview].map(p=>!!p.querySelector('.node-form-section-title svg')),choices:[...d.querySelectorAll('.ms label')].map(el=>el)};
       });
-      await screenshot(page,`host-redesign-${width}x${height}`);
+      await screenshot(page,'host-one-page-'+width+'x'+height);
       await page.keyboard.press('Escape');
       await page.waitForSelector('dialog[open]',{state:'detached'});
-      assert(g.icons.every(Boolean),'Three editor zones must retain semantic SVG headings');
-      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1,'Host editor must fit viewport');
-      assert(g.body.bottom<=g.footer.y+1,'Footer must not cover fields');
+      assert(g.icons.every(Boolean),'All editor zones retain semantic SVG headings');
+      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1,'Host dialog stays within viewport');
+      assert(g.body.bottom<=g.footer.y+1,'Footer does not overlap the form');
       if(width>=1920){
-        assert(g.assignment.x>=g.primary.right,'Connection task must place node assignment beside endpoint fields');
-        assert(Math.abs(g.port.y-g.country.y)<=3,'Paired public fields must share a baseline');
-        assert(g.address.width>=g.publicFields.width*.4,'Paired public endpoint must retain readable width');
-        assert(g.choices.length>=5,'Fixture must show a real node fleet');
-        assert(Math.abs(g.assignment.y-g.primary.y)<=2,'Endpoint and node assignment must start together');
-        assert(g.bodyScroll<=g.bodyClient+1,'Populated TLS/XHTTP Host editor must fit desktop without workspace scrolling: '+JSON.stringify(g));
-        assert(g.copyValues.includes('/host-preview/'+('long-segment-'.repeat(24))),'Full long path must remain available to copy');
-      }else assert(g.assignment.y>=g.primary.bottom,'Mobile connection task must stack node assignment below fields');
+        assert(g.assignment.x>=g.primary.right,'Assignment belongs beside form fields');
+        assert(Math.abs(g.port.y-g.country.y)<=3,'Public inputs share baselines');
+        assert(g.address.width>=g.publicFields.width*.4,'Address remains readable');
+        assert(g.choices.length>=5,'Node fleet is not removed');
+        assert(Math.abs(g.assignment.y-g.primary.y)<=2,'Sidebar top aligns with main form');
+        assert(g.bodyScroll<=g.bodyClient+1,'Desktop form fits without scrolling: '+JSON.stringify(g));
+        assert(g.copyValues.includes('/host-preview/'+('long-segment-'.repeat(24))),'Long path remains copyable');
+      }else assert(g.assignment.y>=g.primary.bottom,'Mobile editor stacks sidebar below the form');
       return g;
     });
 
@@ -3674,11 +3658,7 @@ async function main() {
           assert.equal(await form.locator('[name="remark"]').inputValue(),'🇳🇱 '+hostPresetNode.name,'Explicit preset must replace the remark');
           assert.equal(await form.locator('[name="countryCode"]').inputValue(),'NL');
           assert.equal(await form.locator('[name="profileId"]').inputValue(),String(hostTlsProfile.id));
-          // Preview is intentionally inert while Connection is selected. Read the
-          // visible Preview task rather than innerText of a hidden tab panel.
-          await form.locator('[data-host-editor-tab="preview"]').click();
           assert((await form.locator('[data-host-resolved]').innerText()).includes(hostPresetNode.addr),'Client preview must follow preset changes');
-          await form.locator('[data-host-editor-tab="connection"]').click();
           await form.locator('[name="remark"]').focus();await page.keyboard.press('Tab');
           assert(await form.locator('[name="address"]').evaluate(input=>input===document.activeElement),'Keyboard order must remain remark → address');
           assert.equal(await page.locator('html').getAttribute('data-surface'),surface);
@@ -3705,21 +3685,17 @@ async function main() {
         assert.equal(await form.locator('[name="fp"]').inputValue(),'chrome','New Host must select chrome automatically');
         await form.locator('[name="fp"]').evaluate(select=>{select.value='firefox';select.dispatchEvent(new Event('input',{bubbles:true}))});
         assert.equal(await form.locator('[name="fp"]').inputValue(),'firefox');
-        await form.locator('[data-host-editor-tab="client"]').click();
         await form.locator('[data-host-clear-overrides]').click();
         assert.equal(await form.locator('[name="fp"]').inputValue(),'chrome','Reset overrides must restore chrome');
         await page.waitForFunction(()=>document.querySelector('#dlg [name="fp"]')?.closest('.xm-select-shell')?.querySelector('.xm-select-caption')?.textContent==='chrome');
-        await form.locator('[data-host-editor-tab="connection"]').click();
         await form.locator('[data-host-node-preset]').evaluate((select,id)=>{select.value=String(id);select.dispatchEvent(new Event('change',{bubbles:true}))},realityNode.id);
         await page.waitForFunction(expected=>document.querySelector('#dlg [name="publicKey"]')?.value===expected,publicKey);
         assert.equal(await form.locator('[name="remark"]').inputValue(),'🇩🇪 '+realityNode.name);
         assert.equal(await form.locator('[name="countryCode"]').inputValue(),'DE');
         assert(!(await form.innerHTML()).includes(privateKey),'REALITY private key must never enter the Host DOM');
         assert.equal(await form.locator('[name="privateKey"]').count(),0);
-        await form.locator('[data-host-editor-tab="client"]').click();
         await form.locator('[name="sni"]').fill('tabs.example.invalid');
         await form.locator('[name="fp"]').evaluate(el=>{el.value='firefox';el.dispatchEvent(new Event('change',{bubbles:true}))});
-        await form.locator('[data-host-editor-tab="preview"]').click();
         const creation=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname==='/api/v1/collections/hosts');
         await form.locator('.act button.btn').click();const createdResponse=await creation;
         assert(createdResponse.ok(),'Host creation must retain submit/validation behavior');const createdHost=await createdResponse.json();fixtures.push({collection:'hosts',id:createdHost.id});
