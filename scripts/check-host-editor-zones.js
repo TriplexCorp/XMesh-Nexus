@@ -125,8 +125,10 @@ assert.match(app,/bindHostEditor\(form\)/,
   'The real Host form must bind single-page interactions');
 assert.match(css,/#dlg\.host-wide \.host-editor-layout\{[\s\S]*?grid-template-areas:"connection connection assignment" "public client health" "public client preview"/,
   'Desktop must use balanced concept grid without stacked oversized left cards');
-assert.match(css,/#dlg\.host-wide :is\(\.host-editor-main-column,\.host-editor-primary-column,\.host-editor-client-column,\.host-editor-sidebar\)\{[\s\S]*?display:contents/,
-  'Structural wrappers must not waste grid columns or introduce blank areas');
+assert.doesNotMatch(html,/host-editor-main-column|host-editor-primary-column|host-editor-client-column|host-editor-sidebar/,
+  'All Host sections must be direct grid children, without unused wrapper layers');
+assert.doesNotMatch(css,/display\s*:\s*contents/,
+  'Design-system contract: Host editor must never rely on display:contents');
 assert.match(css,/#dlg\.host-wide \.host-icon-field>\.host-control-glyph\{/,
   'Field-level decorative SVGs must be positioned inside their controls');
 assert.match(css,/\.host-resolved\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
