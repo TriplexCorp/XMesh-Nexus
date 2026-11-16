@@ -73,9 +73,9 @@ const html=editor({profileId:1,tag:'vless-main-2',remark:'🇳🇱',
 const sections=[...html.matchAll(/<section class="([^"]+)"/g)].map(x=>x[1]);
 assert.deepEqual(sections,[
  'host-editor-card host-primary-panel',
- 'host-editor-card host-public-panel',
  'host-editor-card host-advanced host-advanced-panel',
  'host-editor-card host-assignment-panel',
+ 'host-editor-card host-public-panel',
  'host-editor-card host-health-panel',
  'host-editor-card host-editor-side'
 ],'All six semantic editing zones must be present together in a single page.');
@@ -125,16 +125,34 @@ assert.match(feature,/form.addEventListener\('invalid'/,
   'Native validation must reveal controls inside optional disclosures');
 assert.match(app,/bindHostEditor\(form\)/,
   'The real Host form must bind single-page interactions');
-assert.match(css,/#dlg\.host-wide \.host-editor-layout\{[\s\S]*?grid-template-areas:"connection assignment health" "public client preview"/,
-  'Desktop must place all six panels in two compact rows without oversized grid spans');
-assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?grid-template-rows:repeat\(6,max-content\)/,
-  'Mobile Host editor must give each panel a distinct, non-overlapping grid row');
+assert.match(html,/class="host-editor-column host-editor-column-primary"/,
+  'Connection and client overrides must stack independently');
+assert.match(html,/class="host-editor-column host-editor-column-middle"/,
+  'Assignment and public endpoint must stack independently');
+assert.match(html,/class="host-editor-column host-editor-column-preview"/,
+  'Status and live preview must stack independently');
+assert.equal((html.match(/class="host-editor-column host-editor-column-/g)||[]).length,3,
+  'Single-page editor must have exactly three independent columns');
+assert.match(css,/#dlg\.host-wide \.host-editor-column\{[\s\S]*?grid-auto-rows:max-content/,
+  'Card heights must be independent; avoid empty shared grid rows');
+assert.match(css,/#dlg\.host-wide \.host-editor-layout\{[\s\S]*?grid-template-areas:none/,
+  'The active editor must not retain the legacy shared-row geometry');
+assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
+  'Mobile layout must stack the three groups without horizontal overflow');
+assert.match(css,/#dlg\.host-wide \.host-editor-column-middle\{grid-column:1;grid-row:2\}/,
+  'Mobile middle stack needs explicit row two, never overlap first');
+assert.match(css,/#dlg\.host-wide \.host-editor-column-preview\{grid-column:1;grid-row:3\}/,
+  'Mobile preview needs explicit row three, never overlap inputs');
 assert.doesNotMatch(html,/host-editor-main-column|host-editor-primary-column|host-editor-client-column|host-editor-sidebar/,
-  'All Host sections must be direct grid children, without unused wrapper layers');
+  'Obsolete Host layout wrapper layers must not return');
 assert.doesNotMatch(css,/display\s*:\s*contents/,
   'Design-system contract: Host editor must never rely on display:contents');
 assert.match(css,/#dlg\.host-wide \.host-icon-field>\.host-control-glyph\{/,
-  'Field-level decorative SVGs must be positioned inside their controls');
+  'Field-level SVG glyphs must share the control grid row');
+assert.match(css,/grid-column:1;grid-row:2;[\s\S]*?align-self:center;justify-self:start/,
+  'Field icon position must be based on the control, never a fixed top offset');
+assert.equal((html.match(/class="host-section-icon"/g)||[]).length,6,
+  'Every semantic Host section heading must have an identical SVG icon frame');
 assert.match(css,/\.host-resolved\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
   'Right-side preview uses single-column rows instead of a wide empty canvas');
 assert.match(css,/#dlg\.host-wide\s*\{[^}]*--dialog-width:86rem/,
