@@ -105,6 +105,15 @@ def main():
 
         assigned = create_user("ci_scope_assigned", valid_squad["id"])
         unrelated = create_user("ci_scope_unrelated", other_squad["id"])
+        code, before_rows, _ = api("GET", "/collections/users", cookie=cookie)
+        require(code, 200, "snapshot users before rejected telemetry")
+        baseline = {
+            uid: {
+                key: next(item for item in before_rows["items"] if item["id"] == uid).get(key)
+                for key in ("hold", "firstConnectedAt", "onlineAt", "expireAt", "used")
+            }
+            for uid in (assigned, unrelated)
+        }
         sampled_at_ms = int(time.time() * 1000)
 
         def send_signed(user_rows=None, inbound_rows=None):
@@ -149,9 +158,10 @@ def main():
         require(code, 200, "inspect users after rejected telemetry")
         for uid in (assigned, unrelated):
             user = next(item for item in listing["items"] if item["id"] == uid)
-            assert user["hold"] is True and user.get("firstConnectedAt") is None, (
-                "Cross-scope or mixed counters activated an account", uid)
-        print("PASS: rejection left both waiting subscriptions unchanged")
+            for key, original in baseline[uid].items():
+                assert user.get(key) == original, (
+                    "Unauthorized signed sample mutated user state", uid, key, original, user.get(key))
+        print("PASS: rejected telemetry preserved hold, expiry, presence and usage on both accounts")
 
         require(send_signed([{"userId": assigned, "uplinkBytes": 64,
                               "downlinkBytes": 128}]), 201,
