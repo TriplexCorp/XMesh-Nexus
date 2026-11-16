@@ -40,11 +40,25 @@ window.XMeshHostEditor=(() => {
       const fromTag=getProfiles().find(p=>inbs(p).some(i=>i.tag===o.tag));
       const selectedProfile=hostProfile(o.profileId)||fromTag||getProfiles()[0];
       const f=k=>fields.find(x=>x.k===k);
-      const preset='<label class="f"><span>Быстро заполнить из ноды</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+getNodes().map(n=>'<option value="'+esc(n.id)+'">'+esc(n.name)+' · '+esc(n.addr||'')+' · '+esc(n.port||443)+(hostProfile(n.profileId)?'':' · ⚠ Профиль отсутствует')+'</option>').join('')+'</select></label>';
-      const p=field(f('profileId'),selectedProfile?.id||'');
+      const preset='<label class="f host-icon-field"><span>Быстро заполнить из ноды</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+getNodes().map(n=>'<option value="'+esc(n.id)+'">'+esc(n.name)+' · '+esc(n.addr||'')+' · '+esc(n.port||443)+(hostProfile(n.profileId)?'':' · ⚠ Профиль отсутствует')+'</option>').join('')+'</select><span class="host-control-glyph" aria-hidden="true">'+ic('server')+'</span></label>';
+      // Field-level icons use the same safe, bundled SVG glyphs as the panel.
+      // Decorate only ordinary controls: checkbox lists, hidden JSON, and
+      // country-picker adapters keep their existing accessible DOM structure.
+      const withIcon=(markup,iconName)=>{
+        if(!markup||!iconName||!/^<label class="f">/.test(markup))return markup;
+        return markup.replace('<label class="f">','<label class="f host-icon-field">')
+          .replace('</label>','<span class="host-control-glyph" aria-hidden="true">'+ic(iconName)+'</span></label>');
+      };
+      const fieldIcon=(name,value,iconName)=>withIcon(field(f(name),value),iconName);
+      const inputIcons={remark:'layers',address:'link',port:'terminal',countryCode:'globe',
+        serverDescription:'file',host:'globe',path:'sliders',xhttpMode:'layers',
+        securityLayer:'shield',clientEncryption:'lock',sni:'globe',
+        serviceName:'server',alpn:'link',fp:'shield',tlsVerification:'shield',
+        publicKey:'key',shortId:'key',spiderX:'link'};
+      const p=fieldIcon('profileId',selectedProfile?.id||'','layers');
       const inboundOptions=selectedProfile?inbs(selectedProfile).map(i=>[i.tag,i.tag+' · '+i.protocol]):[];
-      const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
-      const basic=['remark','address','port','countryCode','serverDescription'].filter(k=>f(k)).map(k=>field(f(k),o[k])).join('');
+      const tag=withIcon(field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||''),'sliders');
+      const basic=['remark','address','port','countryCode','serverDescription'].filter(k=>f(k)).map(k=>fieldIcon(k,o[k],inputIcons[k])).join('');
       const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
       // Every field lives in one editor; less common overrides are disclosed
       // in place instead of being moved to a separate tab or removed.
@@ -53,7 +67,7 @@ window.XMeshHostEditor=(() => {
         const value=k==='tlsVerification'?(o.clientTlsSettings?.allowInsecure===true?'insecure':o.clientTlsSettings?.allowInsecure===false?'verify':''):k==='xhttpMode'?(o.clientXhttpSettings?.mode||''):o[k]??'';
         const spec=k==='alpn'&&value&&!f(k).o.some(([key])=>key===value)?{...f(k),o:[...f(k).o,[value,value]]}:k==='clientEncryption'?{...f(k),l:'VLESS Encryption'}:f(k);
         const hint=k==='securityLayer'?'Если перед нодой стоит промежуточный сервер, выберите защиту публичного подключения.':k==='tlsVerification'?'Проверка сертификата применяется только к TLS-подключению клиента.':'';
-        const markup=field(spec,value);
+        const markup=withIcon(field(spec,value),inputIcons[k]);
         return hint?markup.replace('<span>'+spec.l+'</span>','<span>'+spec.l+' <span class="host-field-help" tabindex="0" role="img" title="'+esc(hint)+'" aria-label="'+esc(hint)+'">ⓘ</span></span>'):markup;
       };
       const essentialClient=['host','path','xhttpMode','useSniAsHost','securityLayer','clientEncryption','sni'].map(advancedField).join('');
