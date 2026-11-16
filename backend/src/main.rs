@@ -580,7 +580,10 @@ fn application_router(state: AppState) -> Router {
                 .layer(middleware::from_fn(subscription_flood::uri_budget_guard)),
         )
         .route("/auth/session", get(auth::session))
-        .route("/auth/login", post(auth::login))
+        .route(
+            "/auth/login",
+            post(auth::login).layer(RequestBodyLimitLayer::new(8192)),
+        )
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
         .route("/auth/logout", post(auth::logout));
 
