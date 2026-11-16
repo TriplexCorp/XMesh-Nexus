@@ -254,9 +254,16 @@ def main():
             "inbounds":[{"tag":"DE_VLESS","listen":"127.0.0.1","port":28351,
                          "protocol":"vless","settings":{"decryption":"none","clients":[]},
                          "streamSettings":{"network":"tcp","security":"none"}},
+                        # Managed dual-inbound topology permits TCP proxy + Hysteria2,
+                        # not two competing TCP proxy inbounds. Cert paths are
+                        # disposable external-path fixtures; no ACME/network issuance.
                         {"tag":"CDN_DE","listen":"127.0.0.1","port":28352,
-                         "protocol":"vless","settings":{"decryption":"none","clients":[]},
-                         "streamSettings":{"network":"tcp","security":"none"}}],
+                         "protocol":"hysteria","settings":{"version":2,"users":[]},
+                         "streamSettings":{"network":"hysteria","security":"tls",
+                                           "tlsSettings":{"alpn":["h3"],"certificates":[{
+                                               "certificateFile":"/tmp/xmesh-ci-hysteria-cert.pem",
+                                               "keyFile":"/tmp/xmesh-ci-hysteria-key.pem"
+                                           }]}}}],
             "outbounds":[{"tag":"direct","protocol":"freedom"}],
             "routing":{"rules":[]}
         }
