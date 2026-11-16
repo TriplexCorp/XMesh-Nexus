@@ -35,6 +35,11 @@
     "bandit": {
       "version": "1.9.4",
       "assets": []
+    },
+    "govulncheck": {
+      "version": "v1.9.0",
+      "source": "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+      "assets": []
     }
   }
 }
