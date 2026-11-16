@@ -74,6 +74,7 @@ window.XMeshHostEditor=(() => {
       const extraClient=['serviceName','alpn','fp','tlsVerification','publicKey','shortId','spiderX'].map(advancedField).join('');
       const clientFields=['clientXhttpSettings','clientHeaders','clientTlsSettings','clientMasqueSettings'].filter(k=>f(k)).map(k=>field(f(k),typeof o[k]==='object'&&o[k]!==null?JSON.stringify(o[k],null,2):o[k]||'')).join('');
       return '<div class="host-editor-layout" data-host-single-page>'+
+          '<div class="host-editor-column host-editor-column-primary">'+
           '<section class="host-editor-card host-primary-panel" aria-label="Подключение">'+
             '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
             '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
@@ -81,6 +82,11 @@ window.XMeshHostEditor=(() => {
           '<section class="host-editor-card host-public-panel" aria-label="Публичная точка">'+
             '<div class="node-form-section-title">'+ic('globe')+'<span>Публичная точка</span></div>'+
             '<div class="host-public-fields">'+basic+'</div>'+(window.XMeshRemarkPicker?.markup()||'')+
+          '</section>'+
+          '</div><div class="host-editor-column host-editor-column-middle">'+
+          '<section class="host-editor-card host-assignment-panel">'+
+            '<div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
+            '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small>'+
           '</section>'+
           '<section class="host-editor-card host-advanced host-advanced-panel" aria-label="Параметры клиента">'+
             '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Параметры клиента</span></div>'+
@@ -94,10 +100,7 @@ window.XMeshHostEditor=(() => {
                 '<p class="node-ip-hint">JSON-объект. Пустое поле наследует настройки профиля. Применяется только к клиентской конфигурации.</p>'+clientFields+'</details>'+
             '</div>'+
           '</section>'+
-          '<section class="host-editor-card host-assignment-panel">'+
-            '<div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
-            '<div class="host-assignment-fields">'+nodes+'</div><small class="note" data-host-count></small>'+
-          '</section>'+
+          '</div><div class="host-editor-column host-editor-column-preview">'+
           '<section class="host-editor-card host-health-panel">'+
             '<div class="node-form-section-title">'+ic('activity')+'<span>Статус / Проверка</span></div>'+
             '<div class="host-preview-status">'+
@@ -112,7 +115,7 @@ window.XMeshHostEditor=(() => {
             '<div class="host-resolved" data-host-resolved></div>'+
             '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p>'+
           '</section>'+
-      '</div>';
+          '</div></div>';
     }
     function bindHostEditor(form){
       if(!form||form.dataset.hostEditorBound)return;
