@@ -342,12 +342,30 @@ mod tests {
         let configured = configured_public_path(&json!({"subscriptionPath":"/a/b/c"}));
         assert_eq!(configured, "/a/b/c");
         assert_eq!(configured_public_path(&json!({})), "/s");
-        assert_eq!(validate_custom_route(&format!("/a/b/c/{token}"), &configured), Some(token.as_str()));
-        assert_eq!(validate_custom_route(&format!("/a/b/x/{token}"), &configured), None);
-        assert_eq!(validate_custom_route(&format!("/a/b/c/{}", "A".repeat(64)), &configured), None);
-        assert_eq!(validate_custom_route("/a/b/c/not-a-token", &configured), None);
-        assert_eq!(validate_custom_route(&format!("/s/{token}"), &configured), None);
-        assert_eq!(validate_custom_route(&format!("/api/v1/{token}"), &configured), None);
+        assert_eq!(
+            validate_custom_route(&format!("/a/b/c/{token}"), &configured),
+            Some(token.as_str())
+        );
+        assert_eq!(
+            validate_custom_route(&format!("/a/b/x/{token}"), &configured),
+            None
+        );
+        assert_eq!(
+            validate_custom_route(&format!("/a/b/c/{}", "A".repeat(64)), &configured),
+            None
+        );
+        assert_eq!(
+            validate_custom_route("/a/b/c/not-a-token", &configured),
+            None
+        );
+        assert_eq!(
+            validate_custom_route(&format!("/s/{token}"), &configured),
+            None
+        );
+        assert_eq!(
+            validate_custom_route(&format!("/api/v1/{token}"), &configured),
+            None
+        );
     }
 
     #[test]
