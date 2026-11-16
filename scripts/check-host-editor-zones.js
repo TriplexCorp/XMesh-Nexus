@@ -133,19 +133,19 @@ assert.match(html,/class="host-editor-column host-editor-column-preview"/,
   'Status and live preview must stack independently');
 assert.equal((html.match(/class="host-editor-column host-editor-column-/g)||[]).length,3,
   'Single-page editor must have exactly three independent columns');
-assert.match(css,/#dlg\\.host-wide \\.host-editor-column\\{[\\s\\S]*?grid-auto-rows:max-content/,
+assert.match(css,/#dlg\.host-wide \.host-editor-column\{[\s\S]*?grid-auto-rows:max-content/,
   'Card heights must be independent; avoid empty shared grid rows');
-assert.match(css,/#dlg\\.host-wide \\.host-editor-layout\\{[\\s\\S]*?grid-template-areas:none/,
+assert.match(css,/#dlg\.host-wide \.host-editor-layout\{[\s\S]*?grid-template-areas:none/,
   'The active editor must not retain the legacy shared-row geometry');
-assert.match(css,/@media\\(max-width:760px\\)\\{[\\s\\S]*?grid-template-columns:minmax\\(0,1fr\\)/,
+assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
   'Mobile layout must stack the three groups without horizontal overflow');
 assert.doesNotMatch(html,/host-editor-main-column|host-editor-primary-column|host-editor-client-column|host-editor-sidebar/,
   'Obsolete Host layout wrapper layers must not return');
 assert.doesNotMatch(css,/display\s*:\s*contents/,
   'Design-system contract: Host editor must never rely on display:contents');
-assert.match(css,/#dlg\\.host-wide \\.host-icon-field>\\.host-control-glyph\\{/,
+assert.match(css,/#dlg\.host-wide \.host-icon-field>\.host-control-glyph\{/,
   'Field-level SVG glyphs must share the control grid row');
-assert.match(css,/grid-column:1;grid-row:2;[\\s\\S]*?align-self:center;justify-self:start/,
+assert.match(css,/grid-column:1;grid-row:2;[\s\S]*?align-self:center;justify-self:start/,
   'Field icon position must be based on the control, never a fixed top offset');
 assert.equal((html.match(/class="host-section-icon"/g)||[]).length,6,
   'Every semantic Host section heading must have an identical SVG icon frame');
