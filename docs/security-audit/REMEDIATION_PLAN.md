@@ -23,3 +23,11 @@ Separate working branches/PRs per repository when runtime or workflow changes ar
 Latest scanner step is now triage rather than fixing a failed Rust invocation. Establish active SQLx features, validate ZIP extraction bounds/upgrade compatibility, assess actual Node SDK/runtime advisory conditions, and preserve the generated lock/SBOM artifact before its retention expires. Device HWID and physical-device/credential-cloning guarantees must be documented separately.
 
 Track the Host dialog overflow assertion separately; original browser CI remains failing. The independent security matrix target exists so that layout failure cannot prevent signed-node and actual RBAC/MFA/scoped-token checks. Record its result and investigate any security failure before approval.
+
+## Follow-up checkpoint — 2026-11-16
+
+Latest verified head ea675441: default Rust, crypto, isolated signer E2E, baseline/candidate resource and independent security integration checks succeeded. SAST/dependency aggregates and combined browser/API job remain failing; they are not security approval.
+
+Additional source review traced telemetry persistence and migrations 0006/0028. Node identity verification and user-object authorization are distinct assurance requirements. The reviewed persistence schema's positive-ID checks and composite keys do not themselves enforce assignment. This is a priority hypothesis, not a dynamically confirmed finding or assigned CVSS score. Before remediation, inspect every relevant trigger/migration and provisioning membership rule, then test two separately assigned disposable node/user fixtures. Verify that rejecting unauthorized objects preserves legitimate delayed samples and quota reconciliation. Existing signature/replay tests alone do not establish this property.
+
+The local executor remains unavailable. No new dynamic reproduction, production request, runtime modification, dependency upgrade or merge occurred in this follow-up. Reuse existing scan artifacts; next execution should prioritize the focused cross-identity test rather than rerunning broad scans with unchanged source.
