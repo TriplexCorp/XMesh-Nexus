@@ -76,6 +76,7 @@ assert.deepEqual(sections,[
  'host-editor-card host-public-panel',
  'host-editor-card host-advanced host-advanced-panel',
  'host-editor-card host-assignment-panel',
+ 'host-editor-card host-health-panel',
  'host-editor-card host-editor-side'
 ],'All five semantic editing zones must be present together in a single page.');
 for(const key of names){
