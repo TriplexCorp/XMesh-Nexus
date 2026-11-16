@@ -252,6 +252,17 @@ pub async fn serve(
     if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
         return Ok(rejected);
     }
+    serve_authorized(state, token, headers, options).await
+}
+
+/// Called only after a single shared token and rate-budget check. Portal
+/// content negotiation must not account for one refresh twice.
+async fn serve_authorized(
+    state: AppState,
+    token: String,
+    headers: HeaderMap,
+    options: HashMap<String, String>,
+) -> Result<Response, ApiError> {
     let fingerprint = token_fingerprint(&state, &token).await?;
     let request_headers = headers.clone();
     let response = base::serve(
@@ -289,13 +300,15 @@ pub async fn portal(
     if !crate::subscription_flood::valid_token(&token) {
         return Ok(crate::subscription_flood::reject_invalid());
     }
+    // The budget applies before even client User-Agent parsing. A feed and
+    // an HTML portal are one public request, not two independent refreshes.
+    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
+        return Ok(rejected);
+    }
     let wants_feed = crate::subscription_user_agent::wants_feed(&headers, &options)
         .map_err(|message| ApiError::new(StatusCode::BAD_REQUEST, message))?;
     if wants_feed {
-        return serve(State(state), Path(token), headers, Query(options)).await;
-    }
-    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
-        return Ok(rejected);
+        return serve_authorized(state, token, headers, options).await;
     }
     base::portal(State(state), Path(token), headers, Query(options)).await
 }
@@ -320,13 +333,13 @@ pub async fn portal_route(
         token.to_owned()
     };
 
+    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
+        return Ok(rejected);
+    }
     let wants_feed = crate::subscription_user_agent::wants_feed(&headers, &options)
         .map_err(|message| ApiError::new(StatusCode::BAD_REQUEST, message))?;
     if wants_feed {
-        return serve(State(state), Path(token), headers, Query(options)).await;
-    }
-    if let Some(rejected) = crate::subscription_flood::enforce(&state, &token).await {
-        return Ok(rejected);
+        return serve_authorized(state, token, headers, options).await;
     }
     base::portal_route(State(state), OriginalUri(uri), headers, Query(options)).await
 }
