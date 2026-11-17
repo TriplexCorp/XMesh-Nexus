@@ -423,7 +423,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route(
             "/users/{id}/quota-v2/revocation",
-            get(quota_v2::revocation_status),
+            get(quota_v2::revocation_status).post(quota_v2::request_node_revocation),
         )
         .route(
             "/users/{id}/node-quotas",
