@@ -33,6 +33,130 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
+pub async fn validate_limit_change(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    prior_gb: f64,
+    next_gb: f64,
+    base_used_gb: f64,
+) -> Result<(), ApiError> {
+    let old_limit = crate::gb_to_bytes_i64(prior_gb);
+    let new_limit = crate::gb_to_bytes_i64(next_gb);
+    if old_limit == new_limit {
+        return Ok(());
+    }
+    // Even without an existing quota account, nodes may have cached a
+    // version-2 unlimited policy. A new limited tariff needs fleet ACKs.
+    if enabled() && ((old_limit == 0) != (new_limit == 0)) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Смена безлимитного тарифа при квотах v2 требует подтверждения всех нод.",
+        ));
+    }
+    let active = sqlx::query(
+        "SELECT limit_bytes,settled_bytes,epoch::text AS epoch
+         FROM quota_v2_accounts WHERE user_id=$1 AND NOT closed FOR UPDATE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some(active) = active else {
+        return Ok(());
+    };
+    if old_limit == 0 || new_limit == 0 {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Переключение безлимита при квотах v2 требует обновления всех нод.",
+        ));
+    }
+    let epoch: String = active.try_get("epoch")?;
+    let spent: i64 = active.try_get("settled_bytes")?;
+    let held: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-acknowledged_bytes),0)::BIGINT
+         FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .fetch_one(&mut *conn)
+    .await?;
+    // Signed telemetry can be accepted BEFORE the quota receipt arrives.
+    // Count that verified but not yet settled traffic plus outstanding holds.
+    let measured: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT
+         FROM user_node_traffic_totals WHERE user_id=$1",
+    )
+    .bind(user_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let baseline = crate::gb_to_bytes_i64(base_used_gb);
+    let charged = spent.max(baseline.saturating_add(measured.max(0)));
+    if new_limit < charged.saturating_add(held) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Новый лимит меньше уже потраченного и зарезервированного трафика на нодах.",
+        ));
+    }
+    Ok(())
+}
+
+pub async fn close_drained_epoch(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+) -> Result<(), ApiError> {
+    let active = sqlx::query(
+        "SELECT epoch::text AS epoch FROM quota_v2_accounts
+         WHERE user_id=$1 AND NOT closed FOR UPDATE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(active) = active {
+        let epoch: String = active.try_get("epoch")?;
+        let outstanding: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-acknowledged_bytes),0)::BIGINT
+             FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
+        )
+        .bind(user_id)
+        .bind(&epoch)
+        .fetch_one(&mut *conn)
+        .await?;
+        if outstanding > 0 {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.",
+            ));
+        }
+        // Close in the same transaction as resetting the UI/telemetry
+        // baseline. A late signed old-epoch receipt remains chargeable, but
+        // cannot reissue an expired or closed budget.
+        sqlx::query(
+            "UPDATE quota_v2_accounts SET closed=TRUE
+             WHERE user_id=$1 AND epoch=$2::uuid",
+        )
+        .bind(user_id)
+        .bind(&epoch)
+        .execute(&mut *conn)
+        .await?;
+    } else {
+        let old_unsettled: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+               SELECT 1 FROM quota_v2_reservations
+               WHERE user_id=$1 AND ceiling_bytes>acknowledged_bytes
+            )",
+        )
+        .bind(user_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if old_unsettled {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_local(
     local: &[LocalQuotaCounter],
 ) -> Result<HashMap<i64, &LocalQuotaCounter>, ApiError> {
