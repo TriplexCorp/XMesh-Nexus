@@ -231,6 +231,10 @@ def main():
         a.ledger=saved_a
         time.sleep(.02)
         pa2,da2=a.desired(uid,40*MIB,lease_a)
+        # Reconciliation can extend node A's absolute ceiling using only
+        # still-unreserved global capacity. From this point forward use the
+        # latest signed revision, not A's original earlier grant.
+        lease_a=pa2["users"][0]["quotaReservation"]
         settled,held,limit=account()
         assert settled==50*MIB and settled+held<=limit,(settled,held,limit)
         _,a.ledger,denied=guard.enforce(pa2,da2["config"],a.ledger,
