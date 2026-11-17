@@ -180,5 +180,46 @@ def main():
         }]), 201, "accept genuine assigned inbound counters")
 
 
+        # Assignment revocation applies even to a node with accepted old counters.
+        second = create_user("ci_scope_still_assigned", valid_squad["id"])
+        code, _, _ = api("PATCH", f"/collections/users/{assigned}",
+                        {"squads":[other_squad["id"]]}, cookie=cookie)
+        require(code, 200, "move previously metered user out of node scope")
+        code, snapshot, _ = api("GET", "/collections/users", cookie=cookie)
+        require(code, 200, "snapshot reassignment state")
+        watched = ("hold", "firstConnectedAt", "onlineAt", "expireAt", "used")
+        before_rejected = {
+            uid: {field: next(u for u in snapshot["items"] if u["id"]==uid).get(field)
+                  for field in watched}
+            for uid in (assigned, second)
+        }
+        require(send_signed([
+            {"userId":assigned,"uplinkBytes":4096,"downlinkBytes":8192},
+            {"userId":second,"uplinkBytes":32,"downlinkBytes":64}
+        ]), 403, "reject delayed mixed batch after assignment revocation")
+        require(send_signed(inbound_rows=[{
+            "userId":assigned,"inboundTag":"DE_VLESS",
+            "uplinkBytes":128,"downlinkBytes":256
+        }]), 403, "reject old inbound identity after assignment revocation")
+        code, snapshot, _ = api("GET", "/collections/users", cookie=cookie)
+        require(code, 200, "inspect state after delayed rejected samples")
+        for uid, expected in before_rejected.items():
+            user = next(u for u in snapshot["items"] if u["id"]==uid)
+            assert {field:user.get(field) for field in watched} == expected, (
+                "Delayed rejected packet modified user state", uid)
+        code, _, _ = api("PATCH", f"/collections/users/{assigned}",
+                        {"squads":[valid_squad["id"]]}, cookie=cookie)
+        require(code, 200, "restore authorized assignment")
+        require(send_signed([
+            {"userId":assigned,"uplinkBytes":128,"downlinkBytes":256},
+            {"userId":second,"uplinkBytes":32,"downlinkBytes":64}
+        ]), 201, "accept restored scope with counters below rejected sample")
+        code, snapshot, _ = api("GET", "/collections/users", cookie=cookie)
+        require(code, 200, "inspect valid subscriber after restored scope")
+        user = next(u for u in snapshot["items"] if u["id"]==second)
+        assert user["hold"] is False and user.get("firstConnectedAt")
+        print("PASS: assignment revocation rejects delayed batches atomically; restored scope works")
+
+
 if __name__ == "__main__":
     main()
