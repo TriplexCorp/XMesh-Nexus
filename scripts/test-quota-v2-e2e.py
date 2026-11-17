@@ -248,6 +248,8 @@ def main():
         print("PASS: cross-node receipt substitution rejected without mutation")
 
         # A quota decrease cannot invalidate an active offline reservation.
+        code, _, _=api("PATCH",f"/collections/users/{uid}",{"limit":0},cookie)
+        check(code,409,"cannot turn signed limited plan unlimited during unsafe fleet transition")
         code, _, _=api("PATCH",f"/collections/users/{uid}",{"limit":0.01},cookie)
         check(code,409,"cannot lower plan beneath already consumed and reserved bytes")
         assert account()[2]==limit
