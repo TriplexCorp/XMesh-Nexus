@@ -109,6 +109,61 @@ class ReservationTests(unittest.TestCase):
                 "SELECT ceiling_bytes,acknowledged_bytes FROM quota_v2_ack(%s,%s,%s,%s,%s,%s)",
                 (self.uid,self.epoch,node,self.meters[node],reservation_id or self.ids[node],total)).fetchone()
 
+    def revoke(self,node):
+        with psycopg.connect(DSN) as c:
+            c.execute(
+                "INSERT INTO quota_v2_revocation_requests "
+                "(user_id,epoch,node_id,meter_epoch,reservation_id,request_id) "
+                "VALUES (%s,%s,%s,%s,%s,%s)",
+                (self.uid,self.epoch,node,self.meters[node],self.ids[node],uuid.uuid4()))
+
+    def lease_until(self,node):
+        with psycopg.connect(DSN) as c:
+            return c.execute(
+                "SELECT valid_until FROM quota_v2_reservations "
+                "WHERE user_id=%s AND epoch=%s AND node_id=%s",
+                (self.uid,self.epoch,node)).fetchone()[0]
+
+    def test_revoked_lease_never_renews_or_refills_on_signed_poll(self):
+        self.assertEqual(self.reserve(1),(50,0))
+        self.assertEqual(self.reserve(2),(50,0))
+        before_until=self.lease_until(1)
+        self.revoke(1)
+        # Every valid Node poll has a NEW 1-hour expiry proposal; revoked
+        # leases must retain the previously signed expiry for all retries.
+        self.assertEqual(self.reserve(1,target=50,ack=10),(50,10))
+        self.assertEqual(self.lease_until(1),before_until)
+        self.assertEqual(self.state(),(10,90))
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_accounts SET limit_bytes=200 WHERE user_id=%s",
+                      (self.uid,))
+        self.assertEqual(self.reserve(1,target=50,ack=10),(50,10))
+        self.assertEqual(self.lease_until(1),before_until)
+        # The *other* non-revoked node may use newly paid capacity.
+        self.assertEqual(self.reserve(2,target=90),(90,0))
+        self.assertEqual(self.state(),(10,130))
+        # Overshoot is charged, not refunded or used to extend revocation.
+        self.assertEqual(self.reserve(1,target=50,ack=60),(60,60))
+        self.assertEqual(self.lease_until(1),before_until)
+        self.assertEqual(self.state(),(60,90))
+
+    def test_revoked_expired_lease_cannot_be_resurrected(self):
+        self.assertEqual(self.reserve(1,target=50),(50,0))
+        with psycopg.connect(DSN) as c:
+            c.execute(
+                "UPDATE quota_v2_reservations "
+                "SET valid_until=NOW()-INTERVAL '1 hour' "
+                "WHERE user_id=%s AND node_id=1",(self.uid,))
+        self.revoke(1)
+        expired=self.lease_until(1)
+        self.assertEqual(self.reserve(1,target=50,ack=0),(50,0))
+        self.assertEqual(self.lease_until(1),expired)
+        # A previously unfunded identity cannot acquire a grant after revoke.
+        self.assertEqual(self.reserve(2,target=0),(0,0))
+        self.revoke(2)
+        self.assertEqual(self.reserve(2,target=50),(0,0))
+        self.assertEqual(self.state(),(0,50))
+
     def test_signed_receipt_is_scoped_idempotent_and_cannot_reissue_budget(self):
         self.reserve(1)
         self.reserve(2)
