@@ -34,6 +34,7 @@ mod subscription_user_agent;
 mod telegram_admin_bot;
 mod telegram_admin_bot_worker;
 mod telemetry_scope;
+mod quota_v2;
 mod user_subscriptions;
 mod xhttp_device_profiles;
 #[cfg(feature = "xsp-v2-experimental")]
