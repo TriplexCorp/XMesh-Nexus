@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.14"
+AGENT_VERSION="control-v6.0.15"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -151,7 +151,7 @@ restart_xray(){
 # Xray, arbitrary Docker container or remote-selected image is never modified.
 update_managed_xray(){
  local version="${1:?Pinned Xray version required}" worker=/usr/local/libexec/xmesh-xray-update.py event kind payload outcome=false
- [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.14"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
+ [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.15"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
  # Only fixed JSON stages and a sanitized final result cross the signed channel.
  # The worker preserves the exact old container until preflight succeeds and
  # validates all actual TLS/GeoData mounts with run -test before switching.
