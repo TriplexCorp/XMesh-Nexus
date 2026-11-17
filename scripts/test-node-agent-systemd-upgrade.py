@@ -175,9 +175,12 @@ def main():
         # Explicit, disposable fake Docker CLI for the Node guard's real
         # get_counters(). No Docker socket, external requests, or real Xray.
         executable = bin_dir / "docker"
+        docker_log = work / "docker-calls.log"
         executable.write_text(
             "#!/usr/bin/python3\n"
             "import json,os,sys\n"
+            "with open(os.environ['XMESH_AUDIT_DOCKER_LOG'],'a') as log:\n"
+            " log.write(repr(sys.argv)+'\\n')\n"
             "if sys.argv[1] == 'inspect':\n"
             " print('fake-xray-runtime 2026-11-17T00:00:00Z')\n"
             "elif sys.argv[1] == 'exec':\n"
@@ -185,19 +188,33 @@ def main():
             "else:\n"
             " raise SystemExit(2)\n", encoding="utf-8")
         executable.chmod(0o700)
+        test_env = dict(os.environ, PATH=f"{bin_dir}:/usr/bin:/bin",
+                        XMESH_AUDIT_FAKE_STATS=str(stats),
+                        XMESH_AUDIT_DOCKER_LOG=str(docker_log))
+        for args in (("inspect", "-f", "fake", "xmesh-managed-xray"),
+                     ("exec", "xmesh-managed-xray", "xray", "api", "statsquery")):
+            smoke = subprocess.run(["docker", *args], env=test_env,
+                                   capture_output=True, text=True, timeout=8)
+            expect(smoke.returncode == 0, "Fake Xray CLI is not executable: " +
+                   smoke.stderr + " / " + smoke.stdout)
 
         unit_path.write_text(
             "[Unit]\nDescription=Disposable signed-policy meter upgrade canary\n"
             "[Service]\nType=oneshot\nUser=root\nGroup=root\nUMask=0077\n"
             f'Environment="PATH={bin_dir}:/usr/bin:/bin"\n'
             f'Environment="XMESH_AUDIT_FAKE_STATS={stats}"\n'
+            f'Environment="XMESH_AUDIT_DOCKER_LOG={docker_log}"\n'
             f"ExecStart=/usr/bin/python3 {libexec / 'xmesh-policy-guard.py'} "
             f"sample --state {state} --node-id {NODE}\n"
             "NoNewPrivileges=true\nProtectSystem=strict\nProtectHome=true\n"
             "ReadWritePaths=/run\n", encoding="utf-8")
         try:
             run("systemctl", "daemon-reload")
-            start(unit)
+            try:
+                start(unit)
+            except RuntimeError as exc:
+                raise RuntimeError(str(exc) + "\nFake CLI calls: " +
+                                   (docker_log.read_text() if docker_log.exists() else "none"))
             prior = snapshot()
             expect({row["userId"] for row in prior["userTraffic"]} == {1, 2},
                    "Old installed guard did not expose the stale user baseline")
