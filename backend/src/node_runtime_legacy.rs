@@ -1582,7 +1582,8 @@ fn build_offline_policy(
         user_policies.push(json!({
             "userId":user_id,"xrayId":uuid.to_string(),
             "expireAtMs":expires,"panelUsedBytes":used_bytes,
-            "limitBytes":limit_bytes,"offlineBudgetBytes":offline_budget
+            "limitBytes":limit_bytes,"offlineBudgetBytes":offline_budget,
+            "onHold":user.get("hold").and_then(Value::as_bool)==Some(true)
         }));
     }
     user_policies.sort_by_key(|item| item.get("userId").and_then(Value::as_i64).unwrap_or(0));
