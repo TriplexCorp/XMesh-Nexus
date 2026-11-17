@@ -42,6 +42,7 @@ CODES = {
     'health_failed': 'Container stability/listener health check failed',
     'pin_failed': 'Cannot persist verified image identity',
     'interrupted': 'Previous transaction was interrupted',
+    'revocation_pending': 'Signed quota revocation is awaiting safe policy application; Xray update denied',
     'internal_error': 'Local updater failed; inspect root-only diagnostic logs',
 }
 
@@ -262,6 +263,15 @@ class Updater:
                 except BlockingIOError:
                     if time.monotonic()>=deadline: raise Failure('prepare_failed')
                     time.sleep(.2)
+            # Signed quota-v2 revocation fences ALL paths that could restart
+            # the old Xray (including recovery of an interrupted image swap).
+            # The guard/reconciler owns the same lock and clears this marker
+            # only after a valid signed deny has been physically applied.
+            deny_marker = self.state / 'quota-revocation-deny-pending'
+            if deny_marker.exists() or deny_marker.is_symlink():
+                result = self.error_result(Failure('revocation_pending'), 'unchanged')
+                self.emit(result)
+                return result
             self.recover_pending()
             self.prune_private_logs()
             if self.journal.exists():
