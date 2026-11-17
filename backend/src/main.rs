@@ -3417,7 +3417,9 @@ async fn record_node_stop_receipts(
     node_id: i64,
     proofs: &[NodeStopReceipt],
 ) -> Result<(), ApiError> {
-    // This is proof of signed policy application, NOT a proven final meter.
+    // This attests signed policy application, NOT a final Xray accounting
+    // watermark. A stop proof older than already accepted signed spending
+    // must be rejected atomically (including mixed metrics+stop batches).
     // Deliberately NO ceiling reduction or quota refund here.
     for proof in proofs {
         sqlx::query(
@@ -3442,6 +3444,12 @@ async fn record_node_stop_receipts(
                AND lease.node_id=r.node_id AND lease.meter_epoch=r.meter_epoch
                AND lease.reservation_id=r.reservation_id
                AND lease.revision >= $7
+               -- A stop claim cannot trail the signed quota receipt settled
+               -- earlier in this SAME transaction, or a previous accepted
+               -- stop claim. Do not silently MAX() away a forged/stale proof.
+               AND $8 >= lease.acknowledged_bytes
+               AND $8 >= COALESCE(r.observed_used_bytes,0)
+               AND $7 >= COALESCE(r.applied_revision,0)
              RETURNING r.request_id",
         )
         .bind(proof.user_id)
