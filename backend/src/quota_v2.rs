@@ -69,6 +69,7 @@ pub async fn revocation_status(
         return Ok(Json(json!({
             "userId":user_id,"protocol":"v2","state":"inactive",
             "canResetNow":false,"heldBytes":0,"nodes":[],
+            "canRefundNow":false,"finalMeterVerified":false,
             "expirationRefundsBudget":false
         })));
     };
@@ -99,6 +100,12 @@ pub async fn revocation_status(
         let acknowledged: i64 = lease.try_get("acknowledged_bytes")?;
         let outstanding = ceiling.checked_sub(acknowledged).ok_or_else(conflict)?;
         held = held.checked_add(outstanding).ok_or_else(conflict)?;
+        let stop_applied: bool = lease.try_get("revocation_applied")?;
+        let observed_stop: Option<i64> = lease.try_get("observed_used_bytes")?;
+        // An applied signed deny is not a terminal Xray meter. Even when its
+        // observed usage matches the current receipt, no hold is refundable.
+        let stop_proof_below_settled =
+            stop_applied && observed_stop.is_none_or(|used| used < acknowledged);
         nodes.push(json!({
             "nodeId":lease.try_get::<i64,_>("node_id")?,
             "acknowledgedBytes":acknowledged,
@@ -108,8 +115,12 @@ pub async fn revocation_status(
             "nodeConfirmed":lease.try_get::<bool,_>("node_confirmed")?,
             "expired":lease.try_get::<bool,_>("expired")?,
             "revocationRequestId":lease.try_get::<Option<String>,_>("revocation_request_id")?,
-            "stopApplied":lease.try_get::<bool,_>("revocation_applied")?,
-            "observedUsedBytes":lease.try_get::<Option<i64>,_>("observed_used_bytes")?,
+            "stopApplied":stop_applied,
+            "observedUsedBytes":observed_stop,
+            "stopProofBelowSettledUsage":stop_proof_below_settled,
+            "awaitingFinalMeter":stop_applied && outstanding > 0,
+            "finalMeterVerified":false,
+            "canRefundNow":false,
             "refundedBytes":0,
         }));
     }
@@ -117,6 +128,7 @@ pub async fn revocation_status(
         "userId":user_id,"protocol":"v2","state":if held == 0 {"drained"} else {"awaiting_nodes"},
         "epoch":epoch,"limitBytes":limit,"settledBytes":settled,
         "heldBytes":held,"canResetNow":held == 0,
+        "canRefundNow":false,"finalMeterVerified":false,
         "nodes":nodes,"expirationRefundsBudget":false
     })))
 }
