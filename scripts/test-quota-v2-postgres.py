@@ -164,6 +164,106 @@ class ReservationTests(unittest.TestCase):
         self.assertEqual(self.reserve(2,target=50),(0,0))
         self.assertEqual(self.state(),(0,50))
 
+    def burn(self,node,request_id=None):
+        with psycopg.connect(DSN) as c:
+            rid=request_id or c.execute(
+                "SELECT request_id FROM quota_v2_revocation_requests "
+                "WHERE user_id=%s AND epoch=%s AND node_id=%s",
+                (self.uid,self.epoch,node)).fetchone()[0]
+            return c.execute(
+                "SELECT acknowledged_bytes,conservative_burned_bytes,"
+                "conservative_burn_floor_bytes,conservative_burned_at IS NOT NULL "
+                "FROM quota_v2_burn_revoked(%s,%s,%s,%s,%s,%s)",
+                (self.uid,self.epoch,node,self.meters[node],self.ids[node],rid)).fetchone()
+
+    def economic_state(self):
+        with psycopg.connect(DSN) as c:
+            return c.execute(
+                "SELECT a.settled_bytes,COALESCE(SUM(r.ceiling_bytes-"
+                "GREATEST(r.acknowledged_bytes,r.conservative_burn_floor_bytes)),0) "
+                "FROM quota_v2_accounts a LEFT JOIN quota_v2_reservations r "
+                "USING(user_id,epoch) WHERE a.user_id=%s GROUP BY a.settled_bytes",
+                (self.uid,)).fetchone()
+
+    def test_burn_is_permanently_charged_never_refunded_or_double_charged(self):
+        self.assertEqual(self.reserve(1),(50,0))
+        self.assertEqual(self.reserve(2),(50,0))
+        self.assertEqual(self.ack(1,20),(50,20))
+        self.revoke(1)
+        first=self.burn(1)
+        self.assertEqual(first[:3],(20,30,50))
+        self.assertTrue(first[3])
+        self.assertEqual(self.burn(1),first)
+        self.assertEqual(self.economic_state(),(50,50))
+        self.assertEqual(self.reserve(2,target=90),(50,0))
+        self.assertEqual(self.reserve(1,target=50,ack=22),(50,22))
+        self.assertEqual(self.economic_state(),(50,50))
+        self.assertEqual(self.ack(1,50),(50,50))
+        self.assertEqual(self.economic_state(),(50,50))
+        self.assertEqual(self.ack(1,53),(53,53))
+        self.assertEqual(self.economic_state(),(53,50))
+        self.assertEqual(self.reserve(2,target=90),(50,0))
+        # Late genuine Node receipts advance actual meters, but historical
+        # burned liability cannot be enlarged by replaying the operator action.
+        after_late=self.burn(1)
+        self.assertEqual(after_late[0],53)
+        self.assertEqual(after_late[1:],first[1:])
+        self.assertEqual(self.economic_state(),(53,50))
+
+    def test_burn_requires_exact_durable_revocation_and_preserves_state(self):
+        self.reserve(1)
+        self.reserve(2)
+        before=self.economic_state()
+        with self.assertRaises(psycopg.Error):
+            self.burn(1,uuid.uuid4())
+        self.assertEqual(self.economic_state(),before)
+        self.revoke(1)
+        with self.assertRaises(psycopg.Error):
+            self.burn(1,uuid.uuid4())
+        self.assertEqual(self.economic_state(),before)
+        old_id=self.ids[1]
+        self.ids[1]=uuid.uuid4()
+        with self.assertRaises(psycopg.Error):
+            self.burn(1)
+        self.ids[1]=old_id
+        self.assertEqual(self.economic_state(),before)
+        self.assertEqual(self.burn(1)[1],50)
+        self.assertEqual(self.economic_state(),(50,50))
+
+    def test_burn_and_signed_receipt_are_serialized_no_refund(self):
+        self.reserve(1)
+        self.reserve(2)
+        self.revoke(1)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(lambda action: self.burn(1) if action=="burn"
+                                  else self.ack(1,27),("burn","ack")))
+        self.assertEqual(self.economic_state(),(50,50),results)
+        with psycopg.connect(DSN) as c:
+            amount=c.execute("SELECT conservative_burned_bytes "
+                "FROM quota_v2_reservations WHERE user_id=%s AND node_id=1",
+                (self.uid,)).fetchone()[0]
+        self.assertIn(amount,(23,50))
+        self.assertEqual(self.ack(1,49),(50,49))
+        self.assertEqual(self.economic_state(),(50,50))
+
+    def test_fully_burned_expired_hold_can_close_but_late_overshoot_charges(self):
+        self.reserve(1)
+        self.reserve(2)
+        self.revoke(1)
+        self.revoke(2)
+        self.burn(1)
+        self.burn(2)
+        self.assertEqual(self.economic_state(),(100,0))
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_accounts SET closed=TRUE WHERE user_id=%s",
+                      (self.uid,))
+        self.assertEqual(self.ack(1,20),(50,20))
+        self.assertEqual(self.economic_state(),(100,0))
+        self.assertEqual(self.ack(1,54),(54,54))
+        self.assertEqual(self.economic_state(),(104,0))
+        with self.assertRaises(psycopg.Error):
+            self.reserve(1)
+
     def test_signed_receipt_is_scoped_idempotent_and_cannot_reissue_budget(self):
         self.reserve(1)
         self.reserve(2)

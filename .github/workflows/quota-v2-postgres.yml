@@ -5,6 +5,7 @@ on:
       - 'backend/migrations/0125_quota_v2_reservations.sql'
       - 'backend/migrations/0126_quota_v2_revocation_requests.sql'
       - 'backend/migrations/0127_quota_v2_revocation_freeze.sql'
+      - 'backend/migrations/0128_quota_v2_conservative_burn.sql'
       - 'scripts/test-quota-v2-postgres.py'
       - '.github/workflows/quota-v2-postgres.yml'
 permissions:
@@ -45,6 +46,7 @@ jobs:
                   "backend/migrations/0125_quota_v2_reservations.sql",
                   "backend/migrations/0126_quota_v2_revocation_requests.sql",
                   "backend/migrations/0127_quota_v2_revocation_freeze.sql",
+                  "backend/migrations/0128_quota_v2_conservative_burn.sql",
               ):
                   c.execute(Path(path).read_text())
           PY
