@@ -1,0 +1,63 @@
+name: Node/Nexus signed metering release compatibility
+on:
+  pull_request:
+    paths:
+      - 'AGENT_VERSION'
+      - 'deploy/node-metrics-agent.sh'
+      - 'scripts/test-node-presence.py'
+      - 'frontend/js/features/nodes/node-bootstrap-v6.js'
+      - '.github/workflows/node-meter-release-compatibility.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'AGENT_VERSION'
+      - 'deploy/node-metrics-agent.sh'
+      - 'frontend/js/features/nodes/node-bootstrap-v6.js'
+      - '.github/workflows/node-meter-release-compatibility.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-meter-compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out the exact Nexus revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out the explicitly pinned Node candidate revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 520dc61502b80e78373c658994010feed9aa0787
+          path: .ci-reviewed-node
+          persist-credentials: false
+      - name: Fail on Agent version, bootstrap identity or source mismatch
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node_sha="$(git -C .ci-reviewed-node rev-parse HEAD)"
+          test "$node_sha" = '520dc61502b80e78373c658994010feed9aa0787'
+          test "$(tr -d '\r\n' < AGENT_VERSION)" = 'control-v6.0.12'
+          test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.12'
+          python3 - <<'PY'
+          from pathlib import Path
+          ui = Path('frontend/js/features/nodes/node-bootstrap-v6.js').read_text()
+          node = Path('.ci-reviewed-node/deploy/xmesh-policy-guard-base.py').read_text()
+          sender = Path('deploy/node-metrics-agent.sh').read_text()
+          assert "XMESH_V6_NODE_BOOTSTRAP_SHA='520dc61502b80e78373c658994010feed9aa0787'" in ui
+          assert "def verified_snapshot_scope(" in node
+          assert "def committed_snapshot_scope(" in node
+          assert "store_metrics_snapshot(ledger, args.node_id, now_ms, scope)" in node
+          assert "api statsquery" not in sender
+          assert "USER_STATS_STATUS=direct" not in sender
+          assert "USER_STATS_STATUS=unavailable" in sender
+          print("Verified identical Node/Nexus Agent version and exact signed-scope producer/consumer")
+          PY
+      - name: Execute real signed-policy/monotonic-metering regressions from reviewed Node
+        run: |
+          set -Eeuo pipefail
+          python3 .ci-reviewed-node/tests/test_meter_scope_publish.py
+          python3 .ci-reviewed-node/deploy/test-xmesh-policy-guard.py
+          python3 scripts/test-node-presence.py
