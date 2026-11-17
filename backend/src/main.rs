@@ -302,6 +302,18 @@ struct NodeMetricsIngestRequest {
     user_stats_status: Option<String>,
     #[serde(default, alias = "userStatsAtMs")]
     user_stats_at_ms: Option<i64>,
+    #[serde(default, alias = "quotaReceipts")]
+    quota_receipts: Option<Vec<NodeQuotaReceipt>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NodeQuotaReceipt {
+    user_id: i64,
+    epoch: String,
+    meter_epoch: String,
+    reservation_id: String,
+    used_bytes: i64,
 }
 
 /// Cumulative Xray byte counters scoped to a real panel user and the reporting node.
@@ -3298,6 +3310,10 @@ async fn ingest_node_metrics(
     validate_user_traffic_samples(&user_traffic)?;
     let mut inbound_samples = body.user_inbound_traffic.take().unwrap_or_default();
     validate_inbound_traffic_samples(&inbound_samples)?;
+    let mut quota_receipts = body.quota_receipts.take().unwrap_or_default();
+    if quota_receipts.len() > 2048 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Too many quota receipts."));
+    }
     // Node-wide traffic accounting is separate from authenticated per-user
     // Xray counters. Require both monotonic NIC counters and an interface ID.
     // Older metrics agents simply omit these fields until upgraded.
@@ -3315,6 +3331,7 @@ async fn ingest_node_metrics(
         // Do not modify traffic baselines or onlineAt on stale/replayed data.
         user_traffic.clear();
         inbound_samples.clear();
+        quota_receipts.clear();
     }
     metrics
         .as_object_mut()
@@ -3331,6 +3348,23 @@ async fn ingest_node_metrics(
         &inbound_samples,
     )
     .await?;
+    // Receipt must have a corresponding authenticated, scope-verified user
+    // counter in this same accepted sample. A signed node identity alone does
+    // not authorize receipt of an unrelated user's spending.
+    let accepted_users: std::collections::HashSet<i64> =
+        user_traffic.iter().map(|sample| sample.user_id).collect();
+    let mut receipt_users = std::collections::HashSet::new();
+    for receipt in &quota_receipts {
+        if receipt.user_id <= 0
+            || receipt.used_bytes < 0
+            || !accepted_users.contains(&receipt.user_id)
+            || !receipt_users.insert(receipt.user_id)
+            || [&receipt.epoch, &receipt.meter_epoch, &receipt.reservation_id]
+                .into_iter().any(|id| uuid::Uuid::parse_str(id).is_err())
+        {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid scoped quota receipt."));
+        }
+    }
 
     let sampled_at = persist_node_metric_sample(&mut telemetry_tx, &body, metrics).await?;
 
@@ -3357,6 +3391,22 @@ async fn ingest_node_metrics(
         sampled_at,
     )
     .await?;
+    // A verified cumulative receipt is settled independently from aggregate
+    // panelUsedBytes and can never issue or renew a reservation.
+    for receipt in &quota_receipts {
+        sqlx::query(
+            "SELECT quota_v2_ack($1,$2::uuid,$3,$4::uuid,$5::uuid,$6)"
+        )
+        .bind(receipt.user_id)
+        .bind(&receipt.epoch)
+        .bind(body.node_id)
+        .bind(&receipt.meter_epoch)
+        .bind(&receipt.reservation_id)
+        .bind(receipt.used_bytes)
+        .fetch_one(&mut *telemetry_tx)
+        .await
+        .map_err(|_| ApiError::new(StatusCode::CONFLICT, "Invalid or stale quota lease receipt."))?;
+    }
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;
