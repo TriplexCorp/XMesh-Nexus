@@ -29,8 +29,8 @@ grep -Fxq 'AGENT_VERSION="control-v6.0.12"' "$tmp" || { echo "Downloaded Agent i
 grep -q 'enforceStop' "$tmp" || { echo "Downloaded agent is missing traffic cutoff support" >&2;exit 1; }
 grep -q 'xmesh-xray-update.py' "$tmp" || { echo "Downloaded agent does not support pinned Xray versions" >&2;exit 1; }
 
-xray_update_tmp="$(mktemp)"; sync_tmp="$(mktemp)"; policy_tmp="$(mktemp)"; hot_tmp="$(mktemp)"; geo_tmp="$(mktemp)"; metrics_tmp="$(mktemp)"; profile_tmp="$(mktemp)"; tls_tmp="$(mktemp)"; tls_status_tmp="$(mktemp)"; renew_tmp="$(mktemp)"; stage_tmp="$(mktemp)"; stage_service_tmp="$(mktemp)"; self_tmp="$(mktemp)"; router_helper="$(mktemp)"
-trap 'rm -f "$xray_update_tmp" "$tmp" "$sync_tmp" "$policy_tmp" "$hot_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "$tls_status_tmp" "$renew_tmp" "$stage_tmp" "$stage_service_tmp" "$self_tmp" "$router_helper"' EXIT
+xray_update_tmp="$(mktemp)"; sync_tmp="$(mktemp)"; policy_tmp="$(mktemp)"; policy_base_tmp="$(mktemp)"; hot_tmp="$(mktemp)"; geo_tmp="$(mktemp)"; metrics_tmp="$(mktemp)"; profile_tmp="$(mktemp)"; tls_tmp="$(mktemp)"; tls_status_tmp="$(mktemp)"; renew_tmp="$(mktemp)"; stage_tmp="$(mktemp)"; stage_service_tmp="$(mktemp)"; self_tmp="$(mktemp)"; router_helper="$(mktemp)"
+trap 'rm -f "$xray_update_tmp" "$tmp" "$sync_tmp" "$policy_tmp" "$policy_base_tmp" "$hot_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "$tls_status_tmp" "$renew_tmp" "$stage_tmp" "$stage_service_tmp" "$self_tmp" "$router_helper"' EXIT
 
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/xmesh-xray-update.py -o "$xray_update_tmp"
 python3 -m py_compile "$xray_update_tmp"; grep -Fxq 'AGENT_VERSION = "control-v6.0.12"' "$xray_update_tmp" || { echo "Invalid Xray transaction worker" >&2;exit 1; }
@@ -39,6 +39,15 @@ python3 -m py_compile "$xray_update_tmp"; grep -Fxq 'AGENT_VERSION = "control-v6
 bash -n "$sync_tmp"; grep -q 'pinned-image' "$sync_tmp" || { echo "Downloaded sync worker lacks image pin support" >&2;exit 1; }; grep -q 'xmesh-policy-guard.py' "$sync_tmp" || { echo "Sync worker cannot enforce offline policy" >&2;exit 1; }
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-policy-guard.py -o "$policy_tmp"
 python3 -m py_compile "$policy_tmp"; grep -q 'check_signature' "$policy_tmp" || { echo "Policy verifier lacks Ed25519 verification" >&2;exit 1; }
+# The wrapper imports the base helper at runtime. Upgrading only the wrapper
+# silently leaves the old v6.0.11 unscoped snapshot publisher installed.
+# Fetch, validate and install BOTH files before reporting upgrade success.
+/usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-policy-guard-base.py -o "$policy_base_tmp"
+python3 -m py_compile "$policy_base_tmp"
+grep -Fq 'def committed_snapshot_scope(state_dir, node_id):' "$policy_base_tmp" &&
+grep -Fq 'def store_metrics_snapshot(ledger, node_id, now_ms, permitted):' "$policy_base_tmp" &&
+grep -Fq 'scope = committed_snapshot_scope(state, args.node_id)' "$policy_base_tmp" ||
+  { echo "Downloaded policy base lacks verified assignment-scoped metering" >&2; exit 1; }
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-hot-user-reconcile.py -o "$hot_tmp"
 python3 -m py_compile "$hot_tmp"; grep -q 'HandlerService' "$hot_tmp" || { echo "Hot user reconciler lacks HandlerService contract" >&2;exit 1; }
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-geodata-sync.py -o "$geo_tmp"
@@ -114,7 +123,23 @@ cp -p /usr/local/sbin/xmesh-xray-sync /usr/local/sbin/xmesh-xray-sync.bak
 install -d -o root -g root -m 0755 /usr/local/libexec
 install -o root -g root -m 0700 "$stage_tmp" /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new; mv -f /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new /usr/local/libexec/xmesh-xsp-v2-agent-staged-apply
 install -o root -g root -m 0700 "$profile_tmp" /usr/local/libexec/.xmesh-profile-attest.new; mv -f /usr/local/libexec/.xmesh-profile-attest.new /usr/local/libexec/xmesh-profile-attest.py
+# Update the imported base before its wrapper; preserve the private journal in
+# /var/lib/xmesh-xray-sync/policy-usage.json (never truncate or replace it).
+install -o root -g root -m 0700 "$policy_base_tmp" /usr/local/libexec/.xmesh-policy-guard-base.new; mv -f /usr/local/libexec/.xmesh-policy-guard-base.new /usr/local/libexec/xmesh-policy-guard-base.py
 install -o root -g root -m 0700 "$policy_tmp" /usr/local/libexec/.xmesh-policy-guard.new; mv -f /usr/local/libexec/.xmesh-policy-guard.new /usr/local/libexec/xmesh-policy-guard.py
+# Confirm the exact deployed import path, not just the version banner.
+python3 - <<'PY'
+import importlib.util, inspect, pathlib
+base_file = pathlib.Path('/usr/local/libexec/xmesh-policy-guard-base.py')
+assert base_file.is_file() and not base_file.is_symlink()
+spec = importlib.util.spec_from_file_location('xmesh_upgrade_guard_base', base_file)
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+assert 'permitted' in inspect.signature(module.store_metrics_snapshot).parameters
+assert callable(module.committed_snapshot_scope)
+print('Verified installed v6.0.12 signed-scope policy base')
+PY
 install -o root -g root -m 0700 "$hot_tmp" /usr/local/libexec/.xmesh-hot-user-reconcile.new; mv -f /usr/local/libexec/.xmesh-hot-user-reconcile.new /usr/local/libexec/xmesh-hot-user-reconcile.py
 install -o root -g root -m 0700 "$geo_tmp" /usr/local/libexec/.xmesh-geodata-sync.new; mv -f /usr/local/libexec/.xmesh-geodata-sync.new /usr/local/libexec/xmesh-geodata-sync.py
 install -o root -g root -m 0700 "$xray_update_tmp" /usr/local/libexec/.xmesh-xray-update.new; mv -f /usr/local/libexec/.xmesh-xray-update.new /usr/local/libexec/xmesh-xray-update.py
