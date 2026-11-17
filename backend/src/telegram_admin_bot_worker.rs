@@ -615,6 +615,11 @@ async fn handle_extra_confirmation(
                     "This account has unlimited duration or is waiting for first connection. Change it in the panel."
                 }
                 "user_not_found" => "User not found.",
+                "quota_v2_conflict" => locale::tr(
+                    api.language,
+                    "Нельзя изменить лимит: квота v2 уже зарезервирована на нодах. Сначала согласуйте расход.",
+                    "Cannot change this quota: v2 traffic is reserved on nodes. Reconcile usage first.",
+                ),
                 "squad_not_found" => locale::tr(
                     api.language,
                     "Сквад больше не существует. Запустите /create заново.",
