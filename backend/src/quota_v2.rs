@@ -121,7 +121,6 @@ pub async fn revocation_status(
     })))
 }
 
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RevokeNodeRequest {
@@ -144,7 +143,10 @@ pub async fn request_node_revocation(
         ));
     }
     if user_id <= 0 || body.node_id <= 0 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid quota identity."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid quota identity.",
+        ));
     }
     let mut tx = state.pool.begin().await?;
     // Same order as issuance and user reset: user row, then active account.
