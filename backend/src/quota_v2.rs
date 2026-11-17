@@ -246,16 +246,45 @@ async fn lease_identity(
         } else {
             0
         };
-        if local_total != observed_total
-            || local_record.is_some_and(|counter| counter.epoch.is_some())
-        {
+        if local_total != observed_total {
             return Err(conflict());
         }
-        (
-            uuid::Uuid::new_v4().to_string(),
-            uuid::Uuid::new_v4().to_string(),
-            false,
-        )
+        // A new user quota epoch may start only after the previous account
+        // was explicitly closed with ALL issued ceilings fully settled.
+        // Reuse the durable meter incarnation and its absolute raw baseline:
+        // never reset local totals or replay old usage into the new epoch.
+        let meter = if let Some(previous) = local_record.filter(|row| row.epoch.is_some()) {
+            let old_epoch = previous.epoch.as_deref().ok_or_else(conflict)?;
+            let old_meter = previous.meter_epoch.as_deref().ok_or_else(conflict)?;
+            let old_reservation = previous.reservation_id.as_deref().ok_or_else(conflict)?;
+            let historical = sqlx::query(
+                "SELECT r.acknowledged_bytes,r.ceiling_bytes,a.closed
+                 FROM quota_v2_reservations r
+                 JOIN quota_v2_accounts a
+                   ON a.user_id=r.user_id AND a.epoch=r.epoch
+                 WHERE r.user_id=$1 AND r.node_id=$2 AND r.epoch=$3::uuid
+                   AND r.meter_epoch=$4::uuid AND r.reservation_id=$5::uuid
+                 FOR SHARE OF r,a",
+            )
+            .bind(user_id)
+            .bind(node_id)
+            .bind(old_epoch)
+            .bind(old_meter)
+            .bind(old_reservation)
+            .fetch_optional(&mut *conn)
+            .await?
+            .ok_or_else(conflict)?;
+            let closed: bool = historical.try_get("closed")?;
+            let ack: i64 = historical.try_get("acknowledged_bytes")?;
+            let ceiling: i64 = historical.try_get("ceiling_bytes")?;
+            if !closed || ceiling != ack || local_total != ack {
+                return Err(conflict());
+            }
+            old_meter.to_owned()
+        } else {
+            uuid::Uuid::new_v4().to_string()
+        };
+        (meter, uuid::Uuid::new_v4().to_string(), false)
     };
     Ok((meter, reservation, confirmed))
 }
