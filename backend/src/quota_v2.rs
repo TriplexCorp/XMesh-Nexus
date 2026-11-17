@@ -459,8 +459,9 @@ async fn ensure_account(
     } else {
         let new_epoch = uuid::Uuid::new_v4().to_string();
         sqlx::query(
-            "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes,settled_bytes)
-                 VALUES($1,$2::uuid,$3,$4)",
+            "INSERT INTO quota_v2_accounts(
+                    user_id,epoch,limit_bytes,settled_bytes,observed_floor_bytes)
+                 VALUES($1,$2::uuid,$3,$4,$4)",
         )
         .bind(user_id)
         .bind(&new_epoch)
@@ -470,12 +471,12 @@ async fn ensure_account(
         .await?;
         new_epoch
     };
-    // The aggregate panel-used counter may advance from already accepted
-    // activity; it is a floor, never proof that a *particular* node's
-    // local bytes were acknowledged. It must never decrease implicitly.
+    // Aggregate panel usage is a monotonic reservation FLOOR, not an extra
+    // signed receipt charge. Both may describe the same bytes; adding them
+    // would double-charge an honest subscriber on reconnect.
     sqlx::query(
         "UPDATE quota_v2_accounts SET limit_bytes=$3,
-                settled_bytes=GREATEST(settled_bytes,$4)
+                observed_floor_bytes=GREATEST(observed_floor_bytes,$4)
              WHERE user_id=$1 AND epoch=$2::uuid",
     )
     .bind(user_id)
