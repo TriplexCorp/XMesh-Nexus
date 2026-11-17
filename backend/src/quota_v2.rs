@@ -325,9 +325,7 @@ async fn confirm_existing_lease(
         return Ok((meter, reservation, true));
     }
     let lacks_identity = local_record.is_none_or(|record| {
-        record.epoch.is_none()
-            && record.meter_epoch.is_none()
-            && record.reservation_id.is_none()
+        record.epoch.is_none() && record.meter_epoch.is_none() && record.reservation_id.is_none()
     });
     let ack: i64 = row.try_get("acknowledged_bytes")?;
     let ceiling: i64 = row.try_get("ceiling_bytes")?;
@@ -428,7 +426,13 @@ async fn lease_identity(
     .await?;
     if let Some(row) = existing {
         return confirm_existing_lease(
-            conn, user_id, node_id, epoch, local_record, local_total, row,
+            conn,
+            user_id,
+            node_id,
+            epoch,
+            local_record,
+            local_total,
+            row,
         )
         .await;
     }
