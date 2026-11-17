@@ -133,6 +133,11 @@ def main():
             "hold":False,"limit":0.2,"used":0},cookie)
         check(code,201,"create globally limited subscriber")
         uid=user["id"]; key=str(uid)
+        code, preflight, _=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"read authenticated v2 revocation preflight")
+        assert preflight["state"]=="inactive" and not preflight["canResetNow"],preflight
+        code,_,_=api("GET",f"/users/{uid}/quota-v2/revocation")
+        check(code,401,"reject unauthenticated revocation preflight")
         a,b=nodes
         # First request prepares, but cannot activate an unacknowledged
         # offline allowance. Simulate a lost HTTP response from node A:
@@ -183,6 +188,13 @@ def main():
         assert settled==0 and held==lease_a["ceilingBytes"]+lease_b["ceilingBytes"]
         assert settled+held<=limit,(settled,held,limit)
         print("PASS: concurrent node reservations conserve global quota")
+        code, preflight, _=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"show active signed holds across both nodes")
+        assert preflight["state"]=="awaiting_nodes" and not preflight["canResetNow"],preflight
+        assert preflight["heldBytes"]==held and preflight["expirationRefundsBudget"] is False
+        assert {row["nodeId"] for row in preflight["nodes"]}=={a.id,b.id}
+        assert all(row["heldBytes"]>0 and row["nodeConfirmed"] for row in preflight["nodes"])
+        print("PASS: revocation preflight identifies each node holding offline bytes")
         # Resetting only UI usage while a signed offline lease is outstanding
         # would grant fresh bytes without revoking the old policy on node B.
         before_reset = account()
@@ -277,6 +289,11 @@ def main():
         settled,held,limit=account()
         assert held==0 and settled==lease_a["ceilingBytes"]+lease_b["ceilingBytes"]
         print("PASS: all old signed spending obligations settled before reset")
+        code, preflight, _=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"show fully drained reservation readiness")
+        assert preflight["state"]=="drained" and preflight["canResetNow"]
+        assert preflight["heldBytes"]==0
+        assert all(row["heldBytes"]==0 for row in preflight["nodes"]),preflight
         # Simulate Xray restarting after a durable receipt: the fresh raw
         # counter is zero, while the signed Node journal remains cumulative.
         check(a.metrics(uid,lease_a["ceilingBytes"],lease_a,raw_total=0),201,
