@@ -300,6 +300,13 @@ def main():
         assert new_a["reservationId"]!=lease_a["reservationId"]
         assert new_a["ceilingBytes"]==new_a["acknowledgedBytes"]==lease_a["ceilingBytes"]
         assert new_b["ceilingBytes"]==new_b["acknowledgedBytes"]==lease_b["ceilingBytes"]
+        # Reducing a tariff is allowed once there is no outstanding budget
+        # beyond the requested limit; all still-live leases are protected.
+        code,_,_=api("PATCH",f"/collections/users/{uid}",{"limit":0.15},cookie)
+        check(code,200,"safely decrease quota with no outstanding new-epoch grants")
+        check(b.metrics(uid,lease_b["ceilingBytes"],lease_b),201,
+              "late duplicate receipt of closed epoch is safe")
+        assert account()[0]==0 and account()[1]==0
         _,a.ledger,denied=guard.enforce(
             staged_a,sa["config"],a.ledger,{key:lease_a["ceilingBytes"]},
             "xray-a",False,staged_a["issuedAtMs"])
@@ -314,6 +321,7 @@ def main():
         assert grant_a["ceilingBytes"]>grant_a["acknowledgedBytes"]
         assert grant_b["ceilingBytes"]>grant_b["acknowledgedBytes"]
         settled,held,limit=account()
+        assert limit==150_000_000,limit
         assert settled==0 and 0<held<=limit
         _,a.ledger,denied=guard.enforce(
             active_a,aa["config"],a.ledger,{key:lease_a["ceilingBytes"]},
