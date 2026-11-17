@@ -449,8 +449,8 @@ def main():
         # An authenticated late byte can arrive after the operational
         # stop proof. This proves that stop-applied is NOT final-meter-ready.
         check(a.metrics(uid,proof["usedBytes"]+1,revocation_lease,
-                        raw_total=20*MIB,stop=None),201,
-              "charge late signed spending after an applied stop")
+                        raw_total=20*MIB,stop=proof),201,
+              "accept late signed spending with exact replayed stop proof")
         code,preflight,_=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
         check(code,200,"inspect stop proof after late spending")
         item=next(row for row in preflight["nodes"] if row["nodeId"]==a.id)
