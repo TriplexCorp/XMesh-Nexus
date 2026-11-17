@@ -86,11 +86,11 @@ class SignedNode:
         self.state.joinpath("policy-envelope.json").write_text(json.dumps(data))
         return policy,data
 
-    def metrics(self,user_id,total,lease):
+    def metrics(self,user_id,total,lease,raw_total=None):
         self.stats_at=max(self.stats_at+1,int(time.time()*1000))
         body={"node_id":self.id,"userStatsStatus":"verified",
               "userStatsAtMs":self.stats_at,
-              "userTraffic":[{"userId":user_id,"uplinkBytes":total,"downlinkBytes":0}],
+              "userTraffic":[{"userId":user_id,"uplinkBytes":total if raw_total is None else raw_total,"downlinkBytes":0}],
               "quotaReceipts":[{
                   "userId":user_id,"usedBytes":total,
                   **{k:lease[k] for k in ("epoch","meterEpoch","reservationId")}
@@ -269,6 +269,15 @@ def main():
         settled,held,limit=account()
         assert held==0 and settled==lease_a["ceilingBytes"]+lease_b["ceilingBytes"]
         print("PASS: all old signed spending obligations settled before reset")
+        # Simulate Xray restarting after a durable receipt: the fresh raw
+        # counter is zero, while the signed Node journal remains cumulative.
+        check(a.metrics(uid,lease_a["ceilingBytes"],lease_a,raw_total=0),201,
+              "restart raw Xray meter without resetting durable signed receipt")
+        _,a.ledger,denied=guard.enforce(
+            pa2,da2["config"],a.ledger,{key:0},
+            "xray-restarted-a",True,pa2["issuedAtMs"]+30)
+        assert denied.get(pa2["users"][0]["xrayId"]) in ("quota","locally-revoked"),denied
+        print("PASS: restart does not erase durable old-epoch spending")
 
         code,reset_body,_=api("PATCH",f"/collections/users/{uid}",{"used":0},cookie)
         check(code,200,"atomically reset user traffic after old v2 leases drain")
