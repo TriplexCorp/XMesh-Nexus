@@ -424,7 +424,19 @@ pub(super) async fn patch(
     let revision: i64 = row.try_get("revision")?;
     matches_revision(&headers, revision)?;
     let mut user: Value = row.try_get("data")?;
+    let prior_limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
     apply_patch(&mut user, &body)?;
+    if body.get("limitGb").is_some() {
+        crate::quota_v2::validate_limit_change(
+            &mut tx,
+            id,
+            prior_limit,
+            user.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
+            user.get("used").and_then(Value::as_f64).unwrap_or(0.0),
+        )
+        .await
+        .map_err(Problem::from)?;
+    }
     references(
         &mut tx,
         object(
