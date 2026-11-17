@@ -155,10 +155,14 @@ def main():
     unit = "xmesh-meter-upgrade-audit-" + uuid.uuid4().hex[:12] + ".service"
     unit_path = Path("/run/systemd/system") / unit
     snapshot_file = Path("/run/xmesh-node-user-metrics.json")
-    with tempfile.TemporaryDirectory(prefix="xmesh-meter-upgrade-", dir="/run") as root:
+    # /run is noexec on some Ubuntu runners: the fake Xray CLI must reside
+    # on an executable filesystem. Both paths exist only on disposable CI VMs.
+    with tempfile.TemporaryDirectory(prefix="xmesh-meter-upgrade-", dir="/run") as root, \
+         tempfile.TemporaryDirectory(prefix="xmesh-meter-cli-", dir="/usr/local/bin") as bindir:
         work = Path(root)
-        libexec, state, bin_dir = [work / name for name in ("libexec", "state", "bin")]
-        for directory in (libexec, state, bin_dir):
+        libexec, state = work / "libexec", work / "state"
+        bin_dir = Path(bindir)
+        for directory in (libexec, state):
             directory.mkdir(mode=0o700)
         old_helper = old_dir / "deploy"
         new_helper = new_dir / "deploy"
