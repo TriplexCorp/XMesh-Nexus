@@ -149,6 +149,15 @@ def main():
         assert settled==0 and held==lease_a["ceilingBytes"]+lease_b["ceilingBytes"]
         assert settled+held<=limit,(settled,held,limit)
         print("PASS: concurrent node reservations conserve global quota")
+        # Resetting only UI usage while a signed offline lease is outstanding
+        # would grant fresh bytes without revoking the old policy on node B.
+        before_reset = account()
+        code, reset_body, _ = api("PATCH", f"/collections/users/{uid}",
+                                  {"used": 0}, cookie)
+        check(code, 409, "reject user meter reset while v2 leases remain signed")
+        assert account() == before_reset, (before_reset, account())
+        assert isinstance(reset_body, dict) and "согласован" in str(reset_body).lower()
+        print("PASS: admin reset leaves active v2 epoch and reservations unchanged")
 
         # Real admission decisions against independently persisted in-memory
         # ledgers (same guard used by Node service; actual signed policies).
