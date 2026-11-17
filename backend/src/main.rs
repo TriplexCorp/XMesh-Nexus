@@ -3442,7 +3442,6 @@ async fn record_node_stop_receipts(
                AND lease.node_id=r.node_id AND lease.meter_epoch=r.meter_epoch
                AND lease.reservation_id=r.reservation_id
                AND lease.revision >= $7
-               AND lease.acknowledged_bytes <= $8
              RETURNING r.request_id",
         )
         .bind(proof.user_id)
