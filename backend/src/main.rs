@@ -1386,21 +1386,6 @@ async fn update_record(
             .await?
             .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let mut data: Value = existing.try_get("data")?;
-    // A cached, valid v2 unlimited policy could continue permitting traffic
-    // on a disconnected node after a new global cap is imposed. Never flip
-    // unlimited/limited mode without a fleet-wide acknowledgement barrier.
-    if collection == "users" && crate::quota_v2::enabled()
-        && let Some(next) = patch_object.get("limit")
-    {
-        let previous = gb_to_bytes_i64(data.get("limit").and_then(Value::as_f64).unwrap_or(0.0));
-        let next = gb_to_bytes_i64(next.as_f64().unwrap_or(0.0));
-        if (previous == 0) != (next == 0) {
-            return Err(ApiError::new(
-                StatusCode::CONFLICT,
-                "Смена безлимитного тарифа при квотах v2 требует подтверждения всех нод.",
-            ));
-        }
-    }
     let old_node_address = if collection == "nodes" {
         node_address_unique::address_key(&data)
     } else {
@@ -1428,6 +1413,17 @@ async fn update_record(
         object.insert(key, value);
     }
     validate_record(&collection, &data)?;
+    if collection == "users" && patch_object.contains_key("limit") {
+        let prior: Value = existing.try_get("data")?;
+        quota_v2::validate_limit_change(
+            &mut tx,
+            id,
+            prior.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
+            data.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
+            data.get("used").and_then(Value::as_f64).unwrap_or(0.0),
+        )
+        .await?;
+    }
     if collection == "users" && patch_object.contains_key("nodeTrafficLimits") {
         node_user_quotas::require_existing_nodes(&mut tx, &data).await?;
     }
@@ -1438,108 +1434,10 @@ async fn update_record(
         validate_host_binding(&state.pool, &data).await?;
     }
 
-    // Both quota edits and resets serialize with signed reservation issuance:
-    // issuer locks panel_records FOR SHARE before quota_v2_accounts FOR UPDATE.
-    // Never release a byte that a disconnected node can still spend.
-    if collection == "users"
-        && (patch_object.contains_key("used") || patch_object.contains_key("limit"))
-    {
-        let epoch = sqlx::query(
-            "SELECT epoch::text AS epoch,limit_bytes,settled_bytes
-             FROM quota_v2_accounts WHERE user_id=$1 AND NOT closed FOR UPDATE",
-        )
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?;
-        if let Some(epoch) = epoch {
-            let current_epoch: String = epoch.try_get("epoch")?;
-            let old_limit: i64 = epoch.try_get("limit_bytes")?;
-            let spent: i64 = epoch.try_get("settled_bytes")?;
-            let held: i64 = sqlx::query_scalar(
-                "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-acknowledged_bytes),0)::BIGINT
-                 FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
-            )
-            .bind(id)
-            .bind(&current_epoch)
-            .fetch_one(&mut *tx)
-            .await?;
-            if patch_object.contains_key("used") {
-                if held != 0 {
-                    return Err(ApiError::new(
-                        StatusCode::CONFLICT,
-                        "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.",
-                    ));
-                }
-                // Every signed historical ceiling is now fully charged.
-                // Close the old epoch in the SAME transaction as the user
-                // reset. Old delayed receipts continue settling their closed
-                // epoch, but can never issue fresh spending allowance.
-                sqlx::query(
-                    "UPDATE quota_v2_accounts SET closed=TRUE
-                     WHERE user_id=$1 AND epoch=$2::uuid",
-                )
-                .bind(id)
-                .bind(&current_epoch)
-                .execute(&mut *tx)
-                .await?;
-            } else if patch_object.contains_key("limit") {
-                let new_limit = gb_to_bytes_i64(
-                    data.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
-                );
-                if old_limit == 0 || new_limit == 0 {
-                    return Err(ApiError::new(
-                        StatusCode::CONFLICT,
-                        "Переключение безлимита при квотах v2 требует обновления всех нод.",
-                    ));
-                }
-                // Verified Xray telemetry can arrive before the separate
-                // signed quotaReceipt. Account.settled_bytes alone may lag
-                // actual accepted usage; the panel's effective meter is an
-                // additional non-decreasing floor for safe plan reductions.
-                let measured: i64 = sqlx::query_scalar(
-                    "SELECT COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT
-                     FROM user_node_traffic_totals WHERE user_id=$1",
-                )
-                .bind(id)
-                .fetch_one(&mut *tx)
-                .await?;
-                let base_used = gb_to_bytes_i64(
-                    data.get("used").and_then(Value::as_f64).unwrap_or(0.0),
-                );
-                let charged = spent.max(base_used.saturating_add(measured.max(0)));
-                if new_limit < charged.saturating_add(held) {
-                    return Err(ApiError::new(
-                        StatusCode::CONFLICT,
-                        "Новый лимит меньше уже потраченного и зарезервированного трафика на нодах.",
-                    ));
-                }
-            }
-        } else if patch_object.contains_key("used") {
-            let historical: bool =
-                sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM quota_v2_accounts WHERE user_id=$1)")
-                    .bind(id)
-                    .fetch_one(&mut *tx)
-                    .await?;
-            // Closed epochs have no unspent quota by construction. They are
-            // retained as immutable audit history to reconcile late receipts.
-            if historical {
-                let active_old_grants: bool = sqlx::query_scalar(
-                    "SELECT EXISTS(
-                       SELECT 1 FROM quota_v2_reservations
-                       WHERE user_id=$1 AND ceiling_bytes>acknowledged_bytes
-                    )",
-                )
-                .bind(id)
-                .fetch_one(&mut *tx)
-                .await?;
-                if active_old_grants {
-                    return Err(ApiError::new(
-                        StatusCode::CONFLICT,
-                        "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.",
-                    ));
-                }
-            }
-        }
+    // Shared fail-closed epoch fencing applies to every admin reset.
+    // A disconnected Node's signed allowance is never refunded.
+    if collection == "users" && patch_object.contains_key("used") {
+        quota_v2::close_drained_epoch(&mut tx, id).await?;
     }
 
     // Admin traffic reset sets the new baseline without corrupting the
