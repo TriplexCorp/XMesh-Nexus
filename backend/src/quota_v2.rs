@@ -83,9 +83,22 @@ pub async fn issue(
             "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE"
         ).bind(user_id).fetch_optional(&mut *tx).await?.ok_or_else(conflict)?;
         let current_limit = current_user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
-        let current_used = current_user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
+        let base_used_gb = current_user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
+        // load_records() overlays authenticated cumulative traffic on the
+        // stored manually edited baseline before compiling signed policies.
+        // Comparing only the stored base makes every later receipt look like
+        // an unauthorized concurrent edit and rejects the next policy poll.
+        let measured_bytes: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT
+             FROM user_node_traffic_totals WHERE user_id=$1",
+        )
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        let expected_used = crate::gb_to_bytes_i64(base_used_gb)
+            .saturating_add(measured_bytes.max(0));
         if crate::gb_to_bytes_i64(current_limit) != limit
-            || crate::gb_to_bytes_i64(current_used) != panel_used
+            || (panel_used - expected_used).abs() > 1
         {
             return Err(conflict());
         }
