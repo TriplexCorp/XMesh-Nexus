@@ -61,17 +61,39 @@ class ReservationTests(unittest.TestCase):
         self.assertEqual(self.reserve(1), first)
         self.assertEqual(self.state(), (50,90))
 
-    def test_invalid_receipt_rolls_back_and_closed_epoch_fails(self):
+    def test_authenticated_overshoot_is_charged_not_refunded(self):
+        self.reserve(1)
+        self.reserve(2)
+        self.assertEqual(self.state(), (0,100))
+        self.assertEqual(self.reserve(1,ack=51),(51,51))
+        self.assertEqual(self.state(),(51,50))
+        self.assertEqual(self.reserve(1,ack=51),(51,51))
+        self.assertEqual(self.reserve(2),(50,0))
+        self.assertEqual(self.state(),(51,50))
+
+    def test_lease_substitution_and_closed_epoch_are_rejected(self):
         self.reserve(1)
         before=self.state()
+        original=self.ids[1]
+        self.ids[1]=uuid.uuid4()
         with self.assertRaises(psycopg.Error):
-            self.reserve(1, ack=51)
-        self.assertEqual(self.state(), before)
+            self.reserve(1)
+        self.ids[1]=original
+        self.assertEqual(self.state(),before)
         with psycopg.connect(DSN) as c:
             c.execute("UPDATE quota_v2_accounts SET closed=TRUE WHERE user_id=%s",(self.uid,))
         with self.assertRaises(psycopg.Error):
             self.reserve(2)
-        self.assertEqual(self.state(), before)
+        self.assertEqual(self.state(),before)
+
+    def test_initial_migration_baseline_is_not_charged_twice(self):
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_accounts SET limit_bytes=1000,settled_bytes=300 WHERE user_id=%s",(self.uid,))
+        self.assertEqual(self.reserve(1,target=50,ack=300),(350,300))
+        self.assertEqual(self.state(),(300,50))
+        # The next receipt is charged once; a larger signed ceiling requires a new grant.
+        self.assertEqual(self.reserve(1,target=50,ack=320),(370,320))
+        self.assertEqual(self.state(),(320,50))
 
 if __name__ == "__main__":
     assert os.getenv("XMESH_AUDIT_DISPOSABLE") == "1"
