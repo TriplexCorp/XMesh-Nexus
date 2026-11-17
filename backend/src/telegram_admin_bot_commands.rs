@@ -677,6 +677,7 @@ async fn update_account(
         return Err("user_not_found");
     };
     let mut data: Value = db.try_get("data").map_err(|_| "database_unavailable")?;
+    let prior_limit = data.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
     let summary = if action == "renew" {
         if !(1..=3650).contains(&amount) || data.get("hold") == Some(&Value::Bool(true)) {
             return Err("invalid_command");
@@ -710,6 +711,17 @@ async fn update_account(
         )
     };
     crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
+    if action == "quota" {
+        crate::quota_v2::validate_limit_change(
+            &mut **tx,
+            id,
+            prior_limit,
+            data.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
+            data.get("used").and_then(Value::as_f64).unwrap_or(0.0),
+        )
+        .await
+        .map_err(|_| "quota_v2_conflict")?;
+    }
     sqlx::query(
         "UPDATE panel_records SET data=$2,updated_at=NOW()
              WHERE collection='users' AND id=$1",
