@@ -337,19 +337,21 @@ pub async fn burn_revoked_reservation(
     let charged: i64 = result.try_get("conservative_burned_bytes")?;
     let actual: i64 = result.try_get("acknowledged_bytes")?;
     let ceiling: i64 = result.try_get("ceiling_bytes")?;
-    tx.commit().await?;
     if !was_burned {
-        crate::audit(
-            &state.pool,
-            &actor.username,
-            "quota-v2-conservative-burn",
-            Some("users"),
-            Some(user_id),
-            json!({"nodeId":body.node_id,"requestId":body.request_id,
-                   "chargedBytes":charged,"refundedBytes":0}),
+        // The destructive charge and its audit event are ONE transaction.
+        // Audit unavailability must roll back the entire operator action.
+        sqlx::query(
+            "INSERT INTO panel_audit_log(actor,action,collection,record_id,detail)
+             VALUES ($1,'quota-v2-conservative-burn','users',$2,$3)",
         )
-        .await;
+        .bind(&actor.username)
+        .bind(user_id)
+        .bind(json!({"nodeId":body.node_id,"requestId":body.request_id,
+                     "chargedBytes":charged,"refundedBytes":0}))
+        .execute(&mut *tx)
+        .await?;
     }
+    tx.commit().await?;
     Ok((
         StatusCode::OK,
         Json(json!({
