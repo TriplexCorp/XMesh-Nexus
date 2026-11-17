@@ -15,6 +15,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Нельзя изменить лимит: квота v2 уже зарезервирована на нодах. Сначала согласуйте расход.": "Cannot change this quota: v2 traffic is reserved on nodes. Reconcile usage first.",
     "Смена безлимитного тарифа при квотах v2 требует подтверждения всех нод.": "Switching unlimited plans under quota v2 requires confirmation from all nodes.",
     "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.": "Cannot reset quota v2: some nodes still hold unacknowledged traffic reservations.",
     "Переключение безлимита при квотах v2 требует обновления всех нод.": "Switching to or from unlimited quota v2 requires coordinated updates across all nodes.",
