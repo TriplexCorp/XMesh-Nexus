@@ -4,6 +4,11 @@ on:
     paths:
       - '.github/workflows/rust-post-remediation-audit.yml'
       - 'backend/Cargo.toml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/rust-post-remediation-audit.yml'
+      - 'backend/Cargo.toml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +28,38 @@ jobs:
           rustup default stable
           cargo generate-lockfile --manifest-path backend/Cargo.toml
           test -s backend/Cargo.lock
+      - name: Verify immutable upstream SQLx fix and production PostgreSQL-only graph
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import pathlib, tomllib
+          path = pathlib.Path("backend/Cargo.toml")
+          manifest = tomllib.loads(path.read_text())
+          sqlx = manifest["dependencies"]["sqlx"]
+          assert sqlx["default-features"] is False
+          assert "postgres" in sqlx["features"] and "sqlite" not in sqlx["features"]
+          patch = manifest["patch"]["crates-io"]["sqlx-sqlite"]
+          assert patch["rev"] == "10462fa4414c6c7f1ed1d39bb31678e3b726878c"
+          assert patch["git"] == "https://github.com/transact-rs/sqlx"
+          packages = tomllib.loads(pathlib.Path("backend/Cargo.lock").read_text())["package"]
+          driver = [p for p in packages if p["name"] == "sqlx-sqlite"]
+          sqlite = [p for p in packages if p["name"] == "libsqlite3-sys"]
+          assert len(driver) == len(sqlite) == 1, (driver, sqlite)
+          assert driver[0]["source"].startswith("git+https://github.com/transact-rs/sqlx?"), driver
+          assert "10462fa4414c6c7f1ed1d39bb31678e3b726878c" in driver[0]["source"], driver
+          version = tuple(int(n) for n in sqlite[0]["version"].split(".")[:3])
+          assert version >= (0,39,0), sqlite
+          print("SQLx SQLite compatibility pin is exact; resolved libsqlite3-sys =", sqlite[0]["version"])
+          PY
+          cargo tree --manifest-path backend/Cargo.toml --no-default-features \
+            --target x86_64-unknown-linux-gnu --edges normal --format '{p}' \
+            > "$RUNNER_TEMP/production-runtime-tree.txt"
+          if grep -Eq '(^|[[:space:]])(libsqlite3-sys|sqlx-sqlite|rusqlite) v[0-9]' "$RUNNER_TEMP/production-runtime-tree.txt"; then
+            echo 'Unexpected SQLite in production runtime dependency tree' >&2
+            exit 1
+          fi
+          echo 'Production PostgreSQL API remains SQLite-free'
       - name: Install pinned cargo-audit 0.23.0
         run: |
           set -Eeuo pipefail
