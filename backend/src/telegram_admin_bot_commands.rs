@@ -713,7 +713,7 @@ async fn update_account(
     crate::validate_record("users", &data).map_err(|_| "invalid_command")?;
     if action == "quota" {
         crate::quota_v2::validate_limit_change(
-            &mut **tx,
+            tx,
             id,
             prior_limit,
             data.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
