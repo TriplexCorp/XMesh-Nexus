@@ -1386,6 +1386,21 @@ async fn update_record(
             .await?
             .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let mut data: Value = existing.try_get("data")?;
+    // A cached, valid v2 unlimited policy could continue permitting traffic
+    // on a disconnected node after a new global cap is imposed. Never flip
+    // unlimited/limited mode without a fleet-wide acknowledgement barrier.
+    if collection == "users" && crate::quota_v2::enabled()
+        && let Some(next) = patch_object.get("limit")
+    {
+        let previous = gb_to_bytes_i64(data.get("limit").and_then(Value::as_f64).unwrap_or(0.0));
+        let next = gb_to_bytes_i64(next.as_f64().unwrap_or(0.0));
+        if (previous == 0) != (next == 0) {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Смена безлимитного тарифа при квотах v2 требует подтверждения всех нод.",
+            ));
+        }
+    }
     let old_node_address = if collection == "nodes" {
         node_address_unique::address_key(&data)
     } else {
