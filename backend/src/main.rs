@@ -421,6 +421,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         )
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
+        .route("/users/{id}/quota-v2/revocation", get(quota_v2::revocation_status))
         .route(
             "/users/{id}/node-quotas",
             get(node_user_quotas::get_for_user),
