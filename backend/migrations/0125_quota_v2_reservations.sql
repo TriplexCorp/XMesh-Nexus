@@ -18,6 +18,9 @@ CREATE TABLE quota_v2_reservations (
     acknowledged_bytes BIGINT NOT NULL DEFAULT 0 CHECK (acknowledged_bytes >= 0),
     ceiling_bytes BIGINT NOT NULL DEFAULT 0 CHECK (ceiling_bytes >= acknowledged_bytes),
     revision BIGINT NOT NULL DEFAULT 0 CHECK (revision >= 0),
+    -- Two-step issuance: a prepared lease can never authorize spending
+    -- until a later signed node request echoes this random lease identity.
+    node_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
     valid_until TIMESTAMPTZ NOT NULL,
     PRIMARY KEY(user_id,epoch,node_id,meter_epoch),
     FOREIGN KEY(user_id,epoch) REFERENCES quota_v2_accounts(user_id,epoch)

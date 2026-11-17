@@ -171,9 +171,10 @@ async fn lease_identity(
     epoch: &str,
     local_record: Option<&LocalQuotaCounter>,
     local_total: i64,
-) -> Result<(String, String), ApiError> {
+) -> Result<(String, String, bool), ApiError> {
     let existing = sqlx::query(
-        "SELECT meter_epoch::text AS meter_epoch,reservation_id::text AS reservation_id
+        "SELECT meter_epoch::text AS meter_epoch,reservation_id::text AS reservation_id,
+                node_confirmed,acknowledged_bytes,ceiling_bytes
              FROM quota_v2_reservations
              WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
              ORDER BY valid_until DESC LIMIT 1 FOR UPDATE",
@@ -183,21 +184,48 @@ async fn lease_identity(
     .bind(node_id)
     .fetch_optional(&mut *conn)
     .await?;
-    if existing.is_some() && local_record.is_none() {
-        // A lost/corrupted node ledger must not permit another allowance.
-        return Err(conflict());
-    }
-    let (meter, reservation) = if let Some(row) = existing {
+    let (meter, reservation, confirmed) = if let Some(row) = existing {
         let meter: String = row.try_get("meter_epoch")?;
         let reservation: String = row.try_get("reservation_id")?;
-        let received = local_record.ok_or_else(conflict)?;
-        if received.epoch.as_deref() != Some(epoch)
-            || received.meter_epoch.as_deref() != Some(meter.as_str())
-            || received.reservation_id.as_deref() != Some(reservation.as_str())
-        {
-            return Err(conflict());
+        let confirmed: bool = row.try_get("node_confirmed")?;
+        let presented = local_record.is_some_and(|received| {
+            received.epoch.as_deref() == Some(epoch)
+                && received.meter_epoch.as_deref() == Some(meter.as_str())
+                && received.reservation_id.as_deref() == Some(reservation.as_str())
+        });
+        if presented {
+            if !confirmed {
+                // Only a subsequent signed node request proving durable
+                // receipt of the prepared identity may unlock the budget.
+                sqlx::query(
+                    "UPDATE quota_v2_reservations SET node_confirmed=TRUE
+                     WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
+                       AND meter_epoch=$4::uuid AND reservation_id=$5::uuid",
+                )
+                .bind(user_id)
+                .bind(epoch)
+                .bind(node_id)
+                .bind(&meter)
+                .bind(&reservation)
+                .execute(&mut *conn)
+                .await?;
+            }
+            (meter, reservation, true)
+        } else {
+            let lacks_identity = local_record.is_none_or(|record| {
+                record.epoch.is_none()
+                    && record.meter_epoch.is_none()
+                    && record.reservation_id.is_none()
+            });
+            let ack: i64 = row.try_get("acknowledged_bytes")?;
+            let ceiling: i64 = row.try_get("ceiling_bytes")?;
+            // A lost first response must be recoverable, but a lost
+            // already-funded node journal must not mint a second budget.
+            if confirmed || !lacks_identity || ceiling != ack || local_total != ack {
+                return Err(conflict());
+            }
+            (meter, reservation, false)
         }
-        (meter, reservation)
     } else {
         // Refuse migration while durable Node bytes have not reached the
         // authenticated telemetry baseline. Otherwise old unreported
@@ -226,9 +254,10 @@ async fn lease_identity(
         (
             uuid::Uuid::new_v4().to_string(),
             uuid::Uuid::new_v4().to_string(),
+            false,
         )
     };
-    Ok((meter, reservation))
+    Ok((meter, reservation, confirmed))
 }
 
 async fn issue_user(
@@ -265,7 +294,7 @@ async fn issue_user(
     };
     let local_total = local_record.map_or(0, |item| item.used_bytes);
     let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
-    let (meter, reservation) =
+    let (meter, reservation, confirmed) =
         lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
     let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
     let lease = sqlx::query(
@@ -279,7 +308,10 @@ async fn issue_user(
     .bind(node_id)
     .bind(&meter)
     .bind(&reservation)
-    .bind(target)
+    // Prepare a zero-spend signed policy first. A retry after a lost first
+    // HTTP response gets exactly this existing unfunded lease back. Only an
+    // authenticated echo of its durable identity unlocks the real budget.
+    .bind(if confirmed { target } else { 0 })
     .bind(local_total)
     .bind(until)
     .fetch_one(&mut *conn)

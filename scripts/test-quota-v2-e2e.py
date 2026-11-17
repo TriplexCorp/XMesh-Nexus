@@ -132,12 +132,34 @@ def main():
         check(code,201,"create globally limited subscriber")
         uid=user["id"]; key=str(uid)
         a,b=nodes
-        pa,da=a.desired(uid)
-        pb,db=b.desired(uid)
+        # First request prepares, but cannot activate an unacknowledged
+        # offline allowance. Simulate a lost HTTP response from node A:
+        # the repeated request without a durable ID must stay unfunded and
+        # return the SAME reservation, not create an inaccessible new one.
+        prep_a,_=a.desired(uid)
+        prep_b,_=b.desired(uid)
+        lease_pre_a=prep_a["users"][0]["quotaReservation"]
+        lease_pre_b=prep_b["users"][0]["quotaReservation"]
+        assert lease_pre_a["ceilingBytes"]==lease_pre_a["acknowledgedBytes"]==0
+        assert lease_pre_b["ceilingBytes"]==lease_pre_b["acknowledgedBytes"]==0
+        retry_a,_=a.desired(uid)
+        lease_retry=retry_a["users"][0]["quotaReservation"]
+        assert lease_retry["reservationId"]==lease_pre_a["reservationId"]
+        assert lease_retry["ceilingBytes"]==0
+        print("PASS: lost first response recovers unchanged unfunded signed lease")
+        # Once Node reports a durable identity, Nexus unlocks only the
+        # requested share of the account's remaining globally held capacity.
+        pa,da=a.desired(uid,0,lease_pre_a)
+        pb,db=b.desired(uid,0,lease_pre_b)
         lease_a=pa["users"][0]["quotaReservation"]
         lease_b=pb["users"][0]["quotaReservation"]
         assert lease_a["reservationId"]!=lease_b["reservationId"]
         assert lease_a["ceilingBytes"]>0 and lease_b["ceilingBytes"]>0
+        # A lost funded journal cannot be silently replaced: an active grant
+        # may already have been spent offline.
+        code, _, _ = a.post("/node/desired-config",{
+            "node_id":a.id,"quotaProtocolVersion":2,"quotaLocalCounters":[]})
+        check(code,409,"reject missing durable journal after funded reservation")
         def account():
             return tuple(map(int,query(
                 "SELECT settled_bytes||','||"
