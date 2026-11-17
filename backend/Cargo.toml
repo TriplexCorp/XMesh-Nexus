@@ -52,3 +52,13 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 uuid = { version = "1", features = ["v4"] }
 zip = { version = "9.6.0", default-features = false, features = ["deflate"] }
+
+# SQLx 0.9.0 includes the SQLite driver in the resolved Cargo.lock even though
+# the Nexus runtime enables PostgreSQL only. The released sqlite driver pins
+# libsqlite3-sys below the fixed 0.39.x series (RUSTSEC-2026-0459).
+# Use upstream's narrowly reviewed compatibility change (#4502), pinned to
+# an immutable commit. It only broadens the optional driver's dependency range;
+# no SQLite driver is enabled in the production API.
+# Drop this override once a released SQLx version contains upstream #4502.
+[patch.crates-io]
+sqlx-sqlite = { git = "https://github.com/transact-rs/sqlx", rev = "10462fa4414c6c7f1ed1d39bb31678e3b726878c" }
