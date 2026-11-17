@@ -3417,9 +3417,9 @@ async fn record_node_stop_receipts(
     node_id: i64,
     proofs: &[NodeStopReceipt],
 ) -> Result<(), ApiError> {
-    // This attests signed policy application, NOT a final Xray accounting
-    // watermark. Reject fresh stale claims while permitting exact replay
-    // of the old accepted proof after newer receipts (no refund ever).
+    // A signed stop attests configuration application, NOT the final
+    // Xray counter. It may arrive after a newer usage receipt; never treat
+    // it as refundable. Reject only regressions against an accepted stop.
     // Deliberately NO ceiling reduction or quota refund here.
     for proof in proofs {
         sqlx::query(
@@ -3444,18 +3444,12 @@ async fn record_node_stop_receipts(
                AND lease.node_id=r.node_id AND lease.meter_epoch=r.meter_epoch
                AND lease.reservation_id=r.reservation_id
                AND lease.revision >= $7
-               -- A fresh stop claim cannot trail settled usage or a
-               -- previously accepted stop. An EXACT replay of an already
-               -- applied proof remains legal after later signed spending:
-               -- Node keeps publishing it, but it proves no final meter.
+               -- A delayed operational stop can trail real signed
+               -- spending; it is NOT a final meter and refunds zero bytes.
+               -- Fence only regressions of previously accepted stop proofs.
+               -- Repeat receipts remain safe after newer usage reports.
                AND $8 >= COALESCE(r.observed_used_bytes,0)
                AND $7 >= COALESCE(r.applied_revision,0)
-               AND (
-                   $8 >= lease.acknowledged_bytes
-                   OR (r.applied_at IS NOT NULL
-                       AND $8 = r.observed_used_bytes
-                       AND $7 = r.applied_revision)
-               )
              RETURNING r.request_id",
         )
         .bind(proof.user_id)
