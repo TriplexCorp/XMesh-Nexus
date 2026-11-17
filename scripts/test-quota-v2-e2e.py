@@ -389,6 +389,20 @@ def main():
         assert deny["requestId"]==intent["requestId"]
         assert deny["epoch"]==intent["epoch"]
         assert deny["reservationId"]==intent["reservationId"]
+        # Revocation may be delivered over multiple signed polls. Each
+        # revocation policy MUST retain the last already-issued lease expiry
+        # and cannot create fresh spendable bytes while the Node is offline.
+        revoked_lease=stopped["users"][0]["quotaReservation"]
+        assert revoked_lease["validUntilMs"]==grant_a["validUntilMs"],(revoked_lease,grant_a)
+        assert revoked_lease["ceilingBytes"]==grant_a["ceilingBytes"],(revoked_lease,grant_a)
+        time.sleep(0.03)
+        stopped_again,stop_doc_again=a.desired(uid,lease_a["ceilingBytes"],revoked_lease)
+        repeated_lease=stopped_again["users"][0]["quotaReservation"]
+        assert repeated_lease["validUntilMs"]==grant_a["validUntilMs"],repeated_lease
+        assert repeated_lease["ceilingBytes"]==grant_a["ceilingBytes"],repeated_lease
+        assert stopped_again["users"][0]["quotaRevocation"]["requestId"]==intent["requestId"]
+        stopped,stop_doc=stopped_again,stop_doc_again
+        print("PASS: repeated signed revoke never renews node lease or grants bytes")
         effective,a.ledger,blocked=guard.enforce(
             stopped,stop_doc["config"],a.ledger,{key:0},
             "xray-restarted-a",False,stopped["issuedAtMs"])
