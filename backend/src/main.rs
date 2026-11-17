@@ -1492,7 +1492,22 @@ async fn update_record(
                         "Переключение безлимита при квотах v2 требует обновления всех нод.",
                     ));
                 }
-                if new_limit < spent.saturating_add(held) {
+                // Verified Xray telemetry can arrive before the separate
+                // signed quotaReceipt. Account.settled_bytes alone may lag
+                // actual accepted usage; the panel's effective meter is an
+                // additional non-decreasing floor for safe plan reductions.
+                let measured: i64 = sqlx::query_scalar(
+                    "SELECT COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT
+                     FROM user_node_traffic_totals WHERE user_id=$1",
+                )
+                .bind(id)
+                .fetch_one(&mut *tx)
+                .await?;
+                let base_used = gb_to_bytes_i64(
+                    data.get("used").and_then(Value::as_f64).unwrap_or(0.0),
+                );
+                let charged = spent.max(base_used.saturating_add(measured.max(0)));
+                if new_limit < charged.saturating_add(held) {
                     return Err(ApiError::new(
                         StatusCode::CONFLICT,
                         "Новый лимит меньше уже потраченного и зарезервированного трафика на нодах.",
