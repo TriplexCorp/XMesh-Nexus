@@ -1423,6 +1423,28 @@ async fn update_record(
         validate_host_binding(&state.pool, &data).await?;
     }
 
+    // A v1 usage adjustment may reset the cumulative panel baseline, but
+    // a v2 account has signed reservations on independent nodes. Changing
+    // only panel_records/user_node_traffic_totals would silently reallocate
+    // traffic while those old signed ceilings remain usable offline. Fail
+    // closed until an explicit all-node epoch reconciliation is supported.
+    // This check runs under the user's FOR UPDATE record lock; issuance also
+    // takes a FOR SHARE lock, preventing an account-creation race.
+    if collection == "users" && patch_object.contains_key("used") {
+        let has_v2_history: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM quota_v2_accounts WHERE user_id=$1)",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if has_v2_history {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Сброс трафика при квотах v2 требует согласования с нодами; счётчики не изменены.",
+            ));
+        }
+    }
+
     // Admin traffic reset sets the new baseline without corrupting the
     // last-seen Xray monotonic counters. The next delta still counts correctly.
     if collection == "users" && patch_object.contains_key("used") {
