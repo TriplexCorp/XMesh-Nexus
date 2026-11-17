@@ -255,6 +255,115 @@ pub async fn request_node_revocation(
     ))
 }
 
+/// Owner-directed conservative FULL charge: no unmeasured byte is returned.
+/// This action never represents a signed final meter or physical stop proof.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ConservativeBurnRequest {
+    node_id: i64,
+    request_id: String,
+    confirmation: String,
+}
+
+pub async fn burn_revoked_reservation(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(user_id): Path<i64>,
+    Json(body): Json<ConservativeBurnRequest>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    if actor.role != "owner" {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Owner approval required."));
+    }
+    if !enabled() {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Quota-v2 is disabled."));
+    }
+    if user_id <= 0 || body.node_id <= 0
+        || body.confirmation != "CHARGE_ALL_REMAINING_BYTES_NO_REFUND"
+        || uuid::Uuid::parse_str(&body.request_id).is_err()
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Explicit full-reservation charge confirmation and valid request ID required.",
+        ));
+    }
+    let mut tx = state.pool.begin().await?;
+    let user: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if user.is_none() {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found."));
+    }
+    let account = sqlx::query(
+        "SELECT epoch::text AS epoch FROM quota_v2_accounts
+         WHERE user_id=$1 AND NOT closed FOR UPDATE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(conflict)?;
+    let epoch: String = account.try_get("epoch")?;
+    let lease = sqlx::query(
+        "SELECT meter_epoch::text AS meter_epoch,
+                reservation_id::text AS reservation_id,
+                conservative_burned_at IS NOT NULL AS was_burned
+         FROM quota_v2_reservations
+         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3 FOR UPDATE",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(body.node_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(conflict)?;
+    let meter: String = lease.try_get("meter_epoch")?;
+    let reservation: String = lease.try_get("reservation_id")?;
+    let was_burned: bool = lease.try_get("was_burned")?;
+    let result = sqlx::query(
+        "SELECT acknowledged_bytes,ceiling_bytes,conservative_burned_bytes
+         FROM quota_v2_burn_revoked($1,$2::uuid,$3,$4::uuid,$5::uuid,$6::uuid)",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(body.node_id)
+    .bind(&meter)
+    .bind(&reservation)
+    .bind(&body.request_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|_| conflict())?;
+    let charged: i64 = result.try_get("conservative_burned_bytes")?;
+    let actual: i64 = result.try_get("acknowledged_bytes")?;
+    let ceiling: i64 = result.try_get("ceiling_bytes")?;
+    tx.commit().await?;
+    if !was_burned {
+        crate::audit(
+            &state.pool,
+            &actor.username,
+            "quota-v2-conservative-burn",
+            Some("users"),
+            Some(user_id),
+            json!({"nodeId":body.node_id,"requestId":body.request_id,
+                   "chargedBytes":charged,"refundedBytes":0}),
+        )
+        .await;
+    }
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "state":"conservatively_charged","userId":user_id,
+            "nodeId":body.node_id,"requestId":body.request_id,
+            "accountEpoch":epoch,"reservationId":reservation,
+            "chargedBytes":charged,"acknowledgedBytes":actual,
+            "ceilingBytes":ceiling,"alreadyCharged":was_burned,
+            "refundedBytes":0,"finalMeterVerified":false,
+            "note":"All remaining bytes are permanently charged, not refunded; no final Node meter was claimed."
+        })),
+    ))
+}
+
 pub async fn validate_limit_change(
     conn: &mut sqlx::PgConnection,
     user_id: i64,
