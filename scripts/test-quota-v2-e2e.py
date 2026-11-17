@@ -423,12 +423,41 @@ def main():
         item=next(item for item in preflight["nodes"] if item["nodeId"]==a.id)
         assert item["stopApplied"] and item["revocationRequestId"]==intent["requestId"]
         assert item["refundedBytes"]==0 and preflight["heldBytes"]>0,preflight
+        assert item["awaitingFinalMeter"] and not item["finalMeterVerified"],item
+        assert not item["canRefundNow"] and not preflight["canRefundNow"],preflight
+        assert not item["stopProofBelowSettledUsage"],item
         check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=proof),
               201,"replayed signed Node stop proof is idempotent")
+        # Signed stale stop evidence must fail atomically even though the
+        # receipt itself is genuine and a newer stop was already accepted.
+        state_before_stale=account()
+        stale=copy.deepcopy(proof)
+        stale["usedBytes"]-=1
+        assert stale["usedBytes"]>=0
+        check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=stale),
+              409,"reject stop proof below accepted signed traffic receipt")
+        assert account()==state_before_stale,account()
+        older=copy.deepcopy(proof)
+        older["revision"]-=1
+        assert older["revision"]>=0
+        check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=older),
+              409,"reject stop proof revision rollback")
+        assert account()==state_before_stale,account()
         # A node with another identity must never confirm A's revocation.
         forged=b.metrics(uid,proof["usedBytes"],grant_b,raw_total=0,stop=proof)
         check(forged,409,"reject substituted cross-node stop acknowledgment")
-        print("PASS: applied stop is node-scoped, idempotent and cannot refund early")
+        # An authenticated late byte can arrive after the operational
+        # stop proof. This proves that stop-applied is NOT final-meter-ready.
+        check(a.metrics(uid,proof["usedBytes"]+1,revocation_lease,
+                        raw_total=20*MIB,stop=None),201,
+              "charge late signed spending after an applied stop")
+        code,preflight,_=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"inspect stop proof after late spending")
+        item=next(row for row in preflight["nodes"] if row["nodeId"]==a.id)
+        assert item["stopProofBelowSettledUsage"],item
+        assert not item["canRefundNow"] and not preflight["canRefundNow"],preflight
+        assert item["refundedBytes"]==0 and account()[1]>0,account()
+        print("PASS: stale and late stop evidence is fenced without refunded bytes")
     print("Two-node quota-v2 API/guard/PostgreSQL acceptance: PASS")
 
 if __name__=="__main__":
