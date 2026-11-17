@@ -76,10 +76,17 @@ pub async fn revocation_status(
     let limit: i64 = active.try_get("limit_bytes")?;
     let settled: i64 = active.try_get("settled_bytes")?;
     let leases = sqlx::query(
-        "SELECT node_id,acknowledged_bytes,ceiling_bytes,revision,
-                node_confirmed,valid_until<NOW() AS expired
-         FROM quota_v2_reservations
-         WHERE user_id=$1 AND epoch=$2::uuid ORDER BY node_id",
+        "SELECT lease.node_id,lease.acknowledged_bytes,lease.ceiling_bytes,
+                lease.revision,lease.node_confirmed,lease.valid_until<NOW() AS expired,
+                revoke.request_id::text AS revocation_request_id,
+                revoke.applied_at IS NOT NULL AS revocation_applied,
+                revoke.observed_used_bytes
+         FROM quota_v2_reservations AS lease
+         LEFT JOIN quota_v2_revocation_requests AS revoke
+           ON revoke.user_id=lease.user_id AND revoke.epoch=lease.epoch
+          AND revoke.node_id=lease.node_id AND revoke.meter_epoch=lease.meter_epoch
+         WHERE lease.user_id=$1 AND lease.epoch=$2::uuid
+         ORDER BY lease.node_id",
     )
     .bind(user_id)
     .bind(&epoch)
@@ -99,7 +106,11 @@ pub async fn revocation_status(
             "heldBytes":outstanding,
             "revision":lease.try_get::<i64,_>("revision")?,
             "nodeConfirmed":lease.try_get::<bool,_>("node_confirmed")?,
-            "expired":lease.try_get::<bool,_>("expired")?
+            "expired":lease.try_get::<bool,_>("expired")?,
+            "revocationRequestId":lease.try_get::<Option<String>,_>("revocation_request_id")?,
+            "stopApplied":lease.try_get::<bool,_>("revocation_applied")?,
+            "observedUsedBytes":lease.try_get::<Option<i64>,_>("observed_used_bytes")?,
+            "refundedBytes":0,
         }));
     }
     Ok(Json(json!({
