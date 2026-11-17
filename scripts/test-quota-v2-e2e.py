@@ -86,7 +86,7 @@ class SignedNode:
         self.state.joinpath("policy-envelope.json").write_text(json.dumps(data))
         return policy,data
 
-    def metrics(self,user_id,total,lease,raw_total=None,include_receipt=True):
+    def metrics(self,user_id,total,lease,raw_total=None,include_receipt=True,stop=None):
         self.stats_at=max(self.stats_at+1,int(time.time()*1000))
         body={"node_id":self.id,"userStatsStatus":"verified",
               "userStatsAtMs":self.stats_at,
@@ -97,6 +97,8 @@ class SignedNode:
               }]}
         if not include_receipt:
             body["quotaReceipts"]=[]
+        if stop is not None:
+            body["quotaStopReceipts"]=[{"userId":user_id,**stop}]
         return self.post("/metrics/ingest",body)[0]
 
 def main():
@@ -395,7 +397,32 @@ def main():
         # This is a *prepared* decision only; no refund before a separate
         # verified runtime stop proof and final durable meter.
         assert account()==reserved_before
-        print("PASS: signed denial is user/lease scoped, durable and never prematurely refunded")
+        # An actual Node Agent calls the guard's commit only after Docker
+        # applies Xray's verified config and its public router reconciles.
+        # Never acknowledge a prepared denial that still contains the user.
+        with_credential=copy.deepcopy(stop_doc["config"])
+        try:
+            guard.applied_revocation_proofs(stopped,with_credential,copy.deepcopy(a.ledger))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("prepared policy was incorrectly treated as applied")
+        a.ledger=guard.applied_revocation_proofs(stopped,effective,a.ledger)
+        proof=a.ledger["users"][key]["quotaRevocationApplied"]
+        revocation_lease=stopped["users"][0]["quotaReservation"]
+        check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=proof),
+              201,"accept authenticated post-apply Node stop proof")
+        code, preflight, _=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"read persisted stop application proof")
+        item=next(item for item in preflight["nodes"] if item["nodeId"]==a.id)
+        assert item["stopApplied"] and item["revocationRequestId"]==intent["requestId"]
+        assert item["refundedBytes"]==0 and preflight["heldBytes"]>0,preflight
+        check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=proof),
+              201,"replayed signed Node stop proof is idempotent")
+        # A node with another identity must never confirm A's revocation.
+        forged=b.metrics(uid,proof["usedBytes"],grant_b,raw_total=0,stop=proof)
+        check(forged,409,"reject substituted cross-node stop acknowledgment")
+        print("PASS: applied stop is node-scoped, idempotent and cannot refund early")
     print("Two-node quota-v2 API/guard/PostgreSQL acceptance: PASS")
 
 if __name__=="__main__":
