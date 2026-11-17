@@ -316,8 +316,8 @@ def main():
               "late duplicate receipt of closed epoch is safe")
         assert account()[0]==0 and account()[1]==0
         _,a.ledger,denied=guard.enforce(
-            staged_a,sa["config"],a.ledger,{key:lease_a["ceilingBytes"]},
-            "xray-a",False,staged_a["issuedAtMs"])
+            staged_a,sa["config"],a.ledger,{key:0},
+            "xray-restarted-a",False,staged_a["issuedAtMs"])
         assert denied.get(staged_a["users"][0]["xrayId"]) in ("quota","locally-revoked"),denied
         print("PASS: signed new epoch accepted with preserved absolute meter baseline")
 
@@ -332,8 +332,8 @@ def main():
         assert limit==150_000_000,limit
         assert settled==0 and 0<held<=limit
         _,a.ledger,denied=guard.enforce(
-            active_a,aa["config"],a.ledger,{key:lease_a["ceilingBytes"]},
-            "xray-a",False,active_a["issuedAtMs"])
+            active_a,aa["config"],a.ledger,{key:0},
+            "xray-restarted-a",False,active_a["issuedAtMs"])
         assert not denied,denied
         print("PASS: reset quota issues only a newly acknowledged lease without replaying old traffic")
 
