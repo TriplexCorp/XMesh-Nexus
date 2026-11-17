@@ -46,16 +46,23 @@ BEGIN
         RAISE EXCEPTION 'closed quota epoch' USING ERRCODE='22023';
     END IF;
     INSERT INTO quota_v2_reservations(
-       user_id,epoch,node_id,meter_epoch,reservation_id,valid_until)
-      VALUES(p_user,p_epoch,p_node,p_meter,p_id,p_until)
+       user_id,epoch,node_id,meter_epoch,reservation_id,acknowledged_bytes,ceiling_bytes,valid_until)
+      VALUES(p_user,p_epoch,p_node,p_meter,p_id,p_ack,p_ack,p_until)
       ON CONFLICT(user_id,epoch,node_id,meter_epoch) DO NOTHING;
     SELECT * INTO STRICT lease FROM quota_v2_reservations
       WHERE user_id=p_user AND epoch=p_epoch AND node_id=p_node AND meter_epoch=p_meter
       FOR UPDATE;
-    -- A stale receipt is harmless; a counter beyond the authorized ceiling is
-    -- not an acknowledgement and must go through explicit overrun reconciliation.
+    -- Replayed requests cannot substitute a different lease identity.
+    IF lease.reservation_id != p_id THEN
+        RAISE EXCEPTION 'reservation identity mismatch' USING ERRCODE='22023';
+    END IF;
+    -- A physical Xray connection may finish a few bytes past the ceiling.
+    -- Record ALL verified overshoot as spent, NEVER as new free allowance.
+    -- Subsequent grants still require unreserved global capacity.
     IF p_ack > lease.ceiling_bytes THEN
-        RAISE EXCEPTION 'receipt exceeds reservation' USING ERRCODE='22023';
+        UPDATE quota_v2_reservations SET ceiling_bytes=p_ack
+          WHERE user_id=p_user AND epoch=p_epoch AND node_id=p_node AND meter_epoch=p_meter
+          RETURNING * INTO lease;
     END IF;
     delta := GREATEST(p_ack-lease.acknowledged_bytes,0);
     IF delta > 0 THEN
