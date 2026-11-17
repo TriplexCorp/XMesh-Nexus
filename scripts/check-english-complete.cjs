@@ -6,6 +6,12 @@ const assert=require('node:assert/strict');
 const api=runtime(),phrases=candidates();const missing=[];
 // Exercise real interpolated API copy, not just untranslated source templates.
 assert.equal(api.translate('Например, 123456789'),'For example, 123456789');
+assert.equal(api.translate("Нельзя изменить лимит: квота v2 уже зарезервирована на нодах. Сначала согласуйте расход."), "Cannot change this quota: v2 traffic is reserved on nodes. Reconcile usage first.");
+assert.equal(api.translate("Смена безлимитного тарифа при квотах v2 требует подтверждения всех нод."),"Switching unlimited plans under quota v2 requires confirmation from all nodes.");
+assert.equal(api.translate("Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика."),"Cannot reset quota v2: some nodes still hold unacknowledged traffic reservations.");
+assert.equal(api.translate("Переключение безлимита при квотах v2 требует обновления всех нод."),"Switching to or from unlimited quota v2 requires coordinated updates across all nodes.");
+assert.equal(api.translate("Новый лимит меньше уже потраченного и зарезервированного трафика на нодах."),"The new limit is lower than traffic already spent or reserved on nodes.");
+assert.equal(api.translate("Сброс трафика при квотах v2 требует согласования с нодами; счётчики не изменены."), "Quota-v2 traffic reset requires node reconciliation; counters were not changed.");
 assert.equal(
  api.translate('Узел с IP-адресом 2001:db8::abcd уже существует: «Node №1» (ID 42). Откройте существующий узел вместо повторного добавления.'),
  'A node with IP address 2001:db8::abcd already exists: “Node №1” (ID 42). Open the existing node instead of adding it again.'

@@ -21,6 +21,7 @@ mod node_xray_update;
 mod panel_version;
 
 mod protocol_credentials;
+mod quota_v2;
 mod security;
 mod sub_server;
 mod subscription_finalmask;
@@ -302,6 +303,32 @@ struct NodeMetricsIngestRequest {
     user_stats_status: Option<String>,
     #[serde(default, alias = "userStatsAtMs")]
     user_stats_at_ms: Option<i64>,
+    #[serde(default, alias = "quotaReceipts")]
+    quota_receipts: Option<Vec<NodeQuotaReceipt>>,
+    #[serde(default, alias = "quotaStopReceipts")]
+    quota_stop_receipts: Option<Vec<NodeStopReceipt>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NodeQuotaReceipt {
+    user_id: i64,
+    epoch: String,
+    meter_epoch: String,
+    reservation_id: String,
+    used_bytes: i64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NodeStopReceipt {
+    user_id: i64,
+    request_id: String,
+    epoch: String,
+    meter_epoch: String,
+    reservation_id: String,
+    revision: i64,
+    used_bytes: i64,
 }
 
 /// Cumulative Xray byte counters scoped to a real panel user and the reporting node.
@@ -408,6 +435,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         )
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
+        .route(
+            "/users/{id}/quota-v2/revocation",
+            get(quota_v2::revocation_status).post(quota_v2::request_node_revocation),
+        )
         .route(
             "/users/{id}/node-quotas",
             get(node_user_quotas::get_for_user),
@@ -1400,6 +1431,17 @@ async fn update_record(
         object.insert(key, value);
     }
     validate_record(&collection, &data)?;
+    if collection == "users" && patch_object.contains_key("limit") {
+        let prior: Value = existing.try_get("data")?;
+        quota_v2::validate_limit_change(
+            &mut tx,
+            id,
+            prior.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
+            data.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
+            data.get("used").and_then(Value::as_f64).unwrap_or(0.0),
+        )
+        .await?;
+    }
     if collection == "users" && patch_object.contains_key("nodeTrafficLimits") {
         node_user_quotas::require_existing_nodes(&mut tx, &data).await?;
     }
@@ -1408,6 +1450,12 @@ async fn update_record(
     }
     if collection == "hosts" {
         validate_host_binding(&state.pool, &data).await?;
+    }
+
+    // Shared fail-closed epoch fencing applies to every admin reset.
+    // A disconnected Node's signed allowance is never refunded.
+    if collection == "users" && patch_object.contains_key("used") {
+        quota_v2::close_drained_epoch(&mut tx, id).await?;
     }
 
     // Admin traffic reset sets the new baseline without corrupting the
@@ -3275,6 +3323,147 @@ async fn persist_node_metric_sample(
     Ok(sampled_at)
 }
 
+fn verify_scoped_quota_receipts(
+    user_traffic: &[UserTrafficSample],
+    quota_receipts: &[NodeQuotaReceipt],
+) -> Result<(), ApiError> {
+    let accepted_users: std::collections::HashSet<i64> =
+        user_traffic.iter().map(|sample| sample.user_id).collect();
+    let mut receipt_users = std::collections::HashSet::new();
+    for receipt in quota_receipts {
+        if receipt.user_id <= 0
+            || receipt.used_bytes < 0
+            || !accepted_users.contains(&receipt.user_id)
+            || !receipt_users.insert(receipt.user_id)
+            || [
+                &receipt.epoch,
+                &receipt.meter_epoch,
+                &receipt.reservation_id,
+            ]
+            .into_iter()
+            .any(|id| uuid::Uuid::parse_str(id).is_err())
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid scoped quota receipt.",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+async fn settle_quota_receipts(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    receipts: &[NodeQuotaReceipt],
+) -> Result<(), ApiError> {
+    // A verified cumulative receipt is settled independently from aggregate
+    // panelUsedBytes and can never issue or renew a reservation.
+    for receipt in receipts {
+        sqlx::query("SELECT quota_v2_ack($1,$2::uuid,$3,$4::uuid,$5::uuid,$6)")
+            .bind(receipt.user_id)
+            .bind(&receipt.epoch)
+            .bind(node_id)
+            .bind(&receipt.meter_epoch)
+            .bind(&receipt.reservation_id)
+            .bind(receipt.used_bytes)
+            .fetch_one(&mut *conn)
+            .await
+            .map_err(|_| {
+                ApiError::new(
+                    StatusCode::CONFLICT,
+                    "Invalid or stale quota lease receipt.",
+                )
+            })?;
+    }
+
+    Ok(())
+}
+
+fn verify_scoped_stop_receipts(
+    user_traffic: &[UserTrafficSample],
+    proofs: &[NodeStopReceipt],
+) -> Result<(), ApiError> {
+    let accepted: std::collections::HashSet<i64> =
+        user_traffic.iter().map(|item| item.user_id).collect();
+    let mut seen = std::collections::HashSet::new();
+    for receipt in proofs {
+        if receipt.user_id <= 0
+            || receipt.used_bytes < 0
+            || receipt.revision < 0
+            || !accepted.contains(&receipt.user_id)
+            || !seen.insert(receipt.user_id)
+            || [
+                &receipt.request_id,
+                &receipt.epoch,
+                &receipt.meter_epoch,
+                &receipt.reservation_id,
+            ]
+            .into_iter()
+            .any(|id| uuid::Uuid::parse_str(id).is_err())
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid scoped quota stop receipt.",
+            ));
+        }
+    }
+    Ok(())
+}
+
+async fn record_node_stop_receipts(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    proofs: &[NodeStopReceipt],
+) -> Result<(), ApiError> {
+    // This is proof of signed policy application, NOT a proven final meter.
+    // Deliberately NO ceiling reduction or quota refund here.
+    for proof in proofs {
+        sqlx::query(
+            "SELECT epoch FROM quota_v2_accounts
+             WHERE user_id=$1 AND epoch=$2::uuid FOR UPDATE",
+        )
+        .bind(proof.user_id)
+        .bind(&proof.epoch)
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(|_| ApiError::new(StatusCode::CONFLICT, "Unknown quota epoch."))?;
+        let applied = sqlx::query(
+            "UPDATE quota_v2_revocation_requests AS r SET
+                 applied_at=COALESCE(r.applied_at,NOW()),
+                 applied_revision=GREATEST(COALESCE(r.applied_revision,0),$7),
+                 observed_used_bytes=GREATEST(COALESCE(r.observed_used_bytes,0),$8)
+             FROM quota_v2_reservations AS lease
+             WHERE r.user_id=$1 AND r.epoch=$2::uuid AND r.node_id=$3
+               AND r.meter_epoch=$4::uuid AND r.reservation_id=$5::uuid
+               AND r.request_id=$6::uuid
+               AND lease.user_id=r.user_id AND lease.epoch=r.epoch
+               AND lease.node_id=r.node_id AND lease.meter_epoch=r.meter_epoch
+               AND lease.reservation_id=r.reservation_id
+               AND lease.revision >= $7
+             RETURNING r.request_id",
+        )
+        .bind(proof.user_id)
+        .bind(&proof.epoch)
+        .bind(node_id)
+        .bind(&proof.meter_epoch)
+        .bind(&proof.reservation_id)
+        .bind(&proof.request_id)
+        .bind(proof.revision)
+        .bind(proof.used_bytes)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if applied.is_none() {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Invalid or stale Node stop receipt.",
+            ));
+        }
+    }
+    Ok(())
+}
+
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -3298,6 +3487,20 @@ async fn ingest_node_metrics(
     validate_user_traffic_samples(&user_traffic)?;
     let mut inbound_samples = body.user_inbound_traffic.take().unwrap_or_default();
     validate_inbound_traffic_samples(&inbound_samples)?;
+    let mut quota_receipts = body.quota_receipts.take().unwrap_or_default();
+    let mut stop_receipts = body.quota_stop_receipts.take().unwrap_or_default();
+    if stop_receipts.len() > 2048 {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Too many quota stop receipts.",
+        ));
+    }
+    if quota_receipts.len() > 2048 {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Too many quota receipts.",
+        ));
+    }
     // Node-wide traffic accounting is separate from authenticated per-user
     // Xray counters. Require both monotonic NIC counters and an interface ID.
     // Older metrics agents simply omit these fields until upgraded.
@@ -3315,6 +3518,8 @@ async fn ingest_node_metrics(
         // Do not modify traffic baselines or onlineAt on stale/replayed data.
         user_traffic.clear();
         inbound_samples.clear();
+        quota_receipts.clear();
+        stop_receipts.clear();
     }
     metrics
         .as_object_mut()
@@ -3331,6 +3536,11 @@ async fn ingest_node_metrics(
         &inbound_samples,
     )
     .await?;
+    // Receipt must have a corresponding authenticated, scope-verified user
+    // counter in this same accepted sample. A signed node identity alone does
+    // not authorize receipt of an unrelated user's spending.
+    verify_scoped_quota_receipts(&user_traffic, &quota_receipts)?;
+    verify_scoped_stop_receipts(&user_traffic, &stop_receipts)?;
 
     let sampled_at = persist_node_metric_sample(&mut telemetry_tx, &body, metrics).await?;
 
@@ -3357,6 +3567,8 @@ async fn ingest_node_metrics(
         sampled_at,
     )
     .await?;
+    settle_quota_receipts(&mut telemetry_tx, body.node_id, &quota_receipts).await?;
+    record_node_stop_receipts(&mut telemetry_tx, body.node_id, &stop_receipts).await?;
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;

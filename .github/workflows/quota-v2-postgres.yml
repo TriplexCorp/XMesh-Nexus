@@ -1,0 +1,44 @@
+name: Quota v2 PostgreSQL reservation invariants
+on:
+  pull_request:
+    paths:
+      - 'backend/migrations/0125_quota_v2_reservations.sql'
+      - 'scripts/test-quota-v2-postgres.py'
+      - '.github/workflows/quota-v2-postgres.yml'
+permissions:
+  contents: read
+jobs:
+  reservations:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quota_test
+          POSTGRES_PASSWORD: quota_test_disposable
+          POSTGRES_DB: quota_test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      XMESH_AUDIT_DISPOSABLE: '1'
+      QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install 'psycopg[binary]==3.2.3' --break-system-packages
+      - name: Apply actual reservation migration to disposable PostgreSQL
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import psycopg
+          with psycopg.connect(os.environ["QUOTA_TEST_DSN"]) as c:
+              c.execute(Path("backend/migrations/0125_quota_v2_reservations.sql").read_text())
+          PY
+      - run: python3 scripts/test-quota-v2-postgres.py

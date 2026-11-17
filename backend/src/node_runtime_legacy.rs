@@ -1582,7 +1582,8 @@ fn build_offline_policy(
         user_policies.push(json!({
             "userId":user_id,"xrayId":uuid.to_string(),
             "expireAtMs":expires,"panelUsedBytes":used_bytes,
-            "limitBytes":limit_bytes,"offlineBudgetBytes":offline_budget
+            "limitBytes":limit_bytes,"offlineBudgetBytes":offline_budget,
+            "onHold":user.get("hold").and_then(Value::as_bool)==Some(true)
         }));
     }
     user_policies.sort_by_key(|item| item.get("userId").and_then(Value::as_i64).unwrap_or(0));
@@ -2208,11 +2209,34 @@ async fn compile_node_profile(
 #[serde(deny_unknown_fields)]
 struct DesiredConfigRequest {
     node_id: i64,
+    #[serde(default, alias = "quotaProtocolVersion")]
+    quota_protocol_version: Option<u8>,
+    #[serde(default, alias = "quotaLocalCounters")]
+    quota_local_counters: Option<Vec<crate::quota_v2::LocalQuotaCounter>>,
 }
 
 /// Authenticated, outbound-only desired Xray configuration retrieval.
 /// The node signs the request with its registered Ed25519 identity.
 /// Inbounds are bound to loopback so the edge router alone owns public TCP ports.
+async fn apply_quota_v2_if_enabled(
+    state: &AppState,
+    request: &DesiredConfigRequest,
+    policy: &mut Value,
+    now_ms: i64,
+) -> Result<(), ApiError> {
+    if crate::quota_v2::enabled() {
+        crate::quota_v2::issue(
+            &state.pool,
+            request.node_id,
+            policy,
+            request.quota_local_counters.as_deref().unwrap_or(&[]),
+            now_ms,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 pub async fn desired_config(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -2235,6 +2259,15 @@ pub async fn desired_config(
         "/api/v1/node/desired-config",
     )
     .await?;
+    // Operators must upgrade the entire serving fleet before enabling the
+    // shared reservation protocol. Older agents cannot safely mix v1 grants
+    // with v2 leases for the same globally limited user.
+    if crate::quota_v2::enabled() && request.quota_protocol_version != Some(2) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Quota-v2 requires an upgraded node agent.",
+        ));
+    }
     // Enrollment precedes profile authoring. Authenticated nodes without a
     // profile receive a non-successful-to-apply but healthy pending response.
     // Never sign or issue a policy while no Xray configuration exists.
@@ -2274,6 +2307,7 @@ pub async fn desired_config(
     } = compile_node_profile(&state, request.node_id).await?;
     let mut policy =
         build_offline_policy(&config, &users, request.node_id, now, &digest, active_nodes);
+    apply_quota_v2_if_enabled(&state, &request, &mut policy, now).await?;
     if let Some(tls) = tls_provision {
         policy["tlsProvision"] = tls;
     }

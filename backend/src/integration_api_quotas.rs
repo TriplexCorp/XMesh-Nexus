@@ -219,11 +219,23 @@ async fn apply(
     .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "not_found", "User not found"))?;
     user_mutations::matches_revision(headers, row.try_get("revision")?)?;
     let mut user: Value = row.try_get("data")?;
+    let prior_limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
     let object = user.as_object_mut().ok_or_else(Problem::unavailable)?;
     for (field, value) in policy {
         object.insert(field.clone(), value.clone());
     }
     crate::validate_record("users", &user).map_err(Problem::from)?;
+    if policy.contains_key("limit") {
+        crate::quota_v2::validate_limit_change(
+            tx,
+            id,
+            prior_limit,
+            user.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
+            user.get("used").and_then(Value::as_f64).unwrap_or(0.0),
+        )
+        .await
+        .map_err(Problem::from)?;
+    }
     if policy.contains_key("nodeTrafficLimits") {
         node_user_quotas::require_existing_nodes(tx, &user)
             .await
