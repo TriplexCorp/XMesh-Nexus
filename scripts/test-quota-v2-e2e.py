@@ -188,7 +188,7 @@ def main():
                                   {"used": 0}, cookie)
         check(code, 409, "reject user meter reset while v2 leases remain signed")
         assert account() == before_reset, (before_reset, account())
-        assert isinstance(reset_body, dict) and "согласован" in str(reset_body).lower()
+        assert isinstance(reset_body, dict) and "резерв" in str(reset_body).lower()
         print("PASS: admin reset leaves active v2 epoch and reservations unchanged")
 
         # Real admission decisions against independently persisted in-memory
@@ -246,6 +246,71 @@ def main():
         assert c in (400,403,409),("cross-node receipt accepted",c)
         assert account()[0]==50*MIB
         print("PASS: cross-node receipt substitution rejected without mutation")
+
+        # A quota decrease cannot invalidate an active offline reservation.
+        code, _, _=api("PATCH",f"/collections/users/{uid}",{"limit":0.01},cookie)
+        check(code,409,"cannot lower plan beneath already consumed and reserved bytes")
+        assert account()[2]==limit
+
+        # Drain each node's actual signed allowance. Nothing may be refunded
+        # solely because a 24h lease expires, and no new epoch is allowed until
+        # the authenticated absolute receipts have settled every old ceiling.
+        _,a.ledger,denied=guard.enforce(
+            pa2,da2["config"],a.ledger,{key:lease_a["ceilingBytes"]},
+            "xray-a",True,pa2["issuedAtMs"]+25)
+        assert denied.get(pa2["users"][0]["xrayId"])=="quota",denied
+        _,b.ledger,denied=guard.enforce(
+            pb,db["config"],b.ledger,{key:lease_b["ceilingBytes"]},
+            "xray-b",True,pb["issuedAtMs"]+25)
+        assert denied.get(pb["users"][0]["xrayId"])=="quota",denied
+        check(a.metrics(uid,0,lease_a),201,"node A verified meter baseline before full drain")
+        check(a.metrics(uid,lease_a["ceilingBytes"],lease_a),201,"node A fully spends and settles old allowance")
+        check(b.metrics(uid,lease_b["ceilingBytes"],lease_b),201,"node B fully spends and settles old allowance")
+        settled,held,limit=account()
+        assert held==0 and settled==lease_a["ceilingBytes"]+lease_b["ceilingBytes"]
+        print("PASS: all old signed spending obligations settled before reset")
+
+        code,reset_body,_=api("PATCH",f"/collections/users/{uid}",{"used":0},cookie)
+        check(code,200,"atomically reset user traffic after old v2 leases drain")
+        assert reset_body["used"]==0,reset_body
+        assert query("SELECT COUNT(*)::text FROM quota_v2_accounts WHERE user_id="+str(uid)+" AND closed")=="1"
+        assert query("SELECT COUNT(*)::text FROM quota_v2_accounts WHERE user_id="+str(uid)+" AND NOT closed")=="0"
+        print("PASS: drained epoch is closed with no automatic refund")
+
+        time.sleep(0.03)
+        # A Node continues using its durable absolute counter. New epoch
+        # inherits meterEpoch but MUST get a new reservationId and start
+        # unfunded (ceiling equals the old local absolute counter).
+        staged_a,sa=a.desired(uid,lease_a["ceilingBytes"],lease_a)
+        staged_b,sb=b.desired(uid,lease_b["ceilingBytes"],lease_b)
+        new_a=staged_a["users"][0]["quotaReservation"]
+        new_b=staged_b["users"][0]["quotaReservation"]
+        assert new_a["epoch"]!=lease_a["epoch"]
+        assert new_a["epoch"]==new_b["epoch"]
+        assert new_a["meterEpoch"]==lease_a["meterEpoch"]
+        assert new_a["reservationId"]!=lease_a["reservationId"]
+        assert new_a["ceilingBytes"]==new_a["acknowledgedBytes"]==lease_a["ceilingBytes"]
+        assert new_b["ceilingBytes"]==new_b["acknowledgedBytes"]==lease_b["ceilingBytes"]
+        _,a.ledger,denied=guard.enforce(
+            staged_a,sa["config"],a.ledger,{key:lease_a["ceilingBytes"]},
+            "xray-a",False,staged_a["issuedAtMs"])
+        assert denied.get(staged_a["users"][0]["xrayId"]) in ("quota","locally-revoked"),denied
+        print("PASS: signed new epoch accepted with preserved absolute meter baseline")
+
+        time.sleep(0.03)
+        active_a,aa=a.desired(uid,lease_a["ceilingBytes"],new_a)
+        active_b,bb=b.desired(uid,lease_b["ceilingBytes"],new_b)
+        grant_a=active_a["users"][0]["quotaReservation"]
+        grant_b=active_b["users"][0]["quotaReservation"]
+        assert grant_a["ceilingBytes"]>grant_a["acknowledgedBytes"]
+        assert grant_b["ceilingBytes"]>grant_b["acknowledgedBytes"]
+        settled,held,limit=account()
+        assert settled==0 and 0<held<=limit
+        _,a.ledger,denied=guard.enforce(
+            active_a,aa["config"],a.ledger,{key:lease_a["ceilingBytes"]},
+            "xray-a",False,active_a["issuedAtMs"])
+        assert not denied,denied
+        print("PASS: reset quota issues only a newly acknowledged lease without replaying old traffic")
     print("Two-node quota-v2 API/guard/PostgreSQL acceptance: PASS")
 
 if __name__=="__main__":
