@@ -418,7 +418,8 @@ pub async fn burn_revoked_reservation(
     if user.is_none() {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found."));
     }
-    if let Some(history) = historical_burn(&mut tx, user_id, body.node_id, &body.request_id).await? {
+    if let Some(history) = historical_burn(&mut tx, user_id, body.node_id, &body.request_id).await?
+    {
         tx.commit().await?;
         return Ok(burn_reply(user_id, body.node_id, &body.request_id, history));
     }
