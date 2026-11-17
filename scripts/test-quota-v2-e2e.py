@@ -522,7 +522,7 @@ def main():
         check(a.metrics(uid,proof["usedBytes"]+3,revocation_lease,raw_total=20*MIB,stop=proof),
               201,"accept genuine late signed usage within permanently charged floor")
         assert account()==after_burn,account()
-        fresh_b, _=b.desired(uid,grant_b["ceilingBytes"],grant_b)
+        fresh_b, _=b.desired(uid,grant_b["acknowledgedBytes"],grant_b)
         assert fresh_b["users"][0]["quotaReservation"]["ceilingBytes"]==grant_b["ceilingBytes"]
         assert account()==after_burn
         print("PASS: full-hold burn is irreversible, never refunded, and cannot double spend")
