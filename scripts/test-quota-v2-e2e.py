@@ -480,6 +480,52 @@ def main():
         assert not item["canRefundNow"] and not preflight["canRefundNow"],preflight
         assert item["refundedBytes"]==0 and account()[1]>0,account()
         print("PASS: stale and late stop evidence is fenced without refunded bytes")
+        # Explicit owner action is a FULL CHARGE, never a fake final meter.
+        pre_burn_account=account()
+        held_a=item["heldBytes"]
+        assert held_a>0 and not item["conservativeBurned"],item
+        burn_body={"nodeId":a.id,"requestId":intent["requestId"],
+                   "confirmation":"CHARGE_ALL_REMAINING_BYTES_NO_REFUND"}
+        bad_body={**burn_body,"confirmation":"REFUND_UNUSED_BYTES"}
+        code,_,_=api("POST",f"/users/{uid}/quota-v2/conservative-burn",bad_body,cookie)
+        check(code,400,"reject ambiguous or refundable burn request")
+        assert account()==pre_burn_account
+        wrong_id={**burn_body,"requestId":str(uuid.uuid4())}
+        code,_,_=api("POST",f"/users/{uid}/quota-v2/conservative-burn",wrong_id,cookie)
+        check(code,409,"reject unrelated revocation intent before charge")
+        assert account()==pre_burn_account
+        code,_,_=api("POST",f"/users/{uid}/quota-v2/conservative-burn",burn_body)
+        check(code,401,"reject unauthenticated conservative charge")
+        assert account()==pre_burn_account
+        code,charged,_=api("POST",f"/users/{uid}/quota-v2/conservative-burn",
+                           burn_body,cookie)
+        check(code,200,"owner irreversibly charges entire revoked node hold")
+        assert charged["chargedBytes"]==held_a and charged["refundedBytes"]==0,charged
+        assert charged["finalMeterVerified"] is False and not charged["alreadyCharged"],charged
+        after_burn=account()
+        assert after_burn[0]==pre_burn_account[0]+held_a,(after_burn,pre_burn_account)
+        assert after_burn[1]==pre_burn_account[1]-held_a,(after_burn,pre_burn_account)
+        assert after_burn[2]==pre_burn_account[2],after_burn
+        code,repeated_charge,_=api("POST",f"/users/{uid}/quota-v2/conservative-burn",
+                                   burn_body,cookie)
+        check(code,200,"exact owner replay cannot charge reservation twice")
+        assert repeated_charge["alreadyCharged"] and account()==after_burn,repeated_charge
+        code,status,_=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"preflight exposes charge separately from signed Node acknowledgement")
+        charged_item=next(row for row in status["nodes"] if row["nodeId"]==a.id)
+        assert charged_item["acknowledgedBytes"]<charged_item["conservativeBurnFloorBytes"],charged_item
+        assert charged_item["conservativeBurnedBytes"]==held_a,charged_item
+        assert charged_item["heldBytes"]==0 and not charged_item["finalMeterVerified"],charged_item
+        assert status["canRefundNow"] is False
+        # Delayed real Node receipts up to the prepaid burn floor are accepted
+        # as actual readings, without a duplicate charge or newly issued grant.
+        check(a.metrics(uid,proof["usedBytes"]+3,revocation_lease,raw_total=20*MIB,stop=proof),
+              201,"accept genuine late signed usage within permanently charged floor")
+        assert account()==after_burn,account()
+        fresh_b, _=b.desired(uid,grant_b["ceilingBytes"],grant_b)
+        assert fresh_b["users"][0]["quotaReservation"]["ceilingBytes"]==grant_b["ceilingBytes"]
+        assert account()==after_burn
+        print("PASS: full-hold burn is irreversible, never refunded, and cannot double spend")
     print("Two-node quota-v2 API/guard/PostgreSQL acceptance: PASS")
 
 if __name__=="__main__":
