@@ -5,7 +5,7 @@ This does NOT execute real Xray traffic or systemd. It exercises actual
 production Nexus endpoints, Ed25519 authentication, per-node guard decisions
 and persistent PostgreSQL ledgers with independent node identities.
 """
-import hashlib, importlib.util, json, os, subprocess, tempfile, time, uuid
+import copy, hashlib, importlib.util, json, os, subprocess, tempfile, time, uuid
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -162,6 +162,7 @@ def main():
         _,b.ledger,denied=guard.enforce(pb,db["config"],b.ledger,
                                          {key:10*MIB},"xray-b",True,pb["issuedAtMs"]+10)
         assert not denied,denied
+        saved_a = copy.deepcopy(a.ledger)
         check(b.metrics(uid,0,lease_b),201,"node B first verified baseline")
         check(b.metrics(uid,10*MIB,lease_b),201,"node B partial receipt accepted")
         check(b.metrics(uid,10*MIB,lease_b),201,"node B duplicate cumulative receipt is idempotent")
@@ -180,8 +181,9 @@ def main():
 
         # Node A signs its own durable 40 MiB for desired-config; the server can
         # acknowledge it once, but may grant more only from unheld global quota.
-        # Restore A's 40 MiB ledger in this synthetic guard test.
-        a.ledger["users"][key]["total"]=40*MIB
+        # Restore the independent 40 MiB journal before the separate cutoff
+        # branch; copying only total would leave the raw Xray baseline at 64 MiB.
+        a.ledger=saved_a
         time.sleep(.02)
         pa2,da2=a.desired(uid,40*MIB,lease_a)
         settled,held,limit=account()
