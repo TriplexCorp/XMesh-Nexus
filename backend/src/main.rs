@@ -21,6 +21,7 @@ mod node_xray_update;
 mod panel_version;
 
 mod protocol_credentials;
+mod quota_v2;
 mod security;
 mod sub_server;
 mod subscription_finalmask;
@@ -34,7 +35,6 @@ mod subscription_user_agent;
 mod telegram_admin_bot;
 mod telegram_admin_bot_worker;
 mod telemetry_scope;
-mod quota_v2;
 mod user_subscriptions;
 mod xhttp_device_profiles;
 #[cfg(feature = "xsp-v2-experimental")]
@@ -3313,7 +3313,10 @@ async fn ingest_node_metrics(
     validate_inbound_traffic_samples(&inbound_samples)?;
     let mut quota_receipts = body.quota_receipts.take().unwrap_or_default();
     if quota_receipts.len() > 2048 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Too many quota receipts."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Too many quota receipts.",
+        ));
     }
     // Node-wide traffic accounting is separate from authenticated per-user
     // Xray counters. Require both monotonic NIC counters and an interface ID.
@@ -3360,10 +3363,18 @@ async fn ingest_node_metrics(
             || receipt.used_bytes < 0
             || !accepted_users.contains(&receipt.user_id)
             || !receipt_users.insert(receipt.user_id)
-            || [&receipt.epoch, &receipt.meter_epoch, &receipt.reservation_id]
-                .into_iter().any(|id| uuid::Uuid::parse_str(id).is_err())
+            || [
+                &receipt.epoch,
+                &receipt.meter_epoch,
+                &receipt.reservation_id,
+            ]
+            .into_iter()
+            .any(|id| uuid::Uuid::parse_str(id).is_err())
         {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid scoped quota receipt."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid scoped quota receipt.",
+            ));
         }
     }
 
@@ -3395,18 +3406,21 @@ async fn ingest_node_metrics(
     // A verified cumulative receipt is settled independently from aggregate
     // panelUsedBytes and can never issue or renew a reservation.
     for receipt in &quota_receipts {
-        sqlx::query(
-            "SELECT quota_v2_ack($1,$2::uuid,$3,$4::uuid,$5::uuid,$6)"
-        )
-        .bind(receipt.user_id)
-        .bind(&receipt.epoch)
-        .bind(body.node_id)
-        .bind(&receipt.meter_epoch)
-        .bind(&receipt.reservation_id)
-        .bind(receipt.used_bytes)
-        .fetch_one(&mut *telemetry_tx)
-        .await
-        .map_err(|_| ApiError::new(StatusCode::CONFLICT, "Invalid or stale quota lease receipt."))?;
+        sqlx::query("SELECT quota_v2_ack($1,$2::uuid,$3,$4::uuid,$5::uuid,$6)")
+            .bind(receipt.user_id)
+            .bind(&receipt.epoch)
+            .bind(body.node_id)
+            .bind(&receipt.meter_epoch)
+            .bind(&receipt.reservation_id)
+            .bind(receipt.used_bytes)
+            .fetch_one(&mut *telemetry_tx)
+            .await
+            .map_err(|_| {
+                ApiError::new(
+                    StatusCode::CONFLICT,
+                    "Invalid or stale quota lease receipt.",
+                )
+            })?;
     }
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
