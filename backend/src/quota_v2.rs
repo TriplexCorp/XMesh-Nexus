@@ -421,7 +421,12 @@ pub async fn burn_revoked_reservation(
     if let Some(history) = historical_burn(&mut tx, user_id, body.node_id, &body.request_id).await?
     {
         tx.commit().await?;
-        return Ok(burn_reply(user_id, body.node_id, &body.request_id, &history));
+        return Ok(burn_reply(
+            user_id,
+            body.node_id,
+            &body.request_id,
+            &history,
+        ));
     }
     let result = charge_burn(&mut tx, user_id, body.node_id, &body.request_id).await?;
     if !result.already {
