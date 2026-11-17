@@ -3,7 +3,11 @@
 //! The account row serializes allocation across independent nodes; a node's
 //! authenticated durable total is acknowledged only against its own lease.
 use crate::{ApiError, AppState, auth::AuthUser};
-use axum::{Json, extract::{Extension, Path, State}, http::StatusCode};
+use axum::{
+    Json,
+    extract::{Extension, Path, State},
+    http::StatusCode,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
@@ -32,7 +36,6 @@ fn conflict() -> ApiError {
 pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
-
 
 /// Read-only operator preflight for coordinated revocation/reset.
 /// Expiration never refunds an offline grant: the outstanding amount remains
