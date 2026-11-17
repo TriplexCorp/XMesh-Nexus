@@ -242,7 +242,13 @@ def main():
                 "uplinkBytes": 40, "downlinkBytes": 20,
             }], "New signed-scope sampler leaked retired inbound")
             after_upgrade = json.loads((state / "policy-usage.json").read_text())
-            expect(after_upgrade == previous_journal,
+            # The audit timestamp is expected to advance on every timer run;
+            # the durable *byte counters* and runtime baseline must not.
+            after_accounting = {k: v for k, v in after_upgrade.items()
+                                if k != "maxSeenMs"}
+            before_accounting = {k: v for k, v in previous_journal.items()
+                                 if k != "maxSeenMs"}
+            expect(after_accounting == before_accounting,
                    "Replaying unchanged Xray counters mutated historical usage")
 
             # Repeated systemd invocation and fake Xray byte growth.
