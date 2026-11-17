@@ -38,7 +38,7 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 9fbbe9f6c93f1709aaa47c54252f39ad916c8196
+          ref: 9bc796feb91eadacf77830c7f65bb4aed857bcdf
           path: node-agent
       - name: Generate disposable secrets and feature-gated service
         shell: bash

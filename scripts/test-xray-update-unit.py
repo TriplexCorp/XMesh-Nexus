@@ -54,6 +54,33 @@ class TransactionTests(unittest.TestCase):
         count=len(w.calls);self.assertEqual(w.perform('v26.10.31',1),result);self.assertEqual(len(w.calls),count)
         self.assertEqual(json.loads((self.state/'pinned-release.json').read_text())['imageId'],NEW)
         self.assertIn(w.backup,w.containers)
+    def test_signed_revocation_fence_denies_xray_update_without_docker_action(self):
+        w=Fake(self.state)
+        marker=self.state/'quota-revocation-deny-pending'
+        marker.write_text('signed-v2-deny\n')
+        result=w.perform('26.10.31',21)
+        self.assertFalse(result['success'])
+        self.assertEqual(result['code'],'revocation_pending')
+        self.assertEqual(result['rollback'],'unchanged')
+        self.assertFalse(w.calls,'Neither old image recovery nor any new Docker action is safe')
+        self.assertTrue(marker.is_file())
+        self.assertFalse((self.state/'updates/21/transaction.json').exists())
+
+    def test_signed_revocation_fence_blocks_interrupted_update_rollback(self):
+        w=Fake(self.state)
+        def crash(event):
+            if event['stage']=='health_check': raise SystemExit(99)
+        w.emit=crash
+        with self.assertRaises(SystemExit):w.perform('26.10.31',22)
+        w.emit=lambda event:None
+        marker=self.state/'quota-revocation-deny-pending'
+        marker.write_text('signed-v2-deny\n')
+        before=len(w.calls)
+        result=w.perform('26.10.31',22)
+        self.assertEqual(result['code'],'revocation_pending')
+        self.assertEqual(len(w.calls),before,'Interrupted rollback must not restart a denied user')
+        self.assertTrue(marker.exists())
+
     def test_preflight_failures_never_stop_old_runtime(self):
         for i,fault in enumerate(['registry','config','prepare'],1):
             w=Fake(self.state,fault);r=w.perform('26.10.31',i)

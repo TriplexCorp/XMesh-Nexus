@@ -216,27 +216,50 @@ def main():
         code,_,_=signed_post("/node/heartbeat",{"node_id":node,"version":CONTROL_AGENT_VERSION,"xray_running":True,"router_running":True,"xray_version":"26.10.21"})
         assert_status(code,200,"transaction-capable Agent heartbeat")
         code,queued,_=request("POST",f"/nodes/{node}/xray-update",{"version":"v26.10.31"},cookie=cookie,origin=BASE)
-        assert_status(code,202,"queue verified official Xray release")
-        command_id=queued["id"]
-        code,claimed,_=signed_post("/node/restart/poll",{"node_id":node})
-        assert_status(code,200,"claim fixed Xray transaction")
-        code,retry,_=signed_post("/node/restart/poll",{"node_id":node})
-        assert_status(code,200,"redeliver claimed Xray transaction safely")
-        assert retry["command"]==claimed["command"] and retry["enforceStop"] is False
-        progress={"node_id":node,"command_id":command_id,"stage":"validating","code":"tls_resource_missing","exitCode":23,"rollback":"unchanged"}
-        code,_,_=signed_post("/node/restart/progress",dict(progress,stderr="private config must never be accepted"))
-        assert_status(code,400,"progress rejects raw diagnostic/config fields")
-        code,_,_=signed_post("/node/restart/progress",progress)
-        assert_status(code,200,"signed bounded Xray progress accepted")
-        code,view,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
-        assert_status(code,200,"operator sees actual Xray update stage")
-        assert view["progress"]["code"]=="tls_resource_missing" and view["progress"]["exitCode"]==23
-        ack={"node_id":node,"command_id":command_id,"success":False,"detail":"validating: TLS certificate/key unavailable (exit 23); old Xray unchanged"}
-        code,_,_=signed_post("/node/restart/ack",ack);assert_status(code,200,"acknowledge failed preflight without false success")
-        code,duplicate,_=signed_post("/node/restart/ack",ack);assert_status(code,200,"exact Xray ACK retry is idempotent")
-        assert duplicate["duplicate"] is True
-        code,_,_=signed_post("/node/restart/ack",dict(ack,success=True));assert_status(code,409,"changed Xray ACK cannot rewrite terminal evidence")
-        code,_,_=signed_post("/node/restart/progress",progress);assert_status(code,409,"late progress cannot rewrite completed command")
+        if code == 202:
+            assert_status(code,202,"queue verified official Xray release")
+            command_id=queued["id"]
+            code,claimed,_=signed_post("/node/restart/poll",{"node_id":node})
+            assert_status(code,200,"claim fixed Xray transaction")
+            code,retry,_=signed_post("/node/restart/poll",{"node_id":node})
+            assert_status(code,200,"redeliver claimed Xray transaction safely")
+            assert retry["command"]==claimed["command"] and retry["enforceStop"] is False
+            progress={"node_id":node,"command_id":command_id,"stage":"validating","code":"tls_resource_missing","exitCode":23,"rollback":"unchanged"}
+            code,_,_=signed_post("/node/restart/progress",dict(progress,stderr="private config must never be accepted"))
+            assert_status(code,400,"progress rejects raw diagnostic/config fields")
+            code,_,_=signed_post("/node/restart/progress",progress)
+            assert_status(code,200,"signed bounded Xray progress accepted")
+            code,view,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
+            assert_status(code,200,"operator sees actual Xray update stage")
+            assert view["progress"]["code"]=="tls_resource_missing" and view["progress"]["exitCode"]==23
+            ack={"node_id":node,"command_id":command_id,"success":False,"detail":"validating: TLS certificate/key unavailable (exit 23); old Xray unchanged"}
+            code,_,_=signed_post("/node/restart/ack",ack);assert_status(code,200,"acknowledge failed preflight without false success")
+            code,duplicate,_=signed_post("/node/restart/ack",ack);assert_status(code,200,"exact Xray ACK retry is idempotent")
+            assert duplicate["duplicate"] is True
+            code,_,_=signed_post("/node/restart/ack",dict(ack,success=True));assert_status(code,409,"changed Xray ACK cannot rewrite terminal evidence")
+            code,_,_=signed_post("/node/restart/progress",progress);assert_status(code,409,"late progress cannot rewrite completed command")
+        elif code == 502 and isinstance(queued, dict) and (
+                "GitHub releases" in json.dumps(queued) and
+                ("403" in json.dumps(queued) or "429" in json.dumps(queued))):
+            # GitHub API quota is external to Nexus and shared Actions runners
+            # can exhaust it. The live endpoint MUST fail closed and queue no
+            # unverified release. Never accept an arbitrary 502 as a pass.
+            code, unchanged, _ = request("GET", f"/nodes/{node}/restart", cookie=cookie)
+            assert_status(code, 200, "inspect queue after official GitHub release throttling")
+            assert unchanged["state"]=="succeeded" and unchanged["action"]=="update_agent", unchanged
+            code, no_queue, _ = signed_post("/node/restart/poll", {"node_id":node})
+            assert_status(code, 200, "signed Node inspects empty update queue after upstream 403")
+            assert no_queue["command"] is None, no_queue
+            # The bounded, signed progress schema remains enforced even when
+            # no official release could be checked and no update was queued.
+            code,_,_=signed_post("/node/restart/progress", {
+                "node_id":node, "command_id":unchanged["id"],"stage":"validating",
+                "code":"tls_resource_missing","stderr":"private key"})
+            assert_status(code,400,"raw progress denied during official API outage")
+            print("PASS: upstream GitHub release catalog throttled; fail-closed, no unverified Xray update queued")
+        else:
+            raise AssertionError(
+                f"official Xray release verification: HTTP {code}, response {str(queued)[:350]}")
 
         # Real signed database accounting for two inbounds of the same user.
         code, new_user, _ = request("POST", "/collections/users",

@@ -33,11 +33,11 @@ jobs:
           ref: 647adcf7af326b205fce12545fb5d75a20bb8191
           path: .ci-old-node
           persist-credentials: false
-      - name: Check out exact reviewed v6.0.13 Node producer
+      - name: Check out exact reviewed v6.0.15 Node producer
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 9fbbe9f6c93f1709aaa47c54252f39ad916c8196
+          ref: 9bc796feb91eadacf77830c7f65bb4aed857bcdf
           path: .ci-new-node
           persist-credentials: false
       - name: Prove installed helper migration under real Ubuntu systemd

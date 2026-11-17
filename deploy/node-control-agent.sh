@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.14"
+AGENT_VERSION="control-v6.0.15"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -140,6 +140,12 @@ except (ValueError,TypeError,KeyError):
  fi
 }
 restart_xray(){
+ # Prevent a signed node-local quota revocation from being bypassed by
+ # independently authenticated panel restart commands.
+ if [[ -e "$QUOTA_REVOCATION_MARKER" || -L "$QUOTA_REVOCATION_MARKER" ]];then
+  echo "Xray restart denied: signed quota revocation pending" >&2
+  return 1
+ fi
  if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
   timeout 35 docker restart xmesh-managed-xray >/dev/null &&
    docker inspect -f '{{.State.Running}}' xmesh-managed-xray | grep -qx true
@@ -151,7 +157,11 @@ restart_xray(){
 # Xray, arbitrary Docker container or remote-selected image is never modified.
 update_managed_xray(){
  local version="${1:?Pinned Xray version required}" worker=/usr/local/libexec/xmesh-xray-update.py event kind payload outcome=false
- [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.14"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
+ if [[ -e "$QUOTA_REVOCATION_MARKER" || -L "$QUOTA_REVOCATION_MARKER" ]];then
+  detail='Xray update denied: signed quota revocation pending'
+  return 1
+ fi
+ [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.15"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
  # Only fixed JSON stages and a sanitized final result cross the signed channel.
  # The worker preserves the exact old container until preflight succeeds and
  # validates all actual TLS/GeoData mounts with run -test before switching.
@@ -174,6 +184,7 @@ update_managed_xray(){
 # docker restart after a denied node is stopped.
 STATE_DIR=/var/lib/xmesh-node-control
 MARKER="$STATE_DIR/forced-stop"
+QUOTA_REVOCATION_MARKER=/var/lib/xmesh-xray-sync/quota-revocation-deny-pending
 RELEASE_IDENTITY_FILE=/run/xmesh-node-control/agent-release-identity.json
 stage_agent_release_identity(){
  local version="$1" revision="$2" digest="$3" tmp
@@ -346,6 +357,12 @@ stop_xray(){
  return 0
 }
 resume_xray(){
+ # A local manual/disabled-node reactivation cannot override a pending
+ # already-verified quota revoke; only signed Xray policy commit may clear it.
+ if [[ -e "$QUOTA_REVOCATION_MARKER" || -L "$QUOTA_REVOCATION_MARKER" ]];then
+  echo "Xray reactivation denied: signed quota revocation pending" >&2
+  return 1
+ fi
  [[ -f "$MARKER" ]] || return 0
  local mode
  mode="$(cat "$MARKER")"
