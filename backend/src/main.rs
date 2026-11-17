@@ -3288,6 +3288,64 @@ async fn persist_node_metric_sample(
     Ok(sampled_at)
 }
 
+fn verify_scoped_quota_receipts(
+    user_traffic: &[UserTrafficSample],
+    quota_receipts: &[NodeQuotaReceipt],
+) -> Result<(), ApiError> {
+    let accepted_users: std::collections::HashSet<i64> =
+        user_traffic.iter().map(|sample| sample.user_id).collect();
+    let mut receipt_users = std::collections::HashSet::new();
+    for receipt in quota_receipts {
+        if receipt.user_id <= 0
+            || receipt.used_bytes < 0
+            || !accepted_users.contains(&receipt.user_id)
+            || !receipt_users.insert(receipt.user_id)
+            || [
+                &receipt.epoch,
+                &receipt.meter_epoch,
+                &receipt.reservation_id,
+            ]
+            .into_iter()
+            .any(|id| uuid::Uuid::parse_str(id).is_err())
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid scoped quota receipt.",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+async fn settle_quota_receipts(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    receipts: &[NodeQuotaReceipt],
+) -> Result<(), ApiError> {
+    // A verified cumulative receipt is settled independently from aggregate
+    // panelUsedBytes and can never issue or renew a reservation.
+    for receipt in receipts {
+        sqlx::query("SELECT quota_v2_ack($1,$2::uuid,$3,$4::uuid,$5::uuid,$6)")
+            .bind(receipt.user_id)
+            .bind(&receipt.epoch)
+            .bind(node_id)
+            .bind(&receipt.meter_epoch)
+            .bind(&receipt.reservation_id)
+            .bind(receipt.used_bytes)
+            .fetch_one(&mut *conn)
+            .await
+            .map_err(|_| {
+                ApiError::new(
+                    StatusCode::CONFLICT,
+                    "Invalid or stale quota lease receipt.",
+                )
+            })?;
+    }
+
+    Ok(())
+}
+
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -3355,28 +3413,7 @@ async fn ingest_node_metrics(
     // Receipt must have a corresponding authenticated, scope-verified user
     // counter in this same accepted sample. A signed node identity alone does
     // not authorize receipt of an unrelated user's spending.
-    let accepted_users: std::collections::HashSet<i64> =
-        user_traffic.iter().map(|sample| sample.user_id).collect();
-    let mut receipt_users = std::collections::HashSet::new();
-    for receipt in &quota_receipts {
-        if receipt.user_id <= 0
-            || receipt.used_bytes < 0
-            || !accepted_users.contains(&receipt.user_id)
-            || !receipt_users.insert(receipt.user_id)
-            || [
-                &receipt.epoch,
-                &receipt.meter_epoch,
-                &receipt.reservation_id,
-            ]
-            .into_iter()
-            .any(|id| uuid::Uuid::parse_str(id).is_err())
-        {
-            return Err(ApiError::new(
-                StatusCode::BAD_REQUEST,
-                "Invalid scoped quota receipt.",
-            ));
-        }
-    }
+    verify_scoped_quota_receipts(&user_traffic, &quota_receipts)?;
 
     let sampled_at = persist_node_metric_sample(&mut telemetry_tx, &body, metrics).await?;
 
@@ -3403,25 +3440,7 @@ async fn ingest_node_metrics(
         sampled_at,
     )
     .await?;
-    // A verified cumulative receipt is settled independently from aggregate
-    // panelUsedBytes and can never issue or renew a reservation.
-    for receipt in &quota_receipts {
-        sqlx::query("SELECT quota_v2_ack($1,$2::uuid,$3,$4::uuid,$5::uuid,$6)")
-            .bind(receipt.user_id)
-            .bind(&receipt.epoch)
-            .bind(body.node_id)
-            .bind(&receipt.meter_epoch)
-            .bind(&receipt.reservation_id)
-            .bind(receipt.used_bytes)
-            .fetch_one(&mut *telemetry_tx)
-            .await
-            .map_err(|_| {
-                ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Invalid or stale quota lease receipt.",
-                )
-            })?;
-    }
+    settle_quota_receipts(&mut telemetry_tx, body.node_id, &quota_receipts).await?;
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;
