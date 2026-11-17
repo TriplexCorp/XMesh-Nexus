@@ -1,5 +1,5 @@
 //! Staged quota-v2 issuer. Deliberately disabled unless the operator enables
-//! XMESH_QUOTA_V2_ENABLED=1 after rolling out v2-capable node agents.
+//! `XMESH_QUOTA_V2_ENABLED=1` after rolling out v2-capable node agents.
 //! The account row serializes allocation across independent nodes; a node's
 //! authenticated durable total is acknowledged only against its own lease.
 use crate::ApiError;
@@ -33,13 +33,7 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
-pub async fn issue(
-    pool: &PgPool,
-    node_id: i64,
-    policy: &mut Value,
-    local: &[LocalQuotaCounter],
-    now_ms: i64,
-) -> Result<(), ApiError> {
+fn validate_local(local: &[LocalQuotaCounter]) -> Result<HashMap<i64, &LocalQuotaCounter>, ApiError> {
     if local.len() > 2048 {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -80,47 +74,19 @@ pub async fn issue(
         }
         reported.insert(counter.user_id, counter);
     }
-    let users = policy
-        .get_mut("users")
-        .and_then(Value::as_array_mut)
-        .ok_or_else(conflict)?;
-    let mut tx = pool.begin().await?;
-    for user in users.iter_mut() {
-        let user_id = user
-            .get("userId")
-            .and_then(Value::as_i64)
-            .ok_or_else(conflict)?;
-        let limit = user
-            .get("limitBytes")
-            .and_then(Value::as_i64)
-            .ok_or_else(conflict)?;
-        if limit <= 0 {
-            // Node-only and CDN quotas stay on their independent rule path.
-            // A global shared reservation is meaningful only for global limits.
-            continue;
-        }
-        let panel_used = user
-            .get("panelUsedBytes")
-            .and_then(Value::as_i64)
-            .ok_or_else(conflict)?;
-        let target = if user.get("onHold").and_then(Value::as_bool) == Some(true) {
-            // Waiting subscriptions must be able to make the first verified
-            // online connection. Allocate a small shared bootstrap allowance,
-            // never an unreserved offline grant across multiple nodes.
-            1024 * 1024
-        } else {
-            user.get("offlineBudgetBytes")
-                .and_then(Value::as_i64)
-                .unwrap_or(0)
-                .clamp(0, 64 * 1024 * 1024)
-        };
-        let local_record = reported.get(&user_id).copied();
-        let local_total = local_record.map_or(0, |item| item.used_bytes);
+    Ok(reported)
+}
 
+async fn ensure_account(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    limit: i64,
+    panel_used: i64,
+) -> Result<String, ApiError> {
         // Serialize first account creation as well as subsequent updates.
         sqlx::query("SELECT pg_advisory_xact_lock($1)")
             .bind(user_id ^ 0x51_4D_45_53_48_i64)
-            .execute(&mut *tx)
+            .execute(&mut *conn)
             .await?;
         // Prevent issuing a stale allowance concurrently with an admin's
         // plan change or a different node's accepted telemetry delta.
@@ -128,7 +94,7 @@ pub async fn issue(
             "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
         )
         .bind(user_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut *conn)
         .await?
         .ok_or_else(conflict)?;
         let current_limit = current_user
@@ -148,7 +114,7 @@ pub async fn issue(
              FROM user_node_traffic_totals WHERE user_id=$1",
         )
         .bind(user_id)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut *conn)
         .await?;
         let expected_used =
             crate::gb_to_bytes_i64(base_used_gb).saturating_add(measured_bytes.max(0));
@@ -162,7 +128,7 @@ pub async fn issue(
              WHERE user_id=$1 AND NOT closed FOR UPDATE",
         )
         .bind(user_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut *conn)
         .await?;
         let epoch: String = if let Some(row) = account {
             row.try_get("epoch")?
@@ -176,7 +142,7 @@ pub async fn issue(
             .bind(&new_epoch)
             .bind(limit)
             .bind(panel_used)
-            .execute(&mut *tx)
+            .execute(&mut *conn)
             .await?;
             new_epoch
         };
@@ -192,9 +158,20 @@ pub async fn issue(
         .bind(&epoch)
         .bind(limit)
         .bind(panel_used)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
 
+        Ok(epoch)
+}
+
+async fn lease_identity(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    epoch: &str,
+    local_record: Option<&LocalQuotaCounter>,
+    local_total: i64,
+) -> Result<(String, String), ApiError> {
         let existing = sqlx::query(
             "SELECT meter_epoch::text AS meter_epoch,reservation_id::text AS reservation_id
              FROM quota_v2_reservations
@@ -202,9 +179,9 @@ pub async fn issue(
              ORDER BY valid_until DESC LIMIT 1 FOR UPDATE",
         )
         .bind(user_id)
-        .bind(&epoch)
+        .bind(epoch)
         .bind(node_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut *conn)
         .await?;
         if existing.is_some() && local_record.is_none() {
             // A lost/corrupted node ledger must not permit another allowance.
@@ -214,7 +191,7 @@ pub async fn issue(
             let meter: String = row.try_get("meter_epoch")?;
             let reservation: String = row.try_get("reservation_id")?;
             let received = local_record.ok_or_else(conflict)?;
-            if received.epoch.as_deref() != Some(epoch.as_str())
+            if received.epoch.as_deref() != Some(epoch)
                 || received.meter_epoch.as_deref() != Some(meter.as_str())
                 || received.reservation_id.as_deref() != Some(reservation.as_str())
             {
@@ -232,7 +209,7 @@ pub async fn issue(
             )
             .bind(node_id)
             .bind(user_id)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut *conn)
             .await?;
             let observed_total = if let Some(row) = observed {
                 let up: i64 = row.try_get("last_uplink_bytes")?;
@@ -251,6 +228,45 @@ pub async fn issue(
                 uuid::Uuid::new_v4().to_string(),
             )
         };
+        Ok((meter, reservation))
+}
+
+async fn issue_user(
+    conn: &mut sqlx::PgConnection,
+    user: &mut Value,
+    user_id: i64,
+    node_id: i64,
+    local_record: Option<&LocalQuotaCounter>,
+    now_ms: i64,
+) -> Result<(), ApiError> {
+        let limit = user
+            .get("limitBytes")
+            .and_then(Value::as_i64)
+            .ok_or_else(conflict)?;
+        if limit <= 0 {
+            // Node-only and CDN quotas stay on their independent rule path.
+            // A global shared reservation is meaningful only for global limits.
+            return Ok(());
+        }
+        let panel_used = user
+            .get("panelUsedBytes")
+            .and_then(Value::as_i64)
+            .ok_or_else(conflict)?;
+        let target = if user.get("onHold").and_then(Value::as_bool) == Some(true) {
+            // Waiting subscriptions must be able to make the first verified
+            // online connection. Allocate a small shared bootstrap allowance,
+            // never an unreserved offline grant across multiple nodes.
+            1024 * 1024
+        } else {
+            user.get("offlineBudgetBytes")
+                .and_then(Value::as_i64)
+                .unwrap_or(0)
+                .clamp(0, 64 * 1024 * 1024)
+        };
+        let local_total = local_record.map_or(0, |item| item.used_bytes);
+        let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
+        let (meter, reservation) =
+            lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
         let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
         let lease = sqlx::query(
             "SELECT acknowledged_bytes,ceiling_bytes,revision,
@@ -266,7 +282,7 @@ pub async fn issue(
         .bind(target)
         .bind(local_total)
         .bind(until)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut *conn)
         .await
         .map_err(|_| conflict())?;
 
@@ -279,6 +295,25 @@ pub async fn issue(
             "ceilingBytes": lease.try_get::<i64,_>("ceiling_bytes")?,
             "validUntilMs": lease.try_get::<i64,_>("valid_until_ms")?
         });
+        Ok(())
+}
+
+pub async fn issue(
+    pool: &PgPool,
+    node_id: i64,
+    policy: &mut Value,
+    local: &[LocalQuotaCounter],
+    now_ms: i64,
+) -> Result<(), ApiError> {
+    let reported = validate_local(local)?;
+    let users = policy
+        .get_mut("users")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(conflict)?;
+    let mut tx = pool.begin().await?;
+    for user in users.iter_mut() {
+        let id = user.get("userId").and_then(Value::as_i64).ok_or_else(conflict)?;
+        issue_user(&mut tx, user, id, node_id, reported.get(&id).copied(), now_ms).await?;
     }
     policy["version"] = json!(2);
     tx.commit().await?;
