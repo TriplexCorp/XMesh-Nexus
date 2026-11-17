@@ -92,6 +92,19 @@ def main():
             time.sleep(2);transfer();old=json.loads(docker('inspect',name).stdout)[0];old_id=old['Id']
             def worker(fault=None):
                 w=Injected(state,name,DOCKER,events.append,health_seconds=2);w.fault=fault;return w
+            # Real Docker/Xray gate: even though this old instance remains
+            # reachable in the fixture, the standalone image updater must
+            # NOT touch it while a signed revocation fence is persisted.
+            marker=state/'quota-revocation-deny-pending'
+            marker.write_text('signed-v2-deny\\n',encoding='utf-8')
+            fenced=worker().perform('v26.10.31',20)
+            assert not fenced['success'] and fenced['code']=='revocation_pending',fenced
+            observed=json.loads(docker('inspect',name).stdout)[0]
+            assert observed['Id']==old_id and observed['State']['StartedAt']==old['State']['StartedAt']
+            assert not (state/'updates/20/transaction.json').exists()
+            marker.unlink()
+            transfer()
+            print('PASS real Docker/Xray updater refuses signed revoke marker without restarting old image',flush=True)
             original=(state/'config.json').read_bytes()
             def preflight(command,change,code):
                 change()
