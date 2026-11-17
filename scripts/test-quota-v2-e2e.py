@@ -395,8 +395,14 @@ def main():
         assert blocked.get(stopped["users"][0]["xrayId"])=="quota-revocation-pending",blocked
         assert not effective["inbounds"][0]["settings"]["clients"]
         # This is a *prepared* decision only; no refund before a separate
-        # verified runtime stop proof and final durable meter.
-        assert account()==reserved_before
+        # verified runtime stop proof and final durable meter. The signed
+        # desired-config may simultaneously settle A's previously unreported
+        # usage, moving bytes from held to settled without freeing capacity.
+        settled_after,held_after,limit_after=account()
+        spent_before,held_before,limit_before=reserved_before
+        assert limit_after==limit_before
+        assert settled_after>=spent_before
+        assert settled_after+held_after==spent_before+held_before
         # An actual Node Agent calls the guard's commit only after Docker
         # applies Xray's verified config and its public router reconciles.
         # Never acknowledge a prepared denial that still contains the user.
