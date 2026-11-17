@@ -274,7 +274,12 @@ struct BurnResult {
     already: bool,
 }
 
-fn burn_reply(user_id: i64, node_id: i64, request_id: &str, result: BurnResult) -> (StatusCode, Json<Value>) {
+fn burn_reply(
+    user_id: i64,
+    node_id: i64,
+    request_id: &str,
+    result: BurnResult,
+) -> (StatusCode, Json<Value>) {
     (
         StatusCode::OK,
         Json(json!({
