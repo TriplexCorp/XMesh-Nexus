@@ -115,8 +115,17 @@ def install_helper(source, target):
 
 
 def start(unit):
-    run("systemctl", "reset-failed", unit)
-    run("systemctl", "start", unit)
+    # A newly created transient test unit has no failed state to reset.
+    subprocess.run(["systemctl", "reset-failed", unit], capture_output=True,
+                   text=True, timeout=10, check=False)
+    started = subprocess.run(["systemctl", "start", unit], capture_output=True,
+                             text=True, timeout=40, check=False)
+    if started.returncode != 0:
+        journal = subprocess.run(
+            ["journalctl", "-b", "-u", unit, "--no-pager", "-n", "40"],
+            capture_output=True, text=True, timeout=12, check=False)
+        raise RuntimeError("Ubuntu systemd meter start failed: " +
+                           started.stderr + "\n" + journal.stdout[-7000:])
     result = run("systemctl", "show", "--property=Result", "--value", unit)
     expect(result == "success", "systemd oneshot did not exit successfully")
 
