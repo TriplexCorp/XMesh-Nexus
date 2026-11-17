@@ -5,6 +5,9 @@ CREATE TABLE quota_v2_accounts (
     epoch UUID NOT NULL,
     limit_bytes BIGINT NOT NULL CHECK (limit_bytes >= 0),
     settled_bytes BIGINT NOT NULL DEFAULT 0 CHECK (settled_bytes >= 0),
+    -- Verified aggregate telemetry may arrive ahead of signed Node receipts.
+    -- Keep it as a FLOOR, not an additive charge, to avoid double spending.
+    observed_floor_bytes BIGINT NOT NULL DEFAULT 0 CHECK (observed_floor_bytes >= 0),
     closed BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY(user_id,epoch)
 );
@@ -78,7 +81,10 @@ BEGIN
     SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-acknowledged_bytes),0)
       INTO outstanding FROM quota_v2_reservations
       WHERE user_id=p_user AND epoch=p_epoch;
-    available := GREATEST(account.limit_bytes::NUMERIC-account.settled_bytes-outstanding,0)::BIGINT;
+    available := GREATEST(
+        account.limit_bytes::NUMERIC
+        - GREATEST(account.settled_bytes,account.observed_floor_bytes)
+        - outstanding,0)::BIGINT;
     -- target is outstanding capacity, NOT a fresh grant on every policy poll.
     additional := LEAST(GREATEST(p_target-(lease.ceiling_bytes-lease.acknowledged_bytes),0),available);
     UPDATE quota_v2_reservations
