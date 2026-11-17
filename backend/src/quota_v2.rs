@@ -103,11 +103,17 @@ pub async fn issue(
             .get("panelUsedBytes")
             .and_then(Value::as_i64)
             .ok_or_else(conflict)?;
-        let target = user
-            .get("offlineBudgetBytes")
-            .and_then(Value::as_i64)
-            .unwrap_or(0)
-            .clamp(0, 64 * 1024 * 1024);
+        let target = if user.get("onHold").and_then(Value::as_bool) == Some(true) {
+            // Waiting subscriptions must be able to make the first verified
+            // online connection. Allocate a small shared bootstrap allowance,
+            // never an unreserved offline grant across multiple nodes.
+            1024 * 1024
+        } else {
+            user.get("offlineBudgetBytes")
+                .and_then(Value::as_i64)
+                .unwrap_or(0)
+                .clamp(0, 64 * 1024 * 1024)
+        };
         let local_record = reported.get(&user_id).copied();
         let local_total = local_record.map_or(0, |item| item.used_bytes);
 
