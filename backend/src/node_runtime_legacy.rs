@@ -2208,6 +2208,10 @@ async fn compile_node_profile(
 #[serde(deny_unknown_fields)]
 struct DesiredConfigRequest {
     node_id: i64,
+    #[serde(default, alias = "quotaProtocolVersion")]
+    quota_protocol_version: Option<u8>,
+    #[serde(default, alias = "quotaLocalCounters")]
+    quota_local_counters: Option<Vec<crate::quota_v2::LocalQuotaCounter>>,
 }
 
 /// Authenticated, outbound-only desired Xray configuration retrieval.
@@ -2235,6 +2239,15 @@ pub async fn desired_config(
         "/api/v1/node/desired-config",
     )
     .await?;
+    // Operators must upgrade the entire serving fleet before enabling the
+    // shared reservation protocol. Older agents cannot safely mix v1 grants
+    // with v2 leases for the same globally limited user.
+    if crate::quota_v2::enabled() && request.quota_protocol_version != Some(2) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Quota-v2 requires an upgraded node agent.",
+        ));
+    }
     // Enrollment precedes profile authoring. Authenticated nodes without a
     // profile receive a non-successful-to-apply but healthy pending response.
     // Never sign or issue a policy while no Xray configuration exists.
@@ -2274,6 +2287,16 @@ pub async fn desired_config(
     } = compile_node_profile(&state, request.node_id).await?;
     let mut policy =
         build_offline_policy(&config, &users, request.node_id, now, &digest, active_nodes);
+    if crate::quota_v2::enabled() {
+        crate::quota_v2::issue(
+            &state.pool,
+            request.node_id,
+            &mut policy,
+            request.quota_local_counters.as_deref().unwrap_or(&[]),
+            now,
+        )
+        .await?;
+    }
     if let Some(tls) = tls_provision {
         policy["tlsProvision"] = tls;
     }
