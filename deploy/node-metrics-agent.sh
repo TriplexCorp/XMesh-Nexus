@@ -173,7 +173,7 @@ fi
 # Distinct users with a verified Xray byte delta in the previous 45 seconds.
 # No counters / first baseline / reset -> unknown or zero only after a valid baseline.
 online_count=""
-if [[ "$USER_STATS_STATUS" == verified || "$USER_STATS_STATUS" == direct ]]; then
+if [[ "$USER_STATS_STATUS" == verified ]]; then
   online_count="$(printf '%s' "$payload" | python3 -c '
 import json,sys,time,os,tempfile
 path=sys.argv[1]
