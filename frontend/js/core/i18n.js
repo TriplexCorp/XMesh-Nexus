@@ -15,6 +15,9 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.": "Cannot reset quota v2: some nodes still hold unacknowledged traffic reservations.",
+    "Переключение безлимита при квотах v2 требует обновления всех нод.": "Switching to or from unlimited quota v2 requires coordinated updates across all nodes.",
+    "Новый лимит меньше уже потраченного и зарезервированного трафика на нодах.": "The new limit is lower than traffic already spent or reserved on nodes.",
     "Сброс трафика при квотах v2 требует согласования с нодами; счётчики не изменены.": "Quota-v2 traffic reset requires node reconciliation; counters were not changed.",
     "Добавьте новую публичную точку доступа в XMesh Nexus": "Add a new public endpoint to XMesh Nexus",
     "Создать хост": "Create host",
