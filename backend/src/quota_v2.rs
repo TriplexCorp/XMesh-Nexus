@@ -138,9 +138,24 @@ pub async fn issue(
             }
             (meter, reservation)
         } else {
-            // First cutover: the durable counter's existing absolute value is
-            // a baseline already reflected in panel usage, not fresh spending.
-            if local_record.is_some_and(|counter| counter.epoch.is_some()) {
+            // Refuse migration while durable Node bytes have not reached the
+            // authenticated telemetry baseline. Otherwise old unreported
+            // spending could be reclassified as a free initial quota offset.
+            let observed = sqlx::query(
+                "SELECT last_uplink_bytes,last_downlink_bytes
+                 FROM user_node_traffic_totals
+                 WHERE node_id=$1 AND user_id=$2 FOR SHARE"
+            ).bind(node_id).bind(user_id).fetch_optional(&mut *tx).await?;
+            let observed_total = if let Some(row) = observed {
+                let up: i64 = row.try_get("last_uplink_bytes")?;
+                let down: i64 = row.try_get("last_downlink_bytes")?;
+                up.checked_add(down).ok_or_else(conflict)?
+            } else {
+                0
+            };
+            if local_total != observed_total
+                || local_record.is_some_and(|counter| counter.epoch.is_some())
+            {
                 return Err(conflict());
             }
             (uuid::Uuid::new_v4().to_string(), uuid::Uuid::new_v4().to_string())
