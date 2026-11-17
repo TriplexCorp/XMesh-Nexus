@@ -440,6 +440,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
             get(quota_v2::revocation_status).post(quota_v2::request_node_revocation),
         )
         .route(
+            "/users/{id}/quota-v2/conservative-burn",
+            post(quota_v2::burn_revoked_reservation),
+        )
+        .route(
             "/users/{id}/node-quotas",
             get(node_user_quotas::get_for_user),
         )
