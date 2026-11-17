@@ -49,6 +49,44 @@ def require(actual, expected, label):
     print("PASS:", label)
 
 
+def verified_ledger(node_id, user_id):
+    """Inspect only disposable PostgreSQL ledgers; no production DB connection.
+
+    The test's pinned compose project and local-only API are mandatory. Use
+    psql inside the throwaway db container; no secrets or SQL in stdout.
+    """
+    assert os.getenv("XMESH_AUDIT_DISPOSABLE") == "1"
+    assert BASE == "http://127.0.0.1:8080"
+    assert type(node_id) is int and node_id > 0
+    assert type(user_id) is int and user_id > 0
+    assert os.getenv("COMPOSE_PROJECT_NAME") == "xmesh-telemetry-scope"
+    query = f"""
+    SELECT json_build_object(
+      'user', (SELECT json_build_object(
+         'lastUp', last_uplink_bytes, 'lastDown', last_downlink_bytes,
+         'up', uplink_bytes, 'down', downlink_bytes)
+         FROM user_node_traffic_totals WHERE node_id={node_id} AND user_id={user_id}),
+      'quota', (SELECT json_build_object('up', uplink_bytes, 'down', downlink_bytes)
+         FROM user_node_quota_lifetime WHERE node_id={node_id} AND user_id={user_id}),
+      'inbound', (SELECT json_build_object(
+         'lastUp', last_uplink_bytes, 'lastDown', last_downlink_bytes,
+         'up', uplink_bytes, 'down', downlink_bytes)
+         FROM user_inbound_traffic_totals
+         WHERE node_id={node_id} AND user_id={user_id} AND inbound_tag='DE_VLESS'),
+      'deltas', (SELECT json_build_object(
+         'up', COALESCE(SUM(uplink_bytes),0)::BIGINT,
+         'down', COALESCE(SUM(downlink_bytes),0)::BIGINT)
+         FROM verified_traffic_deltas
+         WHERE node_id={node_id} AND user_id={user_id} AND source_type='user')
+    )::text;
+    """
+    response = subprocess.run(
+        ["docker", "compose", "exec", "-T", "db", "sh", "-c",
+         'PGPASSWORD="$POSTGRES_PASSWORD" exec psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d xmesh'],
+        input=query, text=True, capture_output=True, check=True, timeout=25)
+    return json.loads(response.stdout.strip())
+
+
 def main():
     code, auth, cookie = api("POST", "/auth/login",
         {"username": os.getenv("ADMIN_USERNAME", "admin"),
@@ -116,13 +154,14 @@ def main():
         }
         sampled_at_ms = int(time.time() * 1000)
 
-        def send_signed(user_rows=None, inbound_rows=None):
+        def send_signed(user_rows=None, inbound_rows=None, *,
+                        source_override=None, status="verified", return_body=False):
             nonlocal sampled_at_ms
             sampled_at_ms = max(sampled_at_ms + 1, int(time.time() * 1000))
             payload = {
                 "node_id": node_id,
-                "userStatsStatus": "verified",
-                "userStatsAtMs": sampled_at_ms
+                "userStatsStatus": status,
+                "userStatsAtMs": sampled_at_ms if source_override is None else source_override
             }
             if user_rows is not None:
                 payload["userTraffic"] = user_rows
@@ -139,7 +178,8 @@ def main():
             headers = {"X-XMesh-Timestamp": str(stamp),
                        "X-XMesh-Nonce": nonce,
                        "X-XMesh-Signature": signature.hex()}
-            return api("POST", "/metrics/ingest", payload, headers=headers)[0]
+            code, response, _ = api("POST", "/metrics/ingest", payload, headers=headers)
+            return (code, response) if return_body else code
 
         require(send_signed([{"userId": unrelated, "uplinkBytes": 1024,
                               "downlinkBytes": 1024}]), 403,
@@ -219,6 +259,89 @@ def main():
         user = next(u for u in snapshot["items"] if u["id"]==second)
         assert user["hold"] is False and user.get("firstConnectedAt")
         print("PASS: assignment revocation rejects delayed batches atomically; restored scope works")
+
+        # Previous valid user-traffic baseline: (64,128); after restoration the
+        # accepted (128,256) packet must charge ONLY (64,128), not historical
+        # counters which were rejected while this user was assigned elsewhere.
+        expected = {"lastUp": 128, "lastDown": 256, "up": 64, "down": 128}
+        ledger = verified_ledger(node_id, assigned)
+        assert ledger["user"] == expected, ("Wrong physical meter delta", ledger)
+        assert ledger["quota"] == {"up": 64, "down": 128}, ledger
+        assert ledger["deltas"] == {"up": 64, "down": 128}, ledger
+        assert ledger["inbound"] == {
+            "lastUp": 4, "lastDown": 8, "up": 0, "down": 0,
+        }, ledger
+        print("PASS: exact signed user/quota/delta ledgers charge (64,128) once")
+
+        # A lost ACK can cause the same cumulative counters to be resent.
+        # Freshly signed, repeated numbers must not consume another byte.
+        require(send_signed([{"userId": assigned, "uplinkBytes": 128,
+                              "downlinkBytes": 256}]), 201,
+                "accept retransmitted cumulative counters after lost response")
+        assert verified_ledger(node_id, assigned) == ledger
+        print("PASS: duplicate accepted cumulative snapshot charges zero bytes")
+
+        # An old producer timestamp remains signed correctly but is rejected
+        # for user accounting, even if its numeric counters are much larger.
+        seen_source = sampled_at_ms
+        code, response = send_signed([{
+            "userId": assigned, "uplinkBytes": 99999, "downlinkBytes": 99999,
+        }], source_override=seen_source, return_body=True)
+        require(code, 201, "ignore stale signed sample while retaining node health")
+        assert response["userTrafficSamples"] == 0, response
+        assert verified_ledger(node_id, assigned) == ledger
+        print("PASS: out-of-order signed sample did not move any meter baseline")
+
+        # During a disconnected/signed-snapshot-unavailable interval the new
+        # worker must submit node-wide health only, not fabricated zero usage.
+        require(send_signed(status="unavailable"), 201,
+                "allow node-wide health without scoped user counters")
+        assert verified_ledger(node_id, assigned) == ledger
+        print("PASS: missing scoped snapshot did not reset or charge usage")
+
+        # Xray restart: a smaller cumulative counter becomes a new baseline;
+        # the following fresh positive sample is the only newly charged usage.
+        require(send_signed([{"userId": assigned, "uplinkBytes": 9,
+                              "downlinkBytes": 7}]), 201,
+                "start fresh monotonic baseline after Xray restart")
+        reset = verified_ledger(node_id, assigned)
+        assert reset["user"] == {
+            "lastUp": 9, "lastDown": 7, "up": 64, "down": 128,
+        }, reset
+        assert reset["quota"] == ledger["quota"], reset
+        assert reset["deltas"] == ledger["deltas"], reset
+
+        require(send_signed([{"userId": assigned, "uplinkBytes": 15,
+                              "downlinkBytes": 12}]), 201,
+                "charge only new bytes after the Xray restart")
+        charged = verified_ledger(node_id, assigned)
+        assert charged["user"] == {
+            "lastUp": 15, "lastDown": 12, "up": 70, "down": 133,
+        }, charged
+        assert charged["quota"] == {"up": 70, "down": 133}, charged
+        assert charged["deltas"] == {"up": 70, "down": 133}, charged
+        assert charged["inbound"] == ledger["inbound"], charged
+        print("PASS: Xray restart/positive delta and quota accounting are exact")
+
+        # Inbound is a separate meter, never added again to user totals or
+        # per-node quota. Baseline (4,8) + (10,10) in two directions.
+        require(send_signed(inbound_rows=[{
+            "userId": assigned, "inboundTag": "DE_VLESS",
+            "uplinkBytes": 14, "downlinkBytes": 18,
+        }]), 201, "charge only signed inbound-specific traffic once")
+        final = verified_ledger(node_id, assigned)
+        assert final["inbound"] == {
+            "lastUp": 14, "lastDown": 18, "up": 10, "down": 10,
+        }, final
+        assert final["user"] == charged["user"], final
+        assert final["quota"] == charged["quota"], final
+        require(send_signed(inbound_rows=[{
+            "userId": assigned, "inboundTag": "DE_VLESS",
+            "uplinkBytes": 14, "downlinkBytes": 18,
+        }]), 201, "duplicate inbound report is idempotent")
+        assert verified_ledger(node_id, assigned) == final
+        print("PASS: inbound/accounting separation prevents double charge")
+
 
 
 if __name__ == "__main__":
