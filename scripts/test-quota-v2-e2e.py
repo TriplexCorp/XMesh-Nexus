@@ -368,6 +368,34 @@ def main():
         check(code,409,"deny quota decrease using verified traffic even before signed receipt")
         assert account()==(settled,held,limit)
         print("PASS: quota reduction charges pending verified telemetry plus outstanding holds")
+
+        # Operator issues a durable, idempotent stop intent scoped to A's
+        # current signed grant. Until physical Xray stop is proven, both
+        # nodes' remaining spending allowances are still fully held.
+        reserved_before=account()
+        body={"nodeId":a.id}
+        code, intent, _=api("POST",f"/users/{uid}/quota-v2/revocation",body,cookie)
+        check(code,202,"start a lease-bound revocation with NO refunded bytes")
+        assert intent["state"]=="pending_node_stop" and intent["refundedBytes"]==0,intent
+        code, repeated, _=api("POST",f"/users/{uid}/quota-v2/revocation",body,cookie)
+        check(code,202,"repeat the same intent idempotently")
+        assert repeated["requestId"]==intent["requestId"],(repeated,intent)
+        assert account()==reserved_before
+        time.sleep(0.03)
+        stopped,stop_doc=a.desired(uid,lease_a["ceilingBytes"],grant_a)
+        deny=stopped["users"][0]["quotaRevocation"]
+        assert deny["requestId"]==intent["requestId"]
+        assert deny["epoch"]==intent["epoch"]
+        assert deny["reservationId"]==intent["reservationId"]
+        effective,a.ledger,blocked=guard.enforce(
+            stopped,stop_doc["config"],a.ledger,{key:0},
+            "xray-restarted-a",False,stopped["issuedAtMs"])
+        assert blocked.get(stopped["users"][0]["xrayId"])=="quota-revocation-pending",blocked
+        assert not effective["inbounds"][0]["settings"]["clients"]
+        # This is a *prepared* decision only; no refund before a separate
+        # verified runtime stop proof and final durable meter.
+        assert account()==reserved_before
+        print("PASS: signed denial is user/lease scoped, durable and never prematurely refunded")
     print("Two-node quota-v2 API/guard/PostgreSQL acceptance: PASS")
 
 if __name__=="__main__":
