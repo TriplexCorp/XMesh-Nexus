@@ -246,9 +246,6 @@ async fn lease_identity(
         } else {
             0
         };
-        if local_total != observed_total {
-            return Err(conflict());
-        }
         // A new user quota epoch may start only after the previous account
         // was explicitly closed with ALL issued ceilings fully settled.
         // Reuse the durable meter incarnation and its absolute raw baseline:
@@ -282,6 +279,11 @@ async fn lease_identity(
             }
             old_meter.to_owned()
         } else {
+            // First enrollment has no earlier signed lease: compare against
+            // the verified initial telemetry baseline before reserving bytes.
+            if local_total != observed_total {
+                return Err(conflict());
+            }
             uuid::Uuid::new_v4().to_string()
         };
         (meter, uuid::Uuid::new_v4().to_string(), false)
