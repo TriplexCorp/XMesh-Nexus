@@ -182,7 +182,7 @@ def main():
         def account():
             return tuple(map(int,query(
                 "SELECT settled_bytes||','||"
-                "(SELECT COALESCE(SUM(ceiling_bytes-acknowledged_bytes),0)"
+                "(SELECT COALESCE(SUM(ceiling_bytes-GREATEST(acknowledged_bytes,conservative_burn_floor_bytes)),0)"
                 " FROM quota_v2_reservations WHERE user_id="+str(uid)+")||','||limit_bytes"
                 " FROM quota_v2_accounts WHERE user_id="+str(uid)+" AND NOT closed"
             ).split(",")))
