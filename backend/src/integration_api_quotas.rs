@@ -227,7 +227,7 @@ async fn apply(
     crate::validate_record("users", &user).map_err(Problem::from)?;
     if policy.contains_key("limit") {
         crate::quota_v2::validate_limit_change(
-            &mut **tx,
+            tx,
             id,
             prior_limit,
             user.get("limit").and_then(Value::as_f64).unwrap_or(0.0),
