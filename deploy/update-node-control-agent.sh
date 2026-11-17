@@ -138,7 +138,7 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 assert 'permitted' in inspect.signature(module.store_metrics_snapshot).parameters
 assert callable(module.committed_snapshot_scope)
-print('Verified installed v6.0.12 signed-scope policy base')
+print('Verified installed v6.0.13 signed-scope policy base')
 PY
 install -o root -g root -m 0700 "$hot_tmp" /usr/local/libexec/.xmesh-hot-user-reconcile.new; mv -f /usr/local/libexec/.xmesh-hot-user-reconcile.new /usr/local/libexec/xmesh-hot-user-reconcile.py
 install -o root -g root -m 0700 "$geo_tmp" /usr/local/libexec/.xmesh-geodata-sync.new; mv -f /usr/local/libexec/.xmesh-geodata-sync.new /usr/local/libexec/xmesh-geodata-sync.py
