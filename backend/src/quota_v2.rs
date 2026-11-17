@@ -164,6 +164,124 @@ async fn ensure_account(
     Ok(epoch)
 }
 
+async fn confirm_existing_lease(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    epoch: &str,
+    local_record: Option<&LocalQuotaCounter>,
+    local_total: i64,
+    row: sqlx::postgres::PgRow,
+) -> Result<(String, String, bool), ApiError> {
+    let meter: String = row.try_get("meter_epoch")?;
+    let reservation: String = row.try_get("reservation_id")?;
+    let confirmed: bool = row.try_get("node_confirmed")?;
+    let presented = local_record.is_some_and(|received| {
+        received.epoch.as_deref() == Some(epoch)
+            && received.meter_epoch.as_deref() == Some(meter.as_str())
+            && received.reservation_id.as_deref() == Some(reservation.as_str())
+    });
+    if presented {
+        if !confirmed {
+            // Only a subsequent authenticated echo of the durable prepared
+            // identity may unlock the reserved offline spending allowance.
+            sqlx::query(
+                "UPDATE quota_v2_reservations SET node_confirmed=TRUE
+                 WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
+                   AND meter_epoch=$4::uuid AND reservation_id=$5::uuid",
+            )
+            .bind(user_id)
+            .bind(epoch)
+            .bind(node_id)
+            .bind(&meter)
+            .bind(&reservation)
+            .execute(&mut *conn)
+            .await?;
+        }
+        return Ok((meter, reservation, true));
+    }
+    let lacks_identity = local_record.is_none_or(|record| {
+        record.epoch.is_none()
+            && record.meter_epoch.is_none()
+            && record.reservation_id.is_none()
+    });
+    let ack: i64 = row.try_get("acknowledged_bytes")?;
+    let ceiling: i64 = row.try_get("ceiling_bytes")?;
+    // A lost first HTTP response can recover an unfunded lease; losing an
+    // already funded journal must never mint an additional grant.
+    if confirmed || !lacks_identity || ceiling != ack || local_total != ack {
+        return Err(conflict());
+    }
+    Ok((meter, reservation, false))
+}
+
+async fn confirm_closed_epoch(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    previous: &LocalQuotaCounter,
+    local_total: i64,
+) -> Result<String, ApiError> {
+    let old_epoch = previous.epoch.as_deref().ok_or_else(conflict)?;
+    let old_meter = previous.meter_epoch.as_deref().ok_or_else(conflict)?;
+    let old_reservation = previous.reservation_id.as_deref().ok_or_else(conflict)?;
+    let historical = sqlx::query(
+        "SELECT r.acknowledged_bytes,r.ceiling_bytes,a.closed
+         FROM quota_v2_reservations r
+         JOIN quota_v2_accounts a ON a.user_id=r.user_id AND a.epoch=r.epoch
+         WHERE r.user_id=$1 AND r.node_id=$2 AND r.epoch=$3::uuid
+           AND r.meter_epoch=$4::uuid AND r.reservation_id=$5::uuid
+         FOR SHARE OF r,a",
+    )
+    .bind(user_id)
+    .bind(node_id)
+    .bind(old_epoch)
+    .bind(old_meter)
+    .bind(old_reservation)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(conflict)?;
+    let closed: bool = historical.try_get("closed")?;
+    let ack: i64 = historical.try_get("acknowledged_bytes")?;
+    let ceiling: i64 = historical.try_get("ceiling_bytes")?;
+    if !closed || ceiling != ack || local_total != ack {
+        return Err(conflict());
+    }
+    // Keep the durable absolute meter incarnation across the reset. The
+    // cumulative Node journal is not comparable to raw post-restart Xray
+    // counters; the authenticated old receipt is the trusted baseline.
+    Ok(old_meter.to_owned())
+}
+
+async fn verify_initial_meter(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    local_total: i64,
+) -> Result<String, ApiError> {
+    // Initial enrollment cannot treat unreported old usage as free budget.
+    let observed = sqlx::query(
+        "SELECT last_uplink_bytes,last_downlink_bytes
+         FROM user_node_traffic_totals
+         WHERE node_id=$1 AND user_id=$2 FOR SHARE",
+    )
+    .bind(node_id)
+    .bind(user_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let observed_total = if let Some(row) = observed {
+        let up: i64 = row.try_get("last_uplink_bytes")?;
+        let down: i64 = row.try_get("last_downlink_bytes")?;
+        up.checked_add(down).ok_or_else(conflict)?
+    } else {
+        0
+    };
+    if local_total != observed_total {
+        return Err(conflict());
+    }
+    Ok(uuid::Uuid::new_v4().to_string())
+}
+
 async fn lease_identity(
     conn: &mut sqlx::PgConnection,
     user_id: i64,
@@ -175,120 +293,28 @@ async fn lease_identity(
     let existing = sqlx::query(
         "SELECT meter_epoch::text AS meter_epoch,reservation_id::text AS reservation_id,
                 node_confirmed,acknowledged_bytes,ceiling_bytes
-             FROM quota_v2_reservations
-             WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
-             ORDER BY valid_until DESC LIMIT 1 FOR UPDATE",
+         FROM quota_v2_reservations
+         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
+         ORDER BY valid_until DESC LIMIT 1 FOR UPDATE",
     )
     .bind(user_id)
     .bind(epoch)
     .bind(node_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let (meter, reservation, confirmed) = if let Some(row) = existing {
-        let meter: String = row.try_get("meter_epoch")?;
-        let reservation: String = row.try_get("reservation_id")?;
-        let confirmed: bool = row.try_get("node_confirmed")?;
-        let presented = local_record.is_some_and(|received| {
-            received.epoch.as_deref() == Some(epoch)
-                && received.meter_epoch.as_deref() == Some(meter.as_str())
-                && received.reservation_id.as_deref() == Some(reservation.as_str())
-        });
-        if presented {
-            if !confirmed {
-                // Only a subsequent signed node request proving durable
-                // receipt of the prepared identity may unlock the budget.
-                sqlx::query(
-                    "UPDATE quota_v2_reservations SET node_confirmed=TRUE
-                     WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
-                       AND meter_epoch=$4::uuid AND reservation_id=$5::uuid",
-                )
-                .bind(user_id)
-                .bind(epoch)
-                .bind(node_id)
-                .bind(&meter)
-                .bind(&reservation)
-                .execute(&mut *conn)
-                .await?;
-            }
-            (meter, reservation, true)
-        } else {
-            let lacks_identity = local_record.is_none_or(|record| {
-                record.epoch.is_none()
-                    && record.meter_epoch.is_none()
-                    && record.reservation_id.is_none()
-            });
-            let ack: i64 = row.try_get("acknowledged_bytes")?;
-            let ceiling: i64 = row.try_get("ceiling_bytes")?;
-            // A lost first response must be recoverable, but a lost
-            // already-funded node journal must not mint a second budget.
-            if confirmed || !lacks_identity || ceiling != ack || local_total != ack {
-                return Err(conflict());
-            }
-            (meter, reservation, false)
-        }
-    } else {
-        // Refuse migration while durable Node bytes have not reached the
-        // authenticated telemetry baseline. Otherwise old unreported
-        // spending could be reclassified as a free initial quota offset.
-        let observed = sqlx::query(
-            "SELECT last_uplink_bytes,last_downlink_bytes
-                 FROM user_node_traffic_totals
-                 WHERE node_id=$1 AND user_id=$2 FOR SHARE",
+    if let Some(row) = existing {
+        return confirm_existing_lease(
+            conn, user_id, node_id, epoch, local_record, local_total, row,
         )
-        .bind(node_id)
-        .bind(user_id)
-        .fetch_optional(&mut *conn)
-        .await?;
-        let observed_total = if let Some(row) = observed {
-            let up: i64 = row.try_get("last_uplink_bytes")?;
-            let down: i64 = row.try_get("last_downlink_bytes")?;
-            up.checked_add(down).ok_or_else(conflict)?
-        } else {
-            0
-        };
-        // A new user quota epoch may start only after the previous account
-        // was explicitly closed with ALL issued ceilings fully settled.
-        // Reuse the durable meter incarnation and its absolute raw baseline:
-        // never reset local totals or replay old usage into the new epoch.
-        let meter = if let Some(previous) = local_record.filter(|row| row.epoch.is_some()) {
-            let old_epoch = previous.epoch.as_deref().ok_or_else(conflict)?;
-            let old_meter = previous.meter_epoch.as_deref().ok_or_else(conflict)?;
-            let old_reservation = previous.reservation_id.as_deref().ok_or_else(conflict)?;
-            let historical = sqlx::query(
-                "SELECT r.acknowledged_bytes,r.ceiling_bytes,a.closed
-                 FROM quota_v2_reservations r
-                 JOIN quota_v2_accounts a
-                   ON a.user_id=r.user_id AND a.epoch=r.epoch
-                 WHERE r.user_id=$1 AND r.node_id=$2 AND r.epoch=$3::uuid
-                   AND r.meter_epoch=$4::uuid AND r.reservation_id=$5::uuid
-                 FOR SHARE OF r,a",
-            )
-            .bind(user_id)
-            .bind(node_id)
-            .bind(old_epoch)
-            .bind(old_meter)
-            .bind(old_reservation)
-            .fetch_optional(&mut *conn)
-            .await?
-            .ok_or_else(conflict)?;
-            let closed: bool = historical.try_get("closed")?;
-            let ack: i64 = historical.try_get("acknowledged_bytes")?;
-            let ceiling: i64 = historical.try_get("ceiling_bytes")?;
-            if !closed || ceiling != ack || local_total != ack {
-                return Err(conflict());
-            }
-            old_meter.to_owned()
-        } else {
-            // First enrollment has no earlier signed lease: compare against
-            // the verified initial telemetry baseline before reserving bytes.
-            if local_total != observed_total {
-                return Err(conflict());
-            }
-            uuid::Uuid::new_v4().to_string()
-        };
-        (meter, uuid::Uuid::new_v4().to_string(), false)
+        .await;
+    }
+    // Every fresh epoch starts unfunded and must be re-acknowledged by Node.
+    let meter = if let Some(previous) = local_record.filter(|row| row.epoch.is_some()) {
+        confirm_closed_epoch(conn, user_id, node_id, previous, local_total).await?
+    } else {
+        verify_initial_meter(conn, user_id, node_id, local_total).await?
     };
-    Ok((meter, reservation, confirmed))
+    Ok((meter, uuid::Uuid::new_v4().to_string(), false))
 }
 
 async fn issue_user(
