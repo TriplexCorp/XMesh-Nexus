@@ -1431,12 +1431,11 @@ async fn update_record(
     // This check runs under the user's FOR UPDATE record lock; issuance also
     // takes a FOR SHARE lock, preventing an account-creation race.
     if collection == "users" && patch_object.contains_key("used") {
-        let has_v2_history: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM quota_v2_accounts WHERE user_id=$1)",
-        )
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
+        let has_v2_history: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM quota_v2_accounts WHERE user_id=$1)")
+                .bind(id)
+                .fetch_one(&mut *tx)
+                .await?;
         if has_v2_history {
             return Err(ApiError::new(
                 StatusCode::CONFLICT,
