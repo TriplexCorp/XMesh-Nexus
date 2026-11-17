@@ -87,3 +87,42 @@ BEGIN
     RETURN lease;
 END;
 $$;
+
+-- Settle independently authenticated node receipts; unlike reserve(), this
+-- function never issues or renews any allowance. It is safe for delayed
+-- receipts from an expired or closed epoch.
+CREATE FUNCTION quota_v2_ack(
+    p_user BIGINT, p_epoch UUID, p_node BIGINT, p_meter UUID,
+    p_id UUID, p_total BIGINT
+) RETURNS quota_v2_reservations LANGUAGE plpgsql AS $$
+DECLARE
+    account quota_v2_accounts;
+    lease quota_v2_reservations;
+    delta BIGINT;
+BEGIN
+    IF p_total < 0 THEN
+        RAISE EXCEPTION 'invalid quota receipt' USING ERRCODE='22023';
+    END IF;
+    SELECT * INTO STRICT account FROM quota_v2_accounts
+      WHERE user_id=p_user AND epoch=p_epoch FOR UPDATE;
+    SELECT * INTO STRICT lease FROM quota_v2_reservations
+      WHERE user_id=p_user AND epoch=p_epoch AND node_id=p_node AND meter_epoch=p_meter
+      FOR UPDATE;
+    IF lease.reservation_id != p_id THEN
+        RAISE EXCEPTION 'quota receipt lease identity mismatch' USING ERRCODE='22023';
+    END IF;
+    delta := GREATEST(p_total-lease.acknowledged_bytes,0);
+    IF delta > 0 THEN
+        UPDATE quota_v2_accounts
+           SET settled_bytes=settled_bytes+delta
+         WHERE user_id=p_user AND epoch=p_epoch;
+        UPDATE quota_v2_reservations
+           SET acknowledged_bytes=p_total,
+               -- Reconcile in-flight overshoot as consumed, NOT as a grant.
+               ceiling_bytes=GREATEST(ceiling_bytes,p_total)
+         WHERE user_id=p_user AND epoch=p_epoch AND node_id=p_node AND meter_epoch=p_meter
+         RETURNING * INTO lease;
+    END IF;
+    RETURN lease;
+END;
+$$;
