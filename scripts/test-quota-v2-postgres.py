@@ -61,6 +61,23 @@ class ReservationTests(unittest.TestCase):
         self.assertEqual(self.reserve(1), first)
         self.assertEqual(self.state(), (50,90))
 
+    def test_observed_traffic_floor_is_not_added_twice_to_signed_receipts(self):
+        self.assertEqual(self.reserve(1),(50,0))
+        with psycopg.connect(DSN) as c:
+            c.execute(
+                "UPDATE quota_v2_accounts SET observed_floor_bytes=20 WHERE user_id=%s",
+                (self.uid,))
+        # A's 20 verified bytes arrived before its signed receipt; they
+        # constrain B's first lease, without increasing settled_bytes.
+        self.assertEqual(self.reserve(2),(30,0))
+        self.assertEqual(self.state(),(0,80))
+        # Once the actual Node receipt arrives, the 20-byte floor does not
+        # create a SECOND charge for the same 20 bytes.
+        self.assertEqual(self.reserve(1,ack=20),(70,20))
+        self.assertEqual(self.state(),(20,80))
+        self.assertEqual(self.reserve(2),(30,0))
+        self.assertEqual(self.state(),(20,80))
+
     def test_authenticated_overshoot_is_charged_not_refunded(self):
         self.reserve(1)
         self.reserve(2)
