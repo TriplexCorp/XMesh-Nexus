@@ -203,7 +203,12 @@ class ReservationTests(unittest.TestCase):
         self.assertEqual(self.ack(1,53),(53,53))
         self.assertEqual(self.economic_state(),(53,50))
         self.assertEqual(self.reserve(2,target=90),(50,0))
-        self.assertEqual(self.burn(1),first)
+        # Late genuine Node receipts advance actual meters, but historical
+        # burned liability cannot be enlarged by replaying the operator action.
+        after_late=self.burn(1)
+        self.assertEqual(after_late[0],53)
+        self.assertEqual(after_late[1:],first[1:])
+        self.assertEqual(self.economic_state(),(53,50))
 
     def test_burn_requires_exact_durable_revocation_and_preserves_state(self):
         self.reserve(1)
