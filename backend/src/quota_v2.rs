@@ -272,12 +272,16 @@ pub async fn burn_revoked_reservation(
     Json(body): Json<ConservativeBurnRequest>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     if actor.role != "owner" {
-        return Err(ApiError::new(StatusCode::FORBIDDEN, "Owner approval required."));
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Owner approval required.",
+        ));
     }
     if !enabled() {
         return Err(ApiError::new(StatusCode::CONFLICT, "Quota-v2 is disabled."));
     }
-    if user_id <= 0 || body.node_id <= 0
+    if user_id <= 0
+        || body.node_id <= 0
         || body.confirmation != "CHARGE_ALL_REMAINING_BYTES_NO_REFUND"
         || uuid::Uuid::parse_str(&body.request_id).is_err()
     {
@@ -704,8 +708,10 @@ async fn confirm_closed_epoch(
     // A conservative burn is prepaid liability, NOT a fabricated Node meter.
     // Keep the actual monotonic cursor; new signed capacity cannot be issued
     // if a late actual overrun outruns the old prepaid ceiling.
-    if !closed || ceiling != ack.max(burn_floor)
-        || local_total < ack || local_total > ack.max(burn_floor)
+    if !closed
+        || ceiling != ack.max(burn_floor)
+        || local_total < ack
+        || local_total > ack.max(burn_floor)
         || (burn_floor == 0 && local_total != ack)
     {
         return Err(conflict());
