@@ -27,7 +27,7 @@ assert.equal(agentVersionRaw,'control-v6.0.13','Nexus target Agent version must 
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
 assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]13"/);
-assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]13"/,
+assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]12"/,
   'rolling upgrade must keep v6.0.12 enrollable');
 assert.match(gateway,/transitionalAgentVersion\s*=\s*"control-v6[.]0[.]11"/,
   'existing v6.0.11 nodes must remain enrollable');
