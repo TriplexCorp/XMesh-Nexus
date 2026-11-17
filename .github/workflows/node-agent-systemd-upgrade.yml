@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: a081609cc76ee4e58c9edc15a537efa92e069318
+          ref: dd76cd4a230e2303860dd20e5e0b9fde872ecb2c
           path: .ci-new-node
           persist-credentials: false
       - name: Prove installed helper migration under real Ubuntu systemd
