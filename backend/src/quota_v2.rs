@@ -265,6 +265,119 @@ pub struct ConservativeBurnRequest {
     confirmation: String,
 }
 
+struct BurnResult {
+    epoch: String,
+    reservation: String,
+    charged: i64,
+    actual: i64,
+    ceiling: i64,
+    already: bool,
+}
+
+fn burn_reply(user_id: i64, node_id: i64, request_id: &str, result: BurnResult) -> (StatusCode, Json<Value>) {
+    (
+        StatusCode::OK,
+        Json(json!({
+            "state":"conservatively_charged","userId":user_id,
+            "nodeId":node_id,"requestId":request_id,
+            "accountEpoch":result.epoch,"reservationId":result.reservation,
+            "chargedBytes":result.charged,"acknowledgedBytes":result.actual,
+            "ceilingBytes":result.ceiling,"alreadyCharged":result.already,
+            "refundedBytes":0,"finalMeterVerified":false,
+            "note":"All remaining bytes are permanently charged, not refunded; no final Node meter was claimed."
+        })),
+    )
+}
+
+async fn historical_burn(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    request_id: &str,
+) -> Result<Option<BurnResult>, ApiError> {
+    let history = sqlx::query(
+        "SELECT r.epoch::text AS epoch,r.reservation_id::text AS reservation_id,
+                r.conservative_burned_bytes,r.acknowledged_bytes,r.ceiling_bytes
+         FROM quota_v2_revocation_requests req
+         JOIN quota_v2_reservations r
+           ON r.user_id=req.user_id AND r.epoch=req.epoch
+          AND r.node_id=req.node_id AND r.meter_epoch=req.meter_epoch
+          AND r.reservation_id=req.reservation_id
+         WHERE req.user_id=$1 AND req.node_id=$2 AND req.request_id=$3::uuid
+           AND r.conservative_burned_at IS NOT NULL",
+    )
+    .bind(user_id)
+    .bind(node_id)
+    .bind(request_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some(row) = history else {
+        return Ok(None);
+    };
+    Ok(Some(BurnResult {
+        epoch: row.try_get("epoch")?,
+        reservation: row.try_get("reservation_id")?,
+        charged: row.try_get("conservative_burned_bytes")?,
+        actual: row.try_get("acknowledged_bytes")?,
+        ceiling: row.try_get("ceiling_bytes")?,
+        already: true,
+    }))
+}
+
+async fn charge_burn(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    request_id: &str,
+) -> Result<BurnResult, ApiError> {
+    let account = sqlx::query(
+        "SELECT epoch::text AS epoch FROM quota_v2_accounts
+         WHERE user_id=$1 AND NOT closed FOR UPDATE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(conflict)?;
+    let epoch: String = account.try_get("epoch")?;
+    let lease = sqlx::query(
+        "SELECT meter_epoch::text AS meter_epoch,
+                reservation_id::text AS reservation_id,
+                conservative_burned_at IS NOT NULL AS was_burned
+         FROM quota_v2_reservations
+         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3 FOR UPDATE",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(node_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(conflict)?;
+    let meter: String = lease.try_get("meter_epoch")?;
+    let reservation: String = lease.try_get("reservation_id")?;
+    let already: bool = lease.try_get("was_burned")?;
+    let row = sqlx::query(
+        "SELECT acknowledged_bytes,ceiling_bytes,conservative_burned_bytes
+         FROM quota_v2_burn_revoked($1,$2::uuid,$3,$4::uuid,$5::uuid,$6::uuid)",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(node_id)
+    .bind(&meter)
+    .bind(&reservation)
+    .bind(request_id)
+    .fetch_one(&mut *conn)
+    .await
+    .map_err(|_| conflict())?;
+    Ok(BurnResult {
+        epoch,
+        reservation,
+        charged: row.try_get("conservative_burned_bytes")?,
+        actual: row.try_get("acknowledged_bytes")?,
+        ceiling: row.try_get("ceiling_bytes")?,
+        already,
+    })
+}
+
 pub async fn burn_revoked_reservation(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
@@ -300,89 +413,13 @@ pub async fn burn_revoked_reservation(
     if user.is_none() {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found."));
     }
-    // An exact replay of a committed burn must remain idempotent even AFTER
-    // its account epoch is closed by a later user traffic reset. Read only
-    // the immutable burn metadata bound to this owner's exact request ID.
-    let historical = sqlx::query(
-        "SELECT r.epoch::text AS epoch,r.reservation_id::text AS reservation_id,
-                r.conservative_burned_bytes,r.acknowledged_bytes,r.ceiling_bytes
-         FROM quota_v2_revocation_requests req
-         JOIN quota_v2_reservations r
-           ON r.user_id=req.user_id AND r.epoch=req.epoch
-          AND r.node_id=req.node_id AND r.meter_epoch=req.meter_epoch
-          AND r.reservation_id=req.reservation_id
-         WHERE req.user_id=$1 AND req.node_id=$2 AND req.request_id=$3::uuid
-           AND r.conservative_burned_at IS NOT NULL",
-    )
-    .bind(user_id)
-    .bind(body.node_id)
-    .bind(&body.request_id)
-    .fetch_optional(&mut *tx)
-    .await?;
-    if let Some(history) = historical {
-        let epoch: String = history.try_get("epoch")?;
-        let reservation: String = history.try_get("reservation_id")?;
-        let charged: i64 = history.try_get("conservative_burned_bytes")?;
-        let actual: i64 = history.try_get("acknowledged_bytes")?;
-        let ceiling: i64 = history.try_get("ceiling_bytes")?;
+    if let Some(history) = historical_burn(&mut tx, user_id, body.node_id, &body.request_id).await? {
         tx.commit().await?;
-        return Ok((
-            StatusCode::OK,
-            Json(json!({
-                "state":"conservatively_charged","userId":user_id,
-                "nodeId":body.node_id,"requestId":body.request_id,
-                "accountEpoch":epoch,"reservationId":reservation,
-                "chargedBytes":charged,"acknowledgedBytes":actual,
-                "ceilingBytes":ceiling,"alreadyCharged":true,
-                "refundedBytes":0,"finalMeterVerified":false,
-                "note":"All remaining bytes are permanently charged, not refunded; no final Node meter was claimed."
-            })),
-        ));
+        return Ok(burn_reply(user_id, body.node_id, &body.request_id, history));
     }
-    let account = sqlx::query(
-        "SELECT epoch::text AS epoch FROM quota_v2_accounts
-         WHERE user_id=$1 AND NOT closed FOR UPDATE",
-    )
-    .bind(user_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(conflict)?;
-    let epoch: String = account.try_get("epoch")?;
-    let lease = sqlx::query(
-        "SELECT meter_epoch::text AS meter_epoch,
-                reservation_id::text AS reservation_id,
-                conservative_burned_at IS NOT NULL AS was_burned
-         FROM quota_v2_reservations
-         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3 FOR UPDATE",
-    )
-    .bind(user_id)
-    .bind(&epoch)
-    .bind(body.node_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(conflict)?;
-    let meter: String = lease.try_get("meter_epoch")?;
-    let reservation: String = lease.try_get("reservation_id")?;
-    let was_burned: bool = lease.try_get("was_burned")?;
-    let result = sqlx::query(
-        "SELECT acknowledged_bytes,ceiling_bytes,conservative_burned_bytes
-         FROM quota_v2_burn_revoked($1,$2::uuid,$3,$4::uuid,$5::uuid,$6::uuid)",
-    )
-    .bind(user_id)
-    .bind(&epoch)
-    .bind(body.node_id)
-    .bind(&meter)
-    .bind(&reservation)
-    .bind(&body.request_id)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(|_| conflict())?;
-    let charged: i64 = result.try_get("conservative_burned_bytes")?;
-    let actual: i64 = result.try_get("acknowledged_bytes")?;
-    let ceiling: i64 = result.try_get("ceiling_bytes")?;
-    if !was_burned {
-        // The destructive charge and its audit event are ONE transaction.
-        // Audit unavailability must roll back the entire operator action.
+    let result = charge_burn(&mut tx, user_id, body.node_id, &body.request_id).await?;
+    if !result.already {
+        // The irreversible charge and its audit event are ONE transaction.
         sqlx::query(
             "INSERT INTO panel_audit_log(actor,action,collection,record_id,detail)
              VALUES ($1,'quota-v2-conservative-burn','users',$2,$3)",
@@ -390,23 +427,12 @@ pub async fn burn_revoked_reservation(
         .bind(&actor.username)
         .bind(user_id)
         .bind(json!({"nodeId":body.node_id,"requestId":body.request_id,
-                     "chargedBytes":charged,"refundedBytes":0}))
+                     "chargedBytes":result.charged,"refundedBytes":0}))
         .execute(&mut *tx)
         .await?;
     }
     tx.commit().await?;
-    Ok((
-        StatusCode::OK,
-        Json(json!({
-            "state":"conservatively_charged","userId":user_id,
-            "nodeId":body.node_id,"requestId":body.request_id,
-            "accountEpoch":epoch,"reservationId":reservation,
-            "chargedBytes":charged,"acknowledgedBytes":actual,
-            "ceilingBytes":ceiling,"alreadyCharged":was_burned,
-            "refundedBytes":0,"finalMeterVerified":false,
-            "note":"All remaining bytes are permanently charged, not refunded; no final Node meter was claimed."
-        })),
-    ))
+    Ok(burn_reply(user_id, body.node_id, &body.request_id, result))
 }
 
 pub async fn validate_limit_change(
