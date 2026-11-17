@@ -300,6 +300,45 @@ pub async fn burn_revoked_reservation(
     if user.is_none() {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found."));
     }
+    // An exact replay of a committed burn must remain idempotent even AFTER
+    // its account epoch is closed by a later user traffic reset. Read only
+    // the immutable burn metadata bound to this owner's exact request ID.
+    let historical = sqlx::query(
+        "SELECT r.epoch::text AS epoch,r.reservation_id::text AS reservation_id,
+                r.conservative_burned_bytes,r.acknowledged_bytes,r.ceiling_bytes
+         FROM quota_v2_revocation_requests req
+         JOIN quota_v2_reservations r
+           ON r.user_id=req.user_id AND r.epoch=req.epoch
+          AND r.node_id=req.node_id AND r.meter_epoch=req.meter_epoch
+          AND r.reservation_id=req.reservation_id
+         WHERE req.user_id=$1 AND req.node_id=$2 AND req.request_id=$3::uuid
+           AND r.conservative_burned_at IS NOT NULL",
+    )
+    .bind(user_id)
+    .bind(body.node_id)
+    .bind(&body.request_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(history) = historical {
+        let epoch: String = history.try_get("epoch")?;
+        let reservation: String = history.try_get("reservation_id")?;
+        let charged: i64 = history.try_get("conservative_burned_bytes")?;
+        let actual: i64 = history.try_get("acknowledged_bytes")?;
+        let ceiling: i64 = history.try_get("ceiling_bytes")?;
+        tx.commit().await?;
+        return Ok((
+            StatusCode::OK,
+            Json(json!({
+                "state":"conservatively_charged","userId":user_id,
+                "nodeId":body.node_id,"requestId":body.request_id,
+                "accountEpoch":epoch,"reservationId":reservation,
+                "chargedBytes":charged,"acknowledgedBytes":actual,
+                "ceilingBytes":ceiling,"alreadyCharged":true,
+                "refundedBytes":0,"finalMeterVerified":false,
+                "note":"All remaining bytes are permanently charged, not refunded; no final Node meter was claimed."
+            })),
+        ));
+    }
     let account = sqlx::query(
         "SELECT epoch::text AS epoch FROM quota_v2_accounts
          WHERE user_id=$1 AND NOT closed FOR UPDATE",
