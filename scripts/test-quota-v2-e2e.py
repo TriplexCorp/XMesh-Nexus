@@ -525,7 +525,44 @@ def main():
         fresh_b, _=b.desired(uid,grant_b["acknowledgedBytes"],grant_b)
         assert fresh_b["users"][0]["quotaReservation"]["ceilingBytes"]==grant_b["ceilingBytes"]
         assert account()==after_burn
-        print("PASS: full-hold burn is irreversible, never refunded, and cannot double spend")
+        # Optional emergency recovery can charge B's remaining offline
+        # liability as well. No Node is falsely reported as final-metered.
+        code, intent_b, _=api("POST",f"/users/{uid}/quota-v2/revocation",
+                              {"nodeId":b.id},cookie)
+        check(code,202,"start independent B revocation before permanent charge")
+        charged_b_request={"nodeId":b.id,"requestId":intent_b["requestId"],
+                           "confirmation":"CHARGE_ALL_REMAINING_BYTES_NO_REFUND"}
+        code,burned_b,_=api("POST",f"/users/{uid}/quota-v2/conservative-burn",
+                            charged_b_request,cookie)
+        check(code,200,"charge B's entire outstanding balance without refund")
+        assert burned_b["refundedBytes"]==0 and not burned_b["finalMeterVerified"]
+        code,preflight,_=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"fully charged epoch may drain without fabricated Node meters")
+        assert preflight["heldBytes"]==0 and preflight["canResetNow"],preflight
+        assert all(row["conservativeBurned"] for row in preflight["nodes"]),preflight
+        charged_old_epoch=preflight["epoch"]
+        code,_,_=api("PATCH",f"/collections/users/{uid}",{"used":0},cookie)
+        check(code,200,"reset only after entire old offline liability was charged")
+        assert query("SELECT closed::text FROM quota_v2_accounts WHERE user_id="
+                     +str(uid)+" AND epoch='"+charged_old_epoch+"'")=="t"
+        code,after_reset_repeat,_=api("POST",f"/users/{uid}/quota-v2/conservative-burn",
+                                     burn_body,cookie)
+        check(code,200,"closed-epoch burn replay is read-only and idempotent")
+        assert after_reset_repeat["alreadyCharged"]
+        assert after_reset_repeat["chargedBytes"]==charged["chargedBytes"]
+        # Rejoining nodes must preserve the absolute meter incarnation,
+        # even when the actual Node usage was BELOW a paid burn floor.
+        staged_a, _=a.desired(uid,proof["usedBytes"]+3,revocation_lease)
+        staged_b, _=b.desired(uid,grant_b["acknowledgedBytes"],grant_b)
+        new_a=staged_a["users"][0]["quotaReservation"]
+        new_b=staged_b["users"][0]["quotaReservation"]
+        assert new_a["epoch"]==new_b["epoch"] and new_a["epoch"]!=charged_old_epoch
+        assert new_a["meterEpoch"]==revocation_lease["meterEpoch"]
+        assert new_a["reservationId"]!=revocation_lease["reservationId"]
+        assert new_a["acknowledgedBytes"]==new_a["ceilingBytes"]==proof["usedBytes"]+3
+        assert new_b["acknowledgedBytes"]==new_b["ceilingBytes"]==grant_b["acknowledgedBytes"]
+        assert account()[0]==0 and account()[1]==0,account()
+        print("PASS: full-hold burn is replay-safe after reset and cannot mint old capacity")
     print("Two-node quota-v2 API/guard/PostgreSQL acceptance: PASS")
 
 if __name__=="__main__":
