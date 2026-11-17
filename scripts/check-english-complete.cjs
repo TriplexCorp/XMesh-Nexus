@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');
 const api=runtime(),phrases=candidates();const missing=[];
 // Exercise real interpolated API copy, not just untranslated source templates.
 assert.equal(api.translate('Например, 123456789'),'For example, 123456789');
+assert.equal(api.translate("Смена безлимитного тарифа при квотах v2 требует подтверждения всех нод."),"Switching unlimited plans under quota v2 requires confirmation from all nodes.");
 assert.equal(api.translate("Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика."),"Cannot reset quota v2: some nodes still hold unacknowledged traffic reservations.");
 assert.equal(api.translate("Переключение безлимита при квотах v2 требует обновления всех нод."),"Switching to or from unlimited quota v2 requires coordinated updates across all nodes.");
 assert.equal(api.translate("Новый лимит меньше уже потраченного и зарезервированного трафика на нодах."),"The new limit is lower than traffic already spent or reserved on nodes.");
