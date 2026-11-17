@@ -81,7 +81,9 @@ pub async fn revocation_status(
                 lease.revision,lease.node_confirmed,lease.valid_until<NOW() AS expired,
                 revoke.request_id::text AS revocation_request_id,
                 revoke.applied_at IS NOT NULL AS revocation_applied,
-                revoke.observed_used_bytes
+                revoke.observed_used_bytes,
+                lease.conservative_burn_floor_bytes,lease.conservative_burned_bytes,
+                lease.conservative_burned_at IS NOT NULL AS conservatively_burned
          FROM quota_v2_reservations AS lease
          LEFT JOIN quota_v2_revocation_requests AS revoke
            ON revoke.user_id=lease.user_id AND revoke.epoch=lease.epoch
@@ -98,7 +100,12 @@ pub async fn revocation_status(
     for lease in leases {
         let ceiling: i64 = lease.try_get("ceiling_bytes")?;
         let acknowledged: i64 = lease.try_get("acknowledged_bytes")?;
-        let outstanding = ceiling.checked_sub(acknowledged).ok_or_else(conflict)?;
+        let charged_floor: i64 = lease.try_get("conservative_burn_floor_bytes")?;
+        let burned: i64 = lease.try_get("conservative_burned_bytes")?;
+        let burn_completed: bool = lease.try_get("conservatively_burned")?;
+        let outstanding = ceiling
+            .checked_sub(acknowledged.max(charged_floor))
+            .ok_or_else(conflict)?;
         held = held.checked_add(outstanding).ok_or_else(conflict)?;
         let stop_applied: bool = lease.try_get("revocation_applied")?;
         let observed_stop: Option<i64> = lease.try_get("observed_used_bytes")?;
@@ -111,6 +118,9 @@ pub async fn revocation_status(
             "acknowledgedBytes":acknowledged,
             "ceilingBytes":ceiling,
             "heldBytes":outstanding,
+            "conservativeBurnedBytes":burned,
+            "conservativeBurned":burn_completed,
+            "conservativeBurnFloorBytes":charged_floor,
             "revision":lease.try_get::<i64,_>("revision")?,
             "nodeConfirmed":lease.try_get::<bool,_>("node_confirmed")?,
             "expired":lease.try_get::<bool,_>("expired")?,
@@ -284,7 +294,7 @@ pub async fn validate_limit_change(
     let epoch: String = active.try_get("epoch")?;
     let spent: i64 = active.try_get("settled_bytes")?;
     let held: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-acknowledged_bytes),0)::BIGINT
+        "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-GREATEST(acknowledged_bytes,conservative_burn_floor_bytes)),0)::BIGINT
          FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
     )
     .bind(user_id)
@@ -325,7 +335,7 @@ pub async fn close_drained_epoch(
     if let Some(active) = active {
         let epoch: String = active.try_get("epoch")?;
         let outstanding: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-acknowledged_bytes),0)::BIGINT
+            "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-GREATEST(acknowledged_bytes,conservative_burn_floor_bytes)),0)::BIGINT
              FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
         )
         .bind(user_id)
@@ -353,7 +363,7 @@ pub async fn close_drained_epoch(
         let old_unsettled: bool = sqlx::query_scalar(
             "SELECT EXISTS(
                SELECT 1 FROM quota_v2_reservations
-               WHERE user_id=$1 AND ceiling_bytes>acknowledged_bytes
+               WHERE user_id=$1 AND ceiling_bytes>GREATEST(acknowledged_bytes,conservative_burn_floor_bytes)
             )",
         )
         .bind(user_id)
@@ -561,7 +571,7 @@ async fn confirm_closed_epoch(
     let old_meter = previous.meter_epoch.as_deref().ok_or_else(conflict)?;
     let old_reservation = previous.reservation_id.as_deref().ok_or_else(conflict)?;
     let historical = sqlx::query(
-        "SELECT r.acknowledged_bytes,r.ceiling_bytes,a.closed
+        "SELECT r.acknowledged_bytes,r.ceiling_bytes,r.conservative_burn_floor_bytes,a.closed
          FROM quota_v2_reservations r
          JOIN quota_v2_accounts a ON a.user_id=r.user_id AND a.epoch=r.epoch
          WHERE r.user_id=$1 AND r.node_id=$2 AND r.epoch=$3::uuid
@@ -579,7 +589,14 @@ async fn confirm_closed_epoch(
     let closed: bool = historical.try_get("closed")?;
     let ack: i64 = historical.try_get("acknowledged_bytes")?;
     let ceiling: i64 = historical.try_get("ceiling_bytes")?;
-    if !closed || ceiling != ack || local_total != ack {
+    let burn_floor: i64 = historical.try_get("conservative_burn_floor_bytes")?;
+    // A conservative burn is prepaid liability, NOT a fabricated Node meter.
+    // Keep the actual monotonic cursor; new signed capacity cannot be issued
+    // if a late actual overrun outruns the old prepaid ceiling.
+    if !closed || ceiling != ack.max(burn_floor)
+        || local_total < ack || local_total > ack.max(burn_floor)
+        || (burn_floor == 0 && local_total != ack)
+    {
         return Err(conflict());
     }
     // Keep the durable absolute meter incarnation across the reset. The
