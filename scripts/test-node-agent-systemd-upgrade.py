@@ -206,7 +206,7 @@ def main():
             f'Environment="XMESH_AUDIT_DOCKER_LOG={docker_log}"\n'
             f"ExecStart=/usr/bin/python3 {libexec / 'xmesh-policy-guard.py'} "
             f"sample --state {state} --node-id {NODE}\n"
-            "NoNewPrivileges=true\nProtectSystem=strict\nProtectHome=true\n"
+            "NoNewPrivileges=true\nPrivateTmp=true\nProtectSystem=strict\nProtectHome=true\n"
             "ReadWritePaths=/run\n", encoding="utf-8")
         try:
             run("systemctl", "daemon-reload")
