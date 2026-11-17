@@ -33,7 +33,9 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
-fn validate_local(local: &[LocalQuotaCounter]) -> Result<HashMap<i64, &LocalQuotaCounter>, ApiError> {
+fn validate_local(
+    local: &[LocalQuotaCounter],
+) -> Result<HashMap<i64, &LocalQuotaCounter>, ApiError> {
     if local.len() > 2048 {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -83,85 +85,83 @@ async fn ensure_account(
     limit: i64,
     panel_used: i64,
 ) -> Result<String, ApiError> {
-        // Serialize first account creation as well as subsequent updates.
-        sqlx::query("SELECT pg_advisory_xact_lock($1)")
-            .bind(user_id ^ 0x51_4D_45_53_48_i64)
-            .execute(&mut *conn)
-            .await?;
-        // Prevent issuing a stale allowance concurrently with an admin's
-        // plan change or a different node's accepted telemetry delta.
-        let current_user: Value = sqlx::query_scalar(
-            "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
-        )
-        .bind(user_id)
-        .fetch_optional(&mut *conn)
-        .await?
-        .ok_or_else(conflict)?;
-        let current_limit = current_user
-            .get("limit")
-            .and_then(Value::as_f64)
-            .unwrap_or(0.0);
-        let base_used_gb = current_user
-            .get("used")
-            .and_then(Value::as_f64)
-            .unwrap_or(0.0);
-        // load_records() overlays authenticated cumulative traffic on the
-        // stored manually edited baseline before compiling signed policies.
-        // Comparing only the stored base makes every later receipt look like
-        // an unauthorized concurrent edit and rejects the next policy poll.
-        let measured_bytes: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT
+    // Serialize first account creation as well as subsequent updates.
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(user_id ^ 0x51_4D_45_53_48_i64)
+        .execute(&mut *conn)
+        .await?;
+    // Prevent issuing a stale allowance concurrently with an admin's
+    // plan change or a different node's accepted telemetry delta.
+    let current_user: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(conflict)?;
+    let current_limit = current_user
+        .get("limit")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
+    let base_used_gb = current_user
+        .get("used")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
+    // load_records() overlays authenticated cumulative traffic on the
+    // stored manually edited baseline before compiling signed policies.
+    // Comparing only the stored base makes every later receipt look like
+    // an unauthorized concurrent edit and rejects the next policy poll.
+    let measured_bytes: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT
              FROM user_node_traffic_totals WHERE user_id=$1",
-        )
-        .bind(user_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        let expected_used =
-            crate::gb_to_bytes_i64(base_used_gb).saturating_add(measured_bytes.max(0));
-        if crate::gb_to_bytes_i64(current_limit) != limit || panel_used.abs_diff(expected_used) > 1
-        {
-            return Err(conflict());
-        }
+    )
+    .bind(user_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let expected_used = crate::gb_to_bytes_i64(base_used_gb).saturating_add(measured_bytes.max(0));
+    if crate::gb_to_bytes_i64(current_limit) != limit || panel_used.abs_diff(expected_used) > 1 {
+        return Err(conflict());
+    }
 
-        let account = sqlx::query(
-            "SELECT epoch::text AS epoch FROM quota_v2_accounts
+    let account = sqlx::query(
+        "SELECT epoch::text AS epoch FROM quota_v2_accounts
              WHERE user_id=$1 AND NOT closed FOR UPDATE",
-        )
-        .bind(user_id)
-        .fetch_optional(&mut *conn)
-        .await?;
-        let epoch: String = if let Some(row) = account {
-            row.try_get("epoch")?
-        } else {
-            let new_epoch = uuid::Uuid::new_v4().to_string();
-            sqlx::query(
-                "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes,settled_bytes)
-                 VALUES($1,$2::uuid,$3,$4)",
-            )
-            .bind(user_id)
-            .bind(&new_epoch)
-            .bind(limit)
-            .bind(panel_used)
-            .execute(&mut *conn)
-            .await?;
-            new_epoch
-        };
-        // The aggregate panel-used counter may advance from already accepted
-        // activity; it is a floor, never proof that a *particular* node's
-        // local bytes were acknowledged. It must never decrease implicitly.
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let epoch: String = if let Some(row) = account {
+        row.try_get("epoch")?
+    } else {
+        let new_epoch = uuid::Uuid::new_v4().to_string();
         sqlx::query(
-            "UPDATE quota_v2_accounts SET limit_bytes=$3,
-                settled_bytes=GREATEST(settled_bytes,$4)
-             WHERE user_id=$1 AND epoch=$2::uuid",
+            "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes,settled_bytes)
+                 VALUES($1,$2::uuid,$3,$4)",
         )
         .bind(user_id)
-        .bind(&epoch)
+        .bind(&new_epoch)
         .bind(limit)
         .bind(panel_used)
         .execute(&mut *conn)
         .await?;
+        new_epoch
+    };
+    // The aggregate panel-used counter may advance from already accepted
+    // activity; it is a floor, never proof that a *particular* node's
+    // local bytes were acknowledged. It must never decrease implicitly.
+    sqlx::query(
+        "UPDATE quota_v2_accounts SET limit_bytes=$3,
+                settled_bytes=GREATEST(settled_bytes,$4)
+             WHERE user_id=$1 AND epoch=$2::uuid",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(limit)
+    .bind(panel_used)
+    .execute(&mut *conn)
+    .await?;
 
-        Ok(epoch)
+    Ok(epoch)
 }
 
 async fn lease_identity(
@@ -172,63 +172,63 @@ async fn lease_identity(
     local_record: Option<&LocalQuotaCounter>,
     local_total: i64,
 ) -> Result<(String, String), ApiError> {
-        let existing = sqlx::query(
-            "SELECT meter_epoch::text AS meter_epoch,reservation_id::text AS reservation_id
+    let existing = sqlx::query(
+        "SELECT meter_epoch::text AS meter_epoch,reservation_id::text AS reservation_id
              FROM quota_v2_reservations
              WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
              ORDER BY valid_until DESC LIMIT 1 FOR UPDATE",
-        )
-        .bind(user_id)
-        .bind(epoch)
-        .bind(node_id)
-        .fetch_optional(&mut *conn)
-        .await?;
-        if existing.is_some() && local_record.is_none() {
-            // A lost/corrupted node ledger must not permit another allowance.
+    )
+    .bind(user_id)
+    .bind(epoch)
+    .bind(node_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if existing.is_some() && local_record.is_none() {
+        // A lost/corrupted node ledger must not permit another allowance.
+        return Err(conflict());
+    }
+    let (meter, reservation) = if let Some(row) = existing {
+        let meter: String = row.try_get("meter_epoch")?;
+        let reservation: String = row.try_get("reservation_id")?;
+        let received = local_record.ok_or_else(conflict)?;
+        if received.epoch.as_deref() != Some(epoch)
+            || received.meter_epoch.as_deref() != Some(meter.as_str())
+            || received.reservation_id.as_deref() != Some(reservation.as_str())
+        {
             return Err(conflict());
         }
-        let (meter, reservation) = if let Some(row) = existing {
-            let meter: String = row.try_get("meter_epoch")?;
-            let reservation: String = row.try_get("reservation_id")?;
-            let received = local_record.ok_or_else(conflict)?;
-            if received.epoch.as_deref() != Some(epoch)
-                || received.meter_epoch.as_deref() != Some(meter.as_str())
-                || received.reservation_id.as_deref() != Some(reservation.as_str())
-            {
-                return Err(conflict());
-            }
-            (meter, reservation)
-        } else {
-            // Refuse migration while durable Node bytes have not reached the
-            // authenticated telemetry baseline. Otherwise old unreported
-            // spending could be reclassified as a free initial quota offset.
-            let observed = sqlx::query(
-                "SELECT last_uplink_bytes,last_downlink_bytes
+        (meter, reservation)
+    } else {
+        // Refuse migration while durable Node bytes have not reached the
+        // authenticated telemetry baseline. Otherwise old unreported
+        // spending could be reclassified as a free initial quota offset.
+        let observed = sqlx::query(
+            "SELECT last_uplink_bytes,last_downlink_bytes
                  FROM user_node_traffic_totals
                  WHERE node_id=$1 AND user_id=$2 FOR SHARE",
-            )
-            .bind(node_id)
-            .bind(user_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-            let observed_total = if let Some(row) = observed {
-                let up: i64 = row.try_get("last_uplink_bytes")?;
-                let down: i64 = row.try_get("last_downlink_bytes")?;
-                up.checked_add(down).ok_or_else(conflict)?
-            } else {
-                0
-            };
-            if local_total != observed_total
-                || local_record.is_some_and(|counter| counter.epoch.is_some())
-            {
-                return Err(conflict());
-            }
-            (
-                uuid::Uuid::new_v4().to_string(),
-                uuid::Uuid::new_v4().to_string(),
-            )
+        )
+        .bind(node_id)
+        .bind(user_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let observed_total = if let Some(row) = observed {
+            let up: i64 = row.try_get("last_uplink_bytes")?;
+            let down: i64 = row.try_get("last_downlink_bytes")?;
+            up.checked_add(down).ok_or_else(conflict)?
+        } else {
+            0
         };
-        Ok((meter, reservation))
+        if local_total != observed_total
+            || local_record.is_some_and(|counter| counter.epoch.is_some())
+        {
+            return Err(conflict());
+        }
+        (
+            uuid::Uuid::new_v4().to_string(),
+            uuid::Uuid::new_v4().to_string(),
+        )
+    };
+    Ok((meter, reservation))
 }
 
 async fn issue_user(
@@ -239,63 +239,63 @@ async fn issue_user(
     local_record: Option<&LocalQuotaCounter>,
     now_ms: i64,
 ) -> Result<(), ApiError> {
-        let limit = user
-            .get("limitBytes")
+    let limit = user
+        .get("limitBytes")
+        .and_then(Value::as_i64)
+        .ok_or_else(conflict)?;
+    if limit <= 0 {
+        // Node-only and CDN quotas stay on their independent rule path.
+        // A global shared reservation is meaningful only for global limits.
+        return Ok(());
+    }
+    let panel_used = user
+        .get("panelUsedBytes")
+        .and_then(Value::as_i64)
+        .ok_or_else(conflict)?;
+    let target = if user.get("onHold").and_then(Value::as_bool) == Some(true) {
+        // Waiting subscriptions must be able to make the first verified
+        // online connection. Allocate a small shared bootstrap allowance,
+        // never an unreserved offline grant across multiple nodes.
+        1024 * 1024
+    } else {
+        user.get("offlineBudgetBytes")
             .and_then(Value::as_i64)
-            .ok_or_else(conflict)?;
-        if limit <= 0 {
-            // Node-only and CDN quotas stay on their independent rule path.
-            // A global shared reservation is meaningful only for global limits.
-            return Ok(());
-        }
-        let panel_used = user
-            .get("panelUsedBytes")
-            .and_then(Value::as_i64)
-            .ok_or_else(conflict)?;
-        let target = if user.get("onHold").and_then(Value::as_bool) == Some(true) {
-            // Waiting subscriptions must be able to make the first verified
-            // online connection. Allocate a small shared bootstrap allowance,
-            // never an unreserved offline grant across multiple nodes.
-            1024 * 1024
-        } else {
-            user.get("offlineBudgetBytes")
-                .and_then(Value::as_i64)
-                .unwrap_or(0)
-                .clamp(0, 64 * 1024 * 1024)
-        };
-        let local_total = local_record.map_or(0, |item| item.used_bytes);
-        let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
-        let (meter, reservation) =
-            lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
-        let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
-        let lease = sqlx::query(
-            "SELECT acknowledged_bytes,ceiling_bytes,revision,
+            .unwrap_or(0)
+            .clamp(0, 64 * 1024 * 1024)
+    };
+    let local_total = local_record.map_or(0, |item| item.used_bytes);
+    let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
+    let (meter, reservation) =
+        lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
+    let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
+    let lease = sqlx::query(
+        "SELECT acknowledged_bytes,ceiling_bytes,revision,
                     (EXTRACT(EPOCH FROM valid_until)*1000)::BIGINT AS valid_until_ms
              FROM quota_v2_reserve($1,$2::uuid,$3,$4::uuid,$5::uuid,$6,$7,
                    to_timestamp(($8::bigint)::double precision/1000.0))",
-        )
-        .bind(user_id)
-        .bind(&epoch)
-        .bind(node_id)
-        .bind(&meter)
-        .bind(&reservation)
-        .bind(target)
-        .bind(local_total)
-        .bind(until)
-        .fetch_one(&mut *conn)
-        .await
-        .map_err(|_| conflict())?;
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(node_id)
+    .bind(&meter)
+    .bind(&reservation)
+    .bind(target)
+    .bind(local_total)
+    .bind(until)
+    .fetch_one(&mut *conn)
+    .await
+    .map_err(|_| conflict())?;
 
-        user["quotaReservation"] = json!({
-            "epoch": epoch,
-            "meterEpoch": meter,
-            "reservationId": reservation,
-            "revision": lease.try_get::<i64,_>("revision")?,
-            "acknowledgedBytes": lease.try_get::<i64,_>("acknowledged_bytes")?,
-            "ceilingBytes": lease.try_get::<i64,_>("ceiling_bytes")?,
-            "validUntilMs": lease.try_get::<i64,_>("valid_until_ms")?
-        });
-        Ok(())
+    user["quotaReservation"] = json!({
+        "epoch": epoch,
+        "meterEpoch": meter,
+        "reservationId": reservation,
+        "revision": lease.try_get::<i64,_>("revision")?,
+        "acknowledgedBytes": lease.try_get::<i64,_>("acknowledged_bytes")?,
+        "ceilingBytes": lease.try_get::<i64,_>("ceiling_bytes")?,
+        "validUntilMs": lease.try_get::<i64,_>("valid_until_ms")?
+    });
+    Ok(())
 }
 
 pub async fn issue(
@@ -312,8 +312,19 @@ pub async fn issue(
         .ok_or_else(conflict)?;
     let mut tx = pool.begin().await?;
     for user in users.iter_mut() {
-        let id = user.get("userId").and_then(Value::as_i64).ok_or_else(conflict)?;
-        issue_user(&mut tx, user, id, node_id, reported.get(&id).copied(), now_ms).await?;
+        let id = user
+            .get("userId")
+            .and_then(Value::as_i64)
+            .ok_or_else(conflict)?;
+        issue_user(
+            &mut tx,
+            user,
+            id,
+            node_id,
+            reported.get(&id).copied(),
+            now_ms,
+        )
+        .await?;
     }
     policy["version"] = json!(2);
     tx.commit().await?;
