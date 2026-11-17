@@ -4,6 +4,19 @@ on:
     paths:
       - 'backend/src/main.rs'
       - 'backend/src/telemetry_scope.rs'
+      - 'deploy/node-metrics-agent.sh'
+      - 'AGENT_VERSION'
+      - 'scripts/test-node-auth-integration.py'
+      - 'scripts/test-telemetry-scope-integration.py'
+      - '.github/workflows/node-meter-release-compatibility.yml'
+      - '.github/workflows/security-telemetry-scope.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/src/main.rs'
+      - 'backend/src/telemetry_scope.rs'
+      - 'deploy/node-metrics-agent.sh'
+      - 'AGENT_VERSION'
       - 'scripts/test-node-auth-integration.py'
       - 'scripts/test-telemetry-scope-integration.py'
       - '.github/workflows/security-telemetry-scope.yml'
