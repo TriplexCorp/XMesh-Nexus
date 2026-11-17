@@ -278,7 +278,7 @@ fn burn_reply(
     user_id: i64,
     node_id: i64,
     request_id: &str,
-    result: BurnResult,
+    result: &BurnResult,
 ) -> (StatusCode, Json<Value>) {
     (
         StatusCode::OK,
@@ -421,7 +421,7 @@ pub async fn burn_revoked_reservation(
     if let Some(history) = historical_burn(&mut tx, user_id, body.node_id, &body.request_id).await?
     {
         tx.commit().await?;
-        return Ok(burn_reply(user_id, body.node_id, &body.request_id, history));
+        return Ok(burn_reply(user_id, body.node_id, &body.request_id, &history));
     }
     let result = charge_burn(&mut tx, user_id, body.node_id, &body.request_id).await?;
     if !result.already {
@@ -438,7 +438,7 @@ pub async fn burn_revoked_reservation(
         .await?;
     }
     tx.commit().await?;
-    Ok(burn_reply(user_id, body.node_id, &body.request_id, result))
+    Ok(burn_reply(user_id, body.node_id, &body.request_id, &result))
 }
 
 pub async fn validate_limit_change(
