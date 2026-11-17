@@ -110,6 +110,116 @@ pub async fn revocation_status(
     })))
 }
 
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RevokeNodeRequest {
+    node_id: i64,
+}
+
+/// Stage an irreversible signed-deny request for exactly one active Node
+/// reservation. The outstanding offline budget is deliberately NOT refunded.
+pub async fn request_node_revocation(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(user_id): Path<i64>,
+    Json(body): Json<RevokeNodeRequest>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    crate::enforce_collection(&actor, "users", true)?;
+    if !enabled() {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Quota-v2 is disabled; revocation cannot be started.",
+        ));
+    }
+    if user_id <= 0 || body.node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid quota identity."));
+    }
+    let mut tx = state.pool.begin().await?;
+    // Same order as issuance and user reset: user row, then active account.
+    let user_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users' AND id=$1)",
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !user_exists {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found."));
+    }
+    sqlx::query("SELECT id FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE")
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let account = sqlx::query(
+        "SELECT epoch::text AS epoch FROM quota_v2_accounts
+         WHERE user_id=$1 AND NOT closed FOR UPDATE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(conflict)?;
+    let epoch: String = account.try_get("epoch")?;
+    let lease = sqlx::query(
+        "SELECT meter_epoch::text AS meter_epoch,
+                reservation_id::text AS reservation_id,
+                ceiling_bytes,acknowledged_bytes
+         FROM quota_v2_reservations
+         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
+         FOR UPDATE",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(body.node_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(conflict)?;
+    let meter: String = lease.try_get("meter_epoch")?;
+    let reservation: String = lease.try_get("reservation_id")?;
+    let ceiling: i64 = lease.try_get("ceiling_bytes")?;
+    let acknowledged: i64 = lease.try_get("acknowledged_bytes")?;
+    let existing: Option<String> = sqlx::query_scalar(
+        "SELECT request_id::text FROM quota_v2_revocation_requests
+         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
+           AND meter_epoch=$4::uuid",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(body.node_id)
+    .bind(&meter)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let request_id = existing.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    sqlx::query(
+        "INSERT INTO quota_v2_revocation_requests
+         (user_id,epoch,node_id,meter_epoch,reservation_id,request_id)
+         VALUES ($1,$2::uuid,$3,$4::uuid,$5::uuid,$6::uuid)
+         ON CONFLICT (user_id,epoch,node_id,meter_epoch) DO NOTHING",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(body.node_id)
+    .bind(&meter)
+    .bind(&reservation)
+    .bind(&request_id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "state":"pending_node_stop",
+            "userId":user_id,
+            "nodeId":body.node_id,
+            "requestId":request_id,
+            "epoch":epoch,
+            "reservationId":reservation,
+            "heldBytes":ceiling.saturating_sub(acknowledged),
+            "refundedBytes":0,
+            "note":"Await signed Node stop proof; no bytes are released."
+        })),
+    ))
+}
+
 pub async fn validate_limit_change(
     conn: &mut sqlx::PgConnection,
     user_id: i64,
