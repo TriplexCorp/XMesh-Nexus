@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');
 const api=runtime(),phrases=candidates();const missing=[];
 // Exercise real interpolated API copy, not just untranslated source templates.
 assert.equal(api.translate('Например, 123456789'),'For example, 123456789');
+assert.equal(api.translate("Сброс трафика при квотах v2 требует согласования с нодами; счётчики не изменены."), "Quota-v2 traffic reset requires node reconciliation; counters were not changed.");
 assert.equal(
  api.translate('Узел с IP-адресом 2001:db8::abcd уже существует: «Node №1» (ID 42). Откройте существующий узел вместо повторного добавления.'),
  'A node with IP address 2001:db8::abcd already exists: “Node №1” (ID 42). Open the existing node instead of adding it again.'

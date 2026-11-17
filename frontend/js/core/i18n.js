@@ -15,6 +15,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Сброс трафика при квотах v2 требует согласования с нодами; счётчики не изменены.": "Quota-v2 traffic reset requires node reconciliation; counters were not changed.",
     "Добавьте новую публичную точку доступа в XMesh Nexus": "Add a new public endpoint to XMesh Nexus",
     "Создать хост": "Create host",
     "Статус и предпросмотр": "Status and preview",

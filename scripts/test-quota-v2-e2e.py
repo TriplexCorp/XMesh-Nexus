@@ -136,10 +136,20 @@ def main():
         # offline allowance. Simulate a lost HTTP response from node A:
         # the repeated request without a durable ID must stay unfunded and
         # return the SAME reservation, not create an inaccessible new one.
-        prep_a,_=a.desired(uid)
-        prep_b,_=b.desired(uid)
+        prep_a,config_a=a.desired(uid)
+        prep_b,config_b=b.desired(uid)
         lease_pre_a=prep_a["users"][0]["quotaReservation"]
         lease_pre_b=prep_b["users"][0]["quotaReservation"]
+        # Execute the actual guard on the prepared signed lease: it MUST
+        # persist the durable ID even though its zero ceiling denies access.
+        _, prepared_ledger_a, denied = guard.enforce(
+            prep_a,config_a["config"],{}, {key:0},"xray-a",False,prep_a["issuedAtMs"])
+        assert denied.get(prep_a["users"][0]["xrayId"])=="quota", denied
+        _, prepared_ledger_b, denied = guard.enforce(
+            prep_b,config_b["config"],{}, {key:0},"xray-b",False,prep_b["issuedAtMs"])
+        assert denied.get(prep_b["users"][0]["xrayId"])=="quota", denied
+        assert prepared_ledger_a["users"][key]["quotaReservation"]["reservationId"]==lease_pre_a["reservationId"]
+        assert prepared_ledger_b["users"][key]["quotaReservation"]["reservationId"]==lease_pre_b["reservationId"]
         assert lease_pre_a["ceilingBytes"]==lease_pre_a["acknowledgedBytes"]==0
         assert lease_pre_b["ceilingBytes"]==lease_pre_b["acknowledgedBytes"]==0
         retry_a,_=a.desired(uid)
@@ -149,8 +159,8 @@ def main():
         print("PASS: lost first response recovers unchanged unfunded signed lease")
         # Once Node reports a durable identity, Nexus unlocks only the
         # requested share of the account's remaining globally held capacity.
-        pa,da=a.desired(uid,0,lease_pre_a)
-        pb,db=b.desired(uid,0,lease_pre_b)
+        pa,da=a.desired(uid,0,prepared_ledger_a["users"][key]["quotaReservation"])
+        pb,db=b.desired(uid,0,prepared_ledger_b["users"][key]["quotaReservation"])
         lease_a=pa["users"][0]["quotaReservation"]
         lease_b=pb["users"][0]["quotaReservation"]
         assert lease_a["reservationId"]!=lease_b["reservationId"]
@@ -183,9 +193,11 @@ def main():
 
         # Real admission decisions against independently persisted in-memory
         # ledgers (same guard used by Node service; actual signed policies).
-        _,a.ledger,denied=guard.enforce(pa,da["config"],{}, {key:0},"xray-a",False,pa["issuedAtMs"])
+        _,a.ledger,denied=guard.enforce(pa,da["config"],prepared_ledger_a,
+                                         {key:0},"xray-a",False,pa["issuedAtMs"])
         assert not denied,denied
-        _,b.ledger,denied=guard.enforce(pb,db["config"],{}, {key:0},"xray-b",False,pb["issuedAtMs"])
+        _,b.ledger,denied=guard.enforce(pb,db["config"],prepared_ledger_b,
+                                         {key:0},"xray-b",False,pb["issuedAtMs"])
         assert not denied,denied
         _,a.ledger,denied=guard.enforce(pa,da["config"],a.ledger,
                                          {key:40*MIB},"xray-a",True,pa["issuedAtMs"]+10)
