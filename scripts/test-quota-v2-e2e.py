@@ -544,7 +544,7 @@ def main():
         code,_,_=api("PATCH",f"/collections/users/{uid}",{"used":0},cookie)
         check(code,200,"reset only after entire old offline liability was charged")
         assert query("SELECT closed::text FROM quota_v2_accounts WHERE user_id="
-                     +str(uid)+" AND epoch='"+charged_old_epoch+"'")=="t"
+                     +str(uid)+" AND epoch='"+charged_old_epoch+"'")=="true"
         code,after_reset_repeat,_=api("POST",f"/users/{uid}/quota-v2/conservative-burn",
                                      burn_body,cookie)
         check(code,200,"closed-epoch burn replay is read-only and idempotent")
