@@ -3418,8 +3418,8 @@ async fn record_node_stop_receipts(
     proofs: &[NodeStopReceipt],
 ) -> Result<(), ApiError> {
     // This attests signed policy application, NOT a final Xray accounting
-    // watermark. A stop proof older than already accepted signed spending
-    // must be rejected atomically (including mixed metrics+stop batches).
+    // watermark. Reject fresh stale claims while permitting exact replay
+    // of the old accepted proof after newer receipts (no refund ever).
     // Deliberately NO ceiling reduction or quota refund here.
     for proof in proofs {
         sqlx::query(
