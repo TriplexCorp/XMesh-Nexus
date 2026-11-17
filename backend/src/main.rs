@@ -3444,12 +3444,18 @@ async fn record_node_stop_receipts(
                AND lease.node_id=r.node_id AND lease.meter_epoch=r.meter_epoch
                AND lease.reservation_id=r.reservation_id
                AND lease.revision >= $7
-               -- A stop claim cannot trail the signed quota receipt settled
-               -- earlier in this SAME transaction, or a previous accepted
-               -- stop claim. Do not silently MAX() away a forged/stale proof.
-               AND $8 >= lease.acknowledged_bytes
+               -- A fresh stop claim cannot trail settled usage or a
+               -- previously accepted stop. An EXACT replay of an already
+               -- applied proof remains legal after later signed spending:
+               -- Node keeps publishing it, but it proves no final meter.
                AND $8 >= COALESCE(r.observed_used_bytes,0)
                AND $7 >= COALESCE(r.applied_revision,0)
+               AND (
+                   $8 >= lease.acknowledged_bytes
+                   OR (r.applied_at IS NOT NULL
+                       AND $8 = r.observed_used_bytes
+                       AND $7 = r.applied_revision)
+               )
              RETURNING r.request_id",
         )
         .bind(proof.user_id)
