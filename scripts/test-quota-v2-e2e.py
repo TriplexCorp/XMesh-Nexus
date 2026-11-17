@@ -416,8 +416,16 @@ def main():
         a.ledger=guard.applied_revocation_proofs(stopped,effective,a.ledger)
         proof=a.ledger["users"][key]["quotaRevocationApplied"]
         revocation_lease=stopped["users"][0]["quotaReservation"]
-        check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=proof),
-              201,"accept authenticated post-apply Node stop proof")
+        # The first operational stop may arrive AFTER a higher signed
+        # usage receipt (lost HTTP response / in-flight Xray bytes).
+        # Rejecting it would deadlock stop acknowledgements; record it
+        # without EVER treating its old usedBytes as a final refund meter.
+        check(a.metrics(uid,proof["usedBytes"]+1,revocation_lease,
+                        raw_total=20*MIB,stop=None),201,
+              "accept signed late bytes before first stop proof")
+        check(a.metrics(uid,proof["usedBytes"]+1,revocation_lease,
+                        raw_total=20*MIB,stop=proof),201,
+              "accept delayed first signed stop below settled usage without refund")
         code, preflight, _=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
         check(code,200,"read persisted stop application proof")
         item=next(item for item in preflight["nodes"] if item["nodeId"]==a.id)
@@ -425,8 +433,8 @@ def main():
         assert item["refundedBytes"]==0 and preflight["heldBytes"]>0,preflight
         assert item["awaitingFinalMeter"] and not item["finalMeterVerified"],item
         assert not item["canRefundNow"] and not preflight["canRefundNow"],preflight
-        assert not item["stopProofBelowSettledUsage"],item
-        check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=proof),
+        assert item["stopProofBelowSettledUsage"],item
+        check(a.metrics(uid,proof["usedBytes"]+1,revocation_lease,raw_total=20*MIB,stop=proof),
               201,"replayed signed Node stop proof is idempotent")
         # Signed stale stop evidence must fail atomically even though the
         # receipt itself is genuine and a newer stop was already accepted.
@@ -434,13 +442,13 @@ def main():
         stale=copy.deepcopy(proof)
         stale["usedBytes"]-=1
         assert stale["usedBytes"]>=0
-        check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=stale),
-              409,"reject stop proof below accepted signed traffic receipt")
+        check(a.metrics(uid,proof["usedBytes"]+1,revocation_lease,raw_total=20*MIB,stop=stale),
+              409,"reject rollback below previously accepted stop proof")
         assert account()==state_before_stale,account()
         older=copy.deepcopy(proof)
         older["revision"]-=1
         assert older["revision"]>=0
-        check(a.metrics(uid,proof["usedBytes"],revocation_lease,raw_total=20*MIB,stop=older),
+        check(a.metrics(uid,proof["usedBytes"]+1,revocation_lease,raw_total=20*MIB,stop=older),
               409,"reject stop proof revision rollback")
         assert account()==state_before_stale,account()
         # A node with another identity must never confirm A's revocation.
@@ -448,9 +456,9 @@ def main():
         check(forged,409,"reject substituted cross-node stop acknowledgment")
         # An authenticated late byte can arrive after the operational
         # stop proof. This proves that stop-applied is NOT final-meter-ready.
-        check(a.metrics(uid,proof["usedBytes"]+1,revocation_lease,
+        check(a.metrics(uid,proof["usedBytes"]+2,revocation_lease,
                         raw_total=20*MIB,stop=proof),201,
-              "accept late signed spending with exact replayed stop proof")
+              "accept further signed spending with exact replayed stop proof")
         code,preflight,_=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
         check(code,200,"inspect stop proof after late spending")
         item=next(row for row in preflight["nodes"] if row["nodeId"]==a.id)
