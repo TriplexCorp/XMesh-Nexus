@@ -150,10 +150,9 @@ pub async fn issue(
         .bind(user_id)
         .fetch_one(&mut *tx)
         .await?;
-        let expected_used = crate::gb_to_bytes_i64(base_used_gb)
-            .saturating_add(measured_bytes.max(0));
-        if crate::gb_to_bytes_i64(current_limit) != limit
-            || panel_used.abs_diff(expected_used) > 1
+        let expected_used =
+            crate::gb_to_bytes_i64(base_used_gb).saturating_add(measured_bytes.max(0));
+        if crate::gb_to_bytes_i64(current_limit) != limit || panel_used.abs_diff(expected_used) > 1
         {
             return Err(conflict());
         }
