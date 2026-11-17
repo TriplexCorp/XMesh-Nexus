@@ -1,0 +1,58 @@
+name: Security - installed Node v6 meter upgrade (disposable systemd)
+on:
+  pull_request:
+    paths:
+      - 'deploy/update-node-control-agent.sh'
+      - 'scripts/test-node-agent-systemd-upgrade.py'
+      - '.github/workflows/node-agent-systemd-upgrade.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/update-node-control-agent.sh'
+      - 'scripts/test-node-agent-systemd-upgrade.py'
+      - '.github/workflows/node-agent-systemd-upgrade.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-systemd-meter-upgrade:
+    name: Ubuntu 24.04 systemd signed-meter upgrade and interrupted-link canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      XMESH_AUDIT_SYSTEMD_CANARY: "1"
+    steps:
+      - name: Check out Nexus under test
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out exact reviewed old v6.0.11 Node
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 647adcf7af326b205fce12545fb5d75a20bb8191
+          path: .ci-old-node
+          persist-credentials: false
+      - name: Check out exact reviewed v6.0.12 Node producer
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 520dc61502b80e78373c658994010feed9aa0787
+          path: .ci-new-node
+          persist-credentials: false
+      - name: Prove installed helper migration under real Ubuntu systemd
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash -n deploy/update-node-control-agent.sh
+          python3 -m py_compile scripts/test-node-agent-systemd-upgrade.py
+          test -d /run/systemd/system
+          sudo --preserve-env=GITHUB_ACTIONS,XMESH_AUDIT_SYSTEMD_CANARY \
+            /usr/bin/python3 scripts/test-node-agent-systemd-upgrade.py \
+            .ci-old-node .ci-new-node
+      - name: Record systemd diagnostics if test failed
+        if: failure()
+        shell: bash
+        run: |
+          sudo journalctl -b --no-pager --since '-12 minutes' \
+            --grep 'xmesh-meter-upgrade-audit-' -n 60 || true
