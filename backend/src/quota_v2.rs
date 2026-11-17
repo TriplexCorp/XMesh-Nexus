@@ -2,8 +2,8 @@
 //! `XMESH_QUOTA_V2_ENABLED=1` after rolling out v2-capable node agents.
 //! The account row serializes allocation across independent nodes; a node's
 //! authenticated durable total is acknowledged only against its own lease.
-use crate::ApiError;
-use axum::http::StatusCode;
+use crate::{ApiError, AppState, auth::AuthUser};
+use axum::{Json, extract::{Extension, Path, State}, http::StatusCode};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
@@ -31,6 +31,80 @@ fn conflict() -> ApiError {
 
 pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
+}
+
+
+/// Read-only operator preflight for coordinated revocation/reset.
+/// Expiration never refunds an offline grant: the outstanding amount remains
+/// held until authenticated node-side spending or a future revocation proof.
+pub async fn revocation_status(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(user_id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    crate::enforce_collection(&actor, "users", true)?;
+    if user_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid user ID."));
+    }
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users' AND id=$1)",
+    )
+    .bind(user_id)
+    .fetch_one(&state.pool)
+    .await?;
+    if !exists {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found."));
+    }
+    let active = sqlx::query(
+        "SELECT epoch::text AS epoch,limit_bytes,settled_bytes
+         FROM quota_v2_accounts WHERE user_id=$1 AND NOT closed",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    let Some(active) = active else {
+        return Ok(Json(json!({
+            "userId":user_id,"protocol":"v2","state":"inactive",
+            "canResetNow":false,"heldBytes":0,"nodes":[],
+            "expirationRefundsBudget":false
+        })));
+    };
+    let epoch: String = active.try_get("epoch")?;
+    let limit: i64 = active.try_get("limit_bytes")?;
+    let settled: i64 = active.try_get("settled_bytes")?;
+    let leases = sqlx::query(
+        "SELECT node_id,acknowledged_bytes,ceiling_bytes,revision,
+                node_confirmed,valid_until<NOW() AS expired
+         FROM quota_v2_reservations
+         WHERE user_id=$1 AND epoch=$2::uuid ORDER BY node_id",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut held: i64 = 0;
+    let mut nodes = Vec::with_capacity(leases.len());
+    for lease in leases {
+        let ceiling: i64 = lease.try_get("ceiling_bytes")?;
+        let acknowledged: i64 = lease.try_get("acknowledged_bytes")?;
+        let outstanding = ceiling.checked_sub(acknowledged).ok_or_else(conflict)?;
+        held = held.checked_add(outstanding).ok_or_else(conflict)?;
+        nodes.push(json!({
+            "nodeId":lease.try_get::<i64,_>("node_id")?,
+            "acknowledgedBytes":acknowledged,
+            "ceilingBytes":ceiling,
+            "heldBytes":outstanding,
+            "revision":lease.try_get::<i64,_>("revision")?,
+            "nodeConfirmed":lease.try_get::<bool,_>("node_confirmed")?,
+            "expired":lease.try_get::<bool,_>("expired")?
+        }));
+    }
+    Ok(Json(json!({
+        "userId":user_id,"protocol":"v2","state":if held == 0 {"drained"} else {"awaiting_nodes"},
+        "epoch":epoch,"limitBytes":limit,"settledBytes":settled,
+        "heldBytes":held,"canResetNow":held == 0,
+        "nodes":nodes,"expirationRefundsBudget":false
+    })))
 }
 
 pub async fn validate_limit_change(
