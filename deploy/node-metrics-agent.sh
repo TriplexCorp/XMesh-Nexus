@@ -140,10 +140,25 @@ try:
   assert (uid,tag) not in seen_inbounds
   seen_inbounds.add((uid,tag))
   assert all(type(item.get(k)) is int and 0<=item[k]<2**63 for k in ("uplinkBytes","downlinkBytes"))
+ receipts=data.get("quotaReceipts",[])
+ assert isinstance(receipts,list) and len(receipts)<=2048
+ seen_receipts=set()
+ import re
+ uuid_pattern=re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+ for receipt in receipts:
+  assert isinstance(receipt,dict)
+  assert set(receipt)=={"userId","epoch","meterEpoch","reservationId","usedBytes"}
+  uid=receipt.get("userId")
+  assert type(uid) is int and uid in seen_users and uid not in seen_receipts
+  seen_receipts.add(uid)
+  assert type(receipt.get("usedBytes")) is int and 0<=receipt["usedBytes"]<2**63
+  assert all(isinstance(receipt.get(k),str) and uuid_pattern.fullmatch(receipt[k])
+             for k in ("epoch","meterEpoch","reservationId"))
  # The authoritative sample time is set by the producer, not the uploader.
  print(str(stamp))
  print(',"userTraffic":'+json.dumps(users,separators=(",",":"))+
-       ',"userInboundTraffic":'+json.dumps(inbounds,separators=(",",":")))
+       ',"userInboundTraffic":'+json.dumps(inbounds,separators=(",",":"))+
+       ',"quotaReceipts":'+json.dumps(receipts,separators=(",",":")))
 except (AssertionError,ValueError,TypeError,KeyError,OSError):
  sys.exit(1)
 PY
