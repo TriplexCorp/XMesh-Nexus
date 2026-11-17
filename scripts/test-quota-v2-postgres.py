@@ -86,6 +86,33 @@ class ReservationTests(unittest.TestCase):
             self.reserve(2)
         self.assertEqual(self.state(),before)
 
+    def ack(self,node,total, reservation_id=None):
+        with psycopg.connect(DSN) as c:
+            return c.execute(
+                "SELECT ceiling_bytes,acknowledged_bytes FROM quota_v2_ack(%s,%s,%s,%s,%s,%s)",
+                (self.uid,self.epoch,node,self.meters[node],reservation_id or self.ids[node],total)).fetchone()
+
+    def test_signed_receipt_is_scoped_idempotent_and_cannot_reissue_budget(self):
+        self.reserve(1)
+        self.reserve(2)
+        self.assertEqual(self.ack(2,10),(50,10))
+        self.assertEqual(self.state(),(10,90))
+        self.assertEqual(self.ack(2,10),(50,10))
+        self.assertEqual(self.ack(2,0),(50,10))
+        self.assertEqual(self.reserve(1),(50,0))
+        self.assertEqual(self.state(),(10,90))
+        with self.assertRaises(psycopg.Error):
+            self.ack(2,20,uuid.uuid4())
+        self.assertEqual(self.state(),(10,90))
+
+    def test_receipt_after_lease_expiry_and_overshoot_is_still_charged(self):
+        self.reserve(1)
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_reservations SET valid_until=NOW()-INTERVAL '1 hour' WHERE user_id=%s",(self.uid,))
+        self.assertEqual(self.ack(1,55),(55,55))
+        self.assertEqual(self.state(),(55,0))
+        self.assertEqual(self.ack(1,55),(55,55))
+
     def test_initial_migration_baseline_is_not_charged_twice(self):
         with psycopg.connect(DSN) as c:
             c.execute("UPDATE quota_v2_accounts SET limit_bytes=1000,settled_bytes=300 WHERE user_id=%s",(self.uid,))
