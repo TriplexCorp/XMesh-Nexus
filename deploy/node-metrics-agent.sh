@@ -158,47 +158,22 @@ PY
     fi
   fi
 fi
-if [[ "$SNAPSHOT_LOADED" != true ]];then
-# Optional Xray StatsService counters. Missing Xray CLI or inaccessible API
-# must never be reported as successful per-user traffic collection.
-XRAY_API_ADDRESS="${XMESH_XRAY_API_ADDRESS:-127.0.0.1:10085}"
-if [[ "$XRAY_API_ADDRESS" =~ ^127\.0\.0\.1:[0-9]{1,5}$ ]] &&
-   command -v python3 >/dev/null 2>&1 &&
-   [[ -r /usr/local/libexec/xmesh-xray-stats-collector.py ]]; then
-  XRAY_CLI="$(command -v xray || true)"
-  if [[ -z "$XRAY_CLI" ]]; then
-    for candidate in /usr/local/bin/xray /usr/bin/xray /usr/local/xray/xray /opt/xray/xray /usr/local/bin/xray-core; do
-      if [[ -x "$candidate" ]]; then XRAY_CLI="$candidate"; break; fi
-    done
-  fi
-  if [[ -z "$XRAY_CLI" ]]; then
-    echo "XMesh: per-user traffic unavailable: Xray CLI not installed on host (possibly containerized)." >&2
-  else
-    stats_error="$(mktemp)"
-    if stats_json="$(timeout 6 "$XRAY_CLI" api statsquery --server="$XRAY_API_ADDRESS" -pattern 'user>>>xmesh-u' 2>"$stats_error")"; then
-      if stats_fragment="$(printf '%s' "$stats_json" | python3 /usr/local/libexec/xmesh-xray-stats-collector.py)"; then
-        if [[ "$stats_fragment" == ,* ]]; then
-          payload="${payload%\}}$stats_fragment}"
-          USER_STATS_STATUS=direct
-          USER_STATS_AT_MS="$(date +%s%3N)"
-        fi
-      else
-        echo "XMesh: Xray user stats response could not be parsed." >&2
-      fi
-    else
-      echo "XMesh: Xray Stats API unavailable at $XRAY_API_ADDRESS (check API listener and service)." >&2
-    fi
-    rm -f "$stats_error"
-  fi
-else
-  echo "XMesh: Xray StatsService collection is not configured." >&2
+if [[ "$SNAPSHOT_LOADED" != true ]]; then
+  # Never promote raw Xray counters into authenticated per-user telemetry.
+  # StatsService has no knowledge of the CURRENT signed Node/Squad assignments:
+  # it can contain retired users or inbounds after a policy change. The Nexus
+  # object-scope verifier rejects the entire mixed packet, starving valid users.
+  # When the root-owned signed-scope snapshot is stale, corrupt or absent,
+  # continue node-wide metrics only and mark individual usage UNAVAILABLE.
+  # Do not infer an empty/zero sample; the meter's durable ledger is unchanged
+  # and the next authorized snapshot can catch up via cumulative deltas.
+  echo "XMesh: signed-scope user metrics unavailable; unscoped Xray fallback disabled" >&2
 fi
-fi # End fallback for missing root-owned metrics snapshot.
 
 # Distinct users with a verified Xray byte delta in the previous 45 seconds.
 # No counters / first baseline / reset -> unknown or zero only after a valid baseline.
 online_count=""
-if [[ "$USER_STATS_STATUS" == verified || "$USER_STATS_STATUS" == direct ]]; then
+if [[ "$USER_STATS_STATUS" == verified ]]; then
   online_count="$(printf '%s' "$payload" | python3 -c '
 import json,sys,time,os,tempfile
 path=sys.argv[1]
