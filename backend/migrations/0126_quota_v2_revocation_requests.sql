@@ -10,6 +10,9 @@ CREATE TABLE quota_v2_revocation_requests (
     reservation_id UUID NOT NULL,
     request_id UUID NOT NULL UNIQUE,
     requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    applied_at TIMESTAMPTZ,
+    applied_revision BIGINT CHECK (applied_revision >= 0),
+    observed_used_bytes BIGINT CHECK (observed_used_bytes >= 0),
     PRIMARY KEY (user_id, epoch, node_id, meter_epoch),
     FOREIGN KEY (user_id, epoch, node_id, meter_epoch)
         REFERENCES quota_v2_reservations(user_id, epoch, node_id, meter_epoch)
