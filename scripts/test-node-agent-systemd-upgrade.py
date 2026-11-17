@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Isolated Ubuntu systemd canary for v6.0.11 -> v6.0.12 policy-meter upgrade.
+"""Isolated Ubuntu systemd canary for v6.0.11 -> v6.0.13 policy-meter upgrade.
 
 Runs on an ephemeral GitHub-hosted Ubuntu runner as root, never on a VPS.
 Uses real old/current Node guard code, signed Ed25519 policy, real systemd
@@ -21,7 +21,7 @@ import uuid
 
 
 OLD_SHA = "647adcf7af326b205fce12545fb5d75a20bb8191"
-NEW_SHA = "520dc61502b80e78373c658994010feed9aa0787"
+NEW_SHA = "542991eb1543de79b62f8135dba82a073dcdeee3"
 NODE = 31
 UID = "550e8400-e29b-41d4-a716-446655440001"
 ROOT = Path(__file__).resolve().parents[1]
@@ -140,7 +140,7 @@ def main():
 
     old_dir, new_dir = (Path(x).resolve() for x in sys.argv[1:3])
     for folder, required, version in ((old_dir, OLD_SHA, "control-v6.0.11"),
-                                       (new_dir, NEW_SHA, "control-v6.0.12")):
+                                       (new_dir, NEW_SHA, "control-v6.0.13")):
         expect(run("git", "-C", str(folder), "rev-parse", "HEAD") == required,
                "Immutable Node source revision does not match expected code")
         expect((folder / "AGENT_VERSION").read_text().strip() == version,
@@ -149,7 +149,7 @@ def main():
     updater = (ROOT / "deploy/update-node-control-agent.sh").read_text()
     expect('xmesh-policy-guard-base.py -o "$policy_base_tmp"' in updater and
            'install -o root -g root -m 0700 "$policy_base_tmp"' in updater and
-           "Verified installed v6.0.12 signed-scope policy base" in updater,
+           "Verified installed v6.0.13 signed-scope policy base" in updater,
            "Production updater is still missing its policy-base install gate")
 
     unit = "xmesh-meter-upgrade-audit-" + uuid.uuid4().hex[:12] + ".service"
@@ -271,7 +271,7 @@ def main():
             start(unit)
             expect(snapshot()["userTraffic"] == grown["userTraffic"],
                    "Another systemd start changed unchanged cumulative bytes")
-            print("PASS: real Ubuntu systemd v6.0.11 -> v6.0.12 helper upgrade "
+            print("PASS: real Ubuntu systemd v6.0.11 -> v6.0.13 helper upgrade "
                   "with signed policy, preserved root journal, failed-link "
                   "retry and non-duplicated Xray counters")
         finally:
