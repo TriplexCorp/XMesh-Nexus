@@ -147,7 +147,7 @@ mod tests {
     use super::*;
     #[test]
     fn update_requires_transaction_capable_agent() {
-        for version in ["control-v6.0.10", "control-v6.0.11", "control-v6.1.0"] {
+        for version in ["control-v6.0.10", "control-v6.0.11", "control-v6.0.12", "control-v6.1.0"] {
             assert!(supported(version));
         }
         for version in [
