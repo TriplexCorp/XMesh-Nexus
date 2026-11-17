@@ -668,6 +668,18 @@ async fn issue_user(
     let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
     let (meter, reservation, confirmed) =
         lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
+    let revoke_id: Option<String> = sqlx::query_scalar(
+        "SELECT request_id::text FROM quota_v2_revocation_requests
+         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
+           AND meter_epoch=$4::uuid AND reservation_id=$5::uuid",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .bind(node_id)
+    .bind(&meter)
+    .bind(&reservation)
+    .fetch_optional(&mut *conn)
+    .await?;
     let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
     let lease = sqlx::query(
         "SELECT acknowledged_bytes,ceiling_bytes,revision,
@@ -683,7 +695,11 @@ async fn issue_user(
     // Prepare a zero-spend signed policy first. A retry after a lost first
     // HTTP response gets exactly this existing unfunded lease back. Only an
     // authenticated echo of its durable identity unlocks the real budget.
-    .bind(if confirmed { target } else { 0 })
+    .bind(if confirmed && revoke_id.is_none() {
+        target
+    } else {
+        0
+    })
     .bind(local_total)
     .bind(until)
     .fetch_one(&mut *conn)
@@ -699,6 +715,16 @@ async fn issue_user(
         "ceilingBytes": lease.try_get::<i64,_>("ceiling_bytes")?,
         "validUntilMs": lease.try_get::<i64,_>("valid_until_ms")?
     });
+    if let Some(request_id) = revoke_id {
+        // Explicit policy denial is Ed25519 signed with the actual lease.
+        // Holding the reserve is mandatory until a separate proven stop.
+        user["quotaRevocation"] = json!({
+            "requestId":request_id,
+            "epoch":epoch,
+            "meterEpoch":meter,
+            "reservationId":reservation,
+        });
+    }
     Ok(())
 }
 
