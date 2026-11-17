@@ -57,7 +57,7 @@ Path(v['--status-file']).write_text('200\\n')
         self.bootstrap = self.base / 'updater-fixture'
         self.bootstrap.write_text('''#!/bin/bash
 # XMESH_TARGET_AWARE_UPDATER=1
-# AGENT_VERSION="control-v6.0.14"
+# AGENT_VERSION="control-v6.0.15"
 # xmesh-node-agent-upgrade.service
 printf 'executed\\n' >> "$CALLS"
 ''')
@@ -93,7 +93,7 @@ systemd-run(){
 timeout(){ shift; "$@"; }
 sanitize_updater_error(){ :; }
 ''' + worker + '''
-if run_agent_updater control-v6.0.14;then
+if run_agent_updater control-v6.0.15;then
  printf 'success\\n'
 else
  printf '%s\\n' "$UPDATER_ERROR"
