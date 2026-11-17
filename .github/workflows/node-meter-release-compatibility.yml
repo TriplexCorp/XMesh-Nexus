@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 50b503d81180c80b7b01a00f2e3a9063690fff34
+          ref: 2a587436d9dd0e8907a756fb6663c5d3de6ccafd
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Fail on Agent version, bootstrap identity or source mismatch
@@ -38,7 +38,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           node_sha="$(git -C .ci-reviewed-node rev-parse HEAD)"
-          test "$node_sha" = '50b503d81180c80b7b01a00f2e3a9063690fff34'
+          test "$node_sha" = '2a587436d9dd0e8907a756fb6663c5d3de6ccafd'
           test "$(tr -d '\r\n' < AGENT_VERSION)" = 'control-v6.0.14'
           test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.14'
           python3 - <<'PY'
@@ -46,7 +46,7 @@ jobs:
           ui = Path('frontend/js/features/nodes/node-bootstrap-v6.js').read_text()
           node = Path('.ci-reviewed-node/deploy/xmesh-policy-guard-base.py').read_text()
           sender = Path('deploy/node-metrics-agent.sh').read_text()
-          assert "XMESH_V6_NODE_BOOTSTRAP_SHA='50b503d81180c80b7b01a00f2e3a9063690fff34'" in ui
+          assert "XMESH_V6_NODE_BOOTSTRAP_SHA='2a587436d9dd0e8907a756fb6663c5d3de6ccafd'" in ui
           assert "def verified_snapshot_scope(" in node
           assert "def committed_snapshot_scope(" in node
           assert "store_metrics_snapshot(ledger, args.node_id, now_ms, scope)" in node
