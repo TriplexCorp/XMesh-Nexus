@@ -17,3 +17,5 @@ jobs:
           path: .node-transport-fixture
       - name: Exercise bootstrap and signed requests with the production strict PATH
         run: python3 scripts/test-agent-bootstrap-transport.py --node-root .node-transport-fixture
+      - name: Prevent independent Xray restart and reactivation during signed quota revoke
+        run: python3 scripts/test-agent-revocation-control.py
