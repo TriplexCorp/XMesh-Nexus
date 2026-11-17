@@ -15,6 +15,14 @@ import time
 agent = pathlib.Path("deploy/node-metrics-agent.sh").read_text(encoding="utf-8")
 assert agent.count('online_count="$(printf') == 1
 assert agent.count("curl --fail --silent --show-error --max-time 12") == 1
+# A missing/expired signed-policy snapshot cannot fall back to direct Xray.
+# That unscoped path publishes retired users/inbounds after Squad changes,
+# causing the strict Nexus object-scope verifier to reject the entire packet.
+assert "api statsquery" not in agent, "unscoped direct Xray fallback restored"
+assert "USER_STATS_STATUS=direct" not in agent
+assert "signed-scope user metrics unavailable" in agent
+assert 'if [[ "$USER_STATS_STATUS" == verified ]]; then' in agent
+assert "USER_STATS_STATUS=unavailable" in agent
 
 snapshot_start = 'snapshot_fragment="$(python3 - "$SNAPSHOT" "$XMESH_NODE_ID" <<\'PY\'\n'
 snapshot_end = '\nPY\n)";then'
