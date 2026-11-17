@@ -1,0 +1,83 @@
+name: Quota v2 signed two-node API acceptance
+on:
+  pull_request:
+    paths:
+      - 'backend/src/quota_v2.rs'
+      - 'backend/src/node_runtime_legacy.rs'
+      - 'backend/src/main.rs'
+      - 'backend/migrations/0125_quota_v2_reservations.sql'
+      - 'deploy/node-metrics-agent.sh'
+      - 'scripts/test-quota-v2-e2e.py'
+      - '.github/workflows/quota-v2-e2e.yml'
+permissions:
+  contents: read
+jobs:
+  signed-two-node:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      XMESH_AUDIT_DISPOSABLE: '1'
+      XMESH_TEST_URL: http://127.0.0.1:8080
+      COMPOSE_PROJECT_NAME: xmesh-quota-v2
+      XMESH_QUOTA_V2_ENABLED: '1'
+      ADMIN_USERNAME: audit-owner
+      COOKIE_SECURE: 'false'
+      PANEL_DOMAIN: ci.example.invalid
+      DASHBOARD_PATH: /dashboard/quota-v2-disposable
+      HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      ALL_PROXY: ''
+      NO_PROXY: 127.0.0.1,localhost,::1
+    steps:
+      - name: Check out the proposed Nexus implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check out pinned matching Node v2 guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          repository: TriplexCorp/XMesh-Node
+          ref: b33e1553f75f24183fb7e1b636f11fc1f9787a72
+          path: node-agent
+      - name: Generate disposable secrets and feature-gated service
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for name in POSTGRES_PASSWORD APP_DB_PASSWORD REDIS_PASSWORD ADMIN_PASSWORD TOTP_ENCRYPTION_KEY SUBSCRIPTION_ENCRYPTION_KEY XSP_V2_PRODUCT_INTERNAL_TOKEN; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          done
+          mkdir -p deploy/runtime
+          printf '%s\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
+          chmod 0666 deploy/runtime/dashboard-path
+          cat >compose.override.yaml <<'YAML'
+          services:
+            panel:
+              environment:
+                XMESH_QUOTA_V2_ENABLED: "1"
+          YAML
+      - name: Build real API and isolated backing stores
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker compose up --build -d db redis panel
+          for i in $(seq 1 120); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/health/ready >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker compose logs --tail=120 panel
+          exit 1
+      - name: Test real Ed25519 Nexus API, separate Node guards and PostgreSQL conservation
+        run: |
+          set -Eeuo pipefail
+          test "$XMESH_TEST_URL" = http://127.0.0.1:8080
+          test "$XMESH_AUDIT_DISPOSABLE" = 1
+          python3 scripts/test-quota-v2-e2e.py
+      - name: Collect failure diagnostics
+        if: failure()
+        run: docker compose logs --tail=160
+      - name: Destroy disposable services and volumes
+        if: always()
+        run: docker compose down --volumes --remove-orphans
