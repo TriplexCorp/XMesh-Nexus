@@ -21,7 +21,7 @@ import uuid
 
 
 OLD_SHA = "647adcf7af326b205fce12545fb5d75a20bb8191"
-NEW_SHA = "2a587436d9dd0e8907a756fb6663c5d3de6ccafd"
+NEW_SHA = "9fbbe9f6c93f1709aaa47c54252f39ad916c8196"
 NODE = 31
 UID = "550e8400-e29b-41d4-a716-446655440001"
 ROOT = Path(__file__).resolve().parents[1]
