@@ -86,7 +86,7 @@ class SignedNode:
         self.state.joinpath("policy-envelope.json").write_text(json.dumps(data))
         return policy,data
 
-    def metrics(self,user_id,total,lease,raw_total=None):
+    def metrics(self,user_id,total,lease,raw_total=None,include_receipt=True):
         self.stats_at=max(self.stats_at+1,int(time.time()*1000))
         body={"node_id":self.id,"userStatsStatus":"verified",
               "userStatsAtMs":self.stats_at,
@@ -95,6 +95,8 @@ class SignedNode:
                   "userId":user_id,"usedBytes":total,
                   **{k:lease[k] for k in ("epoch","meterEpoch","reservationId")}
               }]}
+        if not include_receipt:
+            body["quotaReceipts"]=[]
         return self.post("/metrics/ingest",body)[0]
 
 def main():
@@ -330,6 +332,21 @@ def main():
             "xray-a",False,active_a["issuedAtMs"])
         assert not denied,denied
         print("PASS: reset quota issues only a newly acknowledged lease without replaying old traffic")
+
+        # Telemetry and quota receipts are separate signed message fields.
+        # A sender may report verified traffic first, before the durable
+        # quota receipt catches up; the admin must count that pending usage
+        # too when validating a lower quota.
+        check(a.metrics(uid,lease_a["ceilingBytes"],grant_a,raw_total=0,include_receipt=False),
+              201,"accept signed raw meter baseline before quota receipt")
+        check(a.metrics(uid,lease_a["ceilingBytes"],grant_a,raw_total=20*MIB,include_receipt=False),
+              201,"record verified user traffic before separate quota receipt")
+        settled,held,limit=account()
+        assert settled==0 and held>0 and held<140_000_000,(settled,held,limit)
+        code,_,_=api("PATCH",f"/collections/users/{uid}",{"limit":0.14},cookie)
+        check(code,409,"deny quota decrease using verified traffic even before signed receipt")
+        assert account()==(settled,held,limit)
+        print("PASS: quota reduction charges pending verified telemetry plus outstanding holds")
     print("Two-node quota-v2 API/guard/PostgreSQL acceptance: PASS")
 
 if __name__=="__main__":
