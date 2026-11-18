@@ -65,7 +65,7 @@ pub async fn record_authenticated_protocol_claim(
 }
 
 /// An operator-only, read-only readiness inventory. A fresh authenticated v2
-/// *authenticated request followed by a signed policy response* is only a compatibility
+/// request followed by a server-signed policy response is only a compatibility
 /// preflight, NOT an attestation of the installed binary, actual Xray
 /// admission state, last accounted bytes, or eligibility for refunds.
 pub async fn fleet_protocol_readiness(
@@ -114,7 +114,7 @@ pub async fn fleet_protocol_readiness(
         let blocker = if disabled {
             "excluded_disabled"
         } else if !recent {
-            "missing_or_stale_signed_request"
+            "missing_or_stale_authenticated_request"
         } else if !claims_v2 {
             "legacy_or_missing_protocol_v2"
         } else if !served {
@@ -143,7 +143,7 @@ pub async fn fleet_protocol_readiness(
         "protocolPreflightPassed":all_claim_v2,
         "observationFreshnessMinutes":15,
         "nodes":nodes,
-        // Signed polling is not a signed *application acknowledgment*.
+        // Authenticated polling is not a signed *application acknowledgment*.
         "installedAgentVersionAttested":false,
         "physicalStopAndFinalMeterVerified":false,
         "canRefundFromThisPreflight":false,
