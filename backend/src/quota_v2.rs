@@ -105,12 +105,17 @@ pub async fn record_authenticated_agent_heartbeat(
 
 // Keep per-node rollout classification independent from the database query.
 // A heartbeat is a reported release, never verified executable attestation.
+#[derive(Clone, Copy)]
+enum FleetReadinessClass {
+    Disabled,
+    Neither,
+    ProtocolOnly,
+    AgentOnly,
+    Ready,
+}
 struct FleetReadinessNode {
     payload: Value,
-    disabled: bool,
-    protocol_compatible: bool,
-    agent_compatible: bool,
-    rollout_compatible: bool,
+    class: FleetReadinessClass,
 }
 
 fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNode, ApiError> {
@@ -136,6 +141,13 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
     let claims_v2 = protocol == Some(2);
     let passed = !disabled && claims_v2 && recent && legacy_quiet && served;
     let rollout_passed = passed && agent_passed;
+    let class = match (disabled, passed, agent_passed) {
+        (true, _, _) => FleetReadinessClass::Disabled,
+        (false, true, true) => FleetReadinessClass::Ready,
+        (false, true, false) => FleetReadinessClass::ProtocolOnly,
+        (false, false, true) => FleetReadinessClass::AgentOnly,
+        (false, false, false) => FleetReadinessClass::Neither,
+    };
     let blocker = if disabled {
         "excluded_disabled"
     } else if !recent {
@@ -182,10 +194,7 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
             "agentBlocker":agent_blocker,
             "rolloutPreflightPassed":rollout_passed,
         }),
-        disabled,
-        protocol_compatible: passed,
-        agent_compatible: agent_passed,
-        rollout_compatible: rollout_passed,
+        class,
     })
 }
 
@@ -240,17 +249,23 @@ pub async fn fleet_protocol_readiness(
     let mut rollout_compatible = 0_usize;
     for entry in &entries {
         let node = classify_fleet_node(entry)?;
-        if !node.disabled {
+        if !matches!(node.class, FleetReadinessClass::Disabled) {
             serving += 1;
-            if node.protocol_compatible {
-                compatible += 1;
-            }
-            if node.agent_compatible {
-                release_compatible += 1;
-            }
-            if node.rollout_compatible {
-                rollout_compatible += 1;
-            }
+        }
+        if matches!(
+            node.class,
+            FleetReadinessClass::ProtocolOnly | FleetReadinessClass::Ready
+        ) {
+            compatible += 1;
+        }
+        if matches!(
+            node.class,
+            FleetReadinessClass::AgentOnly | FleetReadinessClass::Ready
+        ) {
+            release_compatible += 1;
+        }
+        if matches!(node.class, FleetReadinessClass::Ready) {
+            rollout_compatible += 1;
         }
         nodes.push(node.payload);
     }
