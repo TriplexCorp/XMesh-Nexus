@@ -2259,7 +2259,7 @@ pub async fn desired_config(
         "/api/v1/node/desired-config",
     )
     .await?;
-    // Only the authenticated Ed25519 body can update fleet readiness.
+    // Only a Node-authenticated request (Ed25519 or strict-PQ gateway) updates fleet readiness.
     // Store even legacy/missing-protocol requests so a previously v2-capable
     // node cannot remain falsely classified as ready after a downgrade.
     crate::quota_v2::record_authenticated_protocol_claim(
