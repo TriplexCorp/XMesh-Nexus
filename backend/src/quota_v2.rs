@@ -125,22 +125,22 @@ pub async fn fleet_protocol_readiness(
                    AND desired.served_at>=obs.authenticated_request_at
                    AND desired.served_at>=NOW()-INTERVAL '15 minutes'),FALSE)
                     AS signed_policy_after_claim,
-                release.reported_version AS reported_agent_version,
-                (EXTRACT(EPOCH FROM release.last_authenticated_at)*1000)::BIGINT
+                agent_report.reported_version AS reported_agent_version,
+                (EXTRACT(EPOCH FROM agent_report.last_authenticated_at)*1000)::BIGINT
                     AS agent_seen_at_ms,
-                release.last_authenticated_at>=NOW()-INTERVAL '65 seconds'
+                agent_report.last_authenticated_at>=NOW()-INTERVAL '65 seconds'
                     AS agent_fresh,
-                (release.node_id IS NOT NULL AND
-                 (release.last_non_target_at IS NULL OR
-                  release.last_non_target_at<NOW()-INTERVAL '15 minutes'))
+                (agent_report.node_id IS NOT NULL AND
+                 (agent_report.last_non_target_at IS NULL OR
+                  agent_report.last_non_target_at<NOW()-INTERVAL '15 minutes'))
                     AS agent_quiet,
-                (EXTRACT(EPOCH FROM release.last_non_target_at)*1000)::BIGINT
+                (EXTRACT(EPOCH FROM agent_report.last_non_target_at)*1000)::BIGINT
                     AS last_old_agent_at_ms
          FROM panel_records AS n
          LEFT JOIN quota_v2_authenticated_protocol_observations AS obs
            ON obs.node_id=n.id
-         LEFT JOIN quota_v2_authenticated_agent_release_observations AS release
-           ON release.node_id=n.id
+         LEFT JOIN quota_v2_authenticated_agent_release_observations AS agent_report
+           ON agent_report.node_id=n.id
          LEFT JOIN node_desired_revisions AS desired ON desired.node_id=n.id
          WHERE n.collection='nodes'
          ORDER BY n.id",
