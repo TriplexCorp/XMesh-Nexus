@@ -767,6 +767,22 @@ pub async fn validate_limit_change(
     .fetch_optional(&mut *conn)
     .await?;
     let Some(active) = active else {
+        // Closed legacy epochs can still have offline spendable debt.
+        // Without an active account, never permit an admin plan change to
+        // quietly reduce capacity beneath a previously signed obligation.
+        let historical_unsettled: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+                 SELECT 1 FROM quota_v2_reservations
+                 WHERE user_id=$1 AND
+                   ceiling_bytes>GREATEST(acknowledged_bytes,conservative_burn_floor_bytes)
+             )",
+        )
+        .bind(user_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if historical_unsettled {
+            return Err(conflict());
+        }
         return Ok(());
     };
     if old_limit == 0 || new_limit == 0 {
@@ -775,14 +791,15 @@ pub async fn validate_limit_change(
             "Переключение безлимита при квотах v2 требует обновления всех нод.",
         ));
     }
-    let epoch: String = active.try_get("epoch")?;
     let spent: i64 = active.try_get("settled_bytes")?;
+    // A limit decrease must cover outstanding grants from every epoch,
+    // including any legacy closed period with delayed offline usage.
     let held: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-GREATEST(acknowledged_bytes,conservative_burn_floor_bytes)),0)::BIGINT
-         FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
+        "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::NUMERIC-
+                   GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::BIGINT
+         FROM quota_v2_reservations WHERE user_id=$1",
     )
     .bind(user_id)
-    .bind(&epoch)
     .fetch_one(&mut *conn)
     .await?;
     // Signed telemetry can be accepted BEFORE the quota receipt arrives.
