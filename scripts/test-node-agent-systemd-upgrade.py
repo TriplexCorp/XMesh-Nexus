@@ -21,7 +21,7 @@ import uuid
 
 
 OLD_SHA = "647adcf7af326b205fce12545fb5d75a20bb8191"
-NEW_SHA = "602b20594af6e186b17c85a5c93b870cfda832ee"
+NEW_SHA = "d3ebecd521751976982a3ea3cd8fcc4cbbb010af"
 NODE = 31
 UID = "550e8400-e29b-41d4-a716-446655440001"
 ROOT = Path(__file__).resolve().parents[1]
@@ -140,7 +140,7 @@ def main():
 
     old_dir, new_dir = (Path(x).resolve() for x in sys.argv[1:3])
     for folder, required, version in ((old_dir, OLD_SHA, "control-v6.0.11"),
-                                       (new_dir, NEW_SHA, "control-v6.0.16")):
+                                       (new_dir, NEW_SHA, "control-v6.0.17")):
         expect(run("git", "-C", str(folder), "rev-parse", "HEAD") == required,
                "Immutable Node source revision does not match expected code")
         expect((folder / "AGENT_VERSION").read_text().strip() == version,
