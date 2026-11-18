@@ -141,6 +141,17 @@ def main():
         code,_,_=api("GET",f"/users/{uid}/quota-v2/revocation")
         check(code,401,"reject unauthenticated revocation preflight")
         a,b=nodes
+        # A fleet still containing an older quota-protocol Node is NOT
+        # safe to flip globally. The signed v1 request must fail *before*
+        # any grant is created; production rollout needs this preflight.
+        for old_proto in (None,1):
+            payload={"node_id":a.id,"quotaLocalCounters":[]}
+            if old_proto is not None:
+                payload["quotaProtocolVersion"]=old_proto
+            code,_,_=a.post("/node/desired-config",payload)
+            check(code,409,"old Node quota protocol cannot receive any v2 grant")
+        assert query("SELECT COUNT(*)::text FROM quota_v2_reservations WHERE user_id="+str(uid))=="0"
+        print("PASS: pre-v2 Agent is denied without creating unsafe reservations")
         # First request prepares, but cannot activate an unacknowledged
         # offline allowance. Simulate a lost HTTP response from node A:
         # the repeated request without a durable ID must stay unfunded and
