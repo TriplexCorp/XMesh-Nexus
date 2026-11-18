@@ -141,6 +141,21 @@ def main():
         code,_,_=api("GET",f"/users/{uid}/quota-v2/revocation")
         check(code,401,"reject unauthenticated revocation preflight")
         a,b=nodes
+        def fleet():
+            status,data,_=api("GET","/quota-v2/fleet-readiness",cookie=cookie)
+            check(status,200,"authorized quota-v2 signed Node fleet readiness")
+            assert data["featureEnabled"] is True
+            assert data["servingNodes"]==2,data
+            assert data["canRefundFromThisPreflight"] is False
+            assert data["physicalStopAndFinalMeterVerified"] is False
+            assert data["installedAgentVersionAttested"] is False
+            return data
+        missing=fleet()
+        assert not missing["protocolPreflightPassed"] and missing["protocolCompatibleNodes"]==0,missing
+        assert all(row["blocker"]=="missing_or_stale_signed_request"
+                   for row in missing["nodes"]),missing
+        code,_,_=api("GET","/quota-v2/fleet-readiness")
+        check(code,401,"node protocol readiness is not exposed without an operator session")
         # A fleet still containing an older quota-protocol Node is NOT
         # safe to flip globally. The signed v1 request must fail *before*
         # any grant is created; production rollout needs this preflight.
@@ -152,12 +167,37 @@ def main():
             check(code,409,"old Node quota protocol cannot receive any v2 grant")
         assert query("SELECT COUNT(*)::text FROM quota_v2_reservations WHERE user_id="+str(uid))=="0"
         print("PASS: pre-v2 Agent is denied without creating unsafe reservations")
+        obsolete=fleet()
+        legacy=next(row for row in obsolete["nodes"] if row["nodeId"]==a.id)
+        assert legacy["reportedProtocolVersion"]==1 and legacy["recentSignedRequest"],obsolete
+        assert legacy["blocker"]=="legacy_or_missing_protocol_v2",obsolete
+        assert obsolete["protocolCompatibleNodes"]==0
         # First request prepares, but cannot activate an unacknowledged
         # offline allowance. Simulate a lost HTTP response from node A:
         # the repeated request without a durable ID must stay unfunded and
         # return the SAME reservation, not create an inaccessible new one.
         prep_a,config_a=a.desired(uid)
+        half=fleet()
+        assert half["protocolCompatibleNodes"]==1 and not half["protocolPreflightPassed"],half
+        assert next(row for row in half["nodes"] if row["nodeId"]==a.id)["protocolPreflightPassed"],half
         prep_b,config_b=b.desired(uid)
+        compatible=fleet()
+        assert compatible["protocolPreflightPassed"] and compatible["protocolCompatibleNodes"]==2,compatible
+        assert all(row["signedPolicyServedAfterClaim"] for row in compatible["nodes"]),compatible
+        print("PASS: every serving node has recently signed protocol v2 and received a policy")
+        # Downgrading one signed node must immediately invalidate the fleet
+        # snapshot even if it was compatible a moment ago. A rejected old
+        # request MUST NOT mutate existing reservations.
+        code,_,_=a.post("/node/desired-config",
+             {"node_id":a.id,"quotaProtocolVersion":1,"quotaLocalCounters":[]})
+        check(code,409,"authenticated protocol downgrade invalidates fleet readiness")
+        downgraded=fleet()
+        assert not downgraded["protocolPreflightPassed"],downgraded
+        assert next(row for row in downgraded["nodes"] if row["nodeId"]==a.id)["blocker"]=="legacy_or_missing_protocol_v2"
+        recovered,_=a.desired(uid)
+        assert recovered["users"][0]["quotaReservation"]["reservationId"]==prep_a["users"][0]["quotaReservation"]["reservationId"]
+        assert fleet()["protocolPreflightPassed"]
+        print("PASS: signed v2 retry restores compatibility without a fresh reservation")
         lease_pre_a=prep_a["users"][0]["quotaReservation"]
         lease_pre_b=prep_b["users"][0]["quotaReservation"]
         # Execute the actual guard on the prepared signed lease: it MUST
