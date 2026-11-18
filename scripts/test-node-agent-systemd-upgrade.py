@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Isolated Ubuntu systemd canary for v6.0.11 -> v6.0.14 policy-meter upgrade.
+"""Isolated Ubuntu systemd canary for v6.0.11 -> v6.0.16 policy-meter upgrade.
 
 Runs on an ephemeral GitHub-hosted Ubuntu runner as root, never on a VPS.
 Uses real old/current Node guard code, signed Ed25519 policy, real systemd
@@ -21,7 +21,7 @@ import uuid
 
 
 OLD_SHA = "647adcf7af326b205fce12545fb5d75a20bb8191"
-NEW_SHA = "9bc796feb91eadacf77830c7f65bb4aed857bcdf"
+NEW_SHA = "602b20594af6e186b17c85a5c93b870cfda832ee"
 NODE = 31
 UID = "550e8400-e29b-41d4-a716-446655440001"
 ROOT = Path(__file__).resolve().parents[1]
@@ -140,7 +140,7 @@ def main():
 
     old_dir, new_dir = (Path(x).resolve() for x in sys.argv[1:3])
     for folder, required, version in ((old_dir, OLD_SHA, "control-v6.0.11"),
-                                       (new_dir, NEW_SHA, "control-v6.0.15")):
+                                       (new_dir, NEW_SHA, "control-v6.0.16")):
         expect(run("git", "-C", str(folder), "rev-parse", "HEAD") == required,
                "Immutable Node source revision does not match expected code")
         expect((folder / "AGENT_VERSION").read_text().strip() == version,
