@@ -293,6 +293,42 @@ pub async fn fleet_protocol_readiness(
     })))
 }
 
+// Historical holds stay charged even when the newest account is already
+// open/empty. This query is advisory; issuance and reset repeat it under the
+// account serializer instead of trusting an earlier operator preview.
+async fn historical_held_bytes(
+    pool: &PgPool,
+    user_id: i64,
+    exclude_epoch: Option<&str>,
+) -> Result<i64, ApiError> {
+    let held: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::NUMERIC-
+                  GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::BIGINT
+         FROM quota_v2_reservations
+         WHERE user_id=$1 AND ($2::uuid IS NULL OR epoch<>$2::uuid)",
+    )
+    .bind(user_id)
+    .bind(exclude_epoch)
+    .fetch_one(pool)
+    .await?;
+    Ok(held)
+}
+
+async fn inactive_revocation_preflight(
+    pool: &PgPool,
+    user_id: i64,
+) -> Result<Json<Value>, ApiError> {
+    let historical_held = historical_held_bytes(pool, user_id, None).await?;
+    Ok(Json(json!({
+        "userId":user_id,"protocol":"v2",
+        "state":if historical_held>0 {"awaiting_historical"} else {"inactive"},
+        "canResetNow":false,"heldBytes":historical_held,
+        "historicalHeldBytes":historical_held,"nodes":[],
+        "canRefundNow":false,"finalMeterVerified":false,
+        "expirationRefundsBudget":false
+    })))
+}
+
 /// Read-only operator preflight for coordinated revocation/reset.
 /// Expiration never refunds an offline grant: the outstanding amount remains
 /// held until authenticated node-side spending or a future revocation proof.
@@ -322,25 +358,7 @@ pub async fn revocation_status(
     .fetch_optional(&state.pool)
     .await?;
     let Some(active) = active else {
-        // A closed historical epoch can still hold a spendable signed grant
-        // after an interrupted legacy migration or damaged old settlement.
-        // Never conceal that debt behind the absence of an active epoch.
-        let historical_held: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::NUMERIC-
-                      GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::BIGINT
-             FROM quota_v2_reservations WHERE user_id=$1",
-        )
-        .bind(user_id)
-        .fetch_one(&state.pool)
-        .await?;
-        return Ok(Json(json!({
-            "userId":user_id,"protocol":"v2",
-            "state":if historical_held>0 {"awaiting_historical"} else {"inactive"},
-            "canResetNow":false,"heldBytes":historical_held,
-            "historicalHeldBytes":historical_held,"nodes":[],
-            "canRefundNow":false,"finalMeterVerified":false,
-            "expirationRefundsBudget":false
-        })));
+        return inactive_revocation_preflight(&state.pool, user_id).await;
     };
     let epoch: String = active.try_get("epoch")?;
     let limit: i64 = active.try_get("limit_bytes")?;
@@ -405,16 +423,7 @@ pub async fn revocation_status(
     }
     // The visible current-epoch node list is not the whole liability: old
     // closed epochs are also immutable signed obligations until fully charged.
-    let historical_held: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::NUMERIC-
-                  GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::BIGINT
-         FROM quota_v2_reservations
-         WHERE user_id=$1 AND epoch<>$2::uuid",
-    )
-    .bind(user_id)
-    .bind(&epoch)
-    .fetch_one(&state.pool)
-    .await?;
+    let historical_held = historical_held_bytes(&state.pool, user_id, Some(&epoch)).await?;
     let total_held = held.checked_add(historical_held).ok_or_else(conflict)?;
     Ok(Json(json!({
         "userId":user_id,"protocol":"v2",
