@@ -77,9 +77,9 @@ pub async fn fleet_protocol_readiness(
                 (EXTRACT(EPOCH FROM obs.signed_request_at)*1000)::BIGINT
                     AS signed_request_at_ms,
                 obs.signed_request_at>=NOW()-INTERVAL '15 minutes' AS recent,
-                (desired.served_at IS NOT NULL
+                COALESCE((desired.served_at IS NOT NULL
                    AND desired.served_at>=obs.signed_request_at
-                   AND desired.served_at>=NOW()-INTERVAL '15 minutes')
+                   AND desired.served_at>=NOW()-INTERVAL '15 minutes'),FALSE)
                     AS signed_policy_after_claim
          FROM panel_records AS n
          LEFT JOIN quota_v2_signed_protocol_observations AS obs
