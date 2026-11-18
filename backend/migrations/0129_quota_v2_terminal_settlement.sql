@@ -129,6 +129,34 @@ BEGIN
 END;
 $$;
 
+-- A genuinely final meter cannot be followed by a bigger signed usage
+-- receipt. If one appears, the earlier finality claim was invalid: fail the
+-- whole transaction and require operator investigation, never mint capacity.
+-- Also prevent converting an already refunded grant into a full-charge burn.
+CREATE FUNCTION quota_v2_terminal_immutability_guard()
+RETURNS TRIGGER LANGUAGE plpgsql AS $
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM quota_v2_terminal_settlements
+        WHERE user_id=OLD.user_id AND epoch=OLD.epoch AND
+          node_id=OLD.node_id AND meter_epoch=OLD.meter_epoch
+    ) AND (
+        NEW.ceiling_bytes IS DISTINCT FROM OLD.ceiling_bytes OR
+        NEW.acknowledged_bytes IS DISTINCT FROM OLD.acknowledged_bytes OR
+        NEW.conservative_burn_floor_bytes IS DISTINCT FROM OLD.conservative_burn_floor_bytes OR
+        NEW.conservative_burned_bytes IS DISTINCT FROM OLD.conservative_burned_bytes OR
+        NEW.conservative_burned_at IS DISTINCT FROM OLD.conservative_burned_at
+    ) THEN
+        RAISE EXCEPTION 'terminal settlement forbids later meter/burn mutation'
+            USING ERRCODE='22023';
+    END IF;
+    RETURN NEW;
+END;
+$;
+CREATE TRIGGER quota_v2_terminal_immutability_guard_trg
+BEFORE UPDATE ON quota_v2_reservations
+FOR EACH ROW EXECUTE FUNCTION quota_v2_terminal_immutability_guard();
+
 -- Explicitly deny unprivileged callers; the migration owner retains access.
 -- The future trusted backend MUST verify signature and dataplane finality
 -- before it ever invokes this dormant primitive.
