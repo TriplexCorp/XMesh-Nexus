@@ -294,6 +294,154 @@ class ReservationTests(unittest.TestCase):
         self.assertEqual(self.reserve(1,target=50,ack=320),(370,320))
         self.assertEqual(self.state(),(320,50))
 
+    # The following tests exercise the dormant SQL primitive directly as
+    # migration OWNER in disposable PostgreSQL. This does NOT simulate a
+    # valid Ed25519 terminal proof and does NOT enable any application API.
+    def terminal_prepare(self, node=1, acknowledged=20, observed=20):
+        self.reserve(node)
+        self.ack(node, acknowledged)
+        self.revoke(node)
+        with psycopg.connect(DSN) as c:
+            rid=c.execute(
+                "SELECT request_id FROM quota_v2_revocation_requests "
+                "WHERE user_id=%s AND epoch=%s AND node_id=%s",
+                (self.uid,self.epoch,node)).fetchone()[0]
+            c.execute(
+                "UPDATE quota_v2_reservations SET node_confirmed=TRUE "
+                "WHERE user_id=%s AND epoch=%s AND node_id=%s",
+                (self.uid,self.epoch,node))
+            c.execute(
+                "UPDATE quota_v2_revocation_requests "
+                "SET applied_at=NOW(),applied_revision=1,observed_used_bytes=%s "
+                "WHERE user_id=%s AND epoch=%s AND node_id=%s",
+                (observed,self.uid,self.epoch,node))
+            return rid
+
+    def terminal(self,node,total,request,**override):
+        args={
+            "user":self.uid,"epoch":self.epoch,"node":node,
+            "meter":self.meters[node],"id":self.ids[node],
+            "request":request,"revision":1,
+            "runtime":"a"*64,"digest":"b"*64,"total":total,
+        }
+        args.update(override)
+        with psycopg.connect(DSN) as c:
+            return c.execute(
+                "SELECT final_used_bytes,refunded_bytes,applied_revision,"
+                "xray_runtime_id,proof_digest FROM "
+                "quota_v2_settle_verified_terminal("
+                "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (args["user"],args["epoch"],args["node"],args["meter"],
+                 args["id"],args["request"],args["revision"],
+                 args["runtime"],args["digest"],args["total"])).fetchone()
+
+    def test_terminal_settlement_refunds_only_verified_unused_one_node(self):
+        req=self.terminal_prepare(1,acknowledged=20)
+        self.reserve(2)
+        self.assertEqual(self.economic_state(),(20,80))
+        settled=self.terminal(1,30,req)
+        self.assertEqual(settled[:3],(30,20,1))
+        self.assertEqual(self.economic_state(),(30,50))
+        self.assertEqual(self.terminal(1,30,req),settled)
+        self.assertEqual(self.economic_state(),(30,50))
+        self.assertEqual(self.reserve(2,target=70),(70,0))
+        self.assertEqual(self.economic_state(),(30,70))
+        # A's previously expired/revoked reservation cannot mint a second
+        # grant or change the terminal absolute meter.
+        self.assertEqual(self.reserve(1,target=50),(30,30))
+        self.assertEqual(self.economic_state(),(30,70))
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_accounts SET closed=TRUE WHERE user_id=%s",
+                      (self.uid,))
+        self.assertEqual(self.terminal(1,30,req),settled)
+        self.assertEqual(self.economic_state(),(30,70))
+
+    def test_terminal_without_applied_stop_or_wrong_scope_never_releases(self):
+        self.reserve(1)
+        self.reserve(2)
+        self.revoke(1)
+        with psycopg.connect(DSN) as c:
+            req=c.execute(
+                "SELECT request_id FROM quota_v2_revocation_requests "
+                "WHERE user_id=%s AND node_id=1",(self.uid,)).fetchone()[0]
+        baseline=self.economic_state()
+        with self.assertRaises(psycopg.Error):
+            self.terminal(1,20,req)
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_reservations SET node_confirmed=TRUE "
+                      "WHERE user_id=%s AND node_id=1",(self.uid,))
+        with self.assertRaises(psycopg.Error):
+            self.terminal(1,20,req)
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_revocation_requests "
+                      "SET applied_at=NOW(),applied_revision=1,observed_used_bytes=10 "
+                      "WHERE user_id=%s AND node_id=1",(self.uid,))
+        for variant in (
+            {"request":uuid.uuid4()}, {"id":uuid.uuid4()},
+            {"meter":uuid.uuid4()}, {"epoch":uuid.uuid4()},
+            {"node":2}, {"revision":2},
+            {"runtime":"z"*64}, {"digest":"0"*64},
+            {"total":9}, {"total":-1},
+        ):
+            with self.subTest(variant=variant):
+                with self.assertRaises(psycopg.Error):
+                    self.terminal(1,20,req,**variant)
+                self.assertEqual(self.economic_state(),baseline)
+        self.assertEqual(self.economic_state(),(0,100))
+
+    def test_terminal_prevents_late_usage_burn_and_changed_replay(self):
+        req=self.terminal_prepare(1,acknowledged=20)
+        final=self.terminal(1,30,req)
+        self.assertEqual(self.economic_state(),(30,0))
+        for variant in (
+            {"total":31}, {"total":29},
+            {"runtime":"c"*64}, {"digest":"d"*64},
+            {"request":uuid.uuid4()}, {"revision":2},
+        ):
+            with self.subTest(variant=variant):
+                with self.assertRaises(psycopg.Error):
+                    self.terminal(1,30,req,**variant)
+                self.assertEqual(self.economic_state(),(30,0))
+        with self.assertRaises(psycopg.Error):
+            self.ack(1,31)
+        with self.assertRaises(psycopg.Error):
+            self.burn(1)
+        self.assertEqual(self.terminal(1,30,req),final)
+        self.assertEqual(self.economic_state(),(30,0))
+
+    def test_terminal_and_other_node_reserve_are_account_locked(self):
+        req=self.terminal_prepare(1,acknowledged=20)
+        self.reserve(2)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            fut_a=pool.submit(self.terminal,1,30,req)
+            fut_b=pool.submit(self.reserve,2,70)
+            fut_a.result()
+            fut_b.result()
+        spent,held=self.economic_state()
+        self.assertEqual(spent,30)
+        self.assertLessEqual(spent+held,100)
+        self.assertGreaterEqual(held,50)
+        self.assertEqual(self.terminal(1,30,req)[1],20)
+
+    def test_conservative_burn_never_entitles_a_late_refund(self):
+        self.reserve(1)
+        self.revoke(1)
+        self.burn(1)
+        with psycopg.connect(DSN) as c:
+            rid=c.execute(
+                "SELECT request_id FROM quota_v2_revocation_requests "
+                "WHERE user_id=%s AND node_id=1",(self.uid,)).fetchone()[0]
+            c.execute("UPDATE quota_v2_reservations SET node_confirmed=TRUE "
+                      "WHERE user_id=%s AND node_id=1",(self.uid,))
+            c.execute("UPDATE quota_v2_revocation_requests SET applied_at=NOW(),"
+                      "applied_revision=1,observed_used_bytes=0 "
+                      "WHERE user_id=%s AND node_id=1",(self.uid,))
+        before=self.economic_state()
+        with self.assertRaises(psycopg.Error):
+            self.terminal(1,30,rid)
+        self.assertEqual(self.economic_state(),before)
+
+
 if __name__ == "__main__":
     assert os.getenv("XMESH_AUDIT_DISPOSABLE") == "1"
     assert DSN.startswith("postgresql://quota_test:")
