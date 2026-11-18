@@ -517,6 +517,17 @@ def main():
         check(code,200,"show old-epoch offline debt even when new epoch has zero grant")
         assert historical["state"]=="awaiting_historical" and not historical["canResetNow"],historical
         assert historical["historicalHeldBytes"]==7 and historical["heldBytes"]==7,historical
+        # The Node's ordinary authenticated policy poll must also refuse
+        # new signed capacity. Blocking only the UI reset is insufficient:
+        # otherwise an existing zero-grant new epoch can mint another grant.
+        code,_,_=a.post("/node/desired-config",{
+            "node_id":a.id,"quotaProtocolVersion":2,"quotaLocalCounters":[{
+                "userId":uid,"usedBytes":lease_a["ceilingBytes"],
+                "epoch":new_a["epoch"],"meterEpoch":new_a["meterEpoch"],
+                "reservationId":new_a["reservationId"]
+            }]
+        })
+        check(code,409,"refuse signed Node refill while closed epoch holds bytes")
         code,_,_=api("PATCH",f"/collections/users/{uid}",{"used":0},cookie)
         check(code,409,"prevent quota reset with outstanding grant in closed epoch")
         assert query("SELECT COUNT(*)::text FROM quota_v2_accounts WHERE user_id="
