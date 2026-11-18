@@ -37,6 +37,119 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
+/// Record only a *signed request's protocol claim*. The caller must have
+/// verified the node's registered Ed25519 key and signed request body first.
+/// This is never a proof that the Agent applied the policy or stopped traffic.
+pub async fn record_authenticated_protocol_claim(
+    pool: &PgPool,
+    node_id: i64,
+    protocol_version: Option<u8>,
+) -> Result<(), ApiError> {
+    let version = i16::from(protocol_version.unwrap_or_default());
+    sqlx::query(
+        "INSERT INTO quota_v2_signed_protocol_observations
+             (node_id,protocol_version,signed_request_at,last_v2_claim_at)
+         VALUES($1,$2,NOW(),CASE WHEN $2=2 THEN NOW() ELSE NULL END)
+         ON CONFLICT(node_id) DO UPDATE SET
+             protocol_version=EXCLUDED.protocol_version,
+             signed_request_at=NOW(),
+             last_v2_claim_at=CASE WHEN EXCLUDED.protocol_version=2
+                 THEN NOW() ELSE quota_v2_signed_protocol_observations.last_v2_claim_at END",
+    )
+    .bind(node_id)
+    .bind(version)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// An operator-only, read-only readiness inventory. A fresh signed v2
+/// *request followed by a signed policy response* is only a compatibility
+/// preflight, NOT an attestation of the installed binary, actual Xray
+/// admission state, last accounted bytes, or eligibility for refunds.
+pub async fn fleet_protocol_readiness(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    crate::enforce_collection(&actor, "nodes", true)?;
+    let entries = sqlx::query(
+        "SELECT n.id,n.data,obs.protocol_version,
+                (EXTRACT(EPOCH FROM obs.signed_request_at)*1000)::BIGINT
+                    AS signed_request_at_ms,
+                obs.signed_request_at>=NOW()-INTERVAL '15 minutes' AS recent,
+                (desired.served_at IS NOT NULL
+                   AND desired.served_at>=obs.signed_request_at
+                   AND desired.served_at>=NOW()-INTERVAL '15 minutes')
+                    AS signed_policy_after_claim
+         FROM panel_records AS n
+         LEFT JOIN quota_v2_signed_protocol_observations AS obs
+           ON obs.node_id=n.id
+         LEFT JOIN node_desired_revisions AS desired ON desired.node_id=n.id
+         WHERE n.collection='nodes'
+         ORDER BY n.id",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let mut nodes = Vec::with_capacity(entries.len());
+    let mut serving = 0_usize;
+    let mut compatible = 0_usize;
+    for entry in entries {
+        let node_id: i64 = entry.try_get("id")?;
+        let data: Value = entry.try_get("data")?;
+        let disabled = data.get("disabled").and_then(Value::as_bool) == Some(true);
+        let protocol: Option<i16> = entry.try_get("protocol_version")?;
+        let seen_at_ms: Option<i64> = entry.try_get("signed_request_at_ms")?;
+        let recent: Option<bool> = entry.try_get("recent")?;
+        let served: bool = entry.try_get("signed_policy_after_claim")?;
+        let recent = recent.unwrap_or(false);
+        let claims_v2 = protocol == Some(2);
+        let passed = !disabled && claims_v2 && recent && served;
+        if !disabled {
+            serving += 1;
+            if passed {
+                compatible += 1;
+            }
+        }
+        let blocker = if disabled {
+            "excluded_disabled"
+        } else if !recent {
+            "missing_or_stale_signed_request"
+        } else if !claims_v2 {
+            "legacy_or_missing_protocol_v2"
+        } else if !served {
+            "no_signed_policy_served_after_claim"
+        } else {
+            "none"
+        };
+        nodes.push(json!({
+            "nodeId":node_id,
+            "name":data.get("name").and_then(Value::as_str).unwrap_or(""),
+            "disabled":disabled,
+            "reportedProtocolVersion":protocol,
+            "lastSignedRequestAtMs":seen_at_ms,
+            "recentSignedRequest":recent,
+            "signedPolicyServedAfterClaim":served,
+            "protocolPreflightPassed":passed,
+            "blocker":blocker,
+        }));
+    }
+    let all_claim_v2 = serving > 0 && serving == compatible;
+    Ok(Json(json!({
+        "protocol":"v2",
+        "featureEnabled":enabled(),
+        "servingNodes":serving,
+        "protocolCompatibleNodes":compatible,
+        "protocolPreflightPassed":all_claim_v2,
+        "observationFreshnessMinutes":15,
+        "nodes":nodes,
+        // Signed polling is not a signed *application acknowledgment*.
+        "installedAgentVersionAttested":false,
+        "physicalStopAndFinalMeterVerified":false,
+        "canRefundFromThisPreflight":false,
+        "requiresNodeRolloutVerification":true
+    })))
+}
+
 /// Read-only operator preflight for coordinated revocation/reset.
 /// Expiration never refunds an offline grant: the outstanding amount remains
 /// held until authenticated node-side spending or a future revocation proof.
