@@ -69,6 +69,135 @@ pub async fn record_authenticated_protocol_claim(
     Ok(())
 }
 
+/// Track only a successfully authenticated control-Agent heartbeat. A newer
+/// release claim must not erase a recently observed old worker, including
+/// when the release target changes between Nexus deployments. This is a
+/// self-reported version, NOT a verified installed executable identity.
+pub async fn record_authenticated_agent_heartbeat(
+    pool: &PgPool,
+    node_id: i64,
+    version: &str,
+) -> Result<(), ApiError> {
+    let target = crate::node_runtime::CONTROL_AGENT_VERSION;
+    sqlx::query(
+        "INSERT INTO quota_v2_authenticated_agent_release_observations
+           (node_id,reported_version,last_authenticated_at,last_non_target_at)
+         VALUES($1,$2,NOW(),CASE WHEN $2<>$3 THEN NOW() ELSE NULL END)
+         ON CONFLICT(node_id) DO UPDATE SET
+           last_non_target_at=CASE
+               WHEN EXCLUDED.reported_version<>$3 THEN NOW()
+               WHEN quota_v2_authenticated_agent_release_observations.reported_version<>$3
+                   THEN GREATEST(
+                       COALESCE(quota_v2_authenticated_agent_release_observations.last_non_target_at,
+                                quota_v2_authenticated_agent_release_observations.last_authenticated_at),
+                       quota_v2_authenticated_agent_release_observations.last_authenticated_at)
+               ELSE quota_v2_authenticated_agent_release_observations.last_non_target_at END,
+           reported_version=EXCLUDED.reported_version,
+           last_authenticated_at=NOW()",
+    )
+    .bind(node_id)
+    .bind(version)
+    .bind(target)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+// Keep per-node rollout classification independent from the database query.
+// A heartbeat is a reported release, never verified executable attestation.
+#[derive(Clone, Copy)]
+enum FleetReadinessClass {
+    Disabled,
+    Neither,
+    ProtocolOnly,
+    AgentOnly,
+    Ready,
+}
+struct FleetReadinessNode {
+    payload: Value,
+    class: FleetReadinessClass,
+}
+
+fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNode, ApiError> {
+    let node_id: i64 = entry.try_get("id")?;
+    let data: Value = entry.try_get("data")?;
+    let disabled = data.get("disabled").and_then(Value::as_bool) == Some(true);
+    let protocol: Option<i16> = entry.try_get("protocol_version")?;
+    let seen_at_ms: Option<i64> = entry.try_get("authenticated_request_at_ms")?;
+    let recent: Option<bool> = entry.try_get("recent")?;
+    let served: bool = entry.try_get("signed_policy_after_claim")?;
+    let legacy_quiet: bool = entry.try_get("legacy_quiet")?;
+    let last_legacy_ms: Option<i64> = entry.try_get("last_legacy_request_at_ms")?;
+    let recent = recent.unwrap_or(false);
+    let reported_agent: Option<String> = entry.try_get("reported_agent_version")?;
+    let last_agent_ms: Option<i64> = entry.try_get("agent_seen_at_ms")?;
+    let agent_fresh: Option<bool> = entry.try_get("agent_fresh")?;
+    let agent_quiet: bool = entry.try_get("agent_quiet")?;
+    let last_old_agent_ms: Option<i64> = entry.try_get("last_old_agent_at_ms")?;
+    let agent_fresh = agent_fresh.unwrap_or(false);
+    let agent_current =
+        reported_agent.as_deref() == Some(crate::node_runtime::CONTROL_AGENT_VERSION);
+    let agent_passed = !disabled && agent_current && agent_fresh && agent_quiet;
+    let claims_v2 = protocol == Some(2);
+    let passed = !disabled && claims_v2 && recent && legacy_quiet && served;
+    let rollout_passed = passed && agent_passed;
+    let class = match (disabled, passed, agent_passed) {
+        (true, _, _) => FleetReadinessClass::Disabled,
+        (false, true, true) => FleetReadinessClass::Ready,
+        (false, true, false) => FleetReadinessClass::ProtocolOnly,
+        (false, false, true) => FleetReadinessClass::AgentOnly,
+        (false, false, false) => FleetReadinessClass::Neither,
+    };
+    let blocker = if disabled {
+        "excluded_disabled"
+    } else if !recent {
+        "missing_or_stale_authenticated_request"
+    } else if !claims_v2 {
+        "legacy_or_missing_protocol_v2"
+    } else if !legacy_quiet {
+        "legacy_protocol_seen_recently"
+    } else if !served {
+        "no_signed_policy_served_after_claim"
+    } else {
+        "none"
+    };
+    let agent_blocker = if disabled {
+        "excluded_disabled"
+    } else if !agent_fresh {
+        "missing_or_stale_authenticated_agent_heartbeat"
+    } else if !agent_current {
+        "agent_release_version_mismatch"
+    } else if !agent_quiet {
+        "outdated_agent_seen_recently"
+    } else {
+        "none"
+    };
+    Ok(FleetReadinessNode {
+        payload: json!({
+            "nodeId":node_id,
+            "name":data.get("name").and_then(Value::as_str).unwrap_or(""),
+            "disabled":disabled,
+            "reportedProtocolVersion":protocol,
+            "lastAuthenticatedRequestAtMs":seen_at_ms,
+            "recentAuthenticatedRequest":recent,
+            "legacyQuietPeriodPassed":legacy_quiet,
+            "lastLegacyAuthenticatedRequestAtMs":last_legacy_ms,
+            "signedPolicyServedAfterClaim":served,
+            "protocolPreflightPassed":passed,
+            "blocker":blocker,
+            "reportedAgentVersion":reported_agent,
+            "lastAuthenticatedAgentHeartbeatAtMs":last_agent_ms,
+            "agentHeartbeatFresh":agent_fresh,
+            "legacyAgentQuietPeriodPassed":agent_quiet,
+            "lastOutdatedAgentHeartbeatAtMs":last_old_agent_ms,
+            "agentReleasePreflightPassed":agent_passed,
+            "agentBlocker":agent_blocker,
+            "rolloutPreflightPassed":rollout_passed,
+        }),
+        class,
+    })
+}
+
 /// An operator-only, read-only readiness inventory. A fresh authenticated v2
 /// request followed by a server-signed policy response is only a compatibility
 /// preflight, NOT an attestation of the installed binary, actual Xray
@@ -90,10 +219,23 @@ pub async fn fleet_protocol_readiness(
                 COALESCE((desired.served_at IS NOT NULL
                    AND desired.served_at>=obs.authenticated_request_at
                    AND desired.served_at>=NOW()-INTERVAL '15 minutes'),FALSE)
-                    AS signed_policy_after_claim
+                    AS signed_policy_after_claim,
+                agent_report.reported_version AS reported_agent_version,
+                (EXTRACT(EPOCH FROM agent_report.last_authenticated_at)*1000)::BIGINT
+                    AS agent_seen_at_ms,
+                agent_report.last_authenticated_at>=NOW()-INTERVAL '65 seconds'
+                    AS agent_fresh,
+                (agent_report.node_id IS NOT NULL AND
+                 (agent_report.last_non_target_at IS NULL OR
+                  agent_report.last_non_target_at<NOW()-INTERVAL '15 minutes'))
+                    AS agent_quiet,
+                (EXTRACT(EPOCH FROM agent_report.last_non_target_at)*1000)::BIGINT
+                    AS last_old_agent_at_ms
          FROM panel_records AS n
          LEFT JOIN quota_v2_authenticated_protocol_observations AS obs
            ON obs.node_id=n.id
+         LEFT JOIN quota_v2_authenticated_agent_release_observations AS agent_report
+           ON agent_report.node_id=n.id
          LEFT JOIN node_desired_revisions AS desired ON desired.node_id=n.id
          WHERE n.collection='nodes'
          ORDER BY n.id",
@@ -103,51 +245,29 @@ pub async fn fleet_protocol_readiness(
     let mut nodes = Vec::with_capacity(entries.len());
     let mut serving = 0_usize;
     let mut compatible = 0_usize;
-    for entry in entries {
-        let node_id: i64 = entry.try_get("id")?;
-        let data: Value = entry.try_get("data")?;
-        let disabled = data.get("disabled").and_then(Value::as_bool) == Some(true);
-        let protocol: Option<i16> = entry.try_get("protocol_version")?;
-        let seen_at_ms: Option<i64> = entry.try_get("authenticated_request_at_ms")?;
-        let recent: Option<bool> = entry.try_get("recent")?;
-        let served: bool = entry.try_get("signed_policy_after_claim")?;
-        let legacy_quiet: bool = entry.try_get("legacy_quiet")?;
-        let last_legacy_ms: Option<i64> = entry.try_get("last_legacy_request_at_ms")?;
-        let recent = recent.unwrap_or(false);
-        let claims_v2 = protocol == Some(2);
-        let passed = !disabled && claims_v2 && recent && legacy_quiet && served;
-        if !disabled {
+    let mut release_compatible = 0_usize;
+    let mut rollout_compatible = 0_usize;
+    for entry in &entries {
+        let node = classify_fleet_node(entry)?;
+        if !matches!(node.class, FleetReadinessClass::Disabled) {
             serving += 1;
-            if passed {
-                compatible += 1;
-            }
         }
-        let blocker = if disabled {
-            "excluded_disabled"
-        } else if !recent {
-            "missing_or_stale_authenticated_request"
-        } else if !claims_v2 {
-            "legacy_or_missing_protocol_v2"
-        } else if !legacy_quiet {
-            "legacy_protocol_seen_recently"
-        } else if !served {
-            "no_signed_policy_served_after_claim"
-        } else {
-            "none"
-        };
-        nodes.push(json!({
-            "nodeId":node_id,
-            "name":data.get("name").and_then(Value::as_str).unwrap_or(""),
-            "disabled":disabled,
-            "reportedProtocolVersion":protocol,
-            "lastAuthenticatedRequestAtMs":seen_at_ms,
-            "recentAuthenticatedRequest":recent,
-            "legacyQuietPeriodPassed":legacy_quiet,
-            "lastLegacyAuthenticatedRequestAtMs":last_legacy_ms,
-            "signedPolicyServedAfterClaim":served,
-            "protocolPreflightPassed":passed,
-            "blocker":blocker,
-        }));
+        if matches!(
+            node.class,
+            FleetReadinessClass::ProtocolOnly | FleetReadinessClass::Ready
+        ) {
+            compatible += 1;
+        }
+        if matches!(
+            node.class,
+            FleetReadinessClass::AgentOnly | FleetReadinessClass::Ready
+        ) {
+            release_compatible += 1;
+        }
+        if matches!(node.class, FleetReadinessClass::Ready) {
+            rollout_compatible += 1;
+        }
+        nodes.push(node.payload);
     }
     let all_claim_v2 = serving > 0 && serving == compatible;
     Ok(Json(json!({
@@ -156,6 +276,12 @@ pub async fn fleet_protocol_readiness(
         "servingNodes":serving,
         "protocolCompatibleNodes":compatible,
         "protocolPreflightPassed":all_claim_v2,
+        "targetAgentVersion":crate::node_runtime::CONTROL_AGENT_VERSION,
+        "agentReleaseCompatibleNodes":release_compatible,
+        "rolloutCompatibleNodes":rollout_compatible,
+        "rolloutPreflightPassed":serving>0 && rollout_compatible==serving,
+        "agentHeartbeatFreshnessSeconds":65,
+        "legacyAgentQuietPeriodMinutes":15,
         "observationFreshnessMinutes":15,
         "legacyQuietPeriodMinutes":15,
         "nodes":nodes,

@@ -229,6 +229,90 @@ def main():
               "WHERE node_id="+str(a.id))
         assert fleet()["protocolPreflightPassed"]
         print("PASS: old-agent quiet window blocks mixed generations without changing reservation")
+        # Protocol compatibility alone cannot mean the installed control
+        # runtime was recently online. All heartbeat claims below are signed
+        # by the correct Ed25519 Node identity, but they are NOT executable
+        # attestation or proof that Xray has physically stopped.
+        initial_release=fleet()
+        assert initial_release["targetAgentVersion"]=="control-v6.0.17",initial_release
+        assert initial_release["protocolPreflightPassed"],initial_release
+        assert not initial_release["rolloutPreflightPassed"],initial_release
+        assert initial_release["agentReleaseCompatibleNodes"]==0,initial_release
+        def heartbeat(node,version):
+            status,data,_=node.post("/node/heartbeat",{
+                "node_id":node.id,"version":version,
+                "router_running":True,"xray_running":False
+            })
+            check(status,200,f"authenticated Node {node.id} heartbeat for {version}")
+            assert data["accepted"] is True,data
+        heartbeat(a,"control-v6.0.16")
+        heartbeat(b,"control-v6.0.17")
+        obsolete_agent=fleet()
+        assert not obsolete_agent["rolloutPreflightPassed"],obsolete_agent
+        outdated=next(row for row in obsolete_agent["nodes"] if row["nodeId"]==a.id)
+        assert outdated["agentBlocker"]=="agent_release_version_mismatch",obsolete_agent
+        assert outdated["reportedAgentVersion"]=="control-v6.0.16",obsolete_agent
+        assert obsolete_agent["agentReleaseCompatibleNodes"]==1,obsolete_agent
+        # Upgrading an old worker cannot erase evidence of a second stale
+        # worker sharing its Node key. Require 15 minutes without v6.0.16.
+        heartbeat(a,"control-v6.0.17")
+        mixed=fleet()
+        assert mixed["protocolPreflightPassed"] and not mixed["rolloutPreflightPassed"],mixed
+        mixed_a=next(row for row in mixed["nodes"] if row["nodeId"]==a.id)
+        assert mixed_a["agentBlocker"]=="outdated_agent_seen_recently",mixed
+        assert mixed_a["reportedAgentVersion"]=="control-v6.0.17",mixed
+        query("UPDATE quota_v2_authenticated_agent_release_observations "
+              "SET last_non_target_at=NOW()-INTERVAL '16 minutes' "
+              "WHERE node_id="+str(a.id))
+        released=fleet()
+        assert released["rolloutPreflightPassed"] and released["rolloutCompatibleNodes"]==2,released
+        assert all(row["agentReleasePreflightPassed"] for row in released["nodes"]),released
+        # A separate 0.1.0 Go router still has a heartbeat; it MUST NOT
+        # impersonate or overwrite the control-Agent release observation.
+        heartbeat(a,"0.1.0")
+        assert fleet()["rolloutPreflightPassed"],fleet()
+        # A key from A must not forge a claimed release version of B.
+        code,_,_=a.post("/node/heartbeat",{
+            "node_id":b.id,"version":"control-v6.0.16",
+            "router_running":True,"xray_running":False
+        })
+        assert code in (401,403),(code,"forged cross-node release heartbeat")
+        assert fleet()["rolloutPreflightPassed"],fleet()
+        # Even a previously correct signed version becomes untrusted after
+        # its short heartbeat TTL; fresh traffic-policy polling is distinct.
+        query("UPDATE quota_v2_authenticated_agent_release_observations "
+              "SET last_authenticated_at=NOW()-INTERVAL '120 seconds' "
+              "WHERE node_id="+str(b.id))
+        expired=fleet()
+        assert not expired["rolloutPreflightPassed"],expired
+        expired_b=next(row for row in expired["nodes"] if row["nodeId"]==b.id)
+        assert expired_b["agentBlocker"]=="missing_or_stale_authenticated_agent_heartbeat",expired
+        heartbeat(b,"control-v6.0.17")
+        assert fleet()["rolloutPreflightPassed"],fleet()
+        print("PASS: v6.0.17 release preflight needs fresh signed heartbeats and an old-Agent quiet window")
+        # Re-execute the migration's EXACT seed statement in this disposable
+        # database with a pre-existing live Agent heartbeat. The backfill
+        # must conservatively quarantine even an already-correct v6.0.17
+        # report because historical concurrent old workers are unknowable.
+        query("DELETE FROM quota_v2_authenticated_agent_release_observations "
+              "WHERE node_id="+str(a.id))
+        source=Path(__file__).resolve().parents[1]/(
+            "backend/migrations/0131_quota_v2_authenticated_agent_release_observations.sql")
+        migration_sql=source.read_text(encoding="utf-8")
+        prefix="INSERT INTO quota_v2_authenticated_agent_release_observations"
+        assert migration_sql.count(prefix)==1,migration_sql
+        seed_sql=prefix+migration_sql.split(prefix,1)[1].split(";",1)[0]
+        query(seed_sql)
+        migrated=fleet()
+        assert not migrated["rolloutPreflightPassed"],migrated
+        migrated_a=next(row for row in migrated["nodes"] if row["nodeId"]==a.id)
+        assert migrated_a["reportedAgentVersion"]=="control-v6.0.17",migrated
+        assert migrated_a["agentBlocker"]=="outdated_agent_seen_recently",migrated
+        query("UPDATE quota_v2_authenticated_agent_release_observations "
+              "SET last_non_target_at=NOW()-INTERVAL '16 minutes' "
+              "WHERE node_id="+str(a.id))
+        assert fleet()["rolloutPreflightPassed"],fleet()
+        print("PASS: migration seeds a conservative Agent quiet window for existing installations")
         lease_pre_a=prep_a["users"][0]["quotaReservation"]
         lease_pre_b=prep_b["users"][0]["quotaReservation"]
         # Execute the actual guard on the prepared signed lease: it MUST

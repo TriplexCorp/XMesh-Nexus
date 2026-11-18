@@ -6,6 +6,8 @@ on:
       - 'backend/src/node_runtime_legacy.rs'
       - 'backend/src/main.rs'
       - 'backend/migrations/0130_quota_v2_authenticated_protocol_observations.sql'
+      - 'backend/migrations/0131_quota_v2_authenticated_agent_release_observations.sql'
+      - 'docs/QUOTA_V2_FLEET_READINESS.md'
       - 'backend/migrations/0125_quota_v2_reservations.sql'
       - 'deploy/node-metrics-agent.sh'
       - 'scripts/test-quota-v2-e2e.py'
@@ -51,7 +53,7 @@ jobs:
           test -f node-agent/deploy/xmesh-policy-guard-base.py
           test -f node-agent/experiments/xray-dataplane-fence/durable_fence.go.txt
           python3 -m py_compile node-agent/deploy/xmesh-policy-guard.py node-agent/deploy/xmesh-policy-guard-base.py
-          echo 'Pinned current v6.0.16 Node matches committed, immutable signed quota guard'
+          echo 'Pinned current v6.0.17 Node matches committed, immutable signed quota guard'
       - name: Generate disposable secrets and feature-gated service
         shell: bash
         run: |
