@@ -494,6 +494,42 @@ def main():
         assert new_a["reservationId"]!=lease_a["reservationId"]
         assert new_a["ceilingBytes"]==new_a["acknowledgedBytes"]==lease_a["ceilingBytes"]
         assert new_b["ceilingBytes"]==new_b["acknowledgedBytes"]==lease_b["ceilingBytes"]
+        # Regression: a legacy/interrupted CLOSED epoch can still contain
+        # spendable signed capacity even though the current epoch is already
+        # zero-grant. Such debt MUST block admin reset, not be silently
+        # omitted by a current-epoch-only reservation query.
+        old_epoch=lease_a["epoch"]
+        prior_ceiling=int(query(
+            "SELECT ceiling_bytes::text FROM quota_v2_reservations WHERE user_id="
+            +str(uid)+" AND node_id="+str(a.id)+" AND epoch='"+old_epoch+"'"))
+        previous_ack=int(query(
+            "SELECT acknowledged_bytes::text FROM quota_v2_reservations WHERE user_id="
+            +str(uid)+" AND node_id="+str(a.id)+" AND epoch='"+old_epoch+"'"))
+        assert prior_ceiling==previous_ack
+        assert query(
+            "SELECT closed::text FROM quota_v2_accounts WHERE user_id="+str(uid)+
+            " AND epoch='"+old_epoch+"'")=="true"
+        query(
+            "UPDATE quota_v2_reservations SET ceiling_bytes=ceiling_bytes+7 "
+            "WHERE user_id="+str(uid)+" AND node_id="+str(a.id)+
+            " AND epoch='"+old_epoch+"'")
+        code,historical,_=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"show old-epoch offline debt even when new epoch has zero grant")
+        assert historical["state"]=="awaiting_historical" and not historical["canResetNow"],historical
+        assert historical["historicalHeldBytes"]==7 and historical["heldBytes"]==7,historical
+        code,_,_=api("PATCH",f"/collections/users/{uid}",{"used":0},cookie)
+        check(code,409,"prevent quota reset with outstanding grant in closed epoch")
+        assert query("SELECT COUNT(*)::text FROM quota_v2_accounts WHERE user_id="
+                     +str(uid)+" AND NOT closed")=="1"
+        query(
+            "UPDATE quota_v2_reservations SET ceiling_bytes="+str(prior_ceiling)+
+            " WHERE user_id="+str(uid)+" AND node_id="+str(a.id)+
+            " AND epoch='"+old_epoch+"'")
+        code,clean,_=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
+        check(code,200,"preflight recovers when old-epoch liability is fully charged")
+        assert clean["historicalHeldBytes"]==0 and clean["canResetNow"],clean
+        print("PASS: closed historic reserve cannot mint capacity on later admin reset")
+
         # Reducing a tariff is allowed once there is no outstanding budget
         # beyond the requested limit; all still-live leases are protected.
         code,_,_=api("PATCH",f"/collections/users/{uid}",{"limit":0.15},cookie)
