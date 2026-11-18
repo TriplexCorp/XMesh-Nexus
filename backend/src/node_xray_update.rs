@@ -155,7 +155,7 @@ mod tests {
             "control-v6.0.14",
             "control-v6.0.15",
             "control-v6.0.16",
-            "control-v6.0.19",
+            "control-v6.0.21",
             "control-v6.1.0",
         ] {
             assert!(supported(version));
