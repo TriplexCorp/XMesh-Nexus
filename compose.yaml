@@ -78,7 +78,7 @@ services:
       # Enable only after all legacy integration tokens are reissued with a proof key.
       XMESH_INTEGRATION_REQUIRE_PROOF: ${XMESH_INTEGRATION_REQUIRE_PROOF:-false}
       # Staged distributed quota-v2: never activate before every Node agent is
-      # on control-v6.0.19 and the durable quota cutover has been rehearsed.
+      # on control-v6.0.20 and the durable quota cutover has been rehearsed.
       XMESH_QUOTA_V2_ENABLED: ${XMESH_QUOTA_V2_ENABLED:-0}
       XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
       XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
