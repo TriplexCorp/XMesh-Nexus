@@ -49,13 +49,18 @@ pub async fn record_authenticated_protocol_claim(
     let version = i16::from(protocol_version.unwrap_or_default());
     sqlx::query(
         "INSERT INTO quota_v2_authenticated_protocol_observations
-             (node_id,protocol_version,authenticated_request_at,last_v2_claim_at)
-         VALUES($1,$2,NOW(),CASE WHEN $2=2 THEN NOW() ELSE NULL END)
+             (node_id,protocol_version,authenticated_request_at,
+              last_v2_claim_at,last_legacy_claim_at)
+         VALUES($1,$2,NOW(),
+                CASE WHEN $2=2 THEN NOW() ELSE NULL END,
+                CASE WHEN $2<>2 THEN NOW() ELSE NULL END)
          ON CONFLICT(node_id) DO UPDATE SET
              protocol_version=EXCLUDED.protocol_version,
              authenticated_request_at=NOW(),
              last_v2_claim_at=CASE WHEN EXCLUDED.protocol_version=2
-                 THEN NOW() ELSE quota_v2_authenticated_protocol_observations.last_v2_claim_at END",
+                 THEN NOW() ELSE quota_v2_authenticated_protocol_observations.last_v2_claim_at END,
+             last_legacy_claim_at=CASE WHEN EXCLUDED.protocol_version<>2
+                 THEN NOW() ELSE quota_v2_authenticated_protocol_observations.last_legacy_claim_at END",
     )
     .bind(node_id)
     .bind(version)
@@ -78,6 +83,10 @@ pub async fn fleet_protocol_readiness(
                 (EXTRACT(EPOCH FROM obs.authenticated_request_at)*1000)::BIGINT
                     AS authenticated_request_at_ms,
                 obs.authenticated_request_at>=NOW()-INTERVAL '15 minutes' AS recent,
+                (obs.last_legacy_claim_at IS NULL OR
+                 obs.last_legacy_claim_at < NOW()-INTERVAL '15 minutes') AS legacy_quiet,
+                (EXTRACT(EPOCH FROM obs.last_legacy_claim_at)*1000)::BIGINT
+                    AS last_legacy_request_at_ms,
                 COALESCE((desired.served_at IS NOT NULL
                    AND desired.served_at>=obs.authenticated_request_at
                    AND desired.served_at>=NOW()-INTERVAL '15 minutes'),FALSE)
@@ -102,9 +111,11 @@ pub async fn fleet_protocol_readiness(
         let seen_at_ms: Option<i64> = entry.try_get("authenticated_request_at_ms")?;
         let recent: Option<bool> = entry.try_get("recent")?;
         let served: bool = entry.try_get("signed_policy_after_claim")?;
+        let legacy_quiet: bool = entry.try_get("legacy_quiet")?;
+        let last_legacy_ms: Option<i64> = entry.try_get("last_legacy_request_at_ms")?;
         let recent = recent.unwrap_or(false);
         let claims_v2 = protocol == Some(2);
-        let passed = !disabled && claims_v2 && recent && served;
+        let passed = !disabled && claims_v2 && recent && legacy_quiet && served;
         if !disabled {
             serving += 1;
             if passed {
@@ -117,6 +128,8 @@ pub async fn fleet_protocol_readiness(
             "missing_or_stale_authenticated_request"
         } else if !claims_v2 {
             "legacy_or_missing_protocol_v2"
+        } else if !legacy_quiet {
+            "legacy_protocol_seen_recently"
         } else if !served {
             "no_signed_policy_served_after_claim"
         } else {
@@ -129,6 +142,8 @@ pub async fn fleet_protocol_readiness(
             "reportedProtocolVersion":protocol,
             "lastAuthenticatedRequestAtMs":seen_at_ms,
             "recentAuthenticatedRequest":recent,
+            "legacyQuietPeriodPassed":legacy_quiet,
+            "lastLegacyAuthenticatedRequestAtMs":last_legacy_ms,
             "signedPolicyServedAfterClaim":served,
             "protocolPreflightPassed":passed,
             "blocker":blocker,
@@ -142,6 +157,7 @@ pub async fn fleet_protocol_readiness(
         "protocolCompatibleNodes":compatible,
         "protocolPreflightPassed":all_claim_v2,
         "observationFreshnessMinutes":15,
+        "legacyQuietPeriodMinutes":15,
         "nodes":nodes,
         // Authenticated polling is not a signed *application acknowledgment*.
         "installedAgentVersionAttested":false,
