@@ -37,8 +37,9 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
-/// Record only a *signed request's protocol claim*. The caller must have
-/// verified the node's registered Ed25519 key and signed request body first.
+/// Record an authenticated node/gateway protocol claim. The caller must have
+/// completed either registered Node Ed25519 authentication or strict-PQ
+/// product-gateway authorization first.
 /// This is never a proof that the Agent applied the policy or stopped traffic.
 pub async fn record_authenticated_protocol_claim(
     pool: &PgPool,
@@ -47,14 +48,14 @@ pub async fn record_authenticated_protocol_claim(
 ) -> Result<(), ApiError> {
     let version = i16::from(protocol_version.unwrap_or_default());
     sqlx::query(
-        "INSERT INTO quota_v2_signed_protocol_observations
-             (node_id,protocol_version,signed_request_at,last_v2_claim_at)
+        "INSERT INTO quota_v2_authenticated_protocol_observations
+             (node_id,protocol_version,authenticated_request_at,last_v2_claim_at)
          VALUES($1,$2,NOW(),CASE WHEN $2=2 THEN NOW() ELSE NULL END)
          ON CONFLICT(node_id) DO UPDATE SET
              protocol_version=EXCLUDED.protocol_version,
-             signed_request_at=NOW(),
+             authenticated_request_at=NOW(),
              last_v2_claim_at=CASE WHEN EXCLUDED.protocol_version=2
-                 THEN NOW() ELSE quota_v2_signed_protocol_observations.last_v2_claim_at END",
+                 THEN NOW() ELSE quota_v2_authenticated_protocol_observations.last_v2_claim_at END",
     )
     .bind(node_id)
     .bind(version)
@@ -63,8 +64,8 @@ pub async fn record_authenticated_protocol_claim(
     Ok(())
 }
 
-/// An operator-only, read-only readiness inventory. A fresh signed v2
-/// *request followed by a signed policy response* is only a compatibility
+/// An operator-only, read-only readiness inventory. A fresh authenticated v2
+/// *authenticated request followed by a signed policy response* is only a compatibility
 /// preflight, NOT an attestation of the installed binary, actual Xray
 /// admission state, last accounted bytes, or eligibility for refunds.
 pub async fn fleet_protocol_readiness(
@@ -74,15 +75,15 @@ pub async fn fleet_protocol_readiness(
     crate::enforce_collection(&actor, "nodes", true)?;
     let entries = sqlx::query(
         "SELECT n.id,n.data,obs.protocol_version,
-                (EXTRACT(EPOCH FROM obs.signed_request_at)*1000)::BIGINT
-                    AS signed_request_at_ms,
-                obs.signed_request_at>=NOW()-INTERVAL '15 minutes' AS recent,
+                (EXTRACT(EPOCH FROM obs.authenticated_request_at)*1000)::BIGINT
+                    AS authenticated_request_at_ms,
+                obs.authenticated_request_at>=NOW()-INTERVAL '15 minutes' AS recent,
                 COALESCE((desired.served_at IS NOT NULL
-                   AND desired.served_at>=obs.signed_request_at
+                   AND desired.served_at>=obs.authenticated_request_at
                    AND desired.served_at>=NOW()-INTERVAL '15 minutes'),FALSE)
                     AS signed_policy_after_claim
          FROM panel_records AS n
-         LEFT JOIN quota_v2_signed_protocol_observations AS obs
+         LEFT JOIN quota_v2_authenticated_protocol_observations AS obs
            ON obs.node_id=n.id
          LEFT JOIN node_desired_revisions AS desired ON desired.node_id=n.id
          WHERE n.collection='nodes'
@@ -98,7 +99,7 @@ pub async fn fleet_protocol_readiness(
         let data: Value = entry.try_get("data")?;
         let disabled = data.get("disabled").and_then(Value::as_bool) == Some(true);
         let protocol: Option<i16> = entry.try_get("protocol_version")?;
-        let seen_at_ms: Option<i64> = entry.try_get("signed_request_at_ms")?;
+        let seen_at_ms: Option<i64> = entry.try_get("authenticated_request_at_ms")?;
         let recent: Option<bool> = entry.try_get("recent")?;
         let served: bool = entry.try_get("signed_policy_after_claim")?;
         let recent = recent.unwrap_or(false);
@@ -126,8 +127,8 @@ pub async fn fleet_protocol_readiness(
             "name":data.get("name").and_then(Value::as_str).unwrap_or(""),
             "disabled":disabled,
             "reportedProtocolVersion":protocol,
-            "lastSignedRequestAtMs":seen_at_ms,
-            "recentSignedRequest":recent,
+            "lastAuthenticatedRequestAtMs":seen_at_ms,
+            "recentAuthenticatedRequest":recent,
             "signedPolicyServedAfterClaim":served,
             "protocolPreflightPassed":passed,
             "blocker":blocker,
