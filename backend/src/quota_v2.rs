@@ -941,6 +941,28 @@ async fn ensure_account(
     .bind(user_id)
     .fetch_optional(&mut *conn)
     .await?;
+    // Before creating a new accounting period OR renewing an existing one,
+    // refuse any unresolved grant from a prior epoch. Without this check a
+    // legacy closed period could silently lose an offline allowance while a
+    // different node receives a new one from the same paid capacity.
+    let historical_unsettled: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+             SELECT 1 FROM quota_v2_reservations AS r
+             JOIN quota_v2_accounts AS a
+               ON a.user_id=r.user_id AND a.epoch=r.epoch
+             WHERE r.user_id=$1 AND a.closed
+               AND r.ceiling_bytes>GREATEST(r.acknowledged_bytes,r.conservative_burn_floor_bytes)
+         )",
+    )
+    .bind(user_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if historical_unsettled {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Quota v2 cannot issue a grant while an old closed period has unresolved node reservations.",
+        ));
+    }
     let epoch: String = if let Some(row) = account {
         row.try_get("epoch")?
     } else {
