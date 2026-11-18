@@ -116,10 +116,34 @@ def _verify_ed25519(payload, signature, domain, public_key):
             raise ValueError("Node Ed25519 signed stop evidence mismatch")
 
 
+def _trusted_inbound_roster(aliases, expected_scope):
+    """Require the exact independently trusted issued CONFIGURED inbound roster.
+
+    This must originate from an independently authenticated committed policy
+    or Nexus database, NEVER Node telemetry, checkpoint or the caller's HTTP
+    payload. A signed claim 'completeSignedInboundScopeObserved=true' cannot
+    prove it included a provisioned but idle CDN inbound.
+    """
+    if not isinstance(aliases, (tuple, list)) or not 0 < len(aliases) <= 16:
+        raise ValueError("independently trusted signed inbound roster is required")
+    prefix = "xmesh-u" + str(expected_scope["userId"]) + "--"
+    prior = ""
+    for email in aliases:
+        if (not isinstance(email, str) or not email.startswith(prefix) or
+                len(email) <= len(prefix) or
+                len(email.encode("utf-8")) > 128 or
+                (prior and email <= prior)):
+            raise ValueError("untrusted, foreign or duplicate signed inbound roster")
+        prior = email
+    return tuple(aliases)
+
+
 def verify_nonfinal_stop_chain(raw_observation, raw_stop, trusted_public_key,
-                               expected_scope):
+                               expected_scope, trusted_committed_inbound_emails):
     """Return an AUDIT-ONLY result; never grant terminal or refund authority."""
     _scope(expected_scope)
+    trusted_roster = _trusted_inbound_roster(
+        trusted_committed_inbound_emails, expected_scope)
     observation = _decode(raw_observation)
     stop = _decode(raw_stop)
     _envelope(observation, "observed Xray")
@@ -171,6 +195,7 @@ def verify_nonfinal_stop_chain(raw_observation, raw_stop, trusted_public_key,
     total_up = total_down = 0
     last_email = ""
     seen_request = False
+    observed_roster = []
     for entry in inbound:
         _exact(entry, ("email", "uplinkBytes", "downlinkBytes"),
                "signed per-inbound meter")
@@ -181,11 +206,14 @@ def verify_nonfinal_stop_chain(raw_observation, raw_stop, trusted_public_key,
             raise ValueError("unsorted or repeated signed inbound meter")
         if email == cp["email"]:
             seen_request = True
+        observed_roster.append(email)
         last_email = email
         total_up += _meter(entry["uplinkBytes"], "Xray uplink")
         total_down += _meter(entry["downlinkBytes"], "Xray downlink")
         if total_up + total_down > MAX_METER:
             raise ValueError("signed Xray meter overflow")
+    if tuple(observed_roster) != trusted_roster:
+        raise ValueError("signed Xray evidence omits or adds a trusted configured inbound")
     if (not seen_request or total_up != _meter(cp["uplinkBytes"], "total uplink") or
             total_down != _meter(cp["downlinkBytes"], "total downlink") or
             o["checkpointSha256"] != hashlib.sha256(_canonical(cp)).hexdigest()):
@@ -226,6 +254,7 @@ def verify_nonfinal_stop_chain(raw_observation, raw_stop, trusted_public_key,
         "authenticatedNodeId": expected_scope["nodeId"],
         "authenticatedSignedReservation": True,
         "nodeAttestedOldPidfdExit": True,
+        "trustedSignedInboundCount": len(trusted_roster),
         "observedRawBytesForAudit": total_up + total_down,
         "durableAbsoluteFloorBytesForAudit": o["durableAbsoluteFloorBytes"],
         "finalMeterVerified": False,

@@ -29,6 +29,10 @@ SPEC = importlib.util.spec_from_file_location(
 audit = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(audit)
 
+EXPECTED_INBOUND_ROSTER = (
+    "xmesh-u101--vless-cdn", "xmesh-u101--vless-main",
+)
+
 SCOPE = {
     "nodeId": 27, "userId": 101,
     "epoch": "11111111-1111-4111-8111-111111111111",
@@ -123,17 +127,19 @@ class IndependentStopAuditTests(unittest.TestCase):
             stop, original_raw, SCOPE["nodeId"], self.pub)
         return observation, stop
 
-    def check(self, observation=None, stop=None, expected=None):
+    def check(self, observation=None, stop=None, expected=None,
+              roster=EXPECTED_INBOUND_ROSTER):
         return audit.verify_nonfinal_stop_chain(
             self.raw(self.observation if observation is None else observation),
             self.raw(self.stop if stop is None else stop),
-            self.pub, SCOPE if expected is None else expected)
+            self.pub, SCOPE if expected is None else expected, roster)
 
     def test_exact_signed_main_cdn_nonfinal_chain_authenticates(self):
         verified = self.check()
         self.assertTrue(verified["authenticatedSignedReservation"])
         self.assertTrue(verified["nodeAttestedOldPidfdExit"])
         self.assertEqual(verified["observedRawBytesForAudit"], 140)
+        self.assertEqual(verified["trustedSignedInboundCount"], 2)
         self.assertEqual(verified["durableAbsoluteFloorBytesForAudit"], 123)
         self.assertFalse(verified["finalMeterVerified"])
         self.assertFalse(verified["settlementEligible"])
@@ -198,15 +204,17 @@ class IndependentStopAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit.verify_nonfinal_stop_chain(
                 self.raw(self.observation), self.raw(self.stop),
-                alt_pub, SCOPE)
+                alt_pub, SCOPE, EXPECTED_INBOUND_ROSTER)
         original = self.raw(self.observation)
         tampered = original[:-1] + b" "
         with self.assertRaises(ValueError):
             audit.verify_nonfinal_stop_chain(
-                tampered, self.raw(self.stop), self.pub, SCOPE)
+                tampered, self.raw(self.stop), self.pub, SCOPE,
+                EXPECTED_INBOUND_ROSTER)
         with self.assertRaises(ValueError):
             audit.verify_nonfinal_stop_chain(
-                original + b"\n", self.raw(self.stop), self.pub, SCOPE)
+                original + b"\n", self.raw(self.stop), self.pub, SCOPE,
+                EXPECTED_INBOUND_ROSTER)
 
     def test_signed_runtime_or_receipt_binding_forgery_rejected(self):
         for field, value in (
@@ -221,6 +229,61 @@ class IndependentStopAuditTests(unittest.TestCase):
             stop = self.sign(stop["payload"], node_stop.DOMAIN)
             with self.subTest(field=field), self.assertRaises(ValueError):
                 self.check(stop=stop)
+
+    def fully_resign_consistent_main_cdn_change(self, transform):
+        """Model a real Node key signing a self-consistent but partial scope."""
+        observation = copy.deepcopy(self.observation)
+        cp = observation["payload"]["checkpoint"]
+        transform(cp)
+        cp["uplinkBytes"] = sum(x["uplinkBytes"] for x in cp["inboundMeters"])
+        cp["downlinkBytes"] = sum(x["downlinkBytes"] for x in cp["inboundMeters"])
+        observation["payload"]["checkpointSha256"] = hashlib.sha256(
+            node_observed.canonical(cp)).hexdigest()
+        observation = self.sign(observation["payload"], node_observed.DOMAIN)
+        stop = copy.deepcopy(self.stop)
+        stop["payload"]["checkpointSha256"] = (
+            observation["payload"]["checkpointSha256"])
+        stop["payload"]["observationSha256"] = hashlib.sha256(
+            self.raw(observation)).hexdigest()
+        stop = self.sign(stop["payload"], node_stop.DOMAIN)
+        # Confirm BOTH Node signatures and Node's self-reported scope are
+        # internally consistent. Nexus must still refuse missing issued CDN.
+        node_stop.verify_stop_chain(
+            stop, self.raw(observation), SCOPE["nodeId"], self.pub)
+        return observation, stop
+
+    def test_signed_complete_but_omitted_idle_cdn_rejected_by_independent_roster(self):
+        observation, stop = self.fully_resign_consistent_main_cdn_change(
+            lambda cp: cp["inboundMeters"].pop(0))
+        with self.assertRaisesRegex(ValueError, "omits or adds"):
+            self.check(observation=observation, stop=stop)
+        # The same failure applies to an entirely invented extra inbound.
+        observation, stop = self.fully_resign_consistent_main_cdn_change(
+            lambda cp: cp["inboundMeters"].append({
+                "email": "xmesh-u101--vless-other",
+                "uplinkBytes": 0, "downlinkBytes": 0}))
+        with self.assertRaisesRegex(ValueError, "omits or adds"):
+            self.check(observation=observation, stop=stop)
+
+    def test_trusted_signed_roster_is_mandatory_and_cannot_be_node_supplied(self):
+        invalid = (
+            None, (), [], ("xmesh-u101--vless-main",),
+            ("xmesh-u101--vless-cdn", "xmesh-u101--vless-cdn"),
+            ("xmesh-u101--vless-main", "xmesh-u101--vless-cdn"),
+            ("xmesh-u102--vless-cdn", "xmesh-u102--vless-main"),
+            ("xmesh-u101--vless-cdn", "xmesh-u101--vless-main",
+             "xmesh-u101--vless-extra"),
+            ("xmesh-u101--", "xmesh-u101--vless-main"),
+            ("xmesh-u101--vless-cdn", "xmesh-u101--vless-main", 1),
+        )
+        for roster in invalid:
+            with self.subTest(roster=roster), self.assertRaises(ValueError):
+                self.check(roster=roster)
+        # Calling the auditor without a trusted policy roster is an
+        # interface error, not an invitation to trust the Node claim.
+        with self.assertRaises(TypeError):
+            audit.verify_nonfinal_stop_chain(
+                self.raw(self.observation), self.raw(self.stop), self.pub, SCOPE)
 
     def test_signed_omitted_cdn_counter_and_overflow_rejected(self):
         for transformation in (
@@ -251,7 +314,8 @@ class IndependentStopAuditTests(unittest.TestCase):
         for raw in invalid:
             with self.subTest(invalid=raw[:30]), self.assertRaises(ValueError):
                 audit.verify_nonfinal_stop_chain(
-                    raw_observation, raw, self.pub, SCOPE)
+                    raw_observation, raw, self.pub, SCOPE,
+                    EXPECTED_INBOUND_ROSTER)
 
 
 if __name__ == "__main__":
