@@ -134,7 +134,7 @@ $$;
 -- whole transaction and require operator investigation, never mint capacity.
 -- Also prevent converting an already refunded grant into a full-charge burn.
 CREATE FUNCTION quota_v2_terminal_immutability_guard()
-RETURNS TRIGGER LANGUAGE plpgsql AS $
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
     IF EXISTS (
         SELECT 1 FROM quota_v2_terminal_settlements
@@ -152,7 +152,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$;
+$$;
 CREATE TRIGGER quota_v2_terminal_immutability_guard_trg
 BEFORE UPDATE ON quota_v2_reservations
 FOR EACH ROW EXECUTE FUNCTION quota_v2_terminal_immutability_guard();
