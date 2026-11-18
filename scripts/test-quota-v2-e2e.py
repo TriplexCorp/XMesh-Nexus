@@ -178,11 +178,21 @@ def main():
         # return the SAME reservation, not create an inaccessible new one.
         prep_a,config_a=a.desired(uid)
         half=fleet()
-        assert half["protocolCompatibleNodes"]==1 and not half["protocolPreflightPassed"],half
-        assert next(row for row in half["nodes"] if row["nodeId"]==a.id)["protocolPreflightPassed"],half
+        assert half["protocolCompatibleNodes"]==0 and not half["protocolPreflightPassed"],half
+        row_a=next(row for row in half["nodes"] if row["nodeId"]==a.id)
+        assert row_a["blocker"]=="legacy_protocol_seen_recently" and not row_a["legacyQuietPeriodPassed"],half
         prep_b,config_b=b.desired(uid)
+        held=fleet()
+        assert held["protocolCompatibleNodes"]==1 and not held["protocolPreflightPassed"],held
+        assert next(row for row in held["nodes"] if row["nodeId"]==b.id)["protocolPreflightPassed"],held
+        # A new v2 request cannot erase evidence of another still-live v1
+        # worker. Simulate the completed quiet window in this disposable DB.
+        query("UPDATE quota_v2_authenticated_protocol_observations "
+              "SET last_legacy_claim_at=NOW()-INTERVAL '16 minutes' "
+              "WHERE node_id="+str(a.id))
         compatible=fleet()
         assert compatible["protocolPreflightPassed"] and compatible["protocolCompatibleNodes"]==2,compatible
+        assert all(row["legacyQuietPeriodPassed"] for row in compatible["nodes"]),compatible
         assert all(row["signedPolicyServedAfterClaim"] for row in compatible["nodes"]),compatible
         print("PASS: every serving node has recently authenticated protocol v2 and received a policy")
         # A stale-but-once-signed v2 claim is insufficient even if a signed
@@ -208,8 +218,17 @@ def main():
         assert next(row for row in downgraded["nodes"] if row["nodeId"]==a.id)["blocker"]=="legacy_or_missing_protocol_v2"
         recovered,_=a.desired(uid)
         assert recovered["users"][0]["quotaReservation"]["reservationId"]==prep_a["users"][0]["quotaReservation"]["reservationId"]
+        waiting=fleet()
+        assert not waiting["protocolPreflightPassed"],waiting
+        row_a=next(row for row in waiting["nodes"] if row["nodeId"]==a.id)
+        assert row_a["reportedProtocolVersion"]==2 and row_a["blocker"]=="legacy_protocol_seen_recently",waiting
+        # A fresh v2 claim does not prove that the old process has stopped;
+        # wait for a full legacy-free window before declaring compatibility.
+        query("UPDATE quota_v2_authenticated_protocol_observations "
+              "SET last_legacy_claim_at=NOW()-INTERVAL '16 minutes' "
+              "WHERE node_id="+str(a.id))
         assert fleet()["protocolPreflightPassed"]
-        print("PASS: signed v2 retry restores compatibility without a fresh reservation")
+        print("PASS: old-agent quiet window blocks mixed generations without changing reservation")
         lease_pre_a=prep_a["users"][0]["quotaReservation"]
         lease_pre_b=prep_b["users"][0]["quotaReservation"]
         # Execute the actual guard on the prepared signed lease: it MUST
