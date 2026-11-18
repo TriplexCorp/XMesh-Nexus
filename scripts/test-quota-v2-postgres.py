@@ -423,6 +423,29 @@ class ReservationTests(unittest.TestCase):
         self.assertGreaterEqual(held,50)
         self.assertEqual(self.terminal(1,30,req)[1],20)
 
+    def test_final_overrun_is_charged_and_never_refunded(self):
+        request=self.terminal_prepare(1,acknowledged=20)
+        spent=self.terminal(1,60,request)
+        self.assertEqual(spent[0],60)
+        self.assertEqual(spent[1],0)
+        self.assertEqual(self.economic_state(),(60,0))
+        self.assertEqual(self.terminal(1,60,request),spent)
+
+    def test_final_receipt_is_physically_immutable_in_postgres(self):
+        request=self.terminal_prepare(1,acknowledged=20)
+        self.terminal(1,30,request)
+        state=self.economic_state()
+        for sql in (
+            "UPDATE quota_v2_terminal_settlements SET refunded_bytes=50 WHERE user_id=%s",
+            "DELETE FROM quota_v2_terminal_settlements WHERE user_id=%s",
+        ):
+            with self.subTest(operation=sql.split()[0]):
+                with self.assertRaises(psycopg.Error):
+                    with psycopg.connect(DSN) as c:
+                        c.execute(sql,(self.uid,))
+            self.assertEqual(self.economic_state(),state)
+        self.assertEqual(self.terminal(1,30,request)[1],20)
+
     def test_conservative_burn_never_entitles_a_late_refund(self):
         self.reserve(1)
         self.revoke(1)
