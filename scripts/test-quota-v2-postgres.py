@@ -317,12 +317,12 @@ class ReservationTests(unittest.TestCase):
                 (observed,self.uid,self.epoch,node))
             return rid
 
-    def terminal(self,node,total,request,**override):
+    def terminal(self,base_node,base_total,base_request,**override):
         args={
-            "user":self.uid,"epoch":self.epoch,"node":node,
-            "meter":self.meters[node],"id":self.ids[node],
-            "request":request,"revision":1,
-            "runtime":"a"*64,"digest":"b"*64,"total":total,
+            "user":self.uid,"epoch":self.epoch,"node":base_node,
+            "meter":self.meters[base_node],"id":self.ids[base_node],
+            "request":base_request,"revision":1,
+            "runtime":"a"*64,"digest":"b"*64,"total":base_total,
         }
         args.update(override)
         with psycopg.connect(DSN) as c:
