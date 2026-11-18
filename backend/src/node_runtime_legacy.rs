@@ -2259,6 +2259,15 @@ pub async fn desired_config(
         "/api/v1/node/desired-config",
     )
     .await?;
+    // Only a Node-authenticated request (Ed25519 or strict-PQ gateway) updates fleet readiness.
+    // Store even legacy/missing-protocol requests so a previously v2-capable
+    // node cannot remain falsely classified as ready after a downgrade.
+    crate::quota_v2::record_authenticated_protocol_claim(
+        &state.pool,
+        request.node_id,
+        request.quota_protocol_version,
+    )
+    .await?;
     // Operators must upgrade the entire serving fleet before enabling the
     // shared reservation protocol. Older agents cannot safely mix v1 grants
     // with v2 leases for the same globally limited user.

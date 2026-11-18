@@ -141,6 +141,21 @@ def main():
         code,_,_=api("GET",f"/users/{uid}/quota-v2/revocation")
         check(code,401,"reject unauthenticated revocation preflight")
         a,b=nodes
+        def fleet():
+            status,data,_=api("GET","/quota-v2/fleet-readiness",cookie=cookie)
+            check(status,200,"authorized quota-v2 authenticated Node/gateway fleet readiness")
+            assert data["featureEnabled"] is True
+            assert data["servingNodes"]==2,data
+            assert data["canRefundFromThisPreflight"] is False
+            assert data["physicalStopAndFinalMeterVerified"] is False
+            assert data["installedAgentVersionAttested"] is False
+            return data
+        missing=fleet()
+        assert not missing["protocolPreflightPassed"] and missing["protocolCompatibleNodes"]==0,missing
+        assert all(row["blocker"]=="missing_or_stale_authenticated_request"
+                   for row in missing["nodes"]),missing
+        code,_,_=api("GET","/quota-v2/fleet-readiness")
+        check(code,401,"node protocol readiness is not exposed without an operator session")
         # A fleet still containing an older quota-protocol Node is NOT
         # safe to flip globally. The signed v1 request must fail *before*
         # any grant is created; production rollout needs this preflight.
@@ -152,12 +167,68 @@ def main():
             check(code,409,"old Node quota protocol cannot receive any v2 grant")
         assert query("SELECT COUNT(*)::text FROM quota_v2_reservations WHERE user_id="+str(uid))=="0"
         print("PASS: pre-v2 Agent is denied without creating unsafe reservations")
+        obsolete=fleet()
+        legacy=next(row for row in obsolete["nodes"] if row["nodeId"]==a.id)
+        assert legacy["reportedProtocolVersion"]==1 and legacy["recentAuthenticatedRequest"],obsolete
+        assert legacy["blocker"]=="legacy_or_missing_protocol_v2",obsolete
+        assert obsolete["protocolCompatibleNodes"]==0
         # First request prepares, but cannot activate an unacknowledged
         # offline allowance. Simulate a lost HTTP response from node A:
         # the repeated request without a durable ID must stay unfunded and
         # return the SAME reservation, not create an inaccessible new one.
         prep_a,config_a=a.desired(uid)
+        half=fleet()
+        assert half["protocolCompatibleNodes"]==0 and not half["protocolPreflightPassed"],half
+        row_a=next(row for row in half["nodes"] if row["nodeId"]==a.id)
+        assert row_a["blocker"]=="legacy_protocol_seen_recently" and not row_a["legacyQuietPeriodPassed"],half
         prep_b,config_b=b.desired(uid)
+        held=fleet()
+        assert held["protocolCompatibleNodes"]==1 and not held["protocolPreflightPassed"],held
+        assert next(row for row in held["nodes"] if row["nodeId"]==b.id)["protocolPreflightPassed"],held
+        # A new v2 request cannot erase evidence of another still-live v1
+        # worker. Simulate the completed quiet window in this disposable DB.
+        query("UPDATE quota_v2_authenticated_protocol_observations "
+              "SET last_legacy_claim_at=NOW()-INTERVAL '16 minutes' "
+              "WHERE node_id="+str(a.id))
+        compatible=fleet()
+        assert compatible["protocolPreflightPassed"] and compatible["protocolCompatibleNodes"]==2,compatible
+        assert all(row["legacyQuietPeriodPassed"] for row in compatible["nodes"]),compatible
+        assert all(row["signedPolicyServedAfterClaim"] for row in compatible["nodes"]),compatible
+        print("PASS: every serving node has recently authenticated protocol v2 and received a policy")
+        # A stale-but-once-signed v2 claim is insufficient even if a signed
+        # desired policy was issued at some point in the past.
+        query("UPDATE quota_v2_authenticated_protocol_observations "
+              "SET authenticated_request_at=NOW()-INTERVAL '40 minutes' "
+              "WHERE node_id="+str(b.id))
+        stale=fleet()
+        assert not stale["protocolPreflightPassed"],stale
+        assert next(row for row in stale["nodes"] if row["nodeId"]==b.id)["blocker"]=="missing_or_stale_authenticated_request",stale
+        refreshed_b,_=b.desired(uid)
+        assert refreshed_b["users"][0]["quotaReservation"]["reservationId"]==prep_b["users"][0]["quotaReservation"]["reservationId"]
+        assert fleet()["protocolPreflightPassed"]
+        print("PASS: stale authenticated Node observation fails closed until another signed policy response")
+        # Downgrading one signed node must immediately invalidate the fleet
+        # snapshot even if it was compatible a moment ago. A rejected old
+        # request MUST NOT mutate existing reservations.
+        code,_,_=a.post("/node/desired-config",
+             {"node_id":a.id,"quotaProtocolVersion":1,"quotaLocalCounters":[]})
+        check(code,409,"authenticated protocol downgrade invalidates fleet readiness")
+        downgraded=fleet()
+        assert not downgraded["protocolPreflightPassed"],downgraded
+        assert next(row for row in downgraded["nodes"] if row["nodeId"]==a.id)["blocker"]=="legacy_or_missing_protocol_v2"
+        recovered,_=a.desired(uid)
+        assert recovered["users"][0]["quotaReservation"]["reservationId"]==prep_a["users"][0]["quotaReservation"]["reservationId"]
+        waiting=fleet()
+        assert not waiting["protocolPreflightPassed"],waiting
+        row_a=next(row for row in waiting["nodes"] if row["nodeId"]==a.id)
+        assert row_a["reportedProtocolVersion"]==2 and row_a["blocker"]=="legacy_protocol_seen_recently",waiting
+        # A fresh v2 claim does not prove that the old process has stopped;
+        # wait for a full legacy-free window before declaring compatibility.
+        query("UPDATE quota_v2_authenticated_protocol_observations "
+              "SET last_legacy_claim_at=NOW()-INTERVAL '16 minutes' "
+              "WHERE node_id="+str(a.id))
+        assert fleet()["protocolPreflightPassed"]
+        print("PASS: old-agent quiet window blocks mixed generations without changing reservation")
         lease_pre_a=prep_a["users"][0]["quotaReservation"]
         lease_pre_b=prep_b["users"][0]["quotaReservation"]
         # Execute the actual guard on the prepared signed lease: it MUST
