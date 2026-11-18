@@ -185,6 +185,18 @@ def main():
         assert compatible["protocolPreflightPassed"] and compatible["protocolCompatibleNodes"]==2,compatible
         assert all(row["signedPolicyServedAfterClaim"] for row in compatible["nodes"]),compatible
         print("PASS: every serving node has recently signed protocol v2 and received a policy")
+        # A stale-but-once-signed v2 claim is insufficient even if a signed
+        # desired policy was issued at some point in the past.
+        query("UPDATE quota_v2_signed_protocol_observations "
+              "SET signed_request_at=NOW()-INTERVAL '40 minutes' "
+              "WHERE node_id="+str(b.id))
+        stale=fleet()
+        assert not stale["protocolPreflightPassed"],stale
+        assert next(row for row in stale["nodes"] if row["nodeId"]==b.id)["blocker"]=="missing_or_stale_signed_request",stale
+        refreshed_b,_=b.desired(uid)
+        assert refreshed_b["users"][0]["quotaReservation"]["reservationId"]==prep_b["users"][0]["quotaReservation"]["reservationId"]
+        assert fleet()["protocolPreflightPassed"]
+        print("PASS: stale signed Node observation fails closed until another signed policy response")
         # Downgrading one signed node must immediately invalidate the fleet
         # snapshot even if it was compatible a moment ago. A rejected old
         # request MUST NOT mutate existing reservations.
