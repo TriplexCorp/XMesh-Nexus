@@ -510,13 +510,13 @@ def main():
             "SELECT closed::text FROM quota_v2_accounts WHERE user_id="+str(uid)+
             " AND epoch='"+old_epoch+"'")=="true"
         query(
-            "UPDATE quota_v2_reservations SET ceiling_bytes=ceiling_bytes+7 "
+            "UPDATE quota_v2_reservations SET ceiling_bytes=ceiling_bytes+"+str(20*MIB)+" "
             "WHERE user_id="+str(uid)+" AND node_id="+str(a.id)+
             " AND epoch='"+old_epoch+"'")
         code,historical,_=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
         check(code,200,"show old-epoch offline debt even when new epoch has zero grant")
         assert historical["state"]=="awaiting_historical" and not historical["canResetNow"],historical
-        assert historical["historicalHeldBytes"]==7 and historical["heldBytes"]==7,historical
+        assert historical["historicalHeldBytes"]==20*MIB and historical["heldBytes"]==20*MIB,historical
         # The Node's ordinary authenticated policy poll must also refuse
         # new signed capacity. Blocking only the UI reset is insufficient:
         # otherwise an existing zero-grant new epoch can mint another grant.
@@ -528,6 +528,8 @@ def main():
             }]
         })
         check(code,409,"refuse signed Node refill while closed epoch holds bytes")
+        code,_,_=api("PATCH",f"/collections/users/{uid}",{"limit":0.01},cookie)
+        check(code,409,"deny tariff decrease beneath historical node obligation")
         code,_,_=api("PATCH",f"/collections/users/{uid}",{"used":0},cookie)
         check(code,409,"prevent quota reset with outstanding grant in closed epoch")
         assert query("SELECT COUNT(*)::text FROM quota_v2_accounts WHERE user_id="
