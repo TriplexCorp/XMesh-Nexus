@@ -157,6 +157,19 @@ CREATE TRIGGER quota_v2_terminal_immutability_guard_trg
 BEFORE UPDATE ON quota_v2_reservations
 FOR EACH ROW EXECUTE FUNCTION quota_v2_terminal_immutability_guard();
 
+-- No later operation can rewrite or remove the accepted terminal receipt,
+-- including via an accidental migration-owner UPDATE/DELETE.
+CREATE FUNCTION quota_v2_terminal_receipt_immutable()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'accepted terminal proof cannot be edited or removed'
+        USING ERRCODE='22023';
+END;
+$$;
+CREATE TRIGGER quota_v2_terminal_receipt_immutable_trg
+BEFORE UPDATE OR DELETE ON quota_v2_terminal_settlements
+FOR EACH ROW EXECUTE FUNCTION quota_v2_terminal_receipt_immutable();
+
 -- Explicitly deny unprivileged callers; the migration owner retains access.
 -- The future trusted backend MUST verify signature and dataplane finality
 -- before it ever invokes this dormant primitive.
