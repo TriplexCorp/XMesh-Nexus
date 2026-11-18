@@ -1,0 +1,42 @@
+name: Quota v2 independent NONFINAL stop-chain audit
+on:
+  pull_request:
+    paths:
+      - 'scripts/quota_v2_stop_chain_audit.py'
+      - 'scripts/test-quota-v2-stop-chain-audit.py'
+      - '.github/workflows/quota-v2-stop-chain-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/quota_v2_stop_chain_audit.py'
+      - 'scripts/test-quota-v2-stop-chain-audit.py'
+      - '.github/workflows/quota-v2-stop-chain-audit.yml'
+permissions:
+  contents: read
+jobs:
+  verify-nonfinal-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out Nexus independent verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check out exact reviewed Node NONFINAL signed-stop implementation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          repository: TriplexCorp/XMesh-Node
+          ref: 2eba9c06b6c50c93e45f88361744ca24c81dfa59
+          path: .ci-reviewed-node
+      - name: Refuse drift from immutable signed receipt producer
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "2eba9c06b6c50c93e45f88361744ca24c81dfa59"
+          test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = "control-v6.0.19"
+          test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/stop_chain.py
+          test -f .ci-reviewed-node/experiments/xray-dataplane-fence/sign_observation.py
+          python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py
+          python3 scripts/test-quota-v2-stop-chain-audit.py
+          echo 'Nexus independently validates authentic Node NONFINAL stop chain; refunds remain forbidden'
