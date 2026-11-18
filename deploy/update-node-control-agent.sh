@@ -25,7 +25,7 @@ fi
 tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/node-control-agent.sh -o "$tmp"
 bash -n "$tmp"
-grep -Fxq 'AGENT_VERSION="control-v6.0.17"' "$tmp" || { echo "Downloaded Agent is not the current v6 POSTQUANTUM patch" >&2;exit 1; }
+grep -Fxq 'AGENT_VERSION="control-v6.0.18"' "$tmp" || { echo "Downloaded Agent is not the current v6 POSTQUANTUM patch" >&2;exit 1; }
 grep -q 'enforceStop' "$tmp" || { echo "Downloaded agent is missing traffic cutoff support" >&2;exit 1; }
 grep -q 'xmesh-xray-update.py' "$tmp" || { echo "Downloaded agent does not support pinned Xray versions" >&2;exit 1; }
 
@@ -33,7 +33,7 @@ xray_update_tmp="$(mktemp)"; sync_tmp="$(mktemp)"; policy_tmp="$(mktemp)"; polic
 trap 'rm -f "$xray_update_tmp" "$tmp" "$sync_tmp" "$policy_tmp" "$policy_base_tmp" "$hot_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "$tls_status_tmp" "$renew_tmp" "$stage_tmp" "$stage_service_tmp" "$self_tmp" "$router_helper"' EXIT
 
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/xmesh-xray-update.py -o "$xray_update_tmp"
-python3 -m py_compile "$xray_update_tmp"; grep -Fxq 'AGENT_VERSION = "control-v6.0.17"' "$xray_update_tmp" || { echo "Invalid Xray transaction worker" >&2;exit 1; }
+python3 -m py_compile "$xray_update_tmp"; grep -Fxq 'AGENT_VERSION = "control-v6.0.18"' "$xray_update_tmp" || { echo "Invalid Xray transaction worker" >&2;exit 1; }
 [[ -f /usr/local/sbin/xmesh-xray-sync ]] || { echo "Managed Xray synchronizer not found. The node must be enrolled first." >&2;exit 1; }
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-xray-sync.sh -o "$sync_tmp"
 bash -n "$sync_tmp"; grep -q 'pinned-image' "$sync_tmp" || { echo "Downloaded sync worker lacks image pin support" >&2;exit 1; }; grep -q 'xmesh-policy-guard.py' "$sync_tmp" || { echo "Sync worker cannot enforce offline policy" >&2;exit 1; }
@@ -86,14 +86,14 @@ update_router() {
  new_revision="$(git -C "$dir" rev-parse HEAD)" || return 1
  [[ "$new_revision" =~ ^[0-9a-f]{40}$ ]] || return 1
  [[ -f "$dir/VERSION" && "$(tr -d '\r\n' < "$dir/VERSION")" == "6.0.0" ]] || { echo "XMesh-Node main is not v6.0.0" >&2; return 1; }
- [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.17" ]] || { echo "XMesh-Node main does not expose Agent control-v6.0.17" >&2; return 1; }
+ [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.18" ]] || { echo "XMesh-Node main does not expose Agent control-v6.0.18" >&2; return 1; }
  [[ -f "$dir/deploy/install-xsp-v2-production-agent.sh" && ! -L "$dir/deploy/install-xsp-v2-production-agent.sh" ]] || { echo "v6 PQ Agent installer is missing" >&2; return 1; }
  if (cd "$dir" && docker --config "$DOCKER_CONFIG" compose build xmesh-node && docker --config "$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check -config /etc/xmesh-node/config.json && docker --config "$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node && [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]] && bash deploy/install-xsp-v2-production-agent.sh "$new_revision");then
   identity="$(/usr/local/bin/xmesh-agent-xspv2-activate --identity)" || return 1
   python3 - "$identity" "$new_revision" <<'PY'
 import json,sys
 v=json.loads(sys.argv[1])
-assert v.get('version')=='control-v6.0.17',v
+assert v.get('version')=='control-v6.0.18',v
 assert v.get('sourceRevision')==sys.argv[2],v
 assert isinstance(v.get('artifactSha256'),str) and len(v['artifactSha256'])==64,v
 PY
@@ -238,6 +238,6 @@ if ! systemctl start xmesh-node-user-meter.service; then echo "WARNING: Xray use
 install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new; mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
 if systemctl list-unit-files xmesh-xray-sync.service --no-legend 2>/dev/null | grep -q '^xmesh-xray-sync.service'; then systemctl start --no-block xmesh-xray-sync.service || echo "WARNING: Unable to queue immediate Xray reconciliation; timer will retry." >&2;fi
 if [[ "$MODE" != --remote ]]; then systemctl start xmesh-node-control.service;fi
-grep -Fxq 'AGENT_VERSION="control-v6.0.17"' /usr/local/sbin/xmesh-node-control || { echo "v6 Agent version verification failed" >&2; exit 1; }
-/usr/local/bin/xmesh-agent-xspv2-activate --identity | python3 -c 'import json,sys;v=json.load(sys.stdin);assert v["version"]=="control-v6.0.17" and len(v["artifactSha256"])==64'
+grep -Fxq 'AGENT_VERSION="control-v6.0.18"' /usr/local/sbin/xmesh-node-control || { echo "v6 Agent version verification failed" >&2; exit 1; }
+/usr/local/bin/xmesh-agent-xspv2-activate --identity | python3 -c 'import json,sys;v=json.load(sys.stdin);assert v["version"]=="control-v6.0.18" and len(v["artifactSha256"])==64'
 echo "XMesh Agent POSTQUANTUM installed: signed control, verified PQ runtime, offline policy and pinned Xray synchronizer are active."
