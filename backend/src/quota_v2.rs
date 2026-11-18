@@ -322,9 +322,22 @@ pub async fn revocation_status(
     .fetch_optional(&state.pool)
     .await?;
     let Some(active) = active else {
+        // A closed historical epoch can still hold a spendable signed grant
+        // after an interrupted legacy migration or damaged old settlement.
+        // Never conceal that debt behind the absence of an active epoch.
+        let historical_held: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::NUMERIC-
+                      GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::BIGINT
+             FROM quota_v2_reservations WHERE user_id=$1",
+        )
+        .bind(user_id)
+        .fetch_one(&state.pool)
+        .await?;
         return Ok(Json(json!({
-            "userId":user_id,"protocol":"v2","state":"inactive",
-            "canResetNow":false,"heldBytes":0,"nodes":[],
+            "userId":user_id,"protocol":"v2",
+            "state":if historical_held>0 {"awaiting_historical"} else {"inactive"},
+            "canResetNow":false,"heldBytes":historical_held,
+            "historicalHeldBytes":historical_held,"nodes":[],
             "canRefundNow":false,"finalMeterVerified":false,
             "expirationRefundsBudget":false
         })));
@@ -390,10 +403,25 @@ pub async fn revocation_status(
             "refundedBytes":0,
         }));
     }
+    // The visible current-epoch node list is not the whole liability: old
+    // closed epochs are also immutable signed obligations until fully charged.
+    let historical_held: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::NUMERIC-
+                  GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::BIGINT
+         FROM quota_v2_reservations
+         WHERE user_id=$1 AND epoch<>$2::uuid",
+    )
+    .bind(user_id)
+    .bind(&epoch)
+    .fetch_one(&state.pool)
+    .await?;
+    let total_held = held.checked_add(historical_held).ok_or_else(conflict)?;
     Ok(Json(json!({
-        "userId":user_id,"protocol":"v2","state":if held == 0 {"drained"} else {"awaiting_nodes"},
+        "userId":user_id,"protocol":"v2",
+        "state":if historical_held>0 {"awaiting_historical"} else if held == 0 {"drained"} else {"awaiting_nodes"},
         "epoch":epoch,"limitBytes":limit,"settledBytes":settled,
-        "heldBytes":held,"canResetNow":held == 0,
+        "heldBytes":total_held,"historicalHeldBytes":historical_held,
+        "canResetNow":total_held == 0,
         "canRefundNow":false,"finalMeterVerified":false,
         "nodes":nodes,"expirationRefundsBudget":false
     })))
@@ -772,6 +800,9 @@ pub async fn close_drained_epoch(
     conn: &mut sqlx::PgConnection,
     user_id: i64,
 ) -> Result<(), ApiError> {
+    // Serialize with quota-v2 issuance and signed receipts, which lock the
+    // active account before changing a reservation. The caller already locks
+    // the user's row in the same transaction.
     let active = sqlx::query(
         "SELECT epoch::text AS epoch FROM quota_v2_accounts
          WHERE user_id=$1 AND NOT closed FOR UPDATE",
@@ -779,25 +810,28 @@ pub async fn close_drained_epoch(
     .bind(user_id)
     .fetch_optional(&mut *conn)
     .await?;
+    // NEVER limit this test to the active epoch. A damaged or legacy closed
+    // epoch with unspent old signed capacity must not disappear during reset:
+    // a newly funded epoch would otherwise count the same paid bytes twice.
+    // A negative malformed row must not cancel a separate positive liability.
+    let outstanding: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::NUMERIC-
+                   GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::BIGINT
+         FROM quota_v2_reservations WHERE user_id=$1",
+    )
+    .bind(user_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if outstanding > 0 {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Сброс квоты v2 невозможен: остался неподтверждённый резерв трафика в текущем или предыдущем периоде.",
+        ));
+    }
     if let Some(active) = active {
         let epoch: String = active.try_get("epoch")?;
-        let outstanding: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(ceiling_bytes::NUMERIC-GREATEST(acknowledged_bytes,conservative_burn_floor_bytes)),0)::BIGINT
-             FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
-        )
-        .bind(user_id)
-        .bind(&epoch)
-        .fetch_one(&mut *conn)
-        .await?;
-        if outstanding > 0 {
-            return Err(ApiError::new(
-                StatusCode::CONFLICT,
-                "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.",
-            ));
-        }
-        // Close in the same transaction as resetting the UI/telemetry
-        // baseline. A late signed old-epoch receipt remains chargeable, but
-        // cannot reissue an expired or closed budget.
+        // Close with the UI/telemetry baseline reset in one transaction.
+        // Late old-epoch receipts still settle; they never reissue a grant.
         sqlx::query(
             "UPDATE quota_v2_accounts SET closed=TRUE
              WHERE user_id=$1 AND epoch=$2::uuid",
@@ -806,22 +840,6 @@ pub async fn close_drained_epoch(
         .bind(&epoch)
         .execute(&mut *conn)
         .await?;
-    } else {
-        let old_unsettled: bool = sqlx::query_scalar(
-            "SELECT EXISTS(
-               SELECT 1 FROM quota_v2_reservations
-               WHERE user_id=$1 AND ceiling_bytes>GREATEST(acknowledged_bytes,conservative_burn_floor_bytes)
-            )",
-        )
-        .bind(user_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        if old_unsettled {
-            return Err(ApiError::new(
-                StatusCode::CONFLICT,
-                "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.",
-            ));
-        }
     }
     Ok(())
 }
