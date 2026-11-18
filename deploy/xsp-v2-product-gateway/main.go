@@ -35,15 +35,16 @@ const (
 	maxPayloadBytes          = 768 * 1024
 	suite                    = "Ed25519+ML-DSA-65"
 	issuerID                 = "xmesh-nexus-panel"
-	targetAgentVersion       = "control-v6.0.15"
-	previousTargetAgentVersion = "control-v6.0.14"
-	recentAgentVersion       = "control-v6.0.13"
-	previousAgentVersion     = "control-v6.0.12"
-	transitionalAgentVersion = "control-v6.0.11"
-	rolloutAgentVersion      = "control-v6.0.10"
-	recoveryAgentVersion     = "control-v6.0.9"
-	legacyAgentVersion       = "control-v6.0.8"
-	olderAgentVersion        = "control-v6.0.7"
+	targetAgentVersion       = "control-v6.0.16"
+	previousTargetAgentVersion = "control-v6.0.15"
+	recentAgentVersion       = "control-v6.0.14"
+	previousAgentVersion     = "control-v6.0.13"
+	transitionalAgentVersion = "control-v6.0.12"
+	rolloutAgentVersion      = "control-v6.0.11"
+	recoveryAgentVersion     = "control-v6.0.10"
+	legacyAgentVersion       = "control-v6.0.9"
+	olderAgentVersion        = "control-v6.0.8"
+	oldestAgentVersion       = "control-v6.0.7"
 	repairAgentVersion       = "control-v6.0.0"
 )
 
@@ -565,7 +566,7 @@ func (g *gateway) enroll(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "invalid strict-PQ enrollment request")
 		return
 	}
-	versionOK := req.ReleaseIdentity.Version == targetAgentVersion || req.ReleaseIdentity.Version == previousTargetAgentVersion || req.ReleaseIdentity.Version == recentAgentVersion || req.ReleaseIdentity.Version == previousAgentVersion || req.ReleaseIdentity.Version == transitionalAgentVersion || req.ReleaseIdentity.Version == rolloutAgentVersion || req.ReleaseIdentity.Version == recoveryAgentVersion || req.ReleaseIdentity.Version == legacyAgentVersion || req.ReleaseIdentity.Version == olderAgentVersion || req.ReleaseIdentity.Version == repairAgentVersion
+	versionOK := req.ReleaseIdentity.Version == targetAgentVersion || req.ReleaseIdentity.Version == previousTargetAgentVersion || req.ReleaseIdentity.Version == recentAgentVersion || req.ReleaseIdentity.Version == previousAgentVersion || req.ReleaseIdentity.Version == transitionalAgentVersion || req.ReleaseIdentity.Version == rolloutAgentVersion || req.ReleaseIdentity.Version == recoveryAgentVersion || req.ReleaseIdentity.Version == legacyAgentVersion || req.ReleaseIdentity.Version == olderAgentVersion || req.ReleaseIdentity.Version == oldestAgentVersion || req.ReleaseIdentity.Version == repairAgentVersion
 	if req.NodeID <= 0 || req.Purpose != "node_request" || req.KeyEpoch != 1 || !versionOK ||
 		len(req.ReleaseIdentity.SourceRevision) != 40 || len(req.ReleaseIdentity.ArtifactSHA256) != 64 {
 		fail(w, http.StatusBadRequest, "invalid XMesh v6 release identity")
