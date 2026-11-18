@@ -426,6 +426,16 @@ pub async fn heartbeat(
     .bind(report.xray_running).bind(&report.xray_version)
     .bind(&report.geo_data).bind(if report.xray_running {report.applied_revision.as_deref()} else {None})
     .bind(report.profile_check.as_deref()).bind(&report.tls_status).execute(&state.pool).await?;
+    // A successful Node-authenticated control heartbeat contributes only a
+    // reported Agent release. Track old release sightings separately so a
+    // concurrent worker cannot be hidden by one fresh current-version poll.
+    // The 0.1.0 router-only heartbeat returns above and is never an Agent.
+    crate::quota_v2::record_authenticated_agent_heartbeat(
+        &state.pool,
+        report.node_id,
+        &report.version,
+    )
+    .await?;
     // A self-upgrade can replace its own running worker before its ACK is sent.
     // A fresh, authenticated heartbeat with the exact requested version is
     // stronger evidence of success than the lost acknowledgement.
