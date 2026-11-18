@@ -2263,7 +2263,9 @@ pub async fn desired_config(
     // Store even legacy/missing-protocol requests so a previously v2-capable
     // node cannot remain falsely classified as ready after a downgrade.
     crate::quota_v2::record_authenticated_protocol_claim(
-        &state.pool, request.node_id, request.quota_protocol_version,
+        &state.pool,
+        request.node_id,
+        request.quota_protocol_version,
     )
     .await?;
     // Operators must upgrade the entire serving fleet before enabling the
