@@ -290,6 +290,29 @@ def main():
         heartbeat(b,"control-v6.0.17")
         assert fleet()["rolloutPreflightPassed"],fleet()
         print("PASS: v6.0.17 release preflight needs fresh signed heartbeats and an old-Agent quiet window")
+        # Re-execute the migration's EXACT seed statement in this disposable
+        # database with a pre-existing live Agent heartbeat. The backfill
+        # must conservatively quarantine even an already-correct v6.0.17
+        # report because historical concurrent old workers are unknowable.
+        query("DELETE FROM quota_v2_authenticated_agent_release_observations "
+              "WHERE node_id="+str(a.id))
+        source=Path(__file__).resolve().parents[1]/(
+            "backend/migrations/0131_quota_v2_authenticated_agent_release_observations.sql")
+        migration_sql=source.read_text(encoding="utf-8")
+        prefix="INSERT INTO quota_v2_authenticated_agent_release_observations"
+        assert migration_sql.count(prefix)==1,migration_sql
+        seed_sql=prefix+migration_sql.split(prefix,1)[1].split(";",1)[0]
+        query(seed_sql)
+        migrated=fleet()
+        assert not migrated["rolloutPreflightPassed"],migrated
+        migrated_a=next(row for row in migrated["nodes"] if row["nodeId"]==a.id)
+        assert migrated_a["reportedAgentVersion"]=="control-v6.0.17",migrated
+        assert migrated_a["agentBlocker"]=="outdated_agent_seen_recently",migrated
+        query("UPDATE quota_v2_authenticated_agent_release_observations "
+              "SET last_non_target_at=NOW()-INTERVAL '16 minutes' "
+              "WHERE node_id="+str(a.id))
+        assert fleet()["rolloutPreflightPassed"],fleet()
+        print("PASS: migration seeds a conservative Agent quiet window for existing installations")
         lease_pre_a=prep_a["users"][0]["quotaReservation"]
         lease_pre_b=prep_b["users"][0]["quotaReservation"]
         # Execute the actual guard on the prepared signed lease: it MUST
