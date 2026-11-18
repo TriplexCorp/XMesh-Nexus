@@ -5,7 +5,7 @@ on:
       - 'backend/src/quota_v2.rs'
       - 'backend/src/node_runtime_legacy.rs'
       - 'backend/src/main.rs'
-      - 'backend/migrations/0130_quota_v2_signed_protocol_observations.sql'
+      - 'backend/migrations/0130_quota_v2_authenticated_protocol_observations.sql'
       - 'backend/migrations/0125_quota_v2_reservations.sql'
       - 'deploy/node-metrics-agent.sh'
       - 'scripts/test-quota-v2-e2e.py'
