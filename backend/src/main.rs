@@ -433,6 +433,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
             "/metrics/traffic/bucket-detail",
             get(get_traffic_bucket_detail),
         )
+        .route("/quota-v2/fleet-readiness", get(quota_v2::fleet_protocol_readiness))
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route(
