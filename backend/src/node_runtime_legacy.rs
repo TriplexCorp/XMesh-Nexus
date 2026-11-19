@@ -2257,6 +2257,27 @@ async fn apply_quota_v2_if_enabled(
     Ok(())
 }
 
+/// Once ANY durable v2 reservation exists, a feature=0 deployment must NOT
+/// sign fresh v1 allowances for any Node, including a newly enrolled one.
+/// Old offline leases can remain spendable, and v1 would double-count them.
+/// The ledger is a persistent global activation latch across account epochs;
+/// a normal feature flag rollback does not delete it or refund its bytes.
+async fn reject_legacy_policy_after_v2_issuance(pool: &sqlx::PgPool) -> Result<(), ApiError> {
+    if !crate::quota_v2::enabled() {
+        let v2_was_issued: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM quota_v2_reservations)")
+                .fetch_one(pool)
+                .await?;
+        if v2_was_issued {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Quota-v2 reservations already exist; refusing signed v1 downgrade.",
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub async fn desired_config(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -2297,6 +2318,7 @@ pub async fn desired_config(
             "Quota-v2 requires an upgraded node agent.",
         ));
     }
+    reject_legacy_policy_after_v2_issuance(&state.pool).await?;
     // Enrollment precedes profile authoring. Authenticated nodes without a
     // profile receive a non-successful-to-apply but healthy pending response.
     // Never sign or issue a policy while no Xray configuration exists.
