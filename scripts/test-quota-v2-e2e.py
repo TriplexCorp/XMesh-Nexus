@@ -335,6 +335,38 @@ def main():
         applied_heartbeat(b,expected_b)
         assert fleet()["activationCandidatePreflightPassed"],fleet()
         print("PASS: cutover application preflight requires running Xray, verified current profile and fresh post-delivery signed heartbeat")
+        # A newly edited node can be out of date even though its CURRENT
+        # heartbeat matches the LATEST-SERVED (now STALE) revision in the DB.
+        # The readiness endpoint must recompile the actual current profile
+        # without issuing a new policy or modifying any v2 reservation.
+        old_revision_b=expected_b
+        before_compile_recheck=query(
+            "SELECT revision FROM node_desired_revisions WHERE node_id="+str(b.id))
+        assert before_compile_recheck==old_revision_b
+        code,_,_=api("PATCH",f"/collections/nodes/{b.id}",
+                     {"xrayLocalPort":28402},cookie)
+        check(code,200,"edit current node port without delivering new Xray policy")
+        changed_profile=fleet()
+        changed_b=next(row for row in changed_profile["nodes"] if row["nodeId"]==b.id)
+        good_a=next(row for row in changed_profile["nodes"] if row["nodeId"]==a.id)
+        assert changed_b["runtimeHeartbeatFresh"] and changed_b["xrayRunning"]
+        assert changed_b["lastServedRevision"]==old_revision_b
+        assert changed_b["reportedAppliedRevision"]==old_revision_b
+        assert changed_b["currentProfileRecompiled"]
+        assert changed_b["currentAuthoritativeRevision"]!=old_revision_b
+        assert changed_b["applicationBlocker"]=="current_profile_revision_not_applied",changed_b
+        assert not changed_b["applicationPreflightPassed"]
+        assert not changed_profile["activationCandidatePreflightPassed"],changed_profile
+        assert changed_profile["applicationCompatibleNodes"]==1,changed_profile
+        assert good_a["applicationPreflightPassed"] and good_a["currentProfileRecompiled"]
+        assert query("SELECT revision FROM node_desired_revisions WHERE node_id="+str(b.id))==old_revision_b
+        code,_,_=api("PATCH",f"/collections/nodes/{b.id}",
+                     {"xrayLocalPort":28401},cookie)
+        check(code,200,"restore the original compiled node profile")
+        restored=fleet()
+        assert restored["activationCandidatePreflightPassed"],restored
+        assert all(row["currentProfileRecompiled"] for row in restored["nodes"]),restored
+        print("PASS: readiness rejects stale served config after admin edits without falsely issuing another policy")
         # A separate 0.1.0 Go router still has a heartbeat; it MUST NOT
         # impersonate or overwrite the control-Agent release observation.
         heartbeat(a,"0.1.0")
