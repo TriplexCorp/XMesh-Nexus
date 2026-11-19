@@ -41,19 +41,21 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 6c1bafa8433003a9bfed15986d83dba4d8cb5f1a
+          ref: 6b23b9d02f6c9db14a578c9d6fd39b6cf63a5aa8
           path: node-agent
       - name: Pin compatible Agent and guard for quota-v2 rehearsal
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C node-agent rev-parse HEAD)" = "6c1bafa8433003a9bfed15986d83dba4d8cb5f1a"
+          test "$(git -C node-agent rev-parse HEAD)" = "6b23b9d02f6c9db14a578c9d6fd39b6cf63a5aa8"
           test "$(tr -d '\r\n' < node-agent/AGENT_VERSION)" = "control-v6.0.21"
           test -f node-agent/deploy/xmesh-policy-guard.py
           test -f node-agent/deploy/xmesh-policy-guard-base.py
           test -f node-agent/experiments/xray-dataplane-fence/durable_fence.go.txt
+          test -f node-agent/experiments/xray-dataplane-fence/durable_counter_taint.go.txt
+          test -f node-agent/experiments/xray-dataplane-fence/durable_counter_taint_test.go.txt
           python3 -m py_compile node-agent/deploy/xmesh-policy-guard.py node-agent/deploy/xmesh-policy-guard-base.py
-          echo 'Pinned current v6.0.17 Node matches committed, immutable signed quota guard'
+          echo 'Pinned current control-v6.0.21 Node matches signed quota guard; refunds remain disabled'
       - name: Generate disposable secrets and feature-gated service
         shell: bash
         run: |
