@@ -275,9 +275,7 @@ struct FleetSummary {
     activation_candidates: usize,
 }
 
-fn summarize_fleet_nodes(
-    entries: &[sqlx::postgres::PgRow],
-) -> Result<FleetSummary, ApiError> {
+fn summarize_fleet_nodes(entries: &[sqlx::postgres::PgRow]) -> Result<FleetSummary, ApiError> {
     let mut summary = FleetSummary {
         nodes: Vec::with_capacity(entries.len()),
         serving: 0,
