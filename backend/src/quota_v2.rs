@@ -292,10 +292,16 @@ fn summarize_fleet_nodes(
         if !matches!(node.class, FleetReadinessClass::Disabled) {
             summary.serving += 1;
         }
-        if matches!(node.class, FleetReadinessClass::ProtocolOnly | FleetReadinessClass::Ready) {
+        if matches!(
+            node.class,
+            FleetReadinessClass::ProtocolOnly | FleetReadinessClass::Ready
+        ) {
             summary.compatible += 1;
         }
-        if matches!(node.class, FleetReadinessClass::AgentOnly | FleetReadinessClass::Ready) {
+        if matches!(
+            node.class,
+            FleetReadinessClass::AgentOnly | FleetReadinessClass::Ready
+        ) {
             summary.release_compatible += 1;
         }
         if matches!(node.class, FleetReadinessClass::Ready) {
