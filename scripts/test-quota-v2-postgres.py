@@ -1,5 +1,6 @@
 import concurrent.futures
 import os
+import threading
 from pathlib import Path
 import unittest
 import uuid
@@ -445,6 +446,134 @@ class ReservationTests(unittest.TestCase):
                         c.execute(sql,(self.uid,))
             self.assertEqual(self.economic_state(),state)
         self.assertEqual(self.terminal(1,30,request)[1],20)
+
+    def terminal_receipt_count(self):
+        with psycopg.connect(DSN) as c:
+            return c.execute(
+                "SELECT COUNT(*) FROM quota_v2_terminal_settlements "
+                "WHERE user_id=%s AND epoch=%s",
+                (self.uid, self.epoch)).fetchone()[0]
+
+    def test_parallel_identical_terminal_retries_refund_only_once(self):
+        # This SQL function is deliberately DORMANT. A migration-owner CI
+        # harness supplies hypothetical independently verified final bytes;
+        # no Node/API receipt may trigger it until physical finality exists.
+        request=self.terminal_prepare(1,acknowledged=20)
+        self.reserve(2)
+        self.assertEqual(self.economic_state(),(20,80))
+        barrier=threading.Barrier(12,timeout=30)
+        def retry(_):
+            barrier.wait(timeout=30)
+            return self.terminal(1,30,request)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+            result=list(pool.map(retry,range(12)))
+        self.assertEqual(len(set(result)),1)
+        self.assertEqual(result[0][:3],(30,20,1))
+        self.assertEqual(self.terminal_receipt_count(),1)
+        self.assertEqual(self.economic_state(),(30,50))
+        # A second concurrently funded Node can receive at most the 20
+        # newly freed bytes; identical receipt retries never multiply it.
+        self.assertEqual(self.reserve(2,target=70),(70,0))
+        self.assertEqual(self.economic_state(),(30,70))
+
+    def test_conflicting_terminal_proofs_race_first_commit_is_immutable(self):
+        request=self.terminal_prepare(1,acknowledged=20)
+        variants=[
+            {"total":30, "runtime":"a"*64, "digest":"b"*64},
+            {"total":31, "runtime":"a"*64, "digest":"b"*64},
+            {"total":30, "runtime":"c"*64, "digest":"b"*64},
+            {"total":30, "runtime":"a"*64, "digest":"d"*64},
+        ]*2
+        barrier=threading.Barrier(len(variants),timeout=30)
+        def contender(variant):
+            barrier.wait(timeout=30)
+            try:
+                receipt=self.terminal(1,variant["total"],request,**{
+                    "runtime":variant["runtime"],"digest":variant["digest"]})
+                return ("accepted",receipt)
+            except psycopg.Error:
+                return ("rejected",None)
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=len(variants)) as pool:
+            outcomes=list(pool.map(contender,variants))
+        accepted=[row for status,row in outcomes if status=="accepted"]
+        self.assertTrue(accepted, "Every competing SQL transaction failed")
+        self.assertTrue(any(status=="rejected" for status,_ in outcomes),
+                        "Conflicting proof replays were all admitted")
+        self.assertEqual(len(set(accepted)),1,
+                         "Different terminal identities won the same reservation")
+        committed=accepted[0]
+        self.assertEqual(self.terminal_receipt_count(),1)
+        self.assertEqual(self.economic_state(),(committed[0],0))
+        self.assertEqual(committed[1],50-committed[0])
+        for variant in variants:
+            if (variant["total"],variant["runtime"],variant["digest"])!=(
+                    committed[0],committed[3],committed[4]):
+                with self.assertRaises(psycopg.Error):
+                    self.terminal(1,variant["total"],request,**{
+                        "runtime":variant["runtime"],"digest":variant["digest"]})
+            self.assertEqual(self.economic_state(),(committed[0],0))
+
+    def test_terminal_and_conservative_burn_race_never_double_release(self):
+        request=self.terminal_prepare(1,acknowledged=20)
+        barrier=threading.Barrier(2,timeout=30)
+        def settlement():
+            barrier.wait(timeout=30)
+            try:
+                return ("terminal",self.terminal(1,30,request))
+            except psycopg.Error:
+                return ("terminal-rejected",None)
+        def burn():
+            barrier.wait(timeout=30)
+            try:
+                return ("burn",self.burn(1,request))
+            except psycopg.Error:
+                return ("burn-rejected",None)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            a=pool.submit(settlement)
+            b=pool.submit(burn)
+            result=[a.result(timeout=30),b.result(timeout=30)]
+        winners=[state for state,_ in result if state in ("terminal","burn")]
+        self.assertEqual(len(winners),1,result)
+        if winners==["terminal"]:
+            self.assertEqual(self.terminal_receipt_count(),1)
+            self.assertEqual(self.economic_state(),(30,0))
+            with self.assertRaises(psycopg.Error):
+                self.burn(1,request)
+        else:
+            self.assertEqual(self.terminal_receipt_count(),0)
+            self.assertEqual(self.economic_state(),(50,0))
+            with self.assertRaises(psycopg.Error):
+                self.terminal(1,30,request)
+        # Concurrent burn and prospective settlement never make any bytes
+        # available again just because a late stop receipt arrived.
+        self.assertEqual(self.reserve(2,target=50),(0,0))
+
+    def test_public_role_has_no_direct_terminal_settlement_privilege(self):
+        # The dormant owner-only SQL settlement primitive must NOT become
+        # executable merely because migration functions default to PUBLIC.
+        role="quota_terminal_unpriv_"+uuid.uuid4().hex[:12]
+        from psycopg import sql
+        with psycopg.connect(DSN) as c:
+            c.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(role)))
+        try:
+            with psycopg.connect(DSN) as c:
+                c.execute(sql.SQL("SET ROLE {}").format(sql.Identifier(role)))
+                allowed=c.execute(
+                    "SELECT has_function_privilege(current_user,"
+                    "'quota_v2_settle_verified_terminal("
+                    "bigint,uuid,bigint,uuid,uuid,uuid,bigint,text,text,bigint)',"
+                    "'EXECUTE')").fetchone()[0]
+                self.assertFalse(allowed,"PUBLIC received terminal refund authority")
+            with psycopg.connect(DSN) as c:
+                c.execute(sql.SQL("SET ROLE {}").format(sql.Identifier(role)))
+                allowed=c.execute(
+                    "SELECT has_table_privilege(current_user,"
+                    "'quota_v2_terminal_settlements','SELECT')").fetchone()[0]
+                self.assertFalse(allowed,"PUBLIC can read private terminal proof ledger")
+        finally:
+            with psycopg.connect(DSN) as c:
+                c.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role)))
 
     def test_conservative_burn_never_entitles_a_late_refund(self):
         self.reserve(1)
