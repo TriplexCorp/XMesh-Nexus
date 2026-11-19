@@ -6,6 +6,8 @@ production Nexus endpoints, Ed25519 authentication, per-node guard decisions
 and persistent PostgreSQL ledgers with independent node identities.
 """
 import copy, hashlib, importlib.util, json, os, subprocess, tempfile, time, uuid
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -62,7 +64,7 @@ class SignedNode:
         self.public=subprocess.check_output(["openssl","pkey","-in",str(self.file),
                                               "-pubout","-outform","DER"])[-32:].hex()
 
-    def post(self,path,body):
+    def post(self,path,body,send_barrier=None):
         raw=json.dumps(body,separators=(",",":")).encode()
         stamp=int(time.time())
         nonce=os.urandom(16).hex()
@@ -71,15 +73,20 @@ class SignedNode:
         self.message.write_bytes(canonical)
         sig=subprocess.check_output(["openssl","pkeyutl","-sign","-rawin","-inkey",
                                      str(self.file),"-in",str(self.message)]).hex()
+        # Release both requests AFTER their independent Ed25519 signatures
+        # are ready, immediately before the HTTP calls enter the backend.
+        if send_barrier is not None:
+            send_barrier.wait(timeout=20)
         return api("POST",path,body,headers={"X-XMesh-Timestamp":str(stamp),
                    "X-XMesh-Nonce":nonce,"X-XMesh-Signature":sig})
 
-    def desired(self,user_id,total=0,lease=None):
+    def desired(self,user_id,total=0,lease=None,send_barrier=None):
         row={"userId":user_id,"usedBytes":total}
         if lease:
             row.update({k:lease[k] for k in ("epoch","meterEpoch","reservationId")})
         code,data,_=self.post("/node/desired-config",
-            {"node_id":self.id,"quotaProtocolVersion":2,"quotaLocalCounters":[row]})
+            {"node_id":self.id,"quotaProtocolVersion":2,"quotaLocalCounters":[row]},
+            send_barrier=send_barrier)
         check(code,200,f"v2 desired-config issued to node {self.id}")
         assert data["policy"]["version"]==2,data
         policy=guard.verify_envelope(data,self.state,self.id,first_contact=True)
@@ -393,10 +400,23 @@ def main():
         assert lease_retry["reservationId"]==lease_pre_a["reservationId"]
         assert lease_retry["ceilingBytes"]==0
         print("PASS: lost first response recovers unchanged unfunded signed lease")
-        # Once Node reports a durable identity, Nexus unlocks only the
-        # requested share of the account's remaining globally held capacity.
-        pa,da=a.desired(uid,0,prepared_ledger_a["users"][key]["quotaReservation"])
-        pb,db=b.desired(uid,0,prepared_ledger_b["users"][key]["quotaReservation"])
+        # The real danger is two DIFFERENT nodes trying to reserve the
+        # same remaining paid bytes at precisely the same time. Earlier
+        # versions of this acceptance test called A then B serially and
+        # could not detect a race in the per-user allocation serializer.
+        # Keep each Node's own Ed25519 signing file and committed policy
+        # independent; a barrier releases both real HTTP requests together.
+        def concurrent_desired(requests):
+            start=threading.Barrier(len(requests),timeout=20)
+            def invoke(node,total,lease):
+                return node.desired(uid,total,lease,send_barrier=start)
+            with ThreadPoolExecutor(max_workers=len(requests)) as pool:
+                futures=[pool.submit(invoke,*request) for request in requests]
+                return [future.result(timeout=50) for future in futures]
+        (pa,da),(pb,db)=concurrent_desired([
+            (a,0,prepared_ledger_a["users"][key]["quotaReservation"]),
+            (b,0,prepared_ledger_b["users"][key]["quotaReservation"])
+        ])
         lease_a=pa["users"][0]["quotaReservation"]
         lease_b=pb["users"][0]["quotaReservation"]
         assert lease_a["reservationId"]!=lease_b["reservationId"]
@@ -416,7 +436,20 @@ def main():
         settled,held,limit=account()
         assert settled==0 and held==lease_a["ceilingBytes"]+lease_b["ceilingBytes"]
         assert settled+held<=limit,(settled,held,limit)
-        print("PASS: concurrent node reservations conserve global quota")
+        # Replay two signed funded policies concurrently. Missing HTTP
+        # acknowledgements must not mint a second lease, extend a grant
+        # twice, or mutate the globally held balance.
+        before_replay=(settled,held,limit)
+        (retry_pa,_),(retry_pb,_)=concurrent_desired([
+            (a,0,lease_a),(b,0,lease_b)
+        ])
+        for previous,repeated in ((lease_a,retry_pa),(lease_b,retry_pb)):
+            same=repeated["users"][0]["quotaReservation"]
+            assert same["reservationId"]==previous["reservationId"],(previous,same)
+            assert same["epoch"]==previous["epoch"] and same["meterEpoch"]==previous["meterEpoch"]
+            assert same["ceilingBytes"]==previous["ceilingBytes"],(previous,same)
+        assert account()==before_replay,(before_replay,account())
+        print("PASS: parallel signed first-grant and lost-response retry conserve global quota")
         code, preflight, _=api("GET",f"/users/{uid}/quota-v2/revocation",cookie=cookie)
         check(code,200,"show active signed holds across both nodes")
         assert preflight["state"]=="awaiting_nodes" and not preflight["canResetNow"],preflight
