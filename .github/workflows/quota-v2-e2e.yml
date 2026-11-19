@@ -11,6 +11,7 @@ on:
       - 'backend/migrations/0125_quota_v2_reservations.sql'
       - 'deploy/node-metrics-agent.sh'
       - 'scripts/test-quota-v2-e2e.py'
+      - 'scripts/test-quota-v2-flag-transition.py'
       - '.github/workflows/quota-v2-e2e.yml'
 permissions:
   contents: read
@@ -105,6 +106,11 @@ jobs:
           test "$XMESH_TEST_URL" = http://127.0.0.1:8080
           test "$XMESH_AUDIT_DISPOSABLE" = 1
           python3 scripts/test-quota-v2-e2e.py
+      - name: Rehearse feature 0-to-1 and unsafe 1-to-0 rollback against the SAME durable Node
+        run: |
+          set -Eeuo pipefail
+          test "$XMESH_AUDIT_DISPOSABLE" = 1
+          python3 scripts/test-quota-v2-flag-transition.py
       - name: Collect failure diagnostics
         if: failure()
         run: docker compose logs --tail=160
