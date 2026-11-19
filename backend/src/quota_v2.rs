@@ -118,6 +118,55 @@ struct FleetReadinessNode {
     class: FleetReadinessClass,
 }
 
+struct RuntimeApplicationPreflight {
+    fresh: bool,
+    running: bool,
+    after_delivery: bool,
+    applied_revision: Option<String>,
+    served_revision: Option<String>,
+    profile_check: Option<String>,
+    passed: bool,
+    blocker: &'static str,
+}
+
+fn runtime_application_preflight(
+    entry: &sqlx::postgres::PgRow,
+    disabled: bool,
+) -> Result<RuntimeApplicationPreflight, ApiError> {
+    // This signed heartbeat is only a nonterminal application preflight,
+    // NOT binary attestation or a final Xray byte meter.
+    let fresh = entry.try_get::<Option<bool>, _>("runtime_fresh")?.unwrap_or(false);
+    let running = entry.try_get::<Option<bool>, _>("runtime_xray_running")?.unwrap_or(false);
+    let after_delivery: bool = entry.try_get("runtime_after_delivery")?;
+    let applied_revision: Option<String> = entry.try_get("runtime_applied_revision")?;
+    let served_revision: Option<String> = entry.try_get("last_served_revision")?;
+    let profile_check: Option<String> = entry.try_get("runtime_profile_check")?;
+    let revision_matches = applied_revision.as_deref()
+        .zip(served_revision.as_deref())
+        .is_some_and(|(applied, served)| applied == served);
+    let passed = !disabled && fresh && running && after_delivery
+        && profile_check.as_deref() == Some("verified") && revision_matches;
+    let blocker = if disabled {
+        "excluded_disabled"
+    } else if !fresh {
+        "missing_or_stale_authenticated_runtime_heartbeat"
+    } else if !running {
+        "xray_not_running"
+    } else if profile_check.as_deref() != Some("verified") {
+        "active_profile_not_verified"
+    } else if !revision_matches {
+        "last_served_revision_not_applied"
+    } else if !after_delivery {
+        "no_application_heartbeat_after_policy_delivery"
+    } else {
+        "none"
+    };
+    Ok(RuntimeApplicationPreflight {
+        fresh, running, after_delivery, applied_revision,
+        served_revision, profile_check, passed, blocker,
+    })
+}
+
 fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNode, ApiError> {
     let node_id: i64 = entry.try_get("id")?;
     let data: Value = entry.try_get("data")?;
@@ -141,42 +190,8 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
     let claims_v2 = protocol == Some(2);
     let passed = !disabled && claims_v2 && recent && legacy_quiet && served;
     let rollout_passed = passed && agent_passed;
-    // A delivered signed policy does NOT mean the node applied it. Require
-    // an independently subsequent Ed25519-authenticated control heartbeat
-    // reporting actual running Xray + verified on-disk active profile and
-    // the same last SERVED revision. This is an application preflight only:
-    // it does not attest binary integrity or final Xray byte accounting.
-    let runtime_fresh: bool = entry.try_get::<Option<bool>, _>("runtime_fresh")?.unwrap_or(false);
-    let xray_running: bool = entry.try_get::<Option<bool>, _>("runtime_xray_running")?.unwrap_or(false);
-    let runtime_after_delivery: bool = entry.try_get("runtime_after_delivery")?;
-    let applied_revision: Option<String> = entry.try_get("runtime_applied_revision")?;
-    let served_revision: Option<String> = entry.try_get("last_served_revision")?;
-    let profile_check: Option<String> = entry.try_get("runtime_profile_check")?;
-    let revision_matches = applied_revision.as_deref()
-        .zip(served_revision.as_deref())
-        .is_some_and(|(applied, served)| applied == served);
-    let application_passed = !disabled
-        && runtime_fresh
-        && xray_running
-        && runtime_after_delivery
-        && profile_check.as_deref() == Some("verified")
-        && revision_matches;
-    let activation_candidate = rollout_passed && application_passed;
-    let application_blocker = if disabled {
-        "excluded_disabled"
-    } else if !runtime_fresh {
-        "missing_or_stale_authenticated_runtime_heartbeat"
-    } else if !xray_running {
-        "xray_not_running"
-    } else if profile_check.as_deref() != Some("verified") {
-        "active_profile_not_verified"
-    } else if !revision_matches {
-        "last_served_revision_not_applied"
-    } else if !runtime_after_delivery {
-        "no_application_heartbeat_after_policy_delivery"
-    } else {
-        "none"
-    };
+    let application = runtime_application_preflight(entry, disabled)?;
+    let activation_candidate = rollout_passed && application.passed;
     let class = match (disabled, passed, agent_passed) {
         (true, _, _) => FleetReadinessClass::Disabled,
         (false, true, true) => FleetReadinessClass::Ready,
@@ -229,14 +244,14 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
             "agentReleasePreflightPassed":agent_passed,
             "agentBlocker":agent_blocker,
             "rolloutPreflightPassed":rollout_passed,
-            "runtimeHeartbeatFresh":runtime_fresh,
-            "xrayRunning":xray_running,
-            "runtimeProfileCheck":profile_check,
-            "lastServedRevision":served_revision,
-            "reportedAppliedRevision":applied_revision,
-            "runtimeHeartbeatAfterDelivery":runtime_after_delivery,
-            "applicationPreflightPassed":application_passed,
-            "applicationBlocker":application_blocker,
+            "runtimeHeartbeatFresh":application.fresh,
+            "xrayRunning":application.running,
+            "runtimeProfileCheck":application.profile_check,
+            "lastServedRevision":application.served_revision,
+            "reportedAppliedRevision":application.applied_revision,
+            "runtimeHeartbeatAfterDelivery":application.after_delivery,
+            "applicationPreflightPassed":application.passed,
+            "applicationBlocker":application.blocker,
             "activationCandidatePreflightPassed":activation_candidate,
         }),
         class,
