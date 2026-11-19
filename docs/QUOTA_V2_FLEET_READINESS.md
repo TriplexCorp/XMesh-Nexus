@@ -28,6 +28,10 @@ GET /api/v1/quota-v2/fleet-readiness
 
 **Важно:** `protocolPreflightPassed` отвечает только за совместимость протокола и может быть `true` даже при устаревшем Agent. Для проверки обновления парка используйте более строгий `rolloutPreflightPassed`, учитывающий heartbeat. Это всё равно **только предварительная проверка**, а не разрешение активировать квоты или возвращать трафик.
 
+**Проверка применения на Xray (не только доставки):** `applicationPreflightPassed` требует, чтобы на каждой обслуживающей ноде после последней доставки подписанной конфигурации был свежий (≤65 с) Node-аутентифицированный heartbeat с `xrayRunning=true`, `runtimeProfileCheck=verified` и `reportedAppliedRevision`, равной `lastServedRevision` из БД Nexus. Отдельное поле `activationCandidatePreflightPassed` требует одновременно готовности протокола, версии Agent **и** такого подтверждения применения на всех обслуживающих нодах. `applicationBlocker` содержит конкретную причину: `missing_or_stale_authenticated_runtime_heartbeat`, `xray_not_running`, `active_profile_not_verified`, `last_served_revision_not_applied` либо `no_application_heartbeat_after_policy_delivery`. Ревизия из `node_desired_revisions` означает последнюю **выданную**, а не независимо перекомпилированную актуальную конфигурацию.
+
+Подписанный heartbeat всё ещё **не является** независимой аттестацией исполняемого файла, доказательством полного завершения физических потоков Xray или финальным счётчиком. Даже `activationCandidatePreflightPassed=true` сам по себе не меняет `XMESH_QUOTA_V2_ENABLED` и не разрешает возврат резервов.
+
 ## Что этот отчёт НЕ доказывает
 
 Аутентифицированный запрос подтверждает только Node Ed25519-ключ либо авторизацию доверенного product gateway. Самостоятельно он не удостоверяет версию установленного бинарника Agent, применение политики всеми работающими процессами и фактическую остановку Xray, сохранении последних байтов после сбоя или возможности возвращать резерв. Поэтому отчёт намеренно содержит:
