@@ -41,13 +41,13 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: b01e7dfcce7259bc1780717bdefb78ea94b1684f
+          ref: f5128a8726b2cc16287e4af037161d4f0ad22c67
           path: node-agent
       - name: Pin compatible Agent and guard for quota-v2 rehearsal
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C node-agent rev-parse HEAD)" = "b01e7dfcce7259bc1780717bdefb78ea94b1684f"
+          test "$(git -C node-agent rev-parse HEAD)" = "f5128a8726b2cc16287e4af037161d4f0ad22c67"
           test "$(tr -d '\r\n' < node-agent/AGENT_VERSION)" = "control-v6.0.24"
           test -f node-agent/deploy/xmesh-policy-guard.py
           test -f node-agent/deploy/xmesh-policy-guard-base.py
