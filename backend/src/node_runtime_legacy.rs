@@ -2215,6 +2215,16 @@ async fn compile_node_profile(
     })
 }
 
+/// Reuse the authoritative desired-config compiler in read-only fleet
+/// preflight. A cached last-served revision is not necessarily the CURRENT
+/// desired profile after an admin edits node ports, users or squad routing.
+pub async fn current_compiled_node_profile_revision(
+    state: &AppState,
+    node_id: i64,
+) -> Result<String, ApiError> {
+    Ok(compile_node_profile(state, node_id).await?.revision)
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DesiredConfigRequest {

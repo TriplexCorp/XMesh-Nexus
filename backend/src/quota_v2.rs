@@ -259,6 +259,8 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
             "runtimeHeartbeatAfterDelivery":application.after_delivery,
             "applicationPreflightPassed":application.blocker == "none",
             "applicationBlocker":application.blocker,
+            "currentAuthoritativeRevision":Value::Null,
+            "currentProfileRecompiled":false,
             "activationCandidatePreflightPassed":activation_candidate,
         }),
         class,
@@ -316,6 +318,49 @@ fn summarize_fleet_nodes(entries: &[sqlx::postgres::PgRow]) -> Result<FleetSumma
     Ok(summary)
 }
 
+/// Only candidates that have already supplied fresh authenticated application
+/// evidence need a read-only recompile. The cached last-served revision can
+/// lag current administrator changes in users, squads, ports or routing.
+async fn recheck_authoritative_profile_revisions(state: &AppState, fleet: &mut FleetSummary) {
+    for node in &mut fleet.nodes {
+        if node["applicationPreflightPassed"] != true {
+            continue;
+        }
+        let Some(node_id) = node["nodeId"].as_i64() else {
+            continue;
+        };
+        node["currentProfileRecompiled"] = json!(true);
+        if let Ok(current) =
+            crate::node_runtime::current_compiled_node_profile_revision(state, node_id).await
+        {
+            let matches = node["reportedAppliedRevision"].as_str() == Some(current.as_str());
+            node["currentAuthoritativeRevision"] = json!(current);
+            if !matches {
+                node["applicationBlocker"] = json!("current_profile_revision_not_applied");
+                node["applicationPreflightPassed"] = json!(false);
+                node["activationCandidatePreflightPassed"] = json!(false);
+            }
+        } else {
+            // Malformed/unavailable CURRENT configuration must never
+            // inherit a green status from a previously served revision.
+            // Do not leak an internal compiler error or profile secrets.
+            node["applicationBlocker"] = json!("current_profile_compile_failed");
+            node["applicationPreflightPassed"] = json!(false);
+            node["activationCandidatePreflightPassed"] = json!(false);
+        }
+    }
+    fleet.application_compatible = fleet
+        .nodes
+        .iter()
+        .filter(|node| node["applicationPreflightPassed"] == true)
+        .count();
+    fleet.activation_candidates = fleet
+        .nodes
+        .iter()
+        .filter(|node| node["activationCandidatePreflightPassed"] == true)
+        .count();
+}
+
 /// An operator-only, read-only readiness inventory. A fresh authenticated v2
 /// request followed by a server-signed policy response is only a compatibility
 /// preflight, NOT an attestation of the installed binary, actual Xray
@@ -367,7 +412,8 @@ pub async fn fleet_protocol_readiness(
     )
     .fetch_all(&state.pool)
     .await?;
-    let fleet = summarize_fleet_nodes(&entries)?;
+    let mut fleet = summarize_fleet_nodes(&entries)?;
+    recheck_authoritative_profile_revisions(&state, &mut fleet).await;
     let all_claim_v2 = fleet.serving > 0 && fleet.serving == fleet.compatible;
     Ok(Json(json!({
         "protocol":"v2",
