@@ -307,6 +307,106 @@ struct NodeMetricsIngestRequest {
     quota_receipts: Option<Vec<NodeQuotaReceipt>>,
     #[serde(default, alias = "quotaStopReceipts")]
     quota_stop_receipts: Option<Vec<NodeStopReceipt>>,
+    // Keep unrelated unknown fields backward-compatible while exposing any
+    // attempt to smuggle finality/refund claims through ordinary telemetry.
+    #[serde(flatten)]
+    unrecognized_fields: BTreeMap<String, Value>,
+}
+
+/// The signed telemetry endpoint accepts only NONFINAL cumulative usage and
+/// operational stop acknowledgements. A Node signature authenticates its
+/// sender, not the absence of Xray writers or any final byte proof. Until a
+/// separately reviewed terminal-receipt protocol independently verifies
+/// process shutdown, session drain, last counters and replay ordering, it
+/// MUST reject refund/finality fields rather than silently return HTTP 201.
+fn reject_unverified_terminal_claims(fields: &BTreeMap<String, Value>) -> Result<(), ApiError> {
+    for key in fields.keys() {
+        if matches!(
+            key.as_str(),
+            "quotaTerminalReceipts"
+                | "quota_terminal_receipts"
+                | "terminalMeterReceipts"
+                | "terminal_meter_receipts"
+                | "terminalReceipt"
+                | "terminal_receipt"
+                | "finalMeterVerified"
+                | "final_meter_verified"
+                | "settlementEligible"
+                | "settlement_eligible"
+                | "refundableBytes"
+                | "refundable_bytes"
+        ) {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Terminal Xray proofs are not accepted by ordinary Node metrics.",
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod nonterminal_metrics_contract_tests {
+    use super::*;
+
+    #[test]
+    fn reject_any_terminal_or_refund_field_even_when_null_or_zero() {
+        let base = json!({"node_id": 1, "userTraffic": []});
+        let parsed: NodeMetricsIngestRequest = serde_json::from_value(base.clone()).unwrap();
+        assert!(reject_unverified_terminal_claims(&parsed.unrecognized_fields).is_ok());
+
+        for field in [
+            "quotaTerminalReceipts",
+            "quota_terminal_receipts",
+            "terminalMeterReceipts",
+            "terminal_meter_receipts",
+            "terminalReceipt",
+            "terminal_receipt",
+            "finalMeterVerified",
+            "final_meter_verified",
+            "settlementEligible",
+            "settlement_eligible",
+            "refundableBytes",
+            "refundable_bytes",
+        ] {
+            for value in [Value::Null, json!(0), json!([]), json!(true)] {
+                let mut attempted = base.clone();
+                attempted[field] = value;
+                let parsed: NodeMetricsIngestRequest =
+                    serde_json::from_value(attempted).unwrap();
+                assert!(
+                    reject_unverified_terminal_claims(&parsed.unrecognized_fields).is_err(),
+                    "invalid terminal field was ignored: {field}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_stop_receipt_cannot_claim_finality() {
+        let base = json!({
+            "node_id": 1,
+            "userTraffic": [{"userId": 7, "uplinkBytes": 1, "downlinkBytes": 0}],
+            "quotaStopReceipts": [{
+                "userId": 7, "requestId": "11111111-1111-4111-8111-111111111111",
+                "epoch": "22222222-2222-4222-8222-222222222222",
+                "meterEpoch": "33333333-3333-4333-8333-333333333333",
+                "reservationId": "44444444-4444-4444-8444-444444444444",
+                "revision": 1, "usedBytes": 1
+            }]
+        });
+        let parsed: NodeMetricsIngestRequest = serde_json::from_value(base.clone()).unwrap();
+        assert_eq!(parsed.quota_stop_receipts.as_ref().map(Vec::len), Some(1));
+        assert!(reject_unverified_terminal_claims(&parsed.unrecognized_fields).is_ok());
+
+        for claim in [("finalMeterVerified", json!(true)),
+                      ("refundableBytes", json!(100)),
+                      ("settlementEligible", json!(true))] {
+            let mut forged = base.clone();
+            forged["quotaStopReceipts"][0][claim.0] = claim.1;
+            assert!(serde_json::from_value::<NodeMetricsIngestRequest>(forged).is_err());
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -3496,6 +3596,9 @@ async fn ingest_node_metrics(
     // The node must authenticate before untrusted samples are recorded.
     // Telemetry requires a registered Ed25519 identity.
     node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
+    // Reject before ANY transaction or metric persistence: even a correctly
+    // signed Node cannot confer byte finality through generic telemetry.
+    reject_unverified_terminal_claims(&body.unrecognized_fields)?;
 
     let mut metrics =
         prepare_node_metrics(&body, body.metrics.clone().unwrap_or_else(|| json!({})))?;
