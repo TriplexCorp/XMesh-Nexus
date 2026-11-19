@@ -41,13 +41,13 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: f5128a8726b2cc16287e4af037161d4f0ad22c67
+          ref: d2bf974ecb7b8df5edb237f1c6604d6f697baaae
           path: node-agent
       - name: Pin compatible Agent and guard for quota-v2 rehearsal
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C node-agent rev-parse HEAD)" = "f5128a8726b2cc16287e4af037161d4f0ad22c67"
+          test "$(git -C node-agent rev-parse HEAD)" = "d2bf974ecb7b8df5edb237f1c6604d6f697baaae"
           test "$(tr -d '\r\n' < node-agent/AGENT_VERSION)" = "control-v6.0.24"
           test -f node-agent/deploy/xmesh-policy-guard.py
           test -f node-agent/deploy/xmesh-policy-guard-base.py
@@ -64,6 +64,8 @@ jobs:
           python3 -m py_compile node-agent/scripts/quota-v2-local-audit.py
           # Fail cutover on STOPPED managed containers even when Docker ps --all lists their names.
           python3 node-agent/tests/test_quota_v2_local_audit.py
+          # The signed v1 policy is normal while the production flag is 0;
+          # both runtime-only and applied-v2 CLI phases have independent tests.
           python3 node-agent/tests/test_quota_v2_offline_policy_cutoff.py
           # Node 6.0.24 also rejects any stale user rollback after an early failure.
           python3 node-agent/tests/test_quota_v2_prestop_capture.py
