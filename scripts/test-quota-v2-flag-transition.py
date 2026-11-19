@@ -171,6 +171,26 @@ def run():
         assert code == 409, ("CRITICAL: v1 policy was issued after v2 activation",
                              code, response)
         assert "refusing signed v1 downgrade" in str(response), response
+        # A brand new Node has no locally stored v2 policy. It too must be
+        # denied any v1 policy: otherwise a new Node can spend fresh v1
+        # allowances while an older Node still holds durable v2 grants.
+        code, other, _ = api("POST", "/collections/nodes", {
+            "name": "Quota-v2 CI post-activation extra node",
+            "addr": "192.0.2.203",
+        }, login())
+        assert code == 201, (code, other)
+        other_node = SignedNode(other["id"], directory)
+        code, response, _ = api("POST",
+            f"/nodes/{other_node.id}/metrics-key",
+            {"publicKey": other_node.public}, login())
+        assert code == 201, (code, response)
+        code, response, _ = other_node.post("/node/desired-config", {
+            "node_id": other_node.id,
+            "quotaProtocolVersion": 2,
+            "quotaLocalCounters": [],
+        })
+        assert code == 409, ("CRITICAL: fresh Node received v1 after v2 grant",
+                             code, response)
         try:
             guard.verify_envelope(v1, node.state, node.id, first_contact=True)
         except ValueError as error:
