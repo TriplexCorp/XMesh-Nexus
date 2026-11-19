@@ -372,8 +372,7 @@ mod nonterminal_metrics_contract_tests {
             for value in [Value::Null, json!(0), json!([]), json!(true)] {
                 let mut attempted = base.clone();
                 attempted[field] = value;
-                let parsed: NodeMetricsIngestRequest =
-                    serde_json::from_value(attempted).unwrap();
+                let parsed: NodeMetricsIngestRequest = serde_json::from_value(attempted).unwrap();
                 assert!(
                     reject_unverified_terminal_claims(&parsed.unrecognized_fields).is_err(),
                     "invalid terminal field was ignored: {field}"
@@ -399,9 +398,11 @@ mod nonterminal_metrics_contract_tests {
         assert_eq!(parsed.quota_stop_receipts.as_ref().map(Vec::len), Some(1));
         assert!(reject_unverified_terminal_claims(&parsed.unrecognized_fields).is_ok());
 
-        for claim in [("finalMeterVerified", json!(true)),
-                      ("refundableBytes", json!(100)),
-                      ("settlementEligible", json!(true))] {
+        for claim in [
+            ("finalMeterVerified", json!(true)),
+            ("refundableBytes", json!(100)),
+            ("settlementEligible", json!(true)),
+        ] {
             let mut forged = base.clone();
             forged["quotaStopReceipts"][0][claim.0] = claim.1;
             assert!(serde_json::from_value::<NodeMetricsIngestRequest>(forged).is_err());
