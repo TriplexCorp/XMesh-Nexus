@@ -64,7 +64,7 @@ class SignedNode:
         self.public=subprocess.check_output(["openssl","pkey","-in",str(self.file),
                                               "-pubout","-outform","DER"])[-32:].hex()
 
-    def post(self,path,body):
+    def post(self,path,body,send_barrier=None):
         raw=json.dumps(body,separators=(",",":")).encode()
         stamp=int(time.time())
         nonce=os.urandom(16).hex()
@@ -73,15 +73,20 @@ class SignedNode:
         self.message.write_bytes(canonical)
         sig=subprocess.check_output(["openssl","pkeyutl","-sign","-rawin","-inkey",
                                      str(self.file),"-in",str(self.message)]).hex()
+        # Release both requests AFTER their independent Ed25519 signatures
+        # are ready, immediately before the HTTP calls enter the backend.
+        if send_barrier is not None:
+            send_barrier.wait(timeout=20)
         return api("POST",path,body,headers={"X-XMesh-Timestamp":str(stamp),
                    "X-XMesh-Nonce":nonce,"X-XMesh-Signature":sig})
 
-    def desired(self,user_id,total=0,lease=None):
+    def desired(self,user_id,total=0,lease=None,send_barrier=None):
         row={"userId":user_id,"usedBytes":total}
         if lease:
             row.update({k:lease[k] for k in ("epoch","meterEpoch","reservationId")})
         code,data,_=self.post("/node/desired-config",
-            {"node_id":self.id,"quotaProtocolVersion":2,"quotaLocalCounters":[row]})
+            {"node_id":self.id,"quotaProtocolVersion":2,"quotaLocalCounters":[row]},
+            send_barrier=send_barrier)
         check(code,200,f"v2 desired-config issued to node {self.id}")
         assert data["policy"]["version"]==2,data
         policy=guard.verify_envelope(data,self.state,self.id,first_contact=True)
@@ -404,8 +409,7 @@ def main():
         def concurrent_desired(requests):
             start=threading.Barrier(len(requests),timeout=20)
             def invoke(node,total,lease):
-                start.wait(timeout=20)
-                return node.desired(uid,total,lease)
+                return node.desired(uid,total,lease,send_barrier=start)
             with ThreadPoolExecutor(max_workers=len(requests)) as pool:
                 futures=[pool.submit(invoke,*request) for request in requests]
                 return [future.result(timeout=50) for future in futures]
