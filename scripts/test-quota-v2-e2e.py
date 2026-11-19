@@ -267,6 +267,67 @@ def main():
         released=fleet()
         assert released["rolloutPreflightPassed"] and released["rolloutCompatibleNodes"]==2,released
         assert all(row["agentReleasePreflightPassed"] for row in released["nodes"]),released
+        # Receiving a signed desired-config + a fresh version heartbeat is
+        # insufficient to claim Xray ACTUALLY APPLIED that configuration.
+        # All prior heartbeats deliberately report xray_running=False.
+        assert not released["activationCandidatePreflightPassed"],released
+        assert released["applicationCompatibleNodes"]==0,released
+        assert all(row["applicationBlocker"]=="xray_not_running"
+                   for row in released["nodes"]),released
+        def applied_heartbeat(node, revision=None, profile_check="verified", running=True):
+            if revision is None:
+                revision=query("SELECT revision FROM node_desired_revisions WHERE node_id="+str(node.id))
+            assert len(revision)==64 and revision.isalnum(),revision
+            status,data,_=node.post("/node/heartbeat",{
+                "node_id":node.id,"version":"control-v6.0.21",
+                "router_running":True,"xray_running":running,
+                "appliedRevision":revision,"profileCheck":profile_check
+            })
+            check(status,200,"signed runtime application observation")
+            assert data["accepted"] is True,data
+            return revision
+        expected_a=applied_heartbeat(a)
+        candidate_one=fleet()
+        assert candidate_one["applicationCompatibleNodes"]==1,candidate_one
+        assert not candidate_one["activationCandidatePreflightPassed"],candidate_one
+        expected_b=applied_heartbeat(b)
+        deployed=fleet()
+        assert deployed["applicationPreflightPassed"] and deployed["activationCandidatePreflightPassed"],deployed
+        assert deployed["activationCandidateNodes"]==2,deployed
+        assert all(row["runtimeProfileCheck"]=="verified" and row["xrayRunning"]
+                   and row["runtimeHeartbeatAfterDelivery"]
+                   and row["reportedAppliedRevision"]==row["lastServedRevision"]
+                   for row in deployed["nodes"]),deployed
+        # An authenticated worker with a running Xray but a stale applied
+        # revision must no longer be presented as a cutover candidate.
+        changed_b="f"*64 if expected_b!="f"*64 else "e"*64
+        applied_heartbeat(b,changed_b)
+        stale_applied=fleet()
+        assert stale_applied["rolloutPreflightPassed"] and not stale_applied["activationCandidatePreflightPassed"],stale_applied
+        assert next(row for row in stale_applied["nodes"] if row["nodeId"]==b.id)["applicationBlocker"]=="last_served_revision_not_applied",stale_applied
+        applied_heartbeat(b,expected_b,"policy_invalid")
+        bad_profile=fleet()
+        assert not bad_profile["activationCandidatePreflightPassed"],bad_profile
+        assert next(row for row in bad_profile["nodes"] if row["nodeId"]==b.id)["applicationBlocker"]=="active_profile_not_verified",bad_profile
+        applied_heartbeat(b,expected_b)
+        # The report must also reject a same-digest heartbeat that happened
+        # BEFORE the server delivered the most recent policy.
+        query("UPDATE node_runtime_heartbeats SET received_at=NOW()-INTERVAL '10 seconds' WHERE node_id="+str(b.id))
+        query("UPDATE node_desired_revisions SET served_at=NOW() WHERE node_id="+str(b.id))
+        premature=fleet()
+        assert not premature["activationCandidatePreflightPassed"],premature
+        assert next(row for row in premature["nodes"] if row["nodeId"]==b.id)["applicationBlocker"]=="no_application_heartbeat_after_policy_delivery",premature
+        applied_heartbeat(b,expected_b)
+        assert fleet()["activationCandidatePreflightPassed"],fleet()
+        # A stale runtime observation is distinct from the latest Agent
+        # release claim. A healthy release heartbeat alone isn't enough.
+        query("UPDATE node_runtime_heartbeats SET received_at=NOW()-INTERVAL '120 seconds' WHERE node_id="+str(b.id))
+        runtime_stale=fleet()
+        assert not runtime_stale["activationCandidatePreflightPassed"],runtime_stale
+        assert next(row for row in runtime_stale["nodes"] if row["nodeId"]==b.id)["applicationBlocker"]=="missing_or_stale_authenticated_runtime_heartbeat",runtime_stale
+        applied_heartbeat(b,expected_b)
+        assert fleet()["activationCandidatePreflightPassed"],fleet()
+        print("PASS: cutover application preflight requires running Xray, verified current profile and fresh post-delivery signed heartbeat")
         # A separate 0.1.0 Go router still has a heartbeat; it MUST NOT
         # impersonate or overwrite the control-Agent release observation.
         heartbeat(a,"0.1.0")
