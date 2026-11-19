@@ -330,24 +330,23 @@ async fn recheck_authoritative_profile_revisions(state: &AppState, fleet: &mut F
             continue;
         };
         node["currentProfileRecompiled"] = json!(true);
-        match crate::node_runtime::current_compiled_node_profile_revision(state, node_id).await {
-            Ok(current) => {
-                let matches = node["reportedAppliedRevision"].as_str() == Some(current.as_str());
-                node["currentAuthoritativeRevision"] = json!(current);
-                if !matches {
-                    node["applicationBlocker"] = json!("current_profile_revision_not_applied");
-                    node["applicationPreflightPassed"] = json!(false);
-                    node["activationCandidatePreflightPassed"] = json!(false);
-                }
-            }
-            Err(_) => {
-                // Malformed/unavailable CURRENT configuration must never
-                // inherit a green status from a previously served revision.
-                // Do not leak an internal compiler error or profile secrets.
-                node["applicationBlocker"] = json!("current_profile_compile_failed");
+        if let Ok(current) =
+            crate::node_runtime::current_compiled_node_profile_revision(state, node_id).await
+        {
+            let matches = node["reportedAppliedRevision"].as_str() == Some(current.as_str());
+            node["currentAuthoritativeRevision"] = json!(current);
+            if !matches {
+                node["applicationBlocker"] = json!("current_profile_revision_not_applied");
                 node["applicationPreflightPassed"] = json!(false);
                 node["activationCandidatePreflightPassed"] = json!(false);
             }
+        } else {
+            // Malformed/unavailable CURRENT configuration must never
+            // inherit a green status from a previously served revision.
+            // Do not leak an internal compiler error or profile secrets.
+            node["applicationBlocker"] = json!("current_profile_compile_failed");
+            node["applicationPreflightPassed"] = json!(false);
+            node["activationCandidatePreflightPassed"] = json!(false);
         }
     }
     fleet.application_compatible = fleet
