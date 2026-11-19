@@ -125,7 +125,6 @@ struct RuntimeApplicationPreflight {
     applied_revision: Option<String>,
     served_revision: Option<String>,
     profile_check: Option<String>,
-    passed: bool,
     blocker: &'static str,
 }
 
@@ -149,12 +148,6 @@ fn runtime_application_preflight(
         .as_deref()
         .zip(served_revision.as_deref())
         .is_some_and(|(applied, served)| applied == served);
-    let passed = !disabled
-        && fresh
-        && running
-        && after_delivery
-        && profile_check.as_deref() == Some("verified")
-        && revision_matches;
     let blocker = if disabled {
         "excluded_disabled"
     } else if !fresh {
@@ -177,7 +170,6 @@ fn runtime_application_preflight(
         applied_revision,
         served_revision,
         profile_check,
-        passed,
         blocker,
     })
 }
@@ -206,7 +198,7 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
     let passed = !disabled && claims_v2 && recent && legacy_quiet && served;
     let rollout_passed = passed && agent_passed;
     let application = runtime_application_preflight(entry, disabled)?;
-    let activation_candidate = rollout_passed && application.passed;
+    let activation_candidate = rollout_passed && application.blocker == "none";
     let class = match (disabled, passed, agent_passed) {
         (true, _, _) => FleetReadinessClass::Disabled,
         (false, true, true) => FleetReadinessClass::Ready,
@@ -265,12 +257,59 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
             "lastServedRevision":application.served_revision,
             "reportedAppliedRevision":application.applied_revision,
             "runtimeHeartbeatAfterDelivery":application.after_delivery,
-            "applicationPreflightPassed":application.passed,
+            "applicationPreflightPassed":application.blocker == "none",
             "applicationBlocker":application.blocker,
             "activationCandidatePreflightPassed":activation_candidate,
         }),
         class,
     })
+}
+
+struct FleetSummary {
+    nodes: Vec<Value>,
+    serving: usize,
+    compatible: usize,
+    release_compatible: usize,
+    rollout_compatible: usize,
+    application_compatible: usize,
+    activation_candidates: usize,
+}
+
+fn summarize_fleet_nodes(
+    entries: &[sqlx::postgres::PgRow],
+) -> Result<FleetSummary, ApiError> {
+    let mut summary = FleetSummary {
+        nodes: Vec::with_capacity(entries.len()),
+        serving: 0,
+        compatible: 0,
+        release_compatible: 0,
+        rollout_compatible: 0,
+        application_compatible: 0,
+        activation_candidates: 0,
+    };
+    for entry in entries {
+        let node = classify_fleet_node(entry)?;
+        if !matches!(node.class, FleetReadinessClass::Disabled) {
+            summary.serving += 1;
+        }
+        if matches!(node.class, FleetReadinessClass::ProtocolOnly | FleetReadinessClass::Ready) {
+            summary.compatible += 1;
+        }
+        if matches!(node.class, FleetReadinessClass::AgentOnly | FleetReadinessClass::Ready) {
+            summary.release_compatible += 1;
+        }
+        if matches!(node.class, FleetReadinessClass::Ready) {
+            summary.rollout_compatible += 1;
+        }
+        if node.payload["applicationPreflightPassed"] == true {
+            summary.application_compatible += 1;
+        }
+        if node.payload["activationCandidatePreflightPassed"] == true {
+            summary.activation_candidates += 1;
+        }
+        summary.nodes.push(node.payload);
+    }
+    Ok(summary)
 }
 
 /// An operator-only, read-only readiness inventory. A fresh authenticated v2
@@ -324,62 +363,28 @@ pub async fn fleet_protocol_readiness(
     )
     .fetch_all(&state.pool)
     .await?;
-    let mut nodes = Vec::with_capacity(entries.len());
-    let mut serving = 0_usize;
-    let mut compatible = 0_usize;
-    let mut release_compatible = 0_usize;
-    let mut rollout_compatible = 0_usize;
-    let mut application_compatible = 0_usize;
-    let mut activation_candidates = 0_usize;
-    for entry in &entries {
-        let node = classify_fleet_node(entry)?;
-        if !matches!(node.class, FleetReadinessClass::Disabled) {
-            serving += 1;
-        }
-        if matches!(
-            node.class,
-            FleetReadinessClass::ProtocolOnly | FleetReadinessClass::Ready
-        ) {
-            compatible += 1;
-        }
-        if matches!(
-            node.class,
-            FleetReadinessClass::AgentOnly | FleetReadinessClass::Ready
-        ) {
-            release_compatible += 1;
-        }
-        if matches!(node.class, FleetReadinessClass::Ready) {
-            rollout_compatible += 1;
-        }
-        if node.payload["applicationPreflightPassed"] == true {
-            application_compatible += 1;
-        }
-        if node.payload["activationCandidatePreflightPassed"] == true {
-            activation_candidates += 1;
-        }
-        nodes.push(node.payload);
-    }
-    let all_claim_v2 = serving > 0 && serving == compatible;
+    let fleet = summarize_fleet_nodes(&entries)?;
+    let all_claim_v2 = fleet.serving > 0 && fleet.serving == fleet.compatible;
     Ok(Json(json!({
         "protocol":"v2",
         "featureEnabled":enabled(),
-        "servingNodes":serving,
-        "protocolCompatibleNodes":compatible,
+        "servingNodes":fleet.serving,
+        "protocolCompatibleNodes":fleet.compatible,
         "protocolPreflightPassed":all_claim_v2,
         "targetAgentVersion":crate::node_runtime::CONTROL_AGENT_VERSION,
-        "agentReleaseCompatibleNodes":release_compatible,
-        "rolloutCompatibleNodes":rollout_compatible,
-        "rolloutPreflightPassed":serving>0 && rollout_compatible==serving,
-        "applicationCompatibleNodes":application_compatible,
-        "applicationPreflightPassed":serving>0 && application_compatible==serving,
-        "activationCandidateNodes":activation_candidates,
-        "activationCandidatePreflightPassed":serving>0 && activation_candidates==serving,
+        "agentReleaseCompatibleNodes":fleet.release_compatible,
+        "rolloutCompatibleNodes":fleet.rollout_compatible,
+        "rolloutPreflightPassed":fleet.serving>0 && fleet.rollout_compatible==fleet.serving,
+        "applicationCompatibleNodes":fleet.application_compatible,
+        "applicationPreflightPassed":fleet.serving>0 && fleet.application_compatible==fleet.serving,
+        "activationCandidateNodes":fleet.activation_candidates,
+        "activationCandidatePreflightPassed":fleet.serving>0 && fleet.activation_candidates==fleet.serving,
         "runtimeHeartbeatFreshnessSeconds":65,
         "agentHeartbeatFreshnessSeconds":65,
         "legacyAgentQuietPeriodMinutes":15,
         "observationFreshnessMinutes":15,
         "legacyQuietPeriodMinutes":15,
-        "nodes":nodes,
+        "nodes":fleet.nodes,
         // Authenticated polling is not a signed *application acknowledgment*.
         "installedAgentVersionAttested":false,
         "physicalStopAndFinalMeterVerified":false,
