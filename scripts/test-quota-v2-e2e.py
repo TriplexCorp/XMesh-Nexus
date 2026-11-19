@@ -521,6 +521,49 @@ def main():
         assert settled==10*MIB and settled+held<=limit,(settled,held,limit)
         print("PASS: only reporting node's receipt is settled exactly once")
 
+        # The authenticated /metrics/ingest route may persist ordinary
+        # cumulative receipts or operational stop acknowledgements, but it
+        # MUST NOT silently swallow a claimed terminal meter, finality flag
+        # or refundable amount. A Node Ed25519 signature by itself cannot
+        # prove that every Xray writer stopped and all sessions drained.
+        # Reject BEFORE any accepted sample, reservation or terminal record
+        # changes; do not silently return HTTP 201 on an ignored proof.
+        prior_terminal_count=query(
+            "SELECT COUNT(*)::text FROM quota_v2_terminal_settlements "
+            "WHERE user_id="+str(uid))
+        assert prior_terminal_count=="0"
+        for terminal_field, terminal_claim in (
+            ("quotaTerminalReceipts", [{
+                "schemaVersion": 1, "userId": uid, "finalUsedBytes": 0,
+                "finalMeterVerified": True, "refundableBytes": 100 * MIB,
+            }]),
+            ("quota_terminal_receipts", []),
+            ("finalMeterVerified", True),
+            ("refundableBytes", 100 * MIB),
+        ):
+            before_claim=account()
+            code, response, _=b.post("/metrics/ingest",{
+                "node_id":b.id,
+                "userStatsStatus":"verified",
+                "userStatsAtMs":int(time.time()*1000),
+                "userTraffic":[{
+                    "userId":uid,"uplinkBytes":10*MIB,"downlinkBytes":0
+                }],
+                "quotaReceipts":[{
+                    "userId":uid,"usedBytes":10*MIB,
+                    **{k:lease_b[k] for k in ("epoch","meterEpoch","reservationId")}
+                }],
+                terminal_field:terminal_claim,
+            })
+            assert code==400,("unverified finality claim silently accepted",
+                              terminal_field,code,response)
+            assert account()==before_claim,("terminal claim mutated quota",
+                                            terminal_field,account(),before_claim)
+            assert query(
+                "SELECT COUNT(*)::text FROM quota_v2_terminal_settlements "
+                "WHERE user_id="+str(uid))==prior_terminal_count
+        print("PASS: signed finality/refund claims cannot ride ordinary metrics or mutate holds")
+
         # A did not report; B's update cannot change A's held ceiling.
         still_a=query("SELECT ceiling_bytes::text FROM quota_v2_reservations WHERE user_id="
                       +str(uid)+" AND node_id="+str(a.id))
