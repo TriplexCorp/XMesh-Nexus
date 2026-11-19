@@ -135,17 +135,26 @@ fn runtime_application_preflight(
 ) -> Result<RuntimeApplicationPreflight, ApiError> {
     // This signed heartbeat is only a nonterminal application preflight,
     // NOT binary attestation or a final Xray byte meter.
-    let fresh = entry.try_get::<Option<bool>, _>("runtime_fresh")?.unwrap_or(false);
-    let running = entry.try_get::<Option<bool>, _>("runtime_xray_running")?.unwrap_or(false);
+    let fresh = entry
+        .try_get::<Option<bool>, _>("runtime_fresh")?
+        .unwrap_or(false);
+    let running = entry
+        .try_get::<Option<bool>, _>("runtime_xray_running")?
+        .unwrap_or(false);
     let after_delivery: bool = entry.try_get("runtime_after_delivery")?;
     let applied_revision: Option<String> = entry.try_get("runtime_applied_revision")?;
     let served_revision: Option<String> = entry.try_get("last_served_revision")?;
     let profile_check: Option<String> = entry.try_get("runtime_profile_check")?;
-    let revision_matches = applied_revision.as_deref()
+    let revision_matches = applied_revision
+        .as_deref()
         .zip(served_revision.as_deref())
         .is_some_and(|(applied, served)| applied == served);
-    let passed = !disabled && fresh && running && after_delivery
-        && profile_check.as_deref() == Some("verified") && revision_matches;
+    let passed = !disabled
+        && fresh
+        && running
+        && after_delivery
+        && profile_check.as_deref() == Some("verified")
+        && revision_matches;
     let blocker = if disabled {
         "excluded_disabled"
     } else if !fresh {
@@ -162,8 +171,14 @@ fn runtime_application_preflight(
         "none"
     };
     Ok(RuntimeApplicationPreflight {
-        fresh, running, after_delivery, applied_revision,
-        served_revision, profile_check, passed, blocker,
+        fresh,
+        running,
+        after_delivery,
+        applied_revision,
+        served_revision,
+        profile_check,
+        passed,
+        blocker,
     })
 }
 
