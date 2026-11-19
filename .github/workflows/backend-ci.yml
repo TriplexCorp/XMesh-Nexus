@@ -73,7 +73,20 @@ jobs:
       - name: Install pinned browser and dependencies
         run: |
           npm ci --prefix scripts/browser
-          scripts/browser/node_modules/.bin/playwright install --with-deps chromium
+          # Avoid transient Ubuntu runner mirror/socket failures without skipping
+          # Playwright's real dependency installation or browser test coverage.
+          printf 'Acquire::Retries "5";\nAcquire::http::Timeout "45";\nAcquire::https::Timeout "45";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-xmesh-browser-ci-retries >/dev/null
+          for attempt in 1 2 3; do
+            if scripts/browser/node_modules/.bin/playwright install --with-deps chromium; then
+              exit 0
+            fi
+            if [[ "$attempt" == 3 ]]; then
+              echo "Chromium dependencies unavailable after three attempts" >&2
+              exit 1
+            fi
+            sleep 12
+          done
       - name: Verify public portal and Studio interactions independently
         env:
           XMESH_BROWSER_OUTPUT: browser-results
@@ -351,7 +364,21 @@ jobs:
       - name: Install pinned browser regression dependencies
         run: |
           npm ci --prefix scripts/browser
-          scripts/browser/node_modules/.bin/playwright install --with-deps chromium
+          # Ubuntu GitHub mirrors intermittently fail with 100/timeouts while
+          # fetching optional Chromium fonts. Keep the dependency check strict,
+          # but make transient apt transport failures retryable on clean CI.
+          printf 'Acquire::Retries "5";\nAcquire::http::Timeout "45";\nAcquire::https::Timeout "45";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-xmesh-browser-ci-retries >/dev/null
+          for attempt in 1 2 3; do
+            if scripts/browser/node_modules/.bin/playwright install --with-deps chromium; then
+              exit 0
+            fi
+            if [[ "$attempt" == 3 ]]; then
+              echo "Chromium dependencies unavailable after three attempts" >&2
+              exit 1
+            fi
+            sleep 12
+          done
       - name: Enforce English on every rendered panel route, dialogs and authentication
         env:
           XMESH_BROWSER_OUTPUT: browser-results
