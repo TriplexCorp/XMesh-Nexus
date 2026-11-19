@@ -106,10 +106,28 @@ jobs:
           test "$XMESH_TEST_URL" = http://127.0.0.1:8080
           test "$XMESH_AUDIT_DISPOSABLE" = 1
           python3 scripts/test-quota-v2-e2e.py
-      - name: Rehearse feature 0-to-1 and unsafe 1-to-0 rollback against the SAME durable Node
+      - name: Reset ONLY disposable PostgreSQL volumes for flag-transition rehearsal
+        shell: bash
         run: |
           set -Eeuo pipefail
           test "$XMESH_AUDIT_DISPOSABLE" = 1
+          test "$COMPOSE_PROJECT_NAME" = xmesh-quota-v2
+          # The full two-node test above has durable v2 reservations. Start
+          # another EMPTY disposable ledger to exercise initial feature=0.
+          # Otherwise the new permanent rollback latch rightly forbids v1.
+          docker compose down --volumes --remove-orphans
+          docker compose up -d db redis panel
+          for i in $(seq 1 120); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8080/api/v1/health/ready >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker compose logs --tail=120 panel
+          exit 1
+      - name: Rehearse v1-to-v2 and reject unsafe flag rollback against persisted Node
+        run: |
+          set -Eeuo pipefail
+          test "$XMESH_AUDIT_DISPOSABLE" = 1
+          python3 -m py_compile scripts/test-quota-v2-flag-transition.py
           python3 scripts/test-quota-v2-flag-transition.py
       - name: Collect failure diagnostics
         if: failure()
