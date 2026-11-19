@@ -141,6 +141,42 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
     let claims_v2 = protocol == Some(2);
     let passed = !disabled && claims_v2 && recent && legacy_quiet && served;
     let rollout_passed = passed && agent_passed;
+    // A delivered signed policy does NOT mean the node applied it. Require
+    // an independently subsequent Ed25519-authenticated control heartbeat
+    // reporting actual running Xray + verified on-disk active profile and
+    // the same last SERVED revision. This is an application preflight only:
+    // it does not attest binary integrity or final Xray byte accounting.
+    let runtime_fresh: bool = entry.try_get::<Option<bool>, _>("runtime_fresh")?.unwrap_or(false);
+    let xray_running: bool = entry.try_get::<Option<bool>, _>("runtime_xray_running")?.unwrap_or(false);
+    let runtime_after_delivery: bool = entry.try_get("runtime_after_delivery")?;
+    let applied_revision: Option<String> = entry.try_get("runtime_applied_revision")?;
+    let served_revision: Option<String> = entry.try_get("last_served_revision")?;
+    let profile_check: Option<String> = entry.try_get("runtime_profile_check")?;
+    let revision_matches = applied_revision.as_deref()
+        .zip(served_revision.as_deref())
+        .is_some_and(|(applied, served)| applied == served);
+    let application_passed = !disabled
+        && runtime_fresh
+        && xray_running
+        && runtime_after_delivery
+        && profile_check.as_deref() == Some("verified")
+        && revision_matches;
+    let activation_candidate = rollout_passed && application_passed;
+    let application_blocker = if disabled {
+        "excluded_disabled"
+    } else if !runtime_fresh {
+        "missing_or_stale_authenticated_runtime_heartbeat"
+    } else if !xray_running {
+        "xray_not_running"
+    } else if profile_check.as_deref() != Some("verified") {
+        "active_profile_not_verified"
+    } else if !revision_matches {
+        "last_served_revision_not_applied"
+    } else if !runtime_after_delivery {
+        "no_application_heartbeat_after_policy_delivery"
+    } else {
+        "none"
+    };
     let class = match (disabled, passed, agent_passed) {
         (true, _, _) => FleetReadinessClass::Disabled,
         (false, true, true) => FleetReadinessClass::Ready,
@@ -193,6 +229,15 @@ fn classify_fleet_node(entry: &sqlx::postgres::PgRow) -> Result<FleetReadinessNo
             "agentReleasePreflightPassed":agent_passed,
             "agentBlocker":agent_blocker,
             "rolloutPreflightPassed":rollout_passed,
+            "runtimeHeartbeatFresh":runtime_fresh,
+            "xrayRunning":xray_running,
+            "runtimeProfileCheck":profile_check,
+            "lastServedRevision":served_revision,
+            "reportedAppliedRevision":applied_revision,
+            "runtimeHeartbeatAfterDelivery":runtime_after_delivery,
+            "applicationPreflightPassed":application_passed,
+            "applicationBlocker":application_blocker,
+            "activationCandidatePreflightPassed":activation_candidate,
         }),
         class,
     })
@@ -230,13 +275,20 @@ pub async fn fleet_protocol_readiness(
                   agent_report.last_non_target_at<NOW()-INTERVAL '15 minutes'))
                     AS agent_quiet,
                 (EXTRACT(EPOCH FROM agent_report.last_non_target_at)*1000)::BIGINT
-                    AS last_old_agent_at_ms
+                    AS last_old_agent_at_ms,
+                hb.received_at>=NOW()-INTERVAL '65 seconds' AS runtime_fresh,
+                hb.xray_running AS runtime_xray_running,
+                hb.profile_check AS runtime_profile_check,
+                hb.applied_revision AS runtime_applied_revision,
+                desired.revision AS last_served_revision,
+                COALESCE(hb.received_at>=desired.served_at,FALSE) AS runtime_after_delivery
          FROM panel_records AS n
          LEFT JOIN quota_v2_authenticated_protocol_observations AS obs
            ON obs.node_id=n.id
          LEFT JOIN quota_v2_authenticated_agent_release_observations AS agent_report
            ON agent_report.node_id=n.id
          LEFT JOIN node_desired_revisions AS desired ON desired.node_id=n.id
+         LEFT JOIN node_runtime_heartbeats AS hb ON hb.node_id=n.id
          WHERE n.collection='nodes'
          ORDER BY n.id",
     )
@@ -247,6 +299,8 @@ pub async fn fleet_protocol_readiness(
     let mut compatible = 0_usize;
     let mut release_compatible = 0_usize;
     let mut rollout_compatible = 0_usize;
+    let mut application_compatible = 0_usize;
+    let mut activation_candidates = 0_usize;
     for entry in &entries {
         let node = classify_fleet_node(entry)?;
         if !matches!(node.class, FleetReadinessClass::Disabled) {
@@ -267,6 +321,12 @@ pub async fn fleet_protocol_readiness(
         if matches!(node.class, FleetReadinessClass::Ready) {
             rollout_compatible += 1;
         }
+        if node.payload["applicationPreflightPassed"] == true {
+            application_compatible += 1;
+        }
+        if node.payload["activationCandidatePreflightPassed"] == true {
+            activation_candidates += 1;
+        }
         nodes.push(node.payload);
     }
     let all_claim_v2 = serving > 0 && serving == compatible;
@@ -280,6 +340,11 @@ pub async fn fleet_protocol_readiness(
         "agentReleaseCompatibleNodes":release_compatible,
         "rolloutCompatibleNodes":rollout_compatible,
         "rolloutPreflightPassed":serving>0 && rollout_compatible==serving,
+        "applicationCompatibleNodes":application_compatible,
+        "applicationPreflightPassed":serving>0 && application_compatible==serving,
+        "activationCandidateNodes":activation_candidates,
+        "activationCandidatePreflightPassed":serving>0 && activation_candidates==serving,
+        "runtimeHeartbeatFreshnessSeconds":65,
         "agentHeartbeatFreshnessSeconds":65,
         "legacyAgentQuietPeriodMinutes":15,
         "observationFreshnessMinutes":15,
