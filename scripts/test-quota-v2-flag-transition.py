@@ -128,6 +128,9 @@ def reservations(user_id):
 
 def run():
     feature_status(True)
+    assert query("SELECT COUNT(*)::text FROM quota_v2_reservations") == "0", (
+        "The transition rehearsal requires a freshly reset disposable ledger"
+    )
     with tempfile.TemporaryDirectory(prefix="xmesh-v2-flag-ci-") as directory:
         # Create and cache a real Ed25519-signed v1 Node envelope while the
         # issuer is OFF, as it will be in a genuine pre-cutover deployment.
