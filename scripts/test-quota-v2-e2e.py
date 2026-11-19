@@ -241,7 +241,7 @@ def main():
         # by the correct Ed25519 Node identity, but they are NOT executable
         # attestation or proof that Xray has physically stopped.
         initial_release=fleet()
-        assert initial_release["targetAgentVersion"]=="control-v6.0.21",initial_release
+        assert initial_release["targetAgentVersion"]=="control-v6.0.22",initial_release
         assert initial_release["protocolPreflightPassed"],initial_release
         assert not initial_release["rolloutPreflightPassed"],initial_release
         assert initial_release["agentReleaseCompatibleNodes"]==0,initial_release
@@ -253,7 +253,7 @@ def main():
             check(status,200,f"authenticated Node {node.id} heartbeat for {version}")
             assert data["accepted"] is True,data
         heartbeat(a,"control-v6.0.20")
-        heartbeat(b,"control-v6.0.21")
+        heartbeat(b,"control-v6.0.22")
         obsolete_agent=fleet()
         assert not obsolete_agent["rolloutPreflightPassed"],obsolete_agent
         outdated=next(row for row in obsolete_agent["nodes"] if row["nodeId"]==a.id)
@@ -262,12 +262,12 @@ def main():
         assert obsolete_agent["agentReleaseCompatibleNodes"]==1,obsolete_agent
         # Upgrading an old worker cannot erase evidence of a second stale
         # worker sharing its Node key. Require 15 minutes without v6.0.20.
-        heartbeat(a,"control-v6.0.21")
+        heartbeat(a,"control-v6.0.22")
         mixed=fleet()
         assert mixed["protocolPreflightPassed"] and not mixed["rolloutPreflightPassed"],mixed
         mixed_a=next(row for row in mixed["nodes"] if row["nodeId"]==a.id)
         assert mixed_a["agentBlocker"]=="outdated_agent_seen_recently",mixed
-        assert mixed_a["reportedAgentVersion"]=="control-v6.0.21",mixed
+        assert mixed_a["reportedAgentVersion"]=="control-v6.0.22",mixed
         query("UPDATE quota_v2_authenticated_agent_release_observations "
               "SET last_non_target_at=NOW()-INTERVAL '16 minutes' "
               "WHERE node_id="+str(a.id))
@@ -286,7 +286,7 @@ def main():
                 revision=query("SELECT revision FROM node_desired_revisions WHERE node_id="+str(node.id))
             assert len(revision)==64 and revision.isalnum(),revision
             status,data,_=node.post("/node/heartbeat",{
-                "node_id":node.id,"version":"control-v6.0.21",
+                "node_id":node.id,"version":"control-v6.0.22",
                 "router_running":True,"xray_running":running,
                 "appliedRevision":revision,"profileCheck":profile_check
             })
@@ -387,7 +387,7 @@ def main():
         assert not expired["rolloutPreflightPassed"],expired
         expired_b=next(row for row in expired["nodes"] if row["nodeId"]==b.id)
         assert expired_b["agentBlocker"]=="missing_or_stale_authenticated_agent_heartbeat",expired
-        heartbeat(b,"control-v6.0.21")
+        heartbeat(b,"control-v6.0.22")
         assert fleet()["rolloutPreflightPassed"],fleet()
         print("PASS: v6.0.21 release preflight needs fresh signed heartbeats and an old-Agent quiet window")
         # Re-execute the migration's EXACT seed statement in this disposable
@@ -406,7 +406,7 @@ def main():
         migrated=fleet()
         assert not migrated["rolloutPreflightPassed"],migrated
         migrated_a=next(row for row in migrated["nodes"] if row["nodeId"]==a.id)
-        assert migrated_a["reportedAgentVersion"]=="control-v6.0.21",migrated
+        assert migrated_a["reportedAgentVersion"]=="control-v6.0.22",migrated
         assert migrated_a["agentBlocker"]=="outdated_agent_seen_recently",migrated
         query("UPDATE quota_v2_authenticated_agent_release_observations "
               "SET last_non_target_at=NOW()-INTERVAL '16 minutes' "

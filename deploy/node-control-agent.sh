@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.21"
+AGENT_VERSION="control-v6.0.22"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -161,7 +161,7 @@ update_managed_xray(){
   detail='Xray update denied: signed quota revocation pending'
   return 1
  fi
- [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.21"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
+ [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.22"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
  # Only fixed JSON stages and a sanitized final result cross the signed channel.
  # The worker preserves the exact old container until preflight succeeds and
  # validates all actual TLS/GeoData mounts with run -test before switching.
