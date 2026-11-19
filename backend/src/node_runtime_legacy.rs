@@ -2297,6 +2297,26 @@ pub async fn desired_config(
             "Quota-v2 requires an upgraded node agent.",
         ));
     }
+    // Turning the feature flag back OFF is NOT a rollback after the first
+    // durable v2 reservation. Old signed v2 leases remain spendable offline;
+    // issuing *any* new v1 allowance (including to a different Node) would
+    // reopen uncoordinated spending across the same paid user capacity.
+    // The historical reservation ledger is a persistent global activation
+    // latch: even a later account reset does not erase the old obligation.
+    // Do not delete leases or issue v1 as a workaround. An operator must use
+    // a separately reviewed recovery protocol, never a mere env flip.
+    if !crate::quota_v2::enabled() {
+        let v2_was_issued: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM quota_v2_reservations)")
+                .fetch_one(&state.pool)
+                .await?;
+        if v2_was_issued {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Quota-v2 reservations already exist; refusing signed v1 downgrade.",
+            ));
+        }
+    }
     // Enrollment precedes profile authoring. Authenticated nodes without a
     // profile receive a non-successful-to-apply but healthy pending response.
     // Never sign or issue a policy while no Xray configuration exists.
