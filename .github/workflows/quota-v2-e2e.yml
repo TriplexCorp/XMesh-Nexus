@@ -41,13 +41,13 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 4a2478b124539e2021846b38b5389d0aa41fe9c0
+          ref: 665bafff3cfc4d10dd4e207775faf3e0443275e1
           path: node-agent
       - name: Pin compatible Agent and guard for quota-v2 rehearsal
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C node-agent rev-parse HEAD)" = "4a2478b124539e2021846b38b5389d0aa41fe9c0"
+          test "$(git -C node-agent rev-parse HEAD)" = "665bafff3cfc4d10dd4e207775faf3e0443275e1"
           test "$(tr -d '\r\n' < node-agent/AGENT_VERSION)" = "control-v6.0.21"
           test -f node-agent/deploy/xmesh-policy-guard.py
           test -f node-agent/deploy/xmesh-policy-guard-base.py
@@ -60,6 +60,9 @@ jobs:
           python3 -m py_compile node-agent/deploy/xmesh-policy-guard.py node-agent/deploy/xmesh-policy-guard-base.py
           python3 node-agent/experiments/xray-dataplane-fence/test_meter_floor.py
           python3 node-agent/experiments/xray-dataplane-fence/test_signed_nonfinal_observation.py
+          test -f node-agent/scripts/quota-v2-local-audit.py
+          python3 -m py_compile node-agent/scripts/quota-v2-local-audit.py
+          python3 node-agent/tests/test_quota_v2_local_audit.py
           echo 'Pinned merged Node v6.0.21 plus strict nonfinal meter invariants; refunds remain disabled'
       - name: Generate disposable secrets and feature-gated service
         shell: bash
