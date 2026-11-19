@@ -516,6 +516,8 @@ class ReservationTests(unittest.TestCase):
 
     def test_terminal_and_conservative_burn_race_never_double_release(self):
         request=self.terminal_prepare(1,acknowledged=20)
+        self.reserve(2)
+        self.assertEqual(self.economic_state(),(20,80))
         barrier=threading.Barrier(2,timeout=30)
         def settlement():
             barrier.wait(timeout=30)
@@ -537,17 +539,21 @@ class ReservationTests(unittest.TestCase):
         self.assertEqual(len(winners),1,result)
         if winners==["terminal"]:
             self.assertEqual(self.terminal_receipt_count(),1)
-            self.assertEqual(self.economic_state(),(30,0))
+            self.assertEqual(self.economic_state(),(30,50))
             with self.assertRaises(psycopg.Error):
                 self.burn(1,request)
+            # Only the genuinely unused 20 bytes can be granted to B.
+            self.assertEqual(self.reserve(2,target=70),(70,0))
+            self.assertEqual(self.economic_state(),(30,70))
         else:
             self.assertEqual(self.terminal_receipt_count(),0)
-            self.assertEqual(self.economic_state(),(50,0))
+            self.assertEqual(self.economic_state(),(50,50))
             with self.assertRaises(psycopg.Error):
                 self.terminal(1,30,request)
-        # Concurrent burn and prospective settlement never make any bytes
-        # available again just because a late stop receipt arrived.
-        self.assertEqual(self.reserve(2,target=50),(0,0))
+            # Conservative burn spends the full old hold and frees NONE.
+            self.assertEqual(self.reserve(2,target=70),(50,0))
+            self.assertEqual(self.economic_state(),(50,50))
+        # A late stop receipt never frees capacity after the burn wins.
 
     def test_public_role_has_no_direct_terminal_settlement_privilege(self):
         # The dormant owner-only SQL settlement primitive must NOT become
