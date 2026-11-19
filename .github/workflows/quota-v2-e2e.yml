@@ -41,21 +41,26 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 6b23b9d02f6c9db14a578c9d6fd39b6cf63a5aa8
+          ref: 4a2478b124539e2021846b38b5389d0aa41fe9c0
           path: node-agent
       - name: Pin compatible Agent and guard for quota-v2 rehearsal
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C node-agent rev-parse HEAD)" = "6b23b9d02f6c9db14a578c9d6fd39b6cf63a5aa8"
+          test "$(git -C node-agent rev-parse HEAD)" = "4a2478b124539e2021846b38b5389d0aa41fe9c0"
           test "$(tr -d '\r\n' < node-agent/AGENT_VERSION)" = "control-v6.0.21"
           test -f node-agent/deploy/xmesh-policy-guard.py
           test -f node-agent/deploy/xmesh-policy-guard-base.py
           test -f node-agent/experiments/xray-dataplane-fence/durable_fence.go.txt
           test -f node-agent/experiments/xray-dataplane-fence/durable_counter_taint.go.txt
           test -f node-agent/experiments/xray-dataplane-fence/durable_counter_taint_test.go.txt
+          test -f node-agent/experiments/xray-dataplane-fence/meter_floor.py
+          test -f node-agent/experiments/xray-dataplane-fence/test_meter_floor.py
+          test -f node-agent/experiments/xray-dataplane-fence/observed_checkpoint.go.txt
           python3 -m py_compile node-agent/deploy/xmesh-policy-guard.py node-agent/deploy/xmesh-policy-guard-base.py
-          echo 'Pinned current control-v6.0.21 Node matches signed quota guard; refunds remain disabled'
+          python3 node-agent/experiments/xray-dataplane-fence/test_meter_floor.py
+          python3 node-agent/experiments/xray-dataplane-fence/test_signed_nonfinal_observation.py
+          echo 'Pinned merged Node v6.0.21 plus strict nonfinal meter invariants; refunds remain disabled'
       - name: Generate disposable secrets and feature-gated service
         shell: bash
         run: |
