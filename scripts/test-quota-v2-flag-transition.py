@@ -154,22 +154,29 @@ def run():
         assert reservations(user_id) == 1, "Missing durable v2 reservation"
         print("PASS: feature 1 issues a signed v2 reservation without replacing Node identity")
 
-        # A naive 1->0 rollback is NOT safe: server signs v1 again, while the
-        # Node MUST refuse downgrade and leave its last committed v2 durable.
+        # A naive 1->0 rollback is NOT safe. Nexus MUST refuse to
+        # sign any v1 policy after the first durable v2 reservation, even
+        # for another Node. The installed Guard independently blocks a
+        # replay of a previously valid signed v1 policy.
         time.sleep(0.05)
         set_flag(False)
-        downgraded = desired(node, user_id)
-        assert downgraded["policy"]["version"] == 1
+        code, response, _ = node.post("/node/desired-config", {
+            "node_id": node.id,
+            "quotaProtocolVersion": 2,
+            "quotaLocalCounters": [{"userId": user_id, "usedBytes": 0}],
+        })
+        assert code == 409, ("CRITICAL: v1 policy was issued after v2 activation",
+                             code, response)
+        assert "refusing signed v1 downgrade" in str(response), response
         try:
-            guard.verify_envelope(downgraded, node.state, node.id,
-                                  first_contact=True)
+            guard.verify_envelope(v1, node.state, node.id, first_contact=True)
         except ValueError as error:
             assert "Quota protocol downgrade rejected" in str(error), str(error)
         else:
-            raise AssertionError("CRITICAL: signed v2 -> v1 policy downgrade admitted")
+            raise AssertionError("CRITICAL: cached signed v1 replay admitted by Node")
         assert json.loads(node.state.joinpath("policy-envelope.json").read_text()) == v2
         assert reservations(user_id) == 1, "Feature-off silently refunded or erased v2 hold"
-        print("PASS: 1->0 signed-policy rollback is rejected; old hold is NOT refunded")
+        print("PASS: server rejects 1->0 new v1 grants; Node rejects old v1 replay")
     return 0
 
 if __name__ == "__main__":
