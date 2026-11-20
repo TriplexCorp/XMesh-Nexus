@@ -48,6 +48,11 @@ CREATE TRIGGER quota_v2_external_wal_birth_anchor_immutable_trg
 BEFORE UPDATE OR DELETE ON quota_v2_external_wal_birth_anchors
 FOR EACH ROW EXECUTE FUNCTION quota_v2_external_wal_birth_anchor_immutable();
 
+-- Block TRUNCATE: row-level UPDATE/DELETE triggers do not fire for it.
+CREATE TRIGGER quota_v2_external_wal_birth_anchor_no_truncate_trg
+BEFORE TRUNCATE ON quota_v2_external_wal_birth_anchors
+FOR EACH STATEMENT EXECUTE FUNCTION quota_v2_external_wal_birth_anchor_immutable();
+
 CREATE FUNCTION quota_v2_store_external_wal_birth_anchor(
     p_node BIGINT,p_sequence INT,p_inventory_sha TEXT,p_tail TEXT,
     p_original_witness_sha TEXT,p_container_id TEXT,p_started_at TEXT,
