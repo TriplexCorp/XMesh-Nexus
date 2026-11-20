@@ -3,7 +3,9 @@ on:
   pull_request:
     paths:
       - 'scripts/quota_v2_stop_chain_audit.py'
+      - 'scripts/quota_v2_rollover_audit.py'
       - 'scripts/test-quota-v2-stop-chain-audit.py'
+      - 'scripts/test-quota-v2-rollover-audit.py'
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
@@ -11,7 +13,9 @@ on:
     branches: [main]
     paths:
       - 'scripts/quota_v2_stop_chain_audit.py'
+      - 'scripts/quota_v2_rollover_audit.py'
       - 'scripts/test-quota-v2-stop-chain-audit.py'
+      - 'scripts/test-quota-v2-rollover-audit.py'
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
@@ -47,19 +51,21 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 2eba9c06b6c50c93e45f88361744ca24c81dfa59
+          ref: 4492f7a186e3337ef1dc290022e290e81e9db525
           path: .ci-reviewed-node
       - name: Refuse drift from immutable signed receipt producer
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "2eba9c06b6c50c93e45f88361744ca24c81dfa59"
-          test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = "control-v6.0.19"
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "4492f7a186e3337ef1dc290022e290e81e9db525"
+          test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = "control-v6.0.24"
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/stop_chain.py
+          test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/rollover_prepare.py
           test -f .ci-reviewed-node/experiments/xray-dataplane-fence/sign_observation.py
-          python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py
+          python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py scripts/quota_v2_rollover_audit.py scripts/test-quota-v2-rollover-audit.py
           python3 scripts/test-quota-v2-stop-chain-audit.py
-          echo 'Nexus independently validates authentic Node NONFINAL stop chain; refunds remain forbidden'
+          python3 scripts/test-quota-v2-rollover-audit.py
+          echo 'Nexus independently validates signed Node v2 stop and conservative rollover prepare; no unlock or refunds'
       - name: Apply hypothetical SQL accounting + permanent production quarantine
         run: |
           python3 -m pip install 'psycopg[binary]==3.2.3' --break-system-packages
