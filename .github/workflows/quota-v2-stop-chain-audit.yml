@@ -17,6 +17,7 @@ on:
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - 'backend/migrations/0134_quota_v2_shadow_carryforward_watermarks.sql'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
+      - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
   push:
     branches: [main]
@@ -36,6 +37,7 @@ on:
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - 'backend/migrations/0134_quota_v2_shadow_carryforward_watermarks.sql'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
+      - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
 permissions:
   contents: read
@@ -104,6 +106,7 @@ jobs:
                   "0133_quota_v2_nonfinal_rollover_prepare.sql",
                   "0134_quota_v2_shadow_carryforward_watermarks.sql",
                   "0135_quota_v2_external_wal_birth_anchors.sql",
+                  "0136_quota_v2_external_wal_birth_sources.sql",
               ):
                   c.execute((Path("backend/migrations") / name).read_text())
           PY
