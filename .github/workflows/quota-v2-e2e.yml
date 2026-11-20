@@ -9,6 +9,7 @@ on:
       - 'backend/migrations/0131_quota_v2_authenticated_agent_release_observations.sql'
       - 'docs/QUOTA_V2_FLEET_READINESS.md'
       - 'backend/migrations/0125_quota_v2_reservations.sql'
+      - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'deploy/node-metrics-agent.sh'
       - 'scripts/test-quota-v2-e2e.py'
       - 'scripts/test-quota-v2-flag-transition.py'
