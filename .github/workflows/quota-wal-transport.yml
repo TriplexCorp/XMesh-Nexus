@@ -7,7 +7,6 @@ on:
       - 'backend/src/node_policy.rs'
       - 'backend/src/main.rs'
       - 'compose.yaml'
-      - 'deploy/node-control-agent.sh'
       - 'deploy/xsp-v2-product-gateway/main.go'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
@@ -46,7 +45,7 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 19d9c3b9afb4be1dc3265be412244f3e3fc1a6f9
+          ref: 286386081c8f57a2ec8cd94ab02cda6d92b96238
           path: .ci-reviewed-node
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
@@ -58,7 +57,7 @@ jobs:
           set -euo pipefail
           revision="$(git rev-parse HEAD)"
           version="$(tr -d '\r\n' < ../../AGENT_VERSION)"
-          test "$revision" = '19d9c3b9afb4be1dc3265be412244f3e3fc1a6f9'
+          test "$revision" = '286386081c8f57a2ec8cd94ab02cda6d92b96238'
           test "$version" = 'control-v6.0.25'
           go build -trimpath -ldflags "-X main.version=$version -X main.sourceRevision=$revision" \
             -o "$RUNNER_TEMP/wal-product-agent" ./cmd/xmesh-agent-xspv2-product
