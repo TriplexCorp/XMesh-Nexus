@@ -4,19 +4,39 @@ on:
     paths:
       - 'scripts/quota_v2_stop_chain_audit.py'
       - 'scripts/test-quota-v2-stop-chain-audit.py'
+      - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
+      - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
   push:
     branches: [main]
     paths:
       - 'scripts/quota_v2_stop_chain_audit.py'
       - 'scripts/test-quota-v2-stop-chain-audit.py'
+      - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
+      - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
 permissions:
   contents: read
 jobs:
   verify-nonfinal-chain:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quota_test
+          POSTGRES_PASSWORD: quota_test_disposable
+          POSTGRES_DB: quota_test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      XMESH_AUDIT_DISPOSABLE: '1'
+      QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_test
     steps:
       - name: Check out Nexus independent verifier
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -40,3 +60,23 @@ jobs:
           python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py
           python3 scripts/test-quota-v2-stop-chain-audit.py
           echo 'Nexus independently validates authentic Node NONFINAL stop chain; refunds remain forbidden'
+      - name: Apply hypothetical SQL accounting + permanent production quarantine
+        run: |
+          python3 -m pip install 'psycopg[binary]==3.2.3' --break-system-packages
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import psycopg
+          with psycopg.connect(os.environ["QUOTA_TEST_DSN"]) as c:
+              for name in (
+                  "0125_quota_v2_reservations.sql",
+                  "0126_quota_v2_revocation_requests.sql",
+                  "0127_quota_v2_revocation_freeze.sql",
+                  "0128_quota_v2_conservative_burn.sql",
+                  "0129_quota_v2_terminal_settlement.sql",
+                  "0132_quota_v2_terminal_settlement_quarantine.sql",
+              ):
+                  c.execute((Path("backend/migrations") / name).read_text())
+          PY
+      - name: Genuine Node-signed NONFINAL stop remains SQL-unsettleable
+        run: python3 scripts/test-quota-v2-signed-nonfinal-sql-isolation.py
