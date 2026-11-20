@@ -196,11 +196,30 @@ def verify_recorded_receipt(raw, trusted_nexus_public_key,
     document=stop._decode(raw)
     stop._envelope(document,"Nexus prepared registration")
     p=_check_receipt_shape(document["payload"])
+    original=stop._decode(exact_raw_node_proposal)
+    if exact_raw_node_proposal!=stop._canonical(original)+b"\n":
+        raise ValueError("Nexus receipt Node source is not canonical")
+    stop._envelope(original,"Nexus receipt original Node prepare")
+    src=original["payload"]
+    if not isinstance(src,dict):
+        raise ValueError("Nexus receipt missing Node source payload")
     if (any(p[k]!=expected_scope[k] or
-            type(p[k]) is not type(expected_scope[k]) for k in stop.SCOPE) or
+            type(p[k]) is not type(expected_scope[k]) or
+            p[k]!=src.get(k) for k in stop.SCOPE) or
             p["proposalSha256"]!=hashlib.sha256(exact_raw_node_proposal).hexdigest() or
-            p["stagedLedgerRowSha256"]!=expected_staged_ledger_row_sha256):
-        raise ValueError("Nexus receipt replay or substituted reservation")
+            p["stagedLedgerRowSha256"]!=expected_staged_ledger_row_sha256 or
+            any(p[receipt]!=src.get(source) or
+                type(p[receipt]) is not type(src.get(source))
+                for receipt,source in (
+                  ("oldRuntimeId","oldRuntimeId"),
+                  ("oldContainerId","oldContainerId"),
+                  ("oldStartedAt","oldStartedAt"),
+                  ("stopChainSha256","stopChainSha256"),
+                  ("xrayJournalSha256","xrayJournalSha256"),
+                  ("nodeDurableAbsoluteFloorBytes","nodeDurableAbsoluteFloorBytes"),
+                  ("oldRuntimeObservedUplinkBytes","oldRuntimeObservedUplinkBytes"),
+                  ("oldRuntimeObservedDownlinkBytes","oldRuntimeObservedDownlinkBytes")))):
+        raise ValueError("Nexus receipt replay or substituted signed Node bytes")
     stop._verify_ed25519(p,document["signature"],DOMAIN,trusted_nexus_public_key)
     return p
 
