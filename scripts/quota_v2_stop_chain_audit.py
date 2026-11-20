@@ -221,11 +221,11 @@ def verify_nonfinal_stop_chain(raw_observation, raw_stop, trusted_public_key,
 
     s = stop["payload"]
     _exact(s, (*SCOPE, "schemaVersion", "kind", "observationSha256",
-               "checkpointSha256", "oldRuntimeId", "oldContainerId",
+               "checkpointSha256", "xrayJournalSha256", "oldRuntimeId", "oldContainerId",
                "oldStartedAt", *STOP_FLAGS, "finalMeterVerified",
                "settlementEligible", "refundableBytes"),
            "Node stop-chain")
-    if (type(s["schemaVersion"]) is not int or s["schemaVersion"] != 1 or
+    if (type(s["schemaVersion"]) is not int or s["schemaVersion"] != 2 or
             s["kind"] != STOP_KIND or
             s["finalMeterVerified"] is not False or
             s["settlementEligible"] is not False or
@@ -240,6 +240,8 @@ def verify_nonfinal_stop_chain(raw_observation, raw_stop, trusted_public_key,
             not isinstance(s["oldStartedAt"], str) or
             "T" not in s["oldStartedAt"] or
             s["oldStartedAt"].startswith("0001-01-01") or
+            not isinstance(s["xrayJournalSha256"], str) or
+            HEX64.fullmatch(s["xrayJournalSha256"]) is None or
             s["checkpointSha256"] != o["checkpointSha256"] or
             s["observationSha256"] != hashlib.sha256(raw_observation).hexdigest()):
         raise ValueError("signed Node stop claim does not match immutable quota evidence")
@@ -254,6 +256,10 @@ def verify_nonfinal_stop_chain(raw_observation, raw_stop, trusted_public_key,
         "authenticatedNodeId": expected_scope["nodeId"],
         "authenticatedSignedReservation": True,
         "nodeAttestedOldPidfdExit": True,
+        # The hash is Ed25519 authenticated, but Nexus still has NOT
+        # independently read old Xray bytes from the remote VPS.
+        "nodeAttestedXrayJournalSha256": s["xrayJournalSha256"],
+        "xrayJournalIndependentlyVerified": False,
         "trustedSignedInboundCount": len(trusted_roster),
         "observedRawBytesForAudit": total_up + total_down,
         "durableAbsoluteFloorBytesForAudit": o["durableAbsoluteFloorBytes"],

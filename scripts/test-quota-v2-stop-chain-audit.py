@@ -22,6 +22,7 @@ if not (NODE / "experiments/quota-v2-physical-stop/stop_chain.py").is_file():
 sys.path.insert(0, str(NODE / "experiments/quota-v2-physical-stop"))
 import stop_chain as node_stop
 import sign_observation as node_observed
+import rollover_prepare as node_rollover
 
 SPEC = importlib.util.spec_from_file_location(
     "nexus_independent_stop_chain_audit",
@@ -41,6 +42,9 @@ SCOPE = {
     "revision": 7,
     "revocationId": "44444444-4444-4444-8444-444444444444",
 }
+# Deterministic SYNTHETIC old-WAL digest. The Nexus verifier is given this
+# through a separate CI-only audit input, never extracted as the trusted key.
+EXPECTED_OLD_WAL_SHA256=hashlib.sha256(b"synthetic stopped old Xray WAL").hexdigest()
 
 
 class IndependentStopAuditTests(unittest.TestCase):
@@ -105,10 +109,11 @@ class IndependentStopAuditTests(unittest.TestCase):
         observation = self.sign(op, node_observed.DOMAIN)
         original_raw = self.raw(observation)
         sp = {
-            "schemaVersion": 1, "kind": node_stop.KIND,
+            "schemaVersion": 2, "kind": node_stop.KIND,
             **SCOPE,
             "observationSha256": hashlib.sha256(original_raw).hexdigest(),
             "checkpointSha256": op["checkpointSha256"],
+            "xrayJournalSha256": EXPECTED_OLD_WAL_SHA256,
             "oldRuntimeId": cp["runtimeId"],
             "oldContainerId": "a"*64,
             "oldStartedAt": "2026-11-18T14:10:00Z",
@@ -138,6 +143,8 @@ class IndependentStopAuditTests(unittest.TestCase):
         verified = self.check()
         self.assertTrue(verified["authenticatedSignedReservation"])
         self.assertTrue(verified["nodeAttestedOldPidfdExit"])
+        self.assertEqual(verified["nodeAttestedXrayJournalSha256"],EXPECTED_OLD_WAL_SHA256)
+        self.assertFalse(verified["xrayJournalIndependentlyVerified"])
         self.assertEqual(verified["observedRawBytesForAudit"], 140)
         self.assertEqual(verified["trustedSignedInboundCount"], 2)
         self.assertEqual(verified["durableAbsoluteFloorBytesForAudit"], 123)
@@ -229,6 +236,19 @@ class IndependentStopAuditTests(unittest.TestCase):
             stop = self.sign(stop["payload"], node_stop.DOMAIN)
             with self.subTest(field=field), self.assertRaises(ValueError):
                 self.check(stop=stop)
+
+    def test_signed_xray_wal_hash_is_authenticated_but_not_independently_read_here(self):
+        # A Node key can sign ANY syntactically valid hash. An offline stop
+        # verifier has no independent read of the VPS byte journal, so it
+        # must never claim that matching the Node's signed hash proves
+        # complete Xray metering. The *rollover* verifier requires a
+        # separately supplied trusted journal hash and refuses mismatch.
+        altered=copy.deepcopy(self.stop)
+        altered["payload"]["xrayJournalSha256"]="f"*64
+        altered=self.sign(altered["payload"],node_stop.DOMAIN)
+        audited=self.check(stop=altered)
+        self.assertEqual(audited["nodeAttestedXrayJournalSha256"],"f"*64)
+        self.assertIs(audited["xrayJournalIndependentlyVerified"],False)
 
     def fully_resign_consistent_main_cdn_change(self, transform):
         """Model a real Node key signing a self-consistent but partial scope."""
