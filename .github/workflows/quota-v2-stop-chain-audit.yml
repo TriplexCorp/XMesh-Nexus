@@ -7,7 +7,9 @@ on:
       - 'scripts/test-quota-v2-stop-chain-audit.py'
       - 'scripts/test-quota-v2-rollover-audit.py'
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
+      - 'scripts/test-quota-v2-nonfinal-rollover-postgres.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
+      - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
   push:
     branches: [main]
@@ -17,7 +19,9 @@ on:
       - 'scripts/test-quota-v2-stop-chain-audit.py'
       - 'scripts/test-quota-v2-rollover-audit.py'
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
+      - 'scripts/test-quota-v2-nonfinal-rollover-postgres.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
+      - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
 permissions:
   contents: read
@@ -81,8 +85,11 @@ jobs:
                   "0128_quota_v2_conservative_burn.sql",
                   "0129_quota_v2_terminal_settlement.sql",
                   "0132_quota_v2_terminal_settlement_quarantine.sql",
+                  "0133_quota_v2_nonfinal_rollover_prepare.sql",
               ):
                   c.execute((Path("backend/migrations") / name).read_text())
           PY
       - name: Genuine Node-signed NONFINAL stop remains SQL-unsettleable
         run: python3 scripts/test-quota-v2-signed-nonfinal-sql-isolation.py
+      - name: Verified signed rollover candidates stage exactly once without altering any bytes
+        run: python3 scripts/test-quota-v2-nonfinal-rollover-postgres.py
