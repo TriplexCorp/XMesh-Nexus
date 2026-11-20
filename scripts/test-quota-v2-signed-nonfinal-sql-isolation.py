@@ -26,6 +26,12 @@ spec = importlib.util.spec_from_file_location(
 fixture_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture_module)
 
+rollover_spec = importlib.util.spec_from_file_location(
+    "independent_nexus_rollover_audit",
+    ROOT / "scripts/quota_v2_rollover_audit.py")
+rollover_audit = importlib.util.module_from_spec(rollover_spec)
+rollover_spec.loader.exec_module(rollover_audit)
+
 
 class SignedStopIsNotSettlementTests(unittest.TestCase):
     def setUp(self):
@@ -114,6 +120,46 @@ class SignedStopIsNotSettlementTests(unittest.TestCase):
                 self.assertEqual(rejected.exception.sqlstate,"42501")
                 self.assertEqual(self.state(),original)
         self.assertEqual(self.state(),original)
+
+
+    def test_real_signed_rollover_proposal_still_cannot_settle_a_byte(self):
+        """An authenticated prepare is never an acknowledgment/refund."""
+        node_rollover=fixture_module.node_rollover
+        node_observed=fixture_module.node_observed
+        cp=self.fixture.observation["payload"]["checkpoint"]
+        original=self.fixture.raw(self.fixture.observation)
+        stop=self.fixture.raw(self.fixture.stop)
+        old_wal=fixture_module.EXPECTED_OLD_WAL_SHA256
+        payload=node_rollover._build_payload(
+            cp,self.fixture.observation,self.fixture.stop["payload"],
+            original,stop,old_wal)
+        proposal=self.fixture.sign(payload,node_rollover.DOMAIN)
+        raw=self.fixture.raw(proposal)
+        verified=rollover_audit.verify_nonfinal_rollover_prepare(
+            original,stop,raw,self.fixture.pub,
+            self.scope,fixture_module.EXPECTED_INBOUND_ROSTER,old_wal)
+        self.assertTrue(verified["nodePreparedConservativeRollover"])
+        self.assertFalse(verified["canApplyRollover"])
+        self.assertFalse(verified["settlementEligible"])
+        self.assertEqual(verified["refundableBytes"],0)
+        before=self.state()
+        # Hash of a fully authenticated Node-signed rollover is STILL no
+        # authorization for this terminal SQL entry point.
+        digest=hashlib.sha256(raw).hexdigest()
+        for total in (140,200,340,500):
+            with self.subTest(total=total):
+                with self.assertRaises(psycopg.Error) as rejected:
+                    with psycopg.connect(DSN) as c:
+                        c.execute(
+                            "SELECT * FROM quota_v2_settle_verified_terminal"
+                            "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                            (self.user,self.epoch,self.node,self.meter,
+                             self.reservation,self.request,
+                             self.scope["revision"],cp["runtimeId"],
+                             digest,total))
+                self.assertEqual(rejected.exception.sqlstate,"42501")
+                self.assertEqual(self.state(),before)
+
 
 
 if __name__ == "__main__":
