@@ -111,7 +111,7 @@ class IndependentRolloverAuditTests(unittest.TestCase):
             lambda p: p["inboundMeters"][0].update(uplinkBytes=71),
             lambda p: p.update(oldRuntimeObservedDownlinkBytes=500),
             lambda p: p.update(nodeDurableAbsoluteFloorBytes=140),
-            lambda p: p.update(oldContainerId="a"*64),
+            lambda p: p.update(oldContainerId="b"*64),
             lambda p: p.update(oldRuntimeId="a"*64),
             lambda p: p.update(oldStartedAt="2026-11-19T10:00:00Z"),
             lambda p: p.update(stopChainSha256="0"*64),
