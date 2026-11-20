@@ -99,14 +99,14 @@ def _checked_row(staged,scope,prepared_payload,proposal_hash):
     return hashlib.sha256(stop._canonical(staged)).hexdigest()
 
 
-def _payload(scope,source,row_digest):
+def _payload(scope,source,row_digest,proposal_hash):
     p={key:scope[key] for key in stop.SCOPE}
     p.update({
         "schemaVersion":1,"kind":KIND,
         "oldRuntimeId":source["oldRuntimeId"],
         "oldContainerId":source["oldContainerId"],
         "oldStartedAt":source["oldStartedAt"],
-        "proposalSha256":source["proposalSha256"],
+        "proposalSha256":proposal_hash,
         "stopChainSha256":source["stopChainSha256"],
         "xrayJournalSha256":source["xrayJournalSha256"],
         "stagedLedgerRowSha256":row_digest,
@@ -288,7 +288,7 @@ def record_prepared_receipt(conn,raw_observation,raw_stop,raw_prepare,
     original=stop._decode(raw_prepare)["payload"]
     digest=_checked_row(_load_staged(conn,expected_scope),expected_scope,
                         original,verified["proposalSha256"])
-    payload=_payload(expected_scope,original,digest)
+    payload=_payload(expected_scope,original,digest,verified["proposalSha256"])
     _check_receipt_shape(payload)
     envelope={"algorithm":"Ed25519","payload":payload,
               "signature":_sign(nexus_private_key,payload)}
