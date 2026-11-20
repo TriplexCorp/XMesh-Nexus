@@ -13,6 +13,8 @@ on:
       - 'scripts/test-quota-v2-shadow-carryforward-postgres.py'
       - 'scripts/quota_v2_offhost_wal_registration.py'
       - 'scripts/test-quota-v2-offhost-wal-postgres.py'
+      - 'scripts/quota_v2_offhost_nexus_receipt.py'
+      - 'scripts/test-quota-v2-offhost-nexus-receipt.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - 'backend/migrations/0134_quota_v2_shadow_carryforward_watermarks.sql'
@@ -32,6 +34,8 @@ on:
       - 'scripts/test-quota-v2-shadow-carryforward-postgres.py'
       - 'scripts/quota_v2_offhost_wal_registration.py'
       - 'scripts/test-quota-v2-offhost-wal-postgres.py'
+      - 'scripts/quota_v2_offhost_nexus_receipt.py'
+      - 'scripts/test-quota-v2-offhost-nexus-receipt.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - 'backend/migrations/0134_quota_v2_shadow_carryforward_watermarks.sql'
@@ -80,7 +84,7 @@ jobs:
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/stop_chain.py
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/rollover_prepare.py
           test -f .ci-reviewed-node/experiments/xray-dataplane-fence/sign_observation.py
-          python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py scripts/quota_v2_rollover_audit.py scripts/test-quota-v2-rollover-audit.py scripts/quota_v2_prepared_registration.py scripts/test-quota-v2-prepared-registration.py scripts/quota_v2_offhost_wal_registration.py scripts/test-quota-v2-offhost-wal-postgres.py
+          python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py scripts/quota_v2_rollover_audit.py scripts/test-quota-v2-rollover-audit.py scripts/quota_v2_prepared_registration.py scripts/test-quota-v2-prepared-registration.py scripts/quota_v2_offhost_wal_registration.py scripts/test-quota-v2-offhost-wal-postgres.py scripts/quota_v2_offhost_nexus_receipt.py scripts/test-quota-v2-offhost-nexus-receipt.py
           python3 scripts/test-quota-v2-stop-chain-audit.py
           python3 scripts/test-quota-v2-rollover-audit.py
           echo 'Nexus independently validates signed Node v2 stop and conservative rollover prepare; no unlock or refunds'
@@ -115,3 +119,5 @@ jobs:
         run: python3 scripts/test-quota-v2-shadow-carryforward-postgres.py
       - name: Independent off-host Xray WAL birth registration and rollback-detection regression
         run: python3 scripts/test-quota-v2-offhost-wal-postgres.py
+      - name: Nexus Ed25519 off-host receipt must follow committed database re-read
+        run: python3 scripts/test-quota-v2-offhost-nexus-receipt.py
