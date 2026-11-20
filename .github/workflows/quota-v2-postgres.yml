@@ -7,7 +7,9 @@ on:
       - 'backend/migrations/0127_quota_v2_revocation_freeze.sql'
       - 'backend/migrations/0128_quota_v2_conservative_burn.sql'
       - 'backend/migrations/0129_quota_v2_terminal_settlement.sql'
+      - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'scripts/test-quota-v2-postgres.py'
+      - 'scripts/test-quota-v2-terminal-quarantine.py'
       - '.github/workflows/quota-v2-postgres.yml'
 permissions:
   contents: read
@@ -52,4 +54,19 @@ jobs:
               ):
                   c.execute(Path(path).read_text())
           PY
+      # Exercise the hypothetical economic primitive only BEFORE the
+      # production quarantine migration. This is not proof authentication.
       - run: python3 scripts/test-quota-v2-postgres.py
+      - name: Apply production SQL terminal quarantine
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import psycopg
+          with psycopg.connect(os.environ["QUOTA_TEST_DSN"]) as c:
+              c.execute(Path(
+                  "backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql"
+              ).read_text())
+          PY
+      - name: Prove SQL owner and forged final proofs cannot refund
+        run: python3 scripts/test-quota-v2-terminal-quarantine.py
