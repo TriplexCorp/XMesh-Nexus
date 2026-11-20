@@ -10,6 +10,7 @@ No production API/gate or refund.
 import concurrent.futures
 import copy
 import importlib.util
+import itertools
 import os
 from pathlib import Path
 import subprocess
@@ -39,13 +40,17 @@ SPEC=importlib.util.spec_from_file_location(
 nexus=importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(nexus)
 
+# Each disposable test uses a distinct signed Node identity: never erase
+# previous off-host evidence just to obtain a clean test database.
+NODE_IDS=itertools.count(500000)
+
 
 class RemoteWalWitnessTests(unittest.TestCase):
     def setUp(self):
         self.fx=StopChainTests("test_unrelated_user_wal_does_not_block_signed_account_stop")
         self.fx.setUp()
         self.addCleanup(self.fx.doCleanups)
-        self.node=self.fx.cp["nodeId"]
+        self.node=next(NODE_IDS)
         self.node_pub=self.fx.pub
         self.raw_signed,self.raw_index=self.snapshot()
         self.temp=tempfile.TemporaryDirectory(prefix="xmesh-nexus-external-wal-")
@@ -58,9 +63,6 @@ class RemoteWalWitnessTests(unittest.TestCase):
         self.nexus_key.chmod(0o600)
         subprocess.run(["openssl","pkey","-in",str(self.nexus_key),"-pubout",
                         "-out",str(self.nexus_pub)],check=True,capture_output=True)
-        with psycopg.connect(DSN) as db:
-            # This is a dedicated disposal database. NEVER run this in prod.
-            db.execute("TRUNCATE quota_v2_external_wal_birth_anchors")
 
     def snapshot(self):
         return producer.produce_witness(
@@ -90,7 +92,8 @@ class RemoteWalWitnessTests(unittest.TestCase):
                 "inventory_tail_digest,original_node_witness_sha256,"
                 "inventory_bytes,first_external_witness "
                 "FROM quota_v2_external_wal_birth_anchors "
-                "ORDER BY inventory_sequence").fetchall()
+                "WHERE node_id=%s ORDER BY inventory_sequence",
+                (self.node,)).fetchall()
 
     def next_snapshot(self):
         cp=copy.deepcopy(self.fx.cp)
@@ -285,6 +288,7 @@ class RemoteWalWitnessTests(unittest.TestCase):
         old=self.rows()
         for sql in (
             "DELETE FROM quota_v2_external_wal_birth_anchors",
+            "TRUNCATE quota_v2_external_wal_birth_anchors",
             "UPDATE quota_v2_external_wal_birth_anchors "
             "SET inventory_sequence=1",
         ):
