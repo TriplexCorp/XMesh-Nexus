@@ -12,6 +12,13 @@ export LC_ALL=C
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
 AGENT_VERSION="control-v6.0.24"
+WAL_STAGE_AGENT="${XMESH_QUOTA_V2_WAL_STAGE_AGENT:-0}"
+if [[ "$WAL_STAGE_AGENT" == 1 ]];then
+ AGENT_VERSION="control-v6.0.25"
+fi
+wal_blocks_runtime_changes(){
+ [[ "$WAL_STAGE_AGENT" != 0 || "${XMESH_QUOTA_V2_WAL_RECONCILE:-0}" != 0 ]]
+}
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -364,6 +371,10 @@ resume_xray(){
   return 1
  fi
  [[ -f "$MARKER" ]] || return 0
+ if wal_blocks_runtime_changes;then
+  echo "Xray reactivation requires a verified staged WAL recovery." >&2
+  return 1
+ fi
  local mode
  mode="$(cat "$MARKER")"
  if [[ "$mode" == docker ]];then
@@ -432,7 +443,9 @@ read -r command_id action target_version release_version source_revision artifac
 [[ "$command_id" =~ ^[1-9][0-9]*$ ]] || exit 2
 success=false
 detail='Command failed'
-if [[ "$action" == update_xray ]];then
+if wal_blocks_runtime_changes;then
+ detail='Runtime changes require a verified staged WAL recovery'
+elif [[ "$action" == update_xray ]];then
  if update_managed_xray "$target_version";then success=true;fi
 elif [[ "$action" == update_agent ]];then
  clear_agent_release_identity

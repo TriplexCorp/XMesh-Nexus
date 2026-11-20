@@ -6,10 +6,13 @@ on:
       - 'backend/src/node_auth.rs'
       - 'backend/src/node_policy.rs'
       - 'backend/src/main.rs'
+      - 'compose.yaml'
+      - 'deploy/node-control-agent.sh'
       - 'deploy/xsp-v2-product-gateway/main.go'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
       - 'scripts/test-quota-wal-transport.py'
+      - 'scripts/test-quota-wal-reconcile.py'
       - 'scripts/run-quota-wal-transport-audit.sh'
       - '.github/workflows/quota-wal-transport.yml'
 permissions:
@@ -43,8 +46,29 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 165c4759bc89a1077b76129c520b1b8c7dca9cb4
+          ref: d0a0dd944efdbc207deae4af3b1c17851c64c808
           path: .ci-reviewed-node
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: .ci-reviewed-node/agent/xspv2/go.mod
+          cache: false
+      - name: Build and verify the pinned staging Agent
+        working-directory: .ci-reviewed-node/agent/xspv2
+        run: |
+          set -euo pipefail
+          revision="$(git rev-parse HEAD)"
+          version="$(tr -d '\r\n' < ../../AGENT_VERSION)"
+          test "$revision" = 'd0a0dd944efdbc207deae4af3b1c17851c64c808'
+          test "$version" = 'control-v6.0.25'
+          go build -trimpath -ldflags "-X main.version=$version -X main.sourceRevision=$revision" \
+            -o "$RUNNER_TEMP/wal-product-agent" ./cmd/xmesh-agent-xspv2-product
+          "$RUNNER_TEMP/wal-product-agent" --identity | python3 -c '
+          import hashlib, json, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          assert json.load(sys.stdin) == {
+              "version": sys.argv[2], "sourceRevision": sys.argv[3],
+              "artifactSha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+          }' "$RUNNER_TEMP/wal-product-agent" "$version" "$revision"
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
         env:
@@ -55,4 +79,4 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/quota-wal"
           source "$RUNNER_TEMP/quota-wal/bin/activate"
           python -m pip install 'psycopg[binary]==3.2.3'
-          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api
+          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-reconcile
