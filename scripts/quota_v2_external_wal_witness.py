@@ -20,6 +20,8 @@ import stat
 import subprocess
 import tempfile
 
+from psycopg.pq import TransactionStatus
+
 import quota_v2_stop_chain_audit as signed
 
 DOMAIN=b"XMESH_QUOTA_V2_OFFHOST_WAL_BIRTH_WITNESS_V1\x00"
@@ -227,28 +229,28 @@ def verify_nexus_committed_birth_ack(raw_ack,raw_node_witness,raw_index,
 def commit_external_index(conn,raw_node_witness,raw_registry,
                           enrolled_node_public_key, trusted_node_id,
                           root_nexus_private_key, enrolled_nexus_pub):
-    """Autocommit-only: SQL commit must finish BEFORE the Nexus reply is signed.
+    """Require an idle autocommit connection and commit before signing.
 
-    A connection already inside a caller transaction can sign rows that later
-    ROLLBACK, so reject non-autocommit connections absolutely. SQL itself has
-    no privilege to authenticate Ed25519: our standalone verifier does that
-    before attempting the append-only store.
+    An explicit caller transaction is possible even in autocommit mode.
+    Require an idle connection so our transaction cannot become a savepoint.
     """
-    if conn.autocommit is not True:
-        raise ValueError("Nexus external witness requires committed autocommit SQL")
+    if (conn.autocommit is not True or
+            conn.info.transaction_status != TransactionStatus.IDLE):
+        raise ValueError("Nexus external witness requires idle autocommit SQL")
     v=verify_signed_node_birth_witness(
         raw_node_witness,raw_registry,trusted_node_id,enrolled_node_public_key)
-    row=conn.execute(
-        "SELECT * FROM quota_v2_store_external_wal_birth_anchor("
-        "%s,%s,%s,%s,%s,%s,%s,%s)",
-        (trusted_node_id,v["inventorySequence"],v["inventorySha256"],
-         v["inventoryTailDigest"],v["originalNodeWitnessSha256"],
-         v["oldContainerId"],v["oldStartedAt"],raw_registry)).fetchone()
-    if row is None:
-        raise ValueError("no committed remote WAL birth index")
-    # The SQL function is a single transaction. Re-read the persisted FULL
-    # bytes AFTER its COMMIT and BEFORE signing. If commit was uncertain, a
-    # retry must produce the exact same immutable row, or fail closed.
+    with conn.transaction():
+        # Flush the commit WAL even when the session defaults to async commit.
+        conn.execute("SET LOCAL synchronous_commit TO on")
+        row=conn.execute(
+            "SELECT * FROM quota_v2_store_external_wal_birth_anchor("
+            "%s,%s,%s,%s,%s,%s,%s,%s)",
+            (trusted_node_id,v["inventorySequence"],v["inventorySha256"],
+             v["inventoryTailDigest"],v["originalNodeWitnessSha256"],
+             v["oldContainerId"],v["oldStartedAt"],raw_registry)).fetchone()
+        if row is None:
+            raise ValueError("no committed remote WAL birth index")
+    # Re-read the persisted full bytes after COMMIT and before signing.
     loaded=conn.execute(
         "SELECT inventory_sequence,inventory_sha256,inventory_tail_digest,"
         "original_node_witness_sha256,old_container_id,old_started_at,"

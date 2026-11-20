@@ -31,6 +31,7 @@ sys.path.insert(0,str(NODE/"tests"))
 sys.path.insert(0,str(NODE/"experiments/quota-v2-physical-stop"))
 sys.path.insert(0,str(NODE/"experiments/xray-dataplane-fence"))
 import witness_inventory as producer
+import verify_nexus_wal_anchor as node_verifier
 import quota_v2_meter_wal_fixture as wal_fixture
 from test_quota_v2_stop_chain import StopChainTests
 
@@ -104,6 +105,49 @@ class RemoteWalWitnessTests(unittest.TestCase):
             {"email":cp["email"],"uplinkBytes":3,"downlinkBytes":11}]
         wal_fixture.write_test_meter_intents(cp,self.fx.xray)
         return self.snapshot()
+
+    def read_current_head(self):
+        with psycopg.connect(DSN) as db:
+            sequence, registry_sha256, registry = db.execute(
+                "SELECT inventory_sequence,inventory_sha256,inventory_bytes "
+                "FROM quota_v2_external_wal_birth_anchors "
+                "WHERE node_id=%s ORDER BY inventory_sequence DESC LIMIT 1",
+                (self.node,)).fetchone()
+        return {"sequence":sequence,"registrySha256":registry_sha256}, bytes(registry)
+
+    def test_node_verifies_real_nexus_receipt_against_independent_postgres_head(self):
+        first_receipt=self.record()
+        first_head,first_registry=self.read_current_head()
+        doc2,raw2=self.next_snapshot()
+        second_receipt=self.record(doc2,raw2)
+        current_head,current_registry=self.read_current_head()
+        self.assertGreater(current_head["sequence"],first_head["sequence"])
+
+        def verify(receipt, witness, registry, head):
+            return node_verifier.verify_nexus_offhost_anchor(
+                receipt,witness,registry,self.node,self.node_pub,self.nexus_pub,
+                head,str(self.fx.xray))
+
+        # The older receipt still has a valid signature and complete bytes.
+        # It cannot serve as the current checkpoint after the registry grows.
+        self.assertTrue(verify(
+            first_receipt,self.raw_signed,first_registry,first_head
+        )["offhostFullBirthIndexHeadMatched"])
+        with self.assertRaisesRegex(ValueError,"stale Nexus anchor"):
+            verify(first_receipt,self.raw_signed,first_registry,current_head)
+        proof=verify(second_receipt,doc2,current_registry,current_head)
+        self.assertTrue(proof["offhostFullBirthIndexHeadMatched"])
+        self.assertTrue(proof["nodeLocalIndexExtendsNexusHead"])
+        self.assertFalse(proof["canResume"])
+        self.assertFalse(proof["carryforwardApplied"])
+        self.assertFalse(proof["finalMeterVerified"])
+        self.assertEqual(proof["refundableBytes"],0)
+
+        (self.fx.xray/"xmesh-meter-inventory-v1.jsonl").unlink()
+        for file in self.fx.xray.glob("meter-*.jsonl"):
+            file.unlink()
+        with self.assertRaisesRegex(ValueError,"rolled back"):
+            verify(second_receipt,doc2,current_registry,current_head)
 
     def test_genuine_node_births_are_canonical_and_committed_before_nexus_signature(self):
         checked=self.verified()
@@ -267,6 +311,13 @@ class RemoteWalWitnessTests(unittest.TestCase):
                 nexus.commit_external_index(
                     db,self.raw_signed,self.raw_index,self.node_pub,self.node,
                     self.nexus_key,self.nexus_pub)
+        self.assertEqual(self.rows(),[])
+        with psycopg.connect(DSN,autocommit=True) as db:
+            with db.transaction(force_rollback=True):
+                with self.assertRaisesRegex(ValueError,"idle autocommit"):
+                    nexus.commit_external_index(
+                        db,self.raw_signed,self.raw_index,self.node_pub,self.node,
+                        self.nexus_key,self.nexus_pub)
         self.assertEqual(self.rows(),[])
         with self.assertRaises(RuntimeError):
             with psycopg.connect(DSN) as db:

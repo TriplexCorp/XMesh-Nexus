@@ -69,17 +69,18 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 9401a68ded3d51e3dba89b11eed74b5a4b80c6cd
+          ref: 165c4759bc89a1077b76129c520b1b8c7dca9cb4
           path: .ci-reviewed-node
       - name: Refuse drift from immutable signed receipt producer
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "9401a68ded3d51e3dba89b11eed74b5a4b80c6cd"
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "165c4759bc89a1077b76129c520b1b8c7dca9cb4"
           test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = "control-v6.0.24"
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/stop_chain.py
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/rollover_prepare.py
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/witness_inventory.py
+          test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/verify_nexus_wal_anchor.py
           test -f .ci-reviewed-node/experiments/xray-dataplane-fence/sign_observation.py
           python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py scripts/quota_v2_rollover_audit.py scripts/test-quota-v2-rollover-audit.py scripts/quota_v2_prepared_registration.py scripts/test-quota-v2-prepared-registration.py
           python3 scripts/test-quota-v2-stop-chain-audit.py
