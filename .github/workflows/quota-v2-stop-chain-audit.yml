@@ -10,8 +10,10 @@ on:
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
       - 'scripts/test-quota-v2-nonfinal-rollover-postgres.py'
       - 'scripts/test-quota-v2-prepared-registration.py'
+      - 'scripts/test-quota-v2-shadow-carryforward-postgres.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
+      - 'backend/migrations/0134_quota_v2_shadow_carryforward_watermarks.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
   push:
     branches: [main]
@@ -24,8 +26,10 @@ on:
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
       - 'scripts/test-quota-v2-nonfinal-rollover-postgres.py'
       - 'scripts/test-quota-v2-prepared-registration.py'
+      - 'scripts/test-quota-v2-shadow-carryforward-postgres.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
+      - 'backend/migrations/0134_quota_v2_shadow_carryforward_watermarks.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
 permissions:
   contents: read
@@ -90,6 +94,7 @@ jobs:
                   "0129_quota_v2_terminal_settlement.sql",
                   "0132_quota_v2_terminal_settlement_quarantine.sql",
                   "0133_quota_v2_nonfinal_rollover_prepare.sql",
+                  "0134_quota_v2_shadow_carryforward_watermarks.sql",
               ):
                   c.execute((Path("backend/migrations") / name).read_text())
           PY
@@ -99,3 +104,5 @@ jobs:
         run: python3 scripts/test-quota-v2-nonfinal-rollover-postgres.py
       - name: Immutable Nexus Ed25519 prepared-only registration receipt and six competing signers
         run: python3 scripts/test-quota-v2-prepared-registration.py
+      - name: Shadow watermark is exactly-once max-not-sum, immutable and unspendable
+        run: python3 scripts/test-quota-v2-shadow-carryforward-postgres.py
