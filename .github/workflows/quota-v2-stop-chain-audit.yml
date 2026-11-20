@@ -5,15 +5,18 @@ on:
       - 'scripts/quota_v2_stop_chain_audit.py'
       - 'scripts/quota_v2_rollover_audit.py'
       - 'scripts/quota_v2_prepared_registration.py'
+      - 'scripts/quota_v2_external_wal_witness.py'
       - 'scripts/test-quota-v2-stop-chain-audit.py'
       - 'scripts/test-quota-v2-rollover-audit.py'
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
       - 'scripts/test-quota-v2-nonfinal-rollover-postgres.py'
       - 'scripts/test-quota-v2-prepared-registration.py'
+      - 'scripts/test-quota-v2-external-wal-witness.py'
       - 'scripts/test-quota-v2-shadow-carryforward-postgres.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - 'backend/migrations/0134_quota_v2_shadow_carryforward_watermarks.sql'
+      - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
   push:
     branches: [main]
@@ -21,15 +24,18 @@ on:
       - 'scripts/quota_v2_stop_chain_audit.py'
       - 'scripts/quota_v2_rollover_audit.py'
       - 'scripts/quota_v2_prepared_registration.py'
+      - 'scripts/quota_v2_external_wal_witness.py'
       - 'scripts/test-quota-v2-stop-chain-audit.py'
       - 'scripts/test-quota-v2-rollover-audit.py'
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
       - 'scripts/test-quota-v2-nonfinal-rollover-postgres.py'
       - 'scripts/test-quota-v2-prepared-registration.py'
+      - 'scripts/test-quota-v2-external-wal-witness.py'
       - 'scripts/test-quota-v2-shadow-carryforward-postgres.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - 'backend/migrations/0134_quota_v2_shadow_carryforward_watermarks.sql'
+      - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
 permissions:
   contents: read
@@ -63,16 +69,17 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 4492f7a186e3337ef1dc290022e290e81e9db525
+          ref: 9401a68ded3d51e3dba89b11eed74b5a4b80c6cd
           path: .ci-reviewed-node
       - name: Refuse drift from immutable signed receipt producer
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "4492f7a186e3337ef1dc290022e290e81e9db525"
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "9401a68ded3d51e3dba89b11eed74b5a4b80c6cd"
           test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = "control-v6.0.24"
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/stop_chain.py
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/rollover_prepare.py
+          test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/witness_inventory.py
           test -f .ci-reviewed-node/experiments/xray-dataplane-fence/sign_observation.py
           python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py scripts/quota_v2_rollover_audit.py scripts/test-quota-v2-rollover-audit.py scripts/quota_v2_prepared_registration.py scripts/test-quota-v2-prepared-registration.py
           python3 scripts/test-quota-v2-stop-chain-audit.py
@@ -95,6 +102,7 @@ jobs:
                   "0132_quota_v2_terminal_settlement_quarantine.sql",
                   "0133_quota_v2_nonfinal_rollover_prepare.sql",
                   "0134_quota_v2_shadow_carryforward_watermarks.sql",
+                  "0135_quota_v2_external_wal_birth_anchors.sql",
               ):
                   c.execute((Path("backend/migrations") / name).read_text())
           PY
@@ -106,3 +114,7 @@ jobs:
         run: python3 scripts/test-quota-v2-prepared-registration.py
       - name: Shadow watermark is exactly-once max-not-sum, immutable and unspendable
         run: python3 scripts/test-quota-v2-shadow-carryforward-postgres.py
+      - name: Signed full Xray WAL birth registry anchored externally with no rollback or unsafe release
+        run: |
+          python3 -m py_compile scripts/quota_v2_external_wal_witness.py scripts/test-quota-v2-external-wal-witness.py
+          python3 scripts/test-quota-v2-external-wal-witness.py
