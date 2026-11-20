@@ -250,6 +250,23 @@ def commit_external_index(conn,raw_node_witness,raw_registry,
              v["oldContainerId"],v["oldStartedAt"],raw_registry)).fetchone()
         if row is None:
             raise ValueError("no committed remote WAL birth index")
+        # The signed source and full registry must survive the same commit.
+        # An exact retry can attach a source to a pre-0136 checkpoint.
+        conn.execute(
+            "INSERT INTO quota_v2_external_wal_birth_sources "
+            "(node_id,inventory_sequence,witness_bytes) "
+            "SELECT node_id,inventory_sequence,%s::bytea "
+            "FROM quota_v2_external_wal_birth_anchors "
+            "WHERE node_id=%s AND inventory_sequence=%s "
+            "AND original_node_witness_sha256=encode(sha256(%s::bytea),'hex') "
+            "ON CONFLICT DO NOTHING",
+            (raw_node_witness,trusted_node_id,v["inventorySequence"],raw_node_witness))
+        saved=conn.execute(
+            "SELECT witness_bytes FROM quota_v2_external_wal_birth_sources "
+            "WHERE node_id=%s AND inventory_sequence=%s",
+            (trusted_node_id,v["inventorySequence"])).fetchone()
+        if saved is None or bytes(saved[0])!=raw_node_witness:
+            raise ValueError("Nexus WAL checkpoint has no matching signed source")
     # Re-read the persisted full bytes after COMMIT and before signing.
     loaded=conn.execute(
         "SELECT inventory_sequence,inventory_sha256,inventory_tail_digest,"
@@ -265,6 +282,47 @@ def commit_external_index(conn,raw_node_witness,raw_registry,
                 v["oldContainerId"],v["oldStartedAt"]) or
             bytes(loaded[6])!=raw_registry or type(loaded[7]) is not bool):
         raise ValueError("Nexus WAL witness DB did not retain complete signed data")
+    return _sign_committed_birth_ack(
+        v,loaded[7],raw_node_witness,raw_registry,enrolled_node_public_key,
+        root_nexus_private_key,enrolled_nexus_pub)
+
+
+def read_current_external_index(conn,trusted_node_id,enrolled_node_public_key,
+                                root_nexus_private_key,enrolled_nexus_pub):
+    """Read the latest committed checkpoint and reissue its nonfinal receipt."""
+    if (conn.autocommit is not True or
+            conn.info.transaction_status != TransactionStatus.IDLE):
+        raise ValueError("Nexus external witness requires idle autocommit SQL")
+    row=conn.execute(
+        "SELECT a.inventory_sequence,a.inventory_sha256,a.inventory_tail_digest,"
+        "a.original_node_witness_sha256,a.old_container_id,a.old_started_at,"
+        "a.inventory_bytes,a.first_external_witness,s.witness_bytes "
+        "FROM quota_v2_external_wal_birth_anchors AS a "
+        "LEFT JOIN quota_v2_external_wal_birth_sources AS s "
+        "USING (node_id,inventory_sequence) "
+        "WHERE a.node_id=%s ORDER BY a.inventory_sequence DESC LIMIT 1",
+        (trusted_node_id,)).fetchone()
+    # Never fall back to an older checkpoint when the latest lacks a source.
+    if row is None or row[8] is None:
+        raise ValueError("no signed source for the latest Nexus WAL checkpoint")
+    index,witness=bytes(row[6]),bytes(row[8])
+    v=verify_signed_node_birth_witness(
+        witness,index,trusted_node_id,enrolled_node_public_key)
+    if row[:6]!=(
+            v["inventorySequence"],v["inventorySha256"],v["inventoryTailDigest"],
+            v["originalNodeWitnessSha256"],v["oldContainerId"],v["oldStartedAt"]):
+        raise ValueError("latest Nexus WAL checkpoint differs from its signed source")
+    receipt=_sign_committed_birth_ack(
+        v,row[7],witness,index,enrolled_node_public_key,
+        root_nexus_private_key,enrolled_nexus_pub)
+    head={"sequence":row[0],"registrySha256":row[1]}
+    return head,witness,index,receipt
+
+
+def _sign_committed_birth_ack(v,bootstrap,raw_node_witness,raw_registry,
+                              enrolled_node_public_key,root_nexus_private_key,
+                              enrolled_nexus_pub):
+    trusted_node_id=v["nodeId"]
     p={
         "schemaVersion":1,"kind":NEXUS_KIND,"nodeId":trusted_node_id,
         "inventorySequence":v["inventorySequence"],
@@ -274,7 +332,7 @@ def commit_external_index(conn,raw_node_witness,raw_registry,
         "oldContainerId":v["oldContainerId"],
         "oldStartedAt":v["oldStartedAt"],
         "offhostFullIndexCommitted":True,
-        "bootstrapOnly":loaded[7],
+        "bootstrapOnly":bootstrap,
         "canResume":False,"carryforwardApplied":False,
         "finalMeterVerified":False,"refundableBytes":0,
     }

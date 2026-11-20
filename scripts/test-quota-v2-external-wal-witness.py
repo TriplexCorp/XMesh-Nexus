@@ -115,6 +115,58 @@ class RemoteWalWitnessTests(unittest.TestCase):
                 (self.node,)).fetchone()
         return {"sequence":sequence,"registrySha256":registry_sha256}, bytes(registry)
 
+    def recover_checkpoint(self):
+        # A fresh connection provides the original bytes even if Node lost
+        # its copy of the witness or never received its acknowledgment.
+        with psycopg.connect(DSN,autocommit=True) as db:
+            return nexus.read_current_external_index(
+                db,self.node,self.node_pub,self.nexus_key,self.nexus_pub)
+
+    def test_current_checkpoint_recovers_exact_source_and_receipt(self):
+        self.record()
+        doc2,raw2=self.next_snapshot()
+        second_receipt=self.record(doc2,raw2)
+        head,witness,index,receipt=self.recover_checkpoint()
+        self.assertEqual((witness,index,receipt),(doc2,raw2,second_receipt))
+        proof=node_verifier.verify_nexus_offhost_anchor(
+            receipt,witness,index,self.node,self.node_pub,self.nexus_pub,
+            head,str(self.fx.xray))
+        self.assertTrue(proof["offhostFullBirthIndexHeadMatched"])
+        self.assertFalse(proof["canResume"])
+
+    def test_legacy_head_without_source_rejects_read_until_exact_retry(self):
+        self.record()
+        doc2,raw2=self.next_snapshot()
+        v=self.verified(doc2,raw2)
+        with psycopg.connect(DSN,autocommit=True) as db:
+            db.execute(
+                "SELECT * FROM quota_v2_store_external_wal_birth_anchor("
+                "%s,%s,%s,%s,%s,%s,%s,%s)",
+                (self.node,v["inventorySequence"],v["inventorySha256"],
+                 v["inventoryTailDigest"],v["originalNodeWitnessSha256"],
+                 v["oldContainerId"],v["oldStartedAt"],raw2))
+        # Simulate a newer anchor written before migration 0136. The first
+        # anchor still has a valid source and must not replace the latest.
+        with self.assertRaisesRegex(ValueError,"no signed source for the latest"):
+            self.recover_checkpoint()
+        second_receipt=self.record(doc2,raw2)
+        self.assertEqual(self.recover_checkpoint()[1:],(doc2,raw2,second_receipt))
+        self.assertEqual([r[0] for r in self.rows()],[2,4])
+
+    def test_database_owner_cannot_rewrite_or_erase_signed_source(self):
+        self.record()
+        before=self.recover_checkpoint()
+        for sql in (
+            "DELETE FROM quota_v2_external_wal_birth_sources",
+            "TRUNCATE quota_v2_external_wal_birth_sources",
+            "UPDATE quota_v2_external_wal_birth_sources SET witness_bytes='x'",
+        ):
+            with self.subTest(sql=sql),self.assertRaises(psycopg.Error) as raised:
+                with psycopg.connect(DSN) as db:
+                    db.execute(sql)
+            self.assertEqual(raised.exception.sqlstate,"22023")
+        self.assertEqual(self.recover_checkpoint(),before)
+
     def test_node_verifies_real_nexus_receipt_against_independent_postgres_head(self):
         first_receipt=self.record()
         first_head,first_registry=self.read_current_head()
@@ -337,16 +389,17 @@ class RemoteWalWitnessTests(unittest.TestCase):
     def test_database_owner_cannot_delete_or_rewrite_remote_index(self):
         self.record()
         old=self.rows()
-        for sql in (
-            "DELETE FROM quota_v2_external_wal_birth_anchors",
-            "TRUNCATE quota_v2_external_wal_birth_anchors",
-            "UPDATE quota_v2_external_wal_birth_anchors "
-            "SET inventory_sequence=1",
+        for sql,sqlstate in (
+            ("DELETE FROM quota_v2_external_wal_birth_anchors","22023"),
+            ("TRUNCATE quota_v2_external_wal_birth_anchors","0A000"),
+            ("TRUNCATE quota_v2_external_wal_birth_anchors CASCADE","22023"),
+            ("UPDATE quota_v2_external_wal_birth_anchors "
+             "SET inventory_sequence=1","22023"),
         ):
             with self.subTest(sql=sql),self.assertRaises(psycopg.Error) as exc:
                 with psycopg.connect(DSN) as db:
                     db.execute(sql)
-            self.assertEqual(exc.exception.sqlstate,"22023")
+            self.assertEqual(exc.exception.sqlstate,sqlstate)
         self.assertEqual(self.rows(),old)
 
 
