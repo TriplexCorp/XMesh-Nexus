@@ -80,6 +80,7 @@ services:
       # Staged distributed quota-v2: never activate before every Node agent is
       # on control-v6.0.24, verified offline guard, and the durable quota cutover has been rehearsed.
       XMESH_QUOTA_V2_ENABLED: ${XMESH_QUOTA_V2_ENABLED:-0}
+      XMESH_QUOTA_V2_WAL_TRANSPORT: ${XMESH_QUOTA_V2_WAL_TRANSPORT:-0}
       XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
       XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
       XSP_V2_P0D_AGENT_MIGRATION: ${XSP_V2_P0D_AGENT_MIGRATION:-}
