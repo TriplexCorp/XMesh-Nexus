@@ -66,8 +66,12 @@ impl PolicySigner {
         hex::encode(self.0.verifying_key().to_bytes())
     }
     pub fn sign(&self, data: &Value) -> Result<String> {
-        let canonical = serde_json::to_vec(data)?;
-        Ok(hex::encode(self.0.sign(&canonical).to_bytes()))
+        self.sign_domain(b"", data)
+    }
+    pub fn sign_domain(&self, domain: &[u8], data: &Value) -> Result<String> {
+        let mut message = domain.to_vec();
+        serde_json::to_writer(&mut message, data)?;
+        Ok(hex::encode(self.0.sign(&message).to_bytes()))
     }
 }
 
