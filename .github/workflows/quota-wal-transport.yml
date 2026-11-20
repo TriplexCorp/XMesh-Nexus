@@ -6,6 +6,7 @@ on:
       - 'backend/src/node_auth.rs'
       - 'backend/src/node_policy.rs'
       - 'backend/src/main.rs'
+      - 'deploy/xsp-v2-product-gateway/main.go'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
       - 'scripts/test-quota-wal-transport.py'

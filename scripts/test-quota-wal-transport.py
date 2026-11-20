@@ -75,6 +75,36 @@ def signed_exchange(node, key, body):
     })
 
 
+def gateway_exchange(node, body, path=PATH):
+    # Test the Rust API boundary after the authenticated XSP/2 gateway.
+    # The outer hybrid TLS and dual-signature exchange is a separate test.
+    return exchange(json.dumps(body, separators=(",", ":")).encode(), {
+        "Content-Type": "application/json",
+        "Origin": f"http://{URL.netloc}",
+        "X-XSP-Product-Internal": os.environ["XSP_V2_PRODUCT_INTERNAL_TOKEN"],
+        "X-XSP-Product-Node-Id": str(node),
+        "X-XSP-Product-Path": path,
+    })
+
+
+def activate_gateway_fixture(conn, node, public):
+    with conn.transaction():
+        conn.execute(
+            """INSERT INTO node_xsp_public_keysets
+                 (node_id,purpose,key_epoch,ed25519_key_id,mldsa65_key_id,ed25519_public,mldsa65_public)
+               VALUES (%s,'node_request',1,'fixture-ed','fixture-pq',%s,%s)""",
+            (node, bytes.fromhex(public), secrets.token_bytes(1952)),
+        )
+        conn.execute(
+            """INSERT INTO node_xsp_product_nodes
+                 (node_id,state,key_epoch,ed25519_key_id,mldsa65_key_id,tls_spki_sha256,
+                  release_version,release_source_revision,release_artifact_sha256,
+                  activated_at,receipt_sha256,receipt_envelope)
+               VALUES (%s,'active',1,'fixture-ed','fixture-pq',%s,'fixture',%s,%s,NOW(),%s,%s)""",
+            (node, secrets.token_bytes(32), "a" * 40, "b" * 64, secrets.token_bytes(32), b"fixture"),
+        )
+
+
 def expect(response, code):
     assert response[0] == code, response
     return response[1]
@@ -140,7 +170,9 @@ def main():
             expect(signed_exchange(other_node, other, first), 401)
             expect(signed_exchange(other_node, other, store(other_node, first_witness, first_index)), 400)
             expect(signed_exchange(node, fx.key, latest(node, secrets.token_hex(32))), 404)
-            expect(exchange(b"X" * (545 * 1024), {"X-XMesh-Signature": "placeholder"}), 413)
+            expect(exchange(b"", {
+                "Content-Length": str(545 * 1024), "X-XMesh-Signature": "placeholder",
+            }), 413)
             expect(signed_exchange(node, fx.key, store(node, first_witness, first_index + b"\n")), 400)
             print("PASS: scoped node identities, empty history, size limit and signed inventory binding")
 
@@ -185,10 +217,15 @@ def main():
             finally:
                 db.execute("DROP TRIGGER wal_transport_test_commit_fault ON quota_v2_external_wal_birth_sources")
                 db.execute("DROP FUNCTION wal_transport_test_failed_commit()")
-            expect(signed_exchange(node, fx.key, newer), 200)
-            expect(signed_exchange(node, fx.key, first), 409)
+            activate_gateway_fixture(db, node, pubkey(fx.key))
+            expect(signed_exchange(node, fx.key, newer), 401)
+            expect(gateway_exchange(other_node, newer), 401)
+            expect(gateway_exchange(node, newer, "/api/v1/node/desired-config"), 401)
+            expect(gateway_exchange(node, newer), 200)
+            expect(gateway_exchange(node, first), 409)
             challenge = secrets.token_hex(32)
-            response = signed_exchange(node, fx.key, latest(node, challenge))
+            response = gateway_exchange(node, latest(node, challenge))
+            print("PASS: active XSP/2 registration requires the gateway's bound identity and operation")
             current_head, bundle = read_head(response, node, challenge, panel_pub)
             assert current_head["sequence"] > first_head["sequence"]
             try:

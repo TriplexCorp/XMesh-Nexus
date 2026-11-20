@@ -710,12 +710,7 @@ fn application_router(state: AppState) -> Router {
         .route("/node/restart/ack", post(node_runtime::acknowledge_restart))
         .route("/node/restart/progress", post(node_xray_update::progress))
         .route("/node/desired-config", post(node_runtime::desired_config))
-        .route(
-            "/node/quota-v2/wal",
-            post(quota_wal_transport::handle).layer(RequestBodyLimitLayer::new(
-                quota_wal_transport::REQUEST_LIMIT,
-            )),
-        )
+        .route("/node/quota-v2/wal", quota_wal_transport::route())
         .route("/node/enroll", post(node_enrollment::claim))
         .route(
             "/sub/{token}",

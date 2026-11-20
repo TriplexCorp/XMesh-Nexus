@@ -5,6 +5,7 @@ use axum::{
     body::Bytes,
     extract::State,
     http::{HeaderMap, StatusCode, header},
+    routing::{MethodRouter, post},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signature, VerifyingKey};
@@ -14,7 +15,7 @@ use sha2::{Digest, Sha256};
 use sqlx::PgConnection;
 
 pub const PATH: &str = "/api/v1/node/quota-v2/wal";
-pub const REQUEST_LIMIT: usize = 544 * 1024;
+const REQUEST_LIMIT: usize = 544 * 1024;
 // Leave room for the two Base64 layers and the XSP/2 envelope signatures.
 const INDEX_LIMIT: usize = 384 * 1024;
 const WITNESS_LIMIT: usize = 4096;
@@ -409,7 +410,11 @@ async fn head(state: &AppState, node_id: i64, challenge: &str) -> Result<Value, 
     }))
 }
 
-pub async fn handle(
+pub fn route() -> MethodRouter<AppState> {
+    post(handle).layer(tower_http::limit::RequestBodyLimitLayer::new(REQUEST_LIMIT))
+}
+
+async fn handle(
     State(state): State<AppState>,
     headers: HeaderMap,
     raw: Bytes,
