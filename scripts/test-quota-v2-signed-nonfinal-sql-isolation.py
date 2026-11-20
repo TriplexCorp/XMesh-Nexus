@@ -48,6 +48,9 @@ class SignedStopIsNotSettlementTests(unittest.TestCase):
         self.user = self.scope["userId"]
         self.node = self.scope["nodeId"]
         with psycopg.connect(DSN) as c:
+            # This file has multiple independent cases, all against a
+            # dedicated DISPOSABLE CI database. Never reset production.
+            c.execute("TRUNCATE quota_v2_accounts CASCADE")
             c.execute(
                 "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes) "
                 "VALUES(%s,%s,1000)",
