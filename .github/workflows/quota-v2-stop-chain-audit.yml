@@ -4,10 +4,12 @@ on:
     paths:
       - 'scripts/quota_v2_stop_chain_audit.py'
       - 'scripts/quota_v2_rollover_audit.py'
+      - 'scripts/quota_v2_prepared_registration.py'
       - 'scripts/test-quota-v2-stop-chain-audit.py'
       - 'scripts/test-quota-v2-rollover-audit.py'
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
       - 'scripts/test-quota-v2-nonfinal-rollover-postgres.py'
+      - 'scripts/test-quota-v2-prepared-registration.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
@@ -16,10 +18,12 @@ on:
     paths:
       - 'scripts/quota_v2_stop_chain_audit.py'
       - 'scripts/quota_v2_rollover_audit.py'
+      - 'scripts/quota_v2_prepared_registration.py'
       - 'scripts/test-quota-v2-stop-chain-audit.py'
       - 'scripts/test-quota-v2-rollover-audit.py'
       - 'scripts/test-quota-v2-signed-nonfinal-sql-isolation.py'
       - 'scripts/test-quota-v2-nonfinal-rollover-postgres.py'
+      - 'scripts/test-quota-v2-prepared-registration.py'
       - 'backend/migrations/0132_quota_v2_terminal_settlement_quarantine.sql'
       - 'backend/migrations/0133_quota_v2_nonfinal_rollover_prepare.sql'
       - '.github/workflows/quota-v2-stop-chain-audit.yml'
@@ -66,7 +70,7 @@ jobs:
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/stop_chain.py
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/rollover_prepare.py
           test -f .ci-reviewed-node/experiments/xray-dataplane-fence/sign_observation.py
-          python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py scripts/quota_v2_rollover_audit.py scripts/test-quota-v2-rollover-audit.py
+          python3 -m py_compile scripts/quota_v2_stop_chain_audit.py scripts/test-quota-v2-stop-chain-audit.py scripts/quota_v2_rollover_audit.py scripts/test-quota-v2-rollover-audit.py scripts/quota_v2_prepared_registration.py scripts/test-quota-v2-prepared-registration.py
           python3 scripts/test-quota-v2-stop-chain-audit.py
           python3 scripts/test-quota-v2-rollover-audit.py
           echo 'Nexus independently validates signed Node v2 stop and conservative rollover prepare; no unlock or refunds'
@@ -93,3 +97,5 @@ jobs:
         run: python3 scripts/test-quota-v2-signed-nonfinal-sql-isolation.py
       - name: Verified signed rollover candidates stage exactly once without altering any bytes
         run: python3 scripts/test-quota-v2-nonfinal-rollover-postgres.py
+      - name: Immutable Nexus Ed25519 prepared-only registration receipt and six competing signers
+        run: python3 scripts/test-quota-v2-prepared-registration.py
