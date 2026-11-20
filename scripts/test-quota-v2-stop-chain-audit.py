@@ -228,7 +228,6 @@ class IndependentStopAuditTests(unittest.TestCase):
             ("observationSha256", "f"*64),
             ("checkpointSha256", "f"*64),
             ("oldRuntimeId", "f"*64),
-            ("xrayJournalSha256", "f"*64),
             ("nodeId", 9999),
             ("reservationId", "55555555-5555-4555-8555-555555555555"),
         ):
@@ -237,6 +236,19 @@ class IndependentStopAuditTests(unittest.TestCase):
             stop = self.sign(stop["payload"], node_stop.DOMAIN)
             with self.subTest(field=field), self.assertRaises(ValueError):
                 self.check(stop=stop)
+
+    def test_signed_xray_wal_hash_is_authenticated_but_not_independently_read_here(self):
+        # A Node key can sign ANY syntactically valid hash. An offline stop
+        # verifier has no independent read of the VPS byte journal, so it
+        # must never claim that matching the Node's signed hash proves
+        # complete Xray metering. The *rollover* verifier requires a
+        # separately supplied trusted journal hash and refuses mismatch.
+        altered=copy.deepcopy(self.stop)
+        altered["payload"]["xrayJournalSha256"]="f"*64
+        altered=self.sign(altered["payload"],node_stop.DOMAIN)
+        audited=self.check(stop=altered)
+        self.assertEqual(audited["nodeAttestedXrayJournalSha256"],"f"*64)
+        self.assertIs(audited["xrayJournalIndependentlyVerified"],False)
 
     def fully_resign_consistent_main_cdn_change(self, transform):
         """Model a real Node key signing a self-consistent but partial scope."""
