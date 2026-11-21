@@ -2371,10 +2371,43 @@ pub fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_
         .is_some_and(|limit| limit.is_finite() && crate::gb_to_bytes_i64(limit) > 0)
 }
 
+/// A spending-only first cap must never start a waiting subscription or
+/// remain valid past the authoritative subscriber expiry. No finality,
+/// renewal, or hold-activation protocol exists in this rehearsal.
+pub fn first_genesis_active_until(user: &Value, now_ms: i64, until_ms: i64) -> bool {
+    if until_ms <= now_ms || crate::user_status(user, now_ms) != "ACTIVE" {
+        return false;
+    }
+    match user.get("expireAt") {
+        None => true,
+        Some(value) => value.as_i64()
+            .is_some_and(|expiry| expiry == 0 || expiry >= until_ms),
+    }
+}
+
 #[cfg(test)]
 mod first_genesis_rehearsal_limit_tests {
-    use super::first_genesis_rehearsal_limits_supported as supported;
+    use super::{first_genesis_rehearsal_limits_supported as supported, first_genesis_active_until};
     use serde_json::json;
+
+    #[test]
+    fn spending_only_cap_never_starts_waiting_or_outlives_subscription() {
+        let now = 1_800_000_000_000_i64;
+        let end = now + 3_600_000;
+        assert!(first_genesis_active_until(&json!({"limit":2}),now,end));
+        assert!(first_genesis_active_until(&json!({"limit":2,"expireAt":end}),now,end));
+        for user in [
+            json!({"limit":2,"hold":true,"holdDays":30}),
+            json!({"limit":2,"disabled":true}),
+            json!({"limit":2,"used":2}),
+            json!({"limit":2,"expireAt":end-1}),
+            json!({"limit":2,"expireAt":"invalid"}),
+            json!({"limit":2,"expireAt":-1}),
+        ] {
+            assert!(!first_genesis_active_until(&user,now,end));
+        }
+        assert!(!first_genesis_active_until(&json!({"limit":2}),now,now));
+    }
 
     #[test]
     fn independent_quotas_are_not_global_bootstrap_bytes() {
@@ -2483,7 +2516,7 @@ pub async fn original_first_genesis_cap_scope(
         .ok_or_else(cap_policy_denied)?;
     if !first_genesis_rehearsal_limits_supported(
         current_user, node_id, aliases.iter().any(|a| a.class == "cdn"),
-    ) {
+    ) || !first_genesis_active_until(current_user, now_ms, now_ms.saturating_add(3_600_000)) {
         return Err(cap_policy_denied());
     }
     Ok(FirstGenesisCapPolicyScope {
