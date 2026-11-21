@@ -32,6 +32,16 @@ export XMESH_QUOTA_V2_XRAY_GENESIS_STAGING=0
 if [[ "${2:-}" == --with-installed ]]; then
     export XMESH_QUOTA_V2_XRAY_GENESIS_STAGING=1
 fi
+if [[ "${XMESH_INSTALLED_GENESIS_LEASE:-0}" == 1 ]]; then
+    [[ "${2:-}" == --with-installed &&
+       "${GITHUB_ACTIONS:-}" == true &&
+       "${RUNNER_ENVIRONMENT:-}" == github-hosted &&
+       "$QUOTA_TEST_DSN" == */quota_wal_installed ]] || exit 2
+    # ONLY the clean, disposable real installed two-Node rehearsal.
+    export XMESH_QUOTA_V2_ENABLED=1
+    export XMESH_QUOTA_V2_GENESIS_QUARANTINE_STAGING=1
+    export XMESH_QUOTA_V2_GENESIS_RESERVATION_STAGING=1
+fi
 export CORE_DATA_DIR="$run/core"
 export XMESH_TEST_POLICY_PUBLIC_KEY="$run/node-policy.pem"
 
