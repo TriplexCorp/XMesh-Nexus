@@ -48,7 +48,10 @@ def reference_identity(root, revision):
     source = root / "reviewed"
     output = root / "build"
     output.mkdir()
-    subprocess.run(["sudo", "cp", "-a", "--no-preserve=ownership", NODE, source], check=True, timeout=30)
+    subprocess.run(["git", "clone", "--no-hardlinks", "--no-checkout", NODE, source],
+                   check=True, timeout=30)
+    subprocess.run(["git", "-C", source, "checkout", "--detach", revision], check=True, timeout=30)
+    subprocess.run(["sudo", "chown", "-R", "0:0", source], check=True, timeout=30)
     docker("run", "--rm", "-v", f"{source}:/src:ro", "-v", f"{output}:/out", "-w", "/src/agent/xspv2",
            "golang:1.27.3-trixie", "env", "CGO_ENABLED=0", "go", "build", "-trimpath",
            "-ldflags", f"-X main.version=control-v6.0.25 -X main.sourceRevision={revision}",
