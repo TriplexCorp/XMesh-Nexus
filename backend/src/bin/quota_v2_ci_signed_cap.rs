@@ -172,9 +172,6 @@ async fn main() -> Result<()> {
         && lease.revision==p.revision
         && lease.acknowledged_bytes==p.lease_acknowledged_bytes
         && lease.ceiling_bytes==p.lease_ceiling_bytes
-        && account.limit_bytes==p.account_limit_bytes
-        && account.settled_bytes.max(account.observed_floor_bytes)==p.account_floor_bytes
-        && held==p.all_node_held_bytes
         && p.reported_wal_floor_bytes==0
         && genesis.runtime_id==p.prepared_runtime_id
         && genesis.first_activation_sha256==p.first_activation_sha256
@@ -213,6 +210,15 @@ async fn main() -> Result<()> {
         }));
         return Ok(());
     }
+    // For NEW issuance, the immutable preflight must still match the
+    // account-wide snapshot. For an ALREADY fsynced outbox replay, other
+    // Nodes are allowed to reserve more of the still-conserved account
+    // budget; such a legitimate concurrent reservation must not make the
+    // original byte-identical reply permanently inaccessible.
+    ensure!(account.limit_bytes==p.account_limit_bytes
+        && account.settled_bytes.max(account.observed_floor_bytes)==p.account_floor_bytes
+        && held==p.all_node_held_bytes,
+        "shared quota snapshot changed before FIRST signed cap issuance");
     // Do NOT derive positive capacity from user-supplied counters.
     // SQL's existing immutable lease and independently staged Node are the
     // budget source; synthetic inbound membership is fixed by CI only.
