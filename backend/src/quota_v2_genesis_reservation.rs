@@ -334,7 +334,9 @@ pub async fn handle(
     .ok_or_else(deny)?;
     if !crate::node_runtime::first_genesis_rehearsal_limits_supported(
         &current_user, req.node_id, verified.aliases.iter().any(|alias| alias.class == "cdn"),
-    ) || !crate::user_can_connect(&current_user, now_ms)
+    ) || !crate::node_runtime::first_genesis_active_until(
+        &current_user, now_ms, now_ms.saturating_add(3_600_000),
+    )
         || current_user["limit"].as_f64().map(crate::gb_to_bytes_i64)
             != selected[0]["limitBytes"].as_i64()
     {
