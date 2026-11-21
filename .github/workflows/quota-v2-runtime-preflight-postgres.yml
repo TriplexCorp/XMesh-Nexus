@@ -4,6 +4,7 @@ on:
     paths:
       - 'backend/migrations/0138_quota_v2_runtime_preflight_ledger.sql'
       - 'backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql'
+      - 'backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql'
       - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
       - 'scripts/test-quota-v2-runtime-preflight-postgres.py'
       - '.github/workflows/quota-v2-runtime-preflight-postgres.yml'
@@ -59,6 +60,7 @@ jobs:
                   "backend/migrations/0137_quota_v2_xray_genesis.sql",
                   "backend/migrations/0138_quota_v2_runtime_preflight_ledger.sql",
                   "backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql",
+                  "backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
