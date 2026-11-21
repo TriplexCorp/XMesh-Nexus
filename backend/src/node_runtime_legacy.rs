@@ -2225,6 +2225,225 @@ pub async fn current_compiled_node_profile_revision(
     Ok(compile_node_profile(state, node_id).await?.revision)
 }
 
+/// Read-only, zero-authority derivation of the EXACT VLESS MAIN/CDN scope
+/// from the authoritative XRAY STUDIO compilation and the first signed,
+/// immutable quarantine policy. Never accept aliases supplied by the Node.
+#[derive(Clone, Debug)]
+pub struct FirstGenesisCapPolicyScope {
+    pub policy_sha256: String,
+    pub profile_revision: String,
+    pub aliases: Vec<crate::quota_v2_cap_signing::Alias>,
+}
+
+fn cap_policy_denied() -> ApiError {
+    ApiError::new(
+        StatusCode::CONFLICT,
+        "Original first-genesis signed Xray policy or user scope unavailable.",
+    )
+}
+
+fn first_genesis_cap_aliases(
+    config: &Value,
+    policy: &Value,
+    user_id: i64,
+) -> Result<Vec<crate::quota_v2_cap_signing::Alias>, ApiError> {
+    if user_id <= 0
+        || policy.get("kind").and_then(Value::as_str)
+            != Some("xmesh.quota-v2.genesis-quarantine-policy")
+        || policy["quotaV2Genesis"]["mode"] != "quarantined"
+        || policy["quotaV2Genesis"]["authorizedBytes"] != 0
+        || policy["quotaV2Genesis"]["canStart"] != false
+        || policy["quotaV2Genesis"]["canResume"] != false
+    {
+        return Err(cap_policy_denied());
+    }
+    let users = policy["users"].as_array().ok_or_else(cap_policy_denied)?;
+    let matching: Vec<&Value> = users.iter()
+        .filter(|u| u.get("userId").and_then(Value::as_i64) == Some(user_id))
+        .collect();
+    if matching.len() != 1 || matching[0]["onHold"] != true
+        || matching[0]["offlineBudgetBytes"] != 0
+    {
+        return Err(cap_policy_denied());
+    }
+    let original_id = matching[0]["xrayId"].as_str()
+        .filter(|s| uuid::Uuid::parse_str(s).is_ok())
+        .ok_or_else(cap_policy_denied)?;
+    let inbounds = config["inbounds"].as_array().ok_or_else(cap_policy_denied)?;
+    let prefix = format!("xmesh-u{user_id}--");
+    let mut aliases = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for inbound in inbounds {
+        let protocol = inbound["protocol"].as_str().unwrap_or("");
+        let tag = inbound["tag"].as_str().unwrap_or("");
+        let clients = inbound["settings"]["clients"].as_array();
+        if let Some(clients) = clients {
+            for client in clients {
+                let email = client["email"].as_str().unwrap_or("");
+                let id = client["id"].as_str().unwrap_or("");
+                if !email.starts_with(&prefix) && id != original_id {
+                    continue;
+                }
+                // Fail closed on ANY user alias outside exactly one VLESS
+                // MAIN/CDN tagged inbound. This prevents a second unmetered
+                // path with the same Xray ID or user email.
+                let class = match tag {
+                    "vless-main" => "main",
+                    "vless-cdn" => "cdn",
+                    _ => return Err(cap_policy_denied()),
+                };
+                if protocol != "vless"
+                    || email != format!("{prefix}{tag}")
+                    || id != original_id
+                    || !seen.insert(email.to_owned())
+                {
+                    return Err(cap_policy_denied());
+                }
+                aliases.push(crate::quota_v2_cap_signing::Alias {
+                    email: email.to_owned(),
+                    class: class.to_owned(),
+                });
+            }
+        }
+    }
+    if aliases.is_empty() || aliases.len() > 16 {
+        return Err(cap_policy_denied());
+    }
+    aliases.sort_by(|a, b| a.email.cmp(&b.email));
+    Ok(aliases)
+}
+
+/// Future issuer prerequisite, NOT positive authority. Refuses profile
+/// changes, policy key rotation, invalid original signatures and unknown
+/// users instead of building synthetic xmesh-u101 test aliases.
+/// Caller must separately establish strict XSP/2, live kernel runtime,
+/// signed complete WAL and a conserved SQL lease before signing bytes.
+pub async fn original_first_genesis_cap_scope(
+    state: &AppState,
+    node_id: i64,
+    user_id: i64,
+) -> Result<FirstGenesisCapPolicyScope, ApiError> {
+    if node_id <= 0 || user_id <= 0 {
+        return Err(cap_policy_denied());
+    }
+    let original = sqlx::query(
+        "SELECT signed_policy_bytes,policy_signature,policy_sha256,
+                profile_revision,signer_public_key,
+                prepared_ms
+         FROM quota_v2_genesis_quarantine_policies
+         WHERE node_id=$1",
+    )
+    .bind(node_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(cap_policy_denied)?;
+    let signed: Vec<u8> = original.try_get("signed_policy_bytes")?;
+    let sig: String = original.try_get("policy_signature")?;
+    let sha: String = original.try_get("policy_sha256")?;
+    let revision: String = original.try_get("profile_revision")?;
+    let pubkey: String = original.try_get("signer_public_key")?;
+    let prepared_ms: i64 = original.try_get("prepared_ms")?;
+    let now_ms: i64 = sqlx::query_scalar(
+        "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint"
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    if now_ms < prepared_ms || now_ms >= prepared_ms.saturating_add(120_000)
+        || hex::encode(sha2::Sha256::digest(&signed)) != sha
+        || pubkey != state.node_policy_signer.public_key()
+    {
+        return Err(cap_policy_denied());
+    }
+    let policy: Value = serde_json::from_slice(&signed)
+        .map_err(|_| cap_policy_denied())?;
+    if serde_json::to_vec(&policy).map_err(|_| cap_policy_denied())? != signed
+        || state.node_policy_signer.sign(&policy).map_err(|_| cap_policy_denied())? != sig
+    {
+        return Err(cap_policy_denied());
+    }
+    // This compiler uses real Node/profile/squad/user assignments, not the
+    // preflight's caller-provided aliases. Any concurrent edit changing the
+    // signed profile digest blocks first-genesis issuance.
+    let compiled = compile_node_profile(state, node_id).await?;
+    if compiled.revision != revision || policy["configSha256"] != revision
+        || policy["nodeId"] != node_id
+    {
+        return Err(cap_policy_denied());
+    }
+    let aliases = first_genesis_cap_aliases(&compiled.config, &policy, user_id)?;
+    Ok(FirstGenesisCapPolicyScope {
+        policy_sha256: sha,
+        profile_revision: revision,
+        aliases,
+    })
+}
+
+#[cfg(test)]
+mod first_genesis_cap_scope_tests {
+    use super::*;
+
+    fn test_config() -> (Value, Value) {
+        let id = "11111111-1111-4111-8111-111111111111";
+        (
+            json!({"inbounds":[
+                {"tag":"vless-main","protocol":"vless","settings":{"clients":[
+                    {"email":"xmesh-u19--vless-main","id":id}
+                ]}},
+                {"tag":"vless-cdn","protocol":"vless","settings":{"clients":[
+                    {"email":"xmesh-u19--vless-cdn","id":id}
+                ]}}
+            ]}),
+            json!({"kind":"xmesh.quota-v2.genesis-quarantine-policy",
+                "users":[{"userId":19,"xrayId":id,"onHold":true,
+                          "offlineBudgetBytes":0}],
+                "quotaV2Genesis":{"mode":"quarantined","authorizedBytes":0,
+                                  "canStart":false,"canResume":false}}),
+        )
+    }
+
+    #[test]
+    fn derive_exact_sorted_authoritative_scope() {
+        let (config, policy) = test_config();
+        let scopes = first_genesis_cap_aliases(&config, &policy, 19).unwrap();
+        assert_eq!(scopes.len(), 2);
+        assert_eq!(scopes[0].class, "cdn");
+        assert_eq!(scopes[1].class, "main");
+        assert_eq!(scopes[0].email, "xmesh-u19--vless-cdn");
+    }
+
+    #[test]
+    fn refuse_foreign_unmetered_duplicate_or_cross_user_scope() {
+        let (config, policy) = test_config();
+        assert!(first_genesis_cap_aliases(&config, &policy, 20).is_err());
+        for attack in 0..8 {
+            let mut config = config.clone();
+            let mut policy = policy.clone();
+            match attack {
+                0 => config["inbounds"][0]["protocol"] = json!("trojan"),
+                1 => config["inbounds"][0]["tag"] = json!("custom-unmetered"),
+                2 => config["inbounds"][1]["settings"]["clients"][0]["id"] = json!(
+                    "22222222-2222-4222-8222-222222222222"),
+                3 => config["inbounds"][1]["settings"]["clients"][0]["email"] =
+                    json!("xmesh-u20--vless-cdn"),
+                4 => {
+                    let copied = config["inbounds"][0]["settings"]["clients"][0].clone();
+                    config["inbounds"][0]["settings"]["clients"].as_array_mut()
+                        .unwrap().push(copied);
+                }
+                5 => policy["users"][0]["onHold"] = json!(false),
+                6 => policy["users"][0]["offlineBudgetBytes"] = json!(1),
+                7 => policy["users"][0]["xrayId"] = json!(
+                    "33333333-3333-4333-8333-333333333333"),
+                _ => unreachable!(),
+            };
+            assert!(
+                first_genesis_cap_aliases(&config, &policy, 19).is_err(),
+                "attack {attack} must not be granted a signed scope"
+            );
+        }
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DesiredConfigRequest {
