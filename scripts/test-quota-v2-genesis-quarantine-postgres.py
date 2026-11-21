@@ -175,6 +175,15 @@ class QuarantineFirstGenesisSQL(unittest.TestCase):
         self.deny(signer=h("f"))
         self.deny(payload=self.policy(users=[]))
         with psycopg.connect(DSN) as c:
+            # A different privileged SQL actor cannot convert the immutable
+            # quarantine into a normal active desired-config policy.
+            with self.assertRaises(psycopg.Error):
+                with c.transaction():
+                    c.execute("UPDATE quota_v2_xray_genesis SET policy_path_used=TRUE "
+                              "WHERE node_id=%s",(self.node,))
+            self.assertFalse(c.execute(
+                "SELECT policy_path_used FROM quota_v2_xray_genesis "
+                "WHERE node_id=%s",(self.node,)).fetchone()[0])
             for sql in (
                 "UPDATE quota_v2_genesis_quarantine_policies SET can_start=TRUE",
                 "DELETE FROM quota_v2_genesis_quarantine_policies",
