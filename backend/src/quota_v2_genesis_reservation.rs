@@ -191,12 +191,14 @@ pub async fn handle(
     if req.operation == "prepare" && reservation["ceilingBytes"] != 0 {
         return Err(deny());
     }
-    if req.operation == "confirm" && (
-        reservation["epoch"] != req.echo.as_ref().unwrap().epoch
-        || reservation["meterEpoch"] != req.echo.as_ref().unwrap().meter_epoch
-        || reservation["reservationId"] != req.echo.as_ref().unwrap().reservation_id
-    ) {
-        return Err(deny());
+    if req.operation == "confirm" {
+        let expected = req.echo.as_ref().ok_or_else(deny)?;
+        if reservation["epoch"] != expected.epoch
+            || reservation["meterEpoch"] != expected.meter_epoch
+            || reservation["reservationId"] != expected.reservation_id
+        {
+            return Err(deny());
+        }
     }
     // The response is NOT permission to spend reservation bytes. Only a
     // FUTURE one-time positive cap signed after independently verified
