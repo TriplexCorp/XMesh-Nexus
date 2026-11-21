@@ -11,6 +11,8 @@ CREATE FUNCTION quota_v2_record_quarantined_runtime_preflight(
 DECLARE
   signed_policy quota_v2_genesis_quarantine_policies;
   original_policy JSONB;
+  snapshot quota_v2_runtime_admission_preflights;
+  closed BOOLEAN;
 BEGIN
   -- Staged policy is original, immutable and bound to the exact
   -- independently authenticated one-shot Node activation and runtime.
@@ -42,10 +44,21 @@ BEGIN
   -- The real 0138 allocator & SQL preflight retains serial account-first /
   -- lease-second locking, active epoch, no revocation/old debt, expiry and
   -- global budget conservation. This wrapper never bypasses those checks.
-  RETURN quota_v2_record_runtime_admission_preflight(
+  SELECT * INTO STRICT snapshot FROM quota_v2_record_runtime_admission_preflight(
     p_user,p_epoch,p_node,p_meter,p_reservation,p_revision,p_challenge,
     p_runtime,p_container,p_pid,p_policy_sha,p_activation,p_wal_floor
   );
+  -- The original 0138 function locked account -> lease -> Genesis in that
+  -- order. Now that the transaction holds those locks, reject an ordinary
+  -- desired-config policy which permanently consumed first-Genesis. A
+  -- rejection rolls back the snapshot insert in the SAME transaction.
+  SELECT policy_path_used INTO STRICT closed
+    FROM quota_v2_xray_genesis WHERE node_id=p_node FOR SHARE;
+  IF closed THEN
+    RAISE EXCEPTION 'ordinary desired-config already consumed Genesis'
+      USING ERRCODE='22023';
+  END IF;
+  RETURN snapshot;
 END;
 $$;
 REVOKE ALL ON FUNCTION quota_v2_record_quarantined_runtime_preflight(
