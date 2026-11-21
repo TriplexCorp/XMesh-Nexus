@@ -210,6 +210,13 @@ pub(crate) fn verify_quota_cap_dual_signatures_staging(
     verify_both(&request.parsed, enrolled_ed, enrolled_pq)
 }
 
+/// Tests sign the EXACT preexisting canonical XSP2 message; do not introduce
+/// another ad-hoc encoding into Quota V2.
+#[cfg(test)]
+pub(crate) fn quota_cap_signing_input_for_test(raw: &[u8], now_ms: i64) -> Result<Vec<u8>, ApiError> {
+    parse_quota_cap_attestation_staging(raw, now_ms).map(|p| p.parsed.canonical)
+}
+
 
 #[allow(dead_code)] // Staging-only: no authenticated PQ ingress or route is wired.
 const ACK_RECOVERY_PATH: &str = "/api/v2/node/keys/rotation/ack";
