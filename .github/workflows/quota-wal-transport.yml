@@ -110,7 +110,10 @@ jobs:
         env:
           XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: |
+          set -euo pipefail
           source "$RUNNER_TEMP/quota-wal/bin/activate"
+          docker exec "$XMESH_WAL_POSTGRES_CONTAINER" createdb -U quota_test quota_wal_product
+          export QUOTA_TEST_DSN="${QUOTA_TEST_DSN%/*}/quota_wal_product"
           export XMESH_WAL_PRODUCT_AGENT="$RUNNER_TEMP/wal-product-agent"
           export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-product
