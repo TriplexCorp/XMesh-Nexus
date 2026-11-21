@@ -75,7 +75,7 @@ def stats(xray,email):
         [xray,"api","statsquery","--server=127.0.0.1:10085","-pattern",f"user>>>{email}"],
         timeout=8)
     result={}
-    for item in json.loads(raw).get("stat",[]):
+    for item in (json.loads(raw).get("stat") or []):
         for direction in ("uplink","downlink"):
             if item["name"]==f"user>>>{email}>>>traffic>>>{direction}":
                 assert direction not in result
