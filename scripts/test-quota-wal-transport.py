@@ -154,6 +154,61 @@ def read_head(response, node, challenge, panel_pub):
     return {name: head[name] for name in ("sequence", "registrySha256")}, blob
 
 
+def check_index_capacity(db, panel_pub):
+    fx = StopChainTests("test_unrelated_user_wal_does_not_block_signed_account_stop")
+    fx.setUp()
+    try:
+        node = enroll(db, "wal-index-limit-" + secrets.token_hex(8), pubkey(fx.key))
+        cap = 384 * 1024
+        index = fx.xray / fixture.meter_inventory_audit.NAME
+        cp = copy.deepcopy(fx.cp)
+
+        def row(user_id, tag_length):
+            return {"email": f"xmesh-u{user_id}--" + "x" * tag_length,
+                    "uplinkBytes": 1, "downlinkBytes": 0}
+
+        # All variable-width fields in these rows are the email tag and the
+        # sequence. Measure one canonical row, then distribute the padding
+        # over real tag fields to land exactly on the transfer boundary.
+        before = index.stat().st_size
+        cp["inboundMeters"] = [row(200000, 1)]
+        fixture.write_test_meter_intents(cp, fx.xray)
+        index_bytes = index.read_bytes()
+        sequence = index_bytes.count(b"\n")
+        fixed = len(index_bytes) - before - len(str(sequence))
+        remaining = cap - len(index_bytes)
+        count = 0
+        while fixed + len(str(sequence + count + 1)) <= remaining:
+            count += 1
+            remaining -= fixed + len(str(sequence + count))
+        rows = []
+        for number in range(count):
+            extra = min(127, remaining)
+            rows.append(row(200001 + number, 1 + extra))
+            remaining -= extra
+        assert remaining == 0 and rows
+        cp["inboundMeters"] = rows
+        fixture.write_test_meter_intents(cp, fx.xray)
+        witness, exact = checkpoint(fx, node)
+        assert len(exact) == cap
+        expect(signed_exchange(node, fx.key, store(node, witness, exact)), 200)
+
+        cp["inboundMeters"] = [row(299999, 1)]
+        fixture.write_test_meter_intents(cp, fx.xray)
+        witness, oversized = checkpoint(fx, node)
+        assert len(oversized) > cap and oversized.startswith(exact)
+        expect(signed_exchange(node, fx.key, store(node, witness, oversized)), 400)
+        challenge = secrets.token_hex(32)
+        _, bundle = read_head(signed_exchange(node, fx.key, latest(node, challenge)), node, challenge, panel_pub)
+        assert bundle["inventory"] == exact
+        assert db.execute(
+            "SELECT count(*) FROM quota_v2_external_wal_birth_anchors WHERE node_id=%s", (node,),
+        ).fetchone() == (1,)
+        print("PASS: valid 384 KiB inventory commits in full; signed extension over cap leaves the full prior head intact")
+    finally:
+        fx.doCleanups()
+
+
 def main():
     fx = StopChainTests("test_unrelated_user_wal_does_not_block_signed_account_stop")
     fx.setUp()
@@ -254,6 +309,7 @@ def main():
             else:
                 raise AssertionError("missing local WAL history accepted")
             print("PASS: commit failure emits no receipt, current head rejects stale proofs and lost history")
+            check_index_capacity(db, panel_pub)
     finally:
         fx.doCleanups()
 
