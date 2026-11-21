@@ -25,6 +25,18 @@ Only in a disposable, strict-XSP/2-backed test environment:
    transaction must already have inserted `quota_v2_xray_genesis`.
    No existing `node_desired_revisions`, Node quota reservation, local
    lifetime quota, prior telemetry, or external WAL birth inventory may exist.
+   **Before calling the ordinary desired-config**, a newly enrolled Node
+   without a pinned Ed25519 policy signer can fetch ONLY its public key
+   from `POST /api/v1/node/quota-v2/policy-pin` with
+   `{"node_id":N,"operation":"discover_policy_signer"}`. This is a
+   read-only, feature-gated, zero-authority reply transported inside the
+   existing owner-enrolled XSP/2 product tunnel. It returns the original
+   activation binding and public key, NOT traffic authority. The gateway
+   now forwards its original signed activation digest on BOTH
+   `desired-config` quarantine and the policy-pin request, not only WAL.
+   The Node accepts the key only if its original strict-PQ product identity
+   and activation agree, writes exactly one root-private pin, and refuses
+   later mismatched key replacements.
 2. Under verified strict product-gateway identity, call the existing
    `POST /api/v1/node/quota-v2/wal` with
    `{"operation":"prepare_genesis","nodeId":N,"candidateRuntimeId":"<64 lowercase hex>","challenge":"<64 lowercase hex>"}`.
