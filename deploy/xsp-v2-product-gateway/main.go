@@ -560,7 +560,7 @@ func (g *gateway) issueClientCertificate(nodeID int64, publicDER []byte) (string
 
 // The isolated WAL rehearsal pins the exact proposed product binary.
 func pinnedWALCandidate(release releaseIdentity, enabled, pin string) bool {
-	if enabled != "1" || release.Version != "control-v6.0.25" {
+	if enabled != "1" || (release.Version != "control-v6.0.25" && release.Version != "control-v6.0.27") {
 		return false
 	}
 	revision, artifact, ok := strings.Cut(pin, ":")
@@ -933,14 +933,14 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 }
 
 var allowedTunnelPaths = map[string]bool{
-	"/api/v1/metrics/ingest":           true,
-	"/api/v1/node/heartbeat":           true,
-	"/api/v1/node/restart/poll":        true,
-	"/api/v1/node/restart/ack":         true,
-	"/api/v1/node/restart/progress":    true,
-	"/api/v1/node/desired-config":      true,
-	"/api/v1/node/quota-v2/wal":        true,
-	"/api/v1/node/quota-v2/policy-pin": true,
+	"/api/v1/metrics/ingest":                    true,
+	"/api/v1/node/heartbeat":                    true,
+	"/api/v1/node/restart/poll":                 true,
+	"/api/v1/node/restart/ack":                  true,
+	"/api/v1/node/restart/progress":             true,
+	"/api/v1/node/desired-config":               true,
+	"/api/v1/node/quota-v2/wal":                 true,
+	"/api/v1/node/quota-v2/policy-pin":          true,
 	"/api/v1/node/quota-v2/genesis-reservation": true,
 }
 
