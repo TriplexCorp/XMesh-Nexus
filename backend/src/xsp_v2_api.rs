@@ -158,6 +158,64 @@ fn parse_for(raw: &[u8], now_ms: i64, message_type: &str, path: &str) -> Result<
 fn parse(raw: &[u8], now_ms: i64) -> Result<Parsed, ApiError> {
     parse_for(raw, now_ms, "node.heartbeat", "/api/v2/node/heartbeat")
 }
+/// Internal-only signed quota identity assertion. This is NOT a network
+/// handler or evidence of a live Xray kernel PID / physical writer drain.
+/// The future caller must independently authenticate the PQ TLS Node and
+/// establish the measured process and complete off-host WAL first.
+pub struct ParsedQuotaCapAttestation {
+    parsed: Parsed,
+    pub(crate) node_id: i64,
+    pub(crate) key_epoch: i64,
+    pub(crate) ed_key_id: String,
+    pub(crate) pq_key_id: String,
+    pub(crate) request_id: String,
+    pub(crate) revision: String,
+    pub(crate) nonce: Vec<u8>,
+    pub(crate) payload: Vec<u8>,
+}
+
+pub fn parse_quota_cap_attestation_staging(
+    raw: &[u8],
+    now_ms: i64,
+) -> Result<ParsedQuotaCapAttestation, ApiError> {
+    let parsed = parse_for(
+        raw,
+        now_ms,
+        "node.quota-v2.cap.attest",
+        "/api/v2/node/quota-v2/cap/attest",
+    )?;
+    let e = &parsed.value;
+    // XSP/2 signs the SHA-256 of EXACT payload bytes; every use of the
+    // decoded payload must therefore be tied to this same parsed object.
+    let payload = decode_b64(&e.payload_b64, 4096, None)?;
+    let result = ParsedQuotaCapAttestation {
+        node_id: e.node_id,
+        key_epoch: e.key_epoch,
+        ed_key_id: e.ed25519_key_id.clone(),
+        pq_key_id: e.mldsa65_key_id.clone(),
+        request_id: e.request_id.clone(),
+        revision: e.revision.clone(),
+        nonce: parsed.nonce.to_vec(),
+        payload,
+        parsed,
+    };
+    Ok(result)
+}
+
+pub fn verify_quota_cap_dual_signatures_staging(
+    request: &ParsedQuotaCapAttestation,
+    enrolled_ed: &[u8],
+    enrolled_pq: &[u8],
+) -> Result<(), ApiError> {
+    verify_both(&request.parsed, enrolled_ed, enrolled_pq)
+}
+
+/// Tests sign the EXACT preexisting canonical XSP2 message; do not introduce
+/// another ad-hoc encoding into Quota V2.
+#[cfg(test)]
+pub fn quota_cap_signing_input_for_test(raw: &[u8], now_ms: i64) -> Result<Vec<u8>, ApiError> {
+    parse_quota_cap_attestation_staging(raw, now_ms).map(|p| p.parsed.canonical)
+}
 
 #[allow(dead_code)] // Staging-only: no authenticated PQ ingress or route is wired.
 const ACK_RECOVERY_PATH: &str = "/api/v2/node/keys/rotation/ack";

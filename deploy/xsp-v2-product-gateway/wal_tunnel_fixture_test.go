@@ -105,6 +105,10 @@ func TestServeWALTunnelFixture(t *testing.T) {
 			http.Error(w, "mTLS required", http.StatusForbidden)
 			return
 		}
+		if r.TLS.Version != tls.VersionTLS13 || r.TLS.CurveID != tls.X25519MLKEM768 {
+			http.Error(w, "TLS 1.3 hybrid key exchange required", http.StatusForbidden)
+			return
+		}
 		r.Header.Set("X-XSP-V2-Client-Verify", "SUCCESS")
 		r.Header.Set("X-XSP-V2-Client-Cert", url.QueryEscape(string(pem.EncodeToMemory(
 			&pem.Block{Type: "CERTIFICATE", Bytes: r.TLS.PeerCertificates[0].Raw}))))

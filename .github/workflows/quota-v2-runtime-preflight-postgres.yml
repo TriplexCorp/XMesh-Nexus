@@ -1,8 +1,11 @@
-name: Quota V2 runtime admission PostgreSQL preflight (zero authority)
+name: Quota V2 PostgreSQL runtime preflight and immutable signed-cap outbox
 on:
   pull_request:
     paths:
       - 'backend/migrations/0138_quota_v2_runtime_preflight_ledger.sql'
+      - 'backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql'
+      - 'backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql'
+      - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
       - 'scripts/test-quota-v2-runtime-preflight-postgres.py'
       - '.github/workflows/quota-v2-runtime-preflight-postgres.yml'
 permissions:
@@ -56,6 +59,8 @@ jobs:
                   "backend/migrations/0128_quota_v2_conservative_burn.sql",
                   "backend/migrations/0137_quota_v2_xray_genesis.sql",
                   "backend/migrations/0138_quota_v2_runtime_preflight_ledger.sql",
+                  "backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql",
+                  "backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
@@ -63,3 +68,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/test-quota-v2-runtime-preflight-postgres.py
           python3 scripts/test-quota-v2-runtime-preflight-postgres.py -v
+      - name: Exactly-once immutable signed-cap outbox and 20-way concurrency
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-signed-cap-outbox-postgres.py
+          python3 scripts/test-quota-v2-signed-cap-outbox-postgres.py -v
