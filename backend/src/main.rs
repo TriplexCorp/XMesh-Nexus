@@ -60,6 +60,8 @@ mod xsp_v2_enrollment;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_permit_ledger_writer;
 #[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_quota_cap_attestation;
+#[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_rotation;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_signed_cutover;
