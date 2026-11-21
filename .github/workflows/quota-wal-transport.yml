@@ -13,6 +13,7 @@ on:
       - 'scripts/test-quota-wal-transport.py'
       - 'scripts/test-quota-wal-reconcile.py'
       - 'scripts/test-quota-wal-product-tunnel.py'
+      - 'scripts/quota_wal_real_xray.py'
       - 'deploy/xsp-v2-product-gateway/wal_tunnel_fixture_test.go'
       - 'scripts/run-quota-wal-transport-audit.sh'
       - '.github/workflows/quota-wal-transport.yml'
@@ -21,7 +22,7 @@ permissions:
 jobs:
   signed-http:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       XMESH_AUDIT_DISPOSABLE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_test
@@ -84,6 +85,27 @@ jobs:
       - name: Build disposable strict XSP/2 gateway fixture
         working-directory: deploy/xsp-v2-product-gateway
         run: go test -mod=readonly -c -o "$RUNNER_TEMP/wal-tunnel-fixture"
+      - name: Build the reviewed instrumented Xray and record its binary hash
+        env:
+          GOTOOLCHAIN: go1.27.4
+        run: |
+          set -euo pipefail
+          source="$RUNNER_TEMP/xray-source"
+          bundle="$RUNNER_TEMP/xray-image"
+          git init "$source"
+          git -C "$source" fetch --depth=1 https://github.com/XTLS/Xray-core.git a4a3dff5b20c2faae567b742c172c7b95e75c083
+          git -C "$source" checkout --detach FETCH_HEAD
+          test "$(git -C "$source" rev-parse HEAD)" = a4a3dff5b20c2faae567b742c172c7b95e75c083
+          python3 .ci-reviewed-node/experiments/xray-dataplane-fence/apply-experiment.py "$source"
+          mkdir "$bundle"
+          (cd "$source" && CGO_ENABLED=0 go build -trimpath -o "$bundle/xray" ./main)
+          printf 'FROM scratch\nCOPY xray /xray\nENTRYPOINT ["/xray"]\n' > "$bundle/Dockerfile"
+          docker build --iidfile "$bundle/image-id" "$bundle"
+          read -r hash _ < <(sha256sum "$bundle/xray")
+          echo "Instrumented Xray SHA-256 $hash"
+          echo "XMESH_WAL_XRAY_BINARY=$bundle/xray" >> "$GITHUB_ENV"
+          echo "XMESH_WAL_XRAY_IMAGE=$(cat "$bundle/image-id")" >> "$GITHUB_ENV"
+          echo "XMESH_WAL_XRAY_SHA256=$hash" >> "$GITHUB_ENV"
       - name: Enroll two actual Agent binaries and verify WAL over strict XSP/2
         run: |
           source "$RUNNER_TEMP/quota-wal/bin/activate"

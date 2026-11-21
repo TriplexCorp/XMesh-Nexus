@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Two real Agent product processes, strict XSP/2, Nexus and PostgreSQL.
 
-The local WAL inputs are deterministic meter fixtures. The gateway uses
-disposable TLS certificates and its production enrollment/tunnel handlers.
+The gateway uses disposable TLS certificates and its production handlers.
+The instrumented-Xray mode uses WAL produced by real loopback VLESS traffic.
 """
 import concurrent.futures
 from contextlib import ExitStack
@@ -22,6 +22,7 @@ import psycopg
 suite = runpy.run_path(str(Path(__file__).with_name("test-quota-wal-transport.py")))
 from wal_transport import _write_public, sync_checkpoint
 import witness_inventory as producer
+from quota_wal_real_xray import MeteredXray
 
 STATE_ROOT = "/var/lib/xmesh-agent"
 
@@ -140,26 +141,40 @@ def main():
             assert panel.startswith("https://127.0.0.1:")
             database = stack.enter_context(psycopg.connect(suite["DSN"], autocommit=True))
             agents = []
+            binary = os.environ.get("XMESH_WAL_XRAY_BINARY")
             for offset in range(2):
-                local = suite["StopChainTests"]("test_unrelated_user_wal_does_not_block_signed_account_stop")
-                stack.callback(local.doCleanups)
-                local.setUp()
                 work = root / f"agent-{offset}"
                 work.mkdir(mode=0o700)
+                if binary:
+                    local = MeteredXray(
+                        work, stack, Path(binary), os.environ["XMESH_WAL_XRAY_IMAGE"],
+                        os.environ["XMESH_WAL_XRAY_SHA256"],
+                    )
+                    assert local.send(0) == 2
+                else:
+                    local = suite["StopChainTests"]("test_unrelated_user_wal_does_not_block_signed_account_stop")
+                    stack.callback(local.doCleanups)
+                    local.setUp()
                 agent = Agent(work, root, panel, database, local)
                 assert agent.sync("store")["firstRemoteSnapshotWasOnlyBootstrap"]
-                checkpoint = copy.deepcopy(local.cp)
-                checkpoint["runtimeId"] = secrets.token_hex(32)
-                checkpoint["userId"] = 200 + offset
-                checkpoint["email"] = f"xmesh-u{200 + offset}--vless-cdn"
-                checkpoint["inboundMeters"] = [{"email": checkpoint["email"], "uplinkBytes": 3, "downlinkBytes": 11}]
-                suite["fixture"].write_test_meter_intents(checkpoint, local.xray)
+                if not binary:
+                    checkpoint = copy.deepcopy(local.cp)
+                    checkpoint["runtimeId"] = secrets.token_hex(32)
+                    checkpoint["userId"] = 200 + offset
+                    checkpoint["email"] = f"xmesh-u{200 + offset}--vless-cdn"
+                    checkpoint["inboundMeters"] = [{"email": checkpoint["email"], "uplinkBytes": 3, "downlinkBytes": 11}]
+                    suite["fixture"].write_test_meter_intents(checkpoint, local.xray)
                 agents.append(agent)
+
+            def extend(agent):
+                if binary:
+                    assert agent.local.send(1) == 4
+                return agent.sync("sync")
 
             assert agents[0].public != agents[1].public
             agents[0].drop_ack = True
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-                first, second = [pool.submit(a.sync, "sync") for a in agents]
+                first, second = [pool.submit(extend, a) for a in agents]
                 try:
                     first.result()
                 except ConnectionError:
@@ -178,6 +193,24 @@ def main():
                 ).fetchall()
                 assert rows == [(2,), (4,)], rows
             print("Two activated 6.0.25 agents stored and recovered independent WAL through strict XSP/2.")
+            if binary:
+                victim = agents[0]
+                victim.local.crash()
+                victim.sync("sync")
+                next(victim.local.xray.glob("meter-*.jsonl")).unlink()
+                victim.sent.clear()
+                try:
+                    victim.sync("sync")
+                except (ValueError, OSError):
+                    pass
+                else:
+                    raise AssertionError("missing real metered WAL was accepted")
+                assert victim.sent == ["head"]
+                assert not victim.local.inspect()["State"]["Running"]
+                assert agents[1].local.inspect()["State"]["Running"]
+                agents[1].sync("sync")
+                print("Real main and CDN VLESS traffic produced both WAL directions. "
+                      "After SIGKILL, one node rejected missing WAL while its peer still verified.")
 
 
 def wait_for_ready(path):
