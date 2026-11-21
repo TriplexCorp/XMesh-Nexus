@@ -111,3 +111,41 @@ Before any release, the installed strict-PQ Agent must:
 **No working VPS, main branch or production feature flag is changed by
 this staging work.** GitHub CI validation is required before treating
 even the zero-authority flow as qualified.
+
+
+## New strict-PQ Genesis reservation stage (draft, never a positive grant)
+
+After immutable 0141 signed quarantine policy, a **disposable, freshly
+enrolled Node** can opt into a separate exact product-gateway tunnel path:
+`POST /api/v1/node/quota-v2/genesis-reservation`. There is NO legacy
+authentication fallback. This endpoint is disabled without ALL of
+`XMESH_QUOTA_V2_ENABLED=1`, the existing Genesis/quarantine staging
+gates, and `XMESH_QUOTA_V2_GENESIS_RESERVATION_STAGING=1`.
+
+- `prepare`: authenticate the originally activated Node, signed 0141
+  policy SHA and candidate runtime/challenge; recompile the current XRAY
+  STUDIO user roster and MAIN/CDN aliases; request the existing account-
+  serialized `quota_v2::issue` zero-ceiling initial lease for ONE signed
+  user. Return the resulting lease identity under the original Ed25519
+  PolicySigner with `authorizedBytes=0`, `canSpend=false`,
+  `canStart=false`, `canResume=false`, and no refunds.
+- `confirm`: require the precise `epoch`, `meterEpoch` and
+  `reservationId` from the previously issued prepare reply. The
+  owner-enrolled product tunnel supplies fresh replay-protected XSP/2
+  authentication. The SQL allocator confirms the same reservation; any
+  available new held capacity is **NOT** a signed Xray cap. The reply is
+  another zero-authority signed identity.
+- Both stages reject a replaced/revoked activation, expired original
+  120-second Genesis, profile changes, unknown user, duplicate/foreign
+  alias, or mismatched immutable original policy. The local Node helper
+  preserves separate signed prepare and confirm bytes using root-private
+  fsync under the normal reconciler lock.
+
+**Release hold:** This is a tested contract candidate but not yet a
+qualified two-installed-Node integration. No production release or normal
+Agent flow invokes a positive cap. Still missing: independently measured
+live-process attestation on the Nexus side, a complete off-host WAL
+witness, real signed positive XSP/2 issuer connected to the immutable
+0139 outbox, delivery to the measured Unix-socket Xray, public ingress
+qualification and restart/rollback tests. Keep production V2 OFF.
+
