@@ -137,7 +137,6 @@ class QuarantineFirstGenesisSQL(unittest.TestCase):
         for field,val in [
             ("runtime",h("f")),("activation",h("f")),
             ("challenge",h("f")),("revision",h("f")),
-            ("signature","f"*128),("signer",h("f")),
             ("payload",self.policy(users=[
                 {"userId":10,"offlineBudgetBytes":1,"onHold":False}]))
         ]:
@@ -169,7 +168,11 @@ class QuarantineFirstGenesisSQL(unittest.TestCase):
     def test_conflict_replay_and_immutable_record(self):
         baseline=self.policy()
         self.stage(baseline)
+        # The DB cannot independently prove Ed25519, but it refuses ANY
+        # different original signature/key once the trusted Rust signer
+        # committed the first immutable quarantine document.
         self.deny(signature="f"*128)
+        self.deny(signer=h("f"))
         self.deny(payload=self.policy(users=[]))
         with psycopg.connect(DSN) as c:
             for sql in (
