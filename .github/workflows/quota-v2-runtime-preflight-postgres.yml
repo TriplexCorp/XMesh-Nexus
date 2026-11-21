@@ -6,6 +6,8 @@ on:
       - 'backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql'
       - 'backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql'
       - 'backend/migrations/0141_quota_v2_genesis_quarantine_policy.sql'
+      - 'backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql'
+      - 'scripts/test-quota-v2-quarantined-runtime-postgres.py'
       - 'scripts/test-quota-v2-genesis-quarantine-postgres.py'
       - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
       - 'scripts/test-quota-v2-runtime-preflight-postgres.py'
@@ -74,6 +76,7 @@ jobs:
                   "backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql",
                   "backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql",
                   "backend/migrations/0141_quota_v2_genesis_quarantine_policy.sql",
+                  "backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
@@ -89,3 +92,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/test-quota-v2-genesis-quarantine-postgres.py
           python3 scripts/test-quota-v2-genesis-quarantine-postgres.py -v
+      - name: Real global allocator and signed quarantined policy agree before any runtime preflight
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-quarantined-runtime-postgres.py
+          python3 scripts/test-quota-v2-quarantined-runtime-postgres.py -v
