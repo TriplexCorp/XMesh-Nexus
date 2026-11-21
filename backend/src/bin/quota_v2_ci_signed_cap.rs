@@ -16,10 +16,11 @@ mod quota_v2_cap_signing;
 
 use anyhow::{Context, Result, anyhow, ensure};
 use quota_v2_cap_signing::{Alias, SqlSnapshot, sign_snapshot};
-use serde_json::json;
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgConnection, PgPool};
 use std::{
-    env,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -86,7 +87,9 @@ fn require_ci() -> Result<(String, PathBuf)> {
     ensure!(
         matches!(address.scheme(), "postgres" | "postgresql")
             && address.host_str() == Some("127.0.0.1")
-            && address.path() == "/quota_test"
+            && (address.path() == "/quota_test"
+                || (address.path() == "/quota_wal_installed"
+                    && env::var("XMESH_INSTALLED_GENESIS_LEASE").as_deref() == Ok("1")))
             && address.query().is_none()
             && address.fragment().is_none(),
         "refuse non-disposable PostgreSQL"
@@ -122,6 +125,126 @@ fn args() -> Result<(i64, String, i64, String)> {
     Ok((node, v[1].clone(), pid, v[3].clone()))
 }
 
+struct InstalledInput {
+    user_id: i64,
+    container: String,
+    config: PathBuf,
+}
+
+fn hex64(value: &str) -> bool {
+    value.len() == 64 && value.bytes()
+        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+fn installed_args() -> Result<(i64, String, i64, String, InstalledInput)> {
+    let v: Vec<String> = env::args().skip(1).collect();
+    ensure!(
+        env::var("XMESH_INSTALLED_GENESIS_LEASE").as_deref() == Ok("1")
+            && v.len() == 8 && v[0] == "--installed",
+        "installed signer requires the isolated runner test and exact observed inputs"
+    );
+    let node = v[1].parse::<i64>()?;
+    let user = v[2].parse::<i64>()?;
+    let pid = v[4].parse::<i64>()?;
+    let config = PathBuf::from(&v[7]);
+    ensure!(
+        node > 0 && user > 0 && pid > 0 && hex64(&v[3])
+            && hex64(&v[5]) && hex64(&v[6])
+            && config.starts_with(PathBuf::from(env::var("RUNNER_TEMP")?))
+            && fs::symlink_metadata(&config)?.file_type().is_file()
+            && fs::metadata(&config)?.len() <= 262144,
+        "invalid independently measured disposable installed candidate"
+    );
+    Ok((node, v[3].clone(), pid, v[6].clone(), InstalledInput {
+        user_id: user, container: v[5].clone(), config,
+    }))
+}
+
+/// The hosted-runner controller owns the disposable guest/root and reads
+/// the actual config and kernel identity, not a remote Node assertion.
+/// This is NOT a general remote attestation mechanism.
+async fn installed_scope(
+    conn: &mut PgConnection,
+    p: &Preflight,
+    candidate: &InstalledInput,
+    key_path: &Path,
+) -> Result<Vec<Alias>> {
+    let signer = node_policy::PolicySigner::load(key_path)?;
+    let q: (Vec<u8>, String, String, String) = sqlx::query_as(
+        "SELECT signed_policy_bytes,policy_signature,signer_public_key,profile_revision
+         FROM quota_v2_genesis_quarantine_policies
+         WHERE node_id=$1 AND policy_sha256=$2 AND runtime_id=$3
+           AND first_activation_sha256=$4 AND authorized_bytes=0
+         FOR SHARE",
+    )
+    .bind(p.node_id)
+    .bind(&p.reported_policy_sha256)
+    .bind(&p.prepared_runtime_id)
+    .bind(&p.first_activation_sha256)
+    .fetch_one(&mut *conn)
+    .await?;
+    let policy: Value = serde_json::from_slice(&q.0)?;
+    ensure!(serde_json::to_vec(&policy)? == q.0
+            && hex::encode(Sha256::digest(&q.0)) == p.reported_policy_sha256
+            && signer.public_key() == q.2 && signer.sign(&policy)? == q.1
+            && policy["configSha256"].as_str() == Some(q.3.as_str())
+            && policy["nodeId"] == p.node_id,
+            "original installed signed quarantine not verified");
+    let raw = fs::read(&candidate.config)?;
+    let config: Value = serde_json::from_slice(&raw)?;
+    ensure!(serde_json::to_vec(&config)? == raw
+            && hex::encode(Sha256::digest(&raw)) == q.3,
+            "trusted runner config is not the actual signed profile");
+    let users = policy["users"].as_array().context("signed runtime user roster")?;
+    let roster: Vec<_> = users.iter().filter(|u| u["userId"] == p.user_id).collect();
+    ensure!(roster.len() == 1 && roster[0]["onHold"] == true
+            && roster[0]["offlineBudgetBytes"] == 0, "user absent from original scope");
+    let uuid = roster[0]["xrayId"].as_str().context("signed Xray identity")?;
+
+    let lease: (Vec<u8>, String) = sqlx::query_as(
+        "SELECT signed_reply,signer_public_key FROM quota_v2_genesis_lease_replies
+         WHERE node_id=$1 AND user_id=$2 AND stage='confirm' AND policy_sha256=$3",
+    )
+    .bind(p.node_id).bind(p.user_id).bind(&p.reported_policy_sha256)
+    .fetch_one(&mut *conn).await?;
+    let signed: Value = serde_json::from_slice(&lease.0)?;
+    let payload = &signed["payload"];
+    let r = &payload["reservation"];
+    ensure!(signer.public_key() == lease.1
+            && serde_json::to_vec(&signed)? == lease.0
+            && signed["signature"].as_str() == Some(signer.sign(payload)?.as_str())
+            && payload["authorizedBytes"] == 0 && payload["canSpend"] == false
+            && payload["status"] == "confirmed"
+            && r["epoch"].as_str() == Some(p.epoch.as_str())
+            && r["meterEpoch"].as_str() == Some(p.meter_epoch.as_str())
+            && r["reservationId"].as_str() == Some(p.reservation_id.as_str())
+            && r["revision"] == p.revision && r["ceilingBytes"] == p.ceiling_bytes,
+            "installed runner cap does not match original confirmed SQL lease");
+
+    let mut aliases = Vec::new();
+    for inbound in config["inbounds"].as_array().context("original inbounds")? {
+        let tag = inbound["tag"].as_str().context("inbound tag")?;
+        if tag == "xmesh_stats_in" && inbound["protocol"] == "dokodemo-door" {
+            continue;
+        }
+        ensure!(inbound["protocol"] == "vless", "unmetered installed protocol");
+        let class = match tag {
+            "vless-main" => "main",
+            "vless-cdn" => "cdn",
+            _ => anyhow::bail!("unknown installed scope"),
+        };
+        let email = format!("xmesh-u{}--{tag}", p.user_id);
+        let clients = inbound["settings"]["clients"].as_array().context("real clients")?;
+        ensure!(clients.len() == 1
+            && clients[0]["email"].as_str() == Some(email.as_str())
+            && clients[0]["id"].as_str() == Some(uuid),
+            "disposable profile must contain exactly the intended real user");
+        aliases.push(Alias { email, class: class.to_owned() });
+    }
+    ensure!(aliases.len() == 1, "one actual MAIN/CDN VLESS inbound per installed test Node");
+    Ok(aliases)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let (dsn, key_path) = require_ci()?;
@@ -133,17 +256,32 @@ async fn main() -> Result<()> {
         println!("{}", signer.public_key());
         return Ok(());
     }
-    let (node, nonce, observed_pid, policy_sha) = args()?;
+    let (node, nonce, observed_pid, policy_sha, installed) =
+        if env::args().nth(1).as_deref() == Some("--installed") {
+            let (node, nonce, pid, policy, candidate) = installed_args()?;
+            (node, nonce, pid, policy, Some(candidate))
+        } else {
+            let (node, nonce, pid, policy) = args()?;
+            (node, nonce, pid, policy, None)
+        };
     let pool = PgPool::connect(&dsn).await?;
     let mut tx = pool.begin().await?;
 
-    let p = load_preflight(&mut tx, node, &nonce, observed_pid, &policy_sha).await?;
+    let fake_container = "f".repeat(64);
+    let expected_user = installed.as_ref().map_or(101, |v| v.user_id);
+    let expected_container = installed.as_ref().map_or(fake_container.as_str(), |v| v.container.as_str());
+    let p = load_preflight(&mut tx, node, &nonce, observed_pid, &policy_sha,
+                           expected_user, expected_container).await?;
     let snapshot = lock_snapshot(&mut tx, &p).await?;
+    let scope = if let Some(candidate) = &installed {
+        Some(installed_scope(&mut tx, &p, candidate, &key_path).await?)
+    } else { None };
     let Snapshot {
         account,
         lease,
         held,
         now,
+        genesis_expires_ms,
     } = snapshot;
     // The exact signed envelope is an immutable transaction outbox. A
     // retry after COMMIT or lost HTTP response must return identical bytes,
@@ -173,7 +311,7 @@ async fn main() -> Result<()> {
         return Ok(());
     }
     let ceiling = lease.ceiling_bytes;
-    let signing = signing_input(p, &account, &lease, held, now)?;
+    let signing = signing_input(p, &account, &lease, held, now, genesis_expires_ms, scope)?;
     let saved = persist_cap(&mut tx, &key_path, &signing, now).await?;
     ensure!(saved.2 == ceiling, "stored cap ceiling changed");
     tx.commit().await?;
@@ -187,6 +325,8 @@ async fn load_preflight(
     nonce: &str,
     observed_pid: i64,
     policy_sha: &str,
+    expected_user: i64,
+    expected_container: &str,
 ) -> Result<Preflight> {
     // Immutable preflight identifies account/epoch; cannot itself grant.
     let p: Preflight = sqlx::query_as(
@@ -205,13 +345,13 @@ async fn load_preflight(
     .await?;
 
     ensure!(
-        p.user_id == 101 && p.node_id == node && p.request_challenge == nonce,
+        p.user_id == expected_user && p.node_id == node && p.request_challenge == nonce,
         "foreign candidate or wrong Node"
     );
     ensure!(
         p.reported_pid == observed_pid
             && p.reported_policy_sha256 == policy_sha
-            && p.reported_container_id == "f".repeat(64),
+            && p.reported_container_id == expected_container,
         "unproven candidate process/container/policy mismatch"
     );
     Ok(p)
@@ -222,6 +362,7 @@ struct Snapshot {
     lease: Lease,
     held: i64,
     now: i64,
+    genesis_expires_ms: i64,
 }
 
 async fn lock_snapshot(conn: &mut PgConnection, p: &Preflight) -> Result<Snapshot> {
@@ -316,6 +457,7 @@ async fn lock_snapshot(conn: &mut PgConnection, p: &Preflight) -> Result<Snapsho
         lease,
         held,
         now,
+        genesis_expires_ms: genesis.prepared_ms.saturating_add(120_000),
     })
 }
 
@@ -351,6 +493,8 @@ fn signing_input(
     lease: &Lease,
     held: i64,
     now: i64,
+    genesis_expires_ms: i64,
+    installed_scope: Option<Vec<Alias>>,
 ) -> Result<SqlSnapshot> {
     // For NEW issuance, the immutable preflight must still match the
     // account-wide snapshot. For an ALREADY fsynced outbox replay, other
@@ -367,7 +511,10 @@ fn signing_input(
     // SQL's existing immutable lease and independently staged Node are the
     // budget source; synthetic inbound membership is fixed by CI only.
     let until = (now + 3_600_000).min(lease.valid_until_ms);
-    let install_before = (now + 60_000).min(p.expires_ms);
+    let install_before = (now + 60_000).min(p.expires_ms).min(genesis_expires_ms);
+    let cdn_ceiling = installed_scope.as_ref().map_or(150.min(lease.ceiling_bytes), |aliases| {
+        if aliases.iter().any(|a| a.class == "cdn") { lease.ceiling_bytes } else { 0 }
+    });
     Ok(SqlSnapshot {
         user_id: p.user_id,
         node_id: p.node_id,
@@ -385,7 +532,7 @@ fn signing_input(
         measured_cdn_wal: 0,
         ceiling: lease.ceiling_bytes,
         node_ceiling: lease.ceiling_bytes,
-        cdn_ceiling: 150.min(lease.ceiling_bytes),
+        cdn_ceiling,
         shared_account_limit: account.limit_bytes,
         shared_account_floor: account.settled_bytes.max(account.observed_floor_bytes),
         all_node_held: held,
@@ -394,7 +541,7 @@ fn signing_input(
         issued_at_ms: now - 1000,
         install_before_ms: install_before,
         valid_until_ms: until,
-        aliases: vec![
+        aliases: installed_scope.unwrap_or_else(|| vec![
             Alias {
                 email: "xmesh-u101--vless-cdn".into(),
                 class: "cdn".into(),
@@ -403,7 +550,7 @@ fn signing_input(
                 email: "xmesh-u101--vless-main".into(),
                 class: "main".into(),
             },
-        ],
+        ]),
     })
 }
 
