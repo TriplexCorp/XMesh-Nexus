@@ -193,9 +193,9 @@ pub async fn handle(
     }
     if req.operation == "confirm" {
         let expected = req.echo.as_ref().ok_or_else(deny)?;
-        if reservation["epoch"] != expected.epoch
-            || reservation["meterEpoch"] != expected.meter_epoch
-            || reservation["reservationId"] != expected.reservation_id
+        if reservation["epoch"].as_str() != Some(expected.epoch.as_str())
+            || reservation["meterEpoch"].as_str() != Some(expected.meter_epoch.as_str())
+            || reservation["reservationId"].as_str() != Some(expected.reservation_id.as_str())
         {
             return Err(deny());
         }
