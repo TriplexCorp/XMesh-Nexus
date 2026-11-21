@@ -167,6 +167,25 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert guest_a.request(LEASE_PATH,request_b)[0]==401
     assert guest_a.request(LEASE_PATH,dict(request_a,userId=uid+1000000))[0]==409
 
+    # An independent quota is NOT a shared global allowance. An owner
+    # can change these settings without changing the VLESS client's UUID
+    # or its compiled config, so the current plan must be checked separately.
+    user_path=f"/collections/users/{uid}"
+    owner.request("PATCH",user_path,{
+        "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.000000001,"period":"daily"}},
+        "cdnLimitGb":0.000000001,
+    })
+    try:
+        assert guest_a.request(LEASE_PATH,request_a)[0]==409
+        assert guest_b.request(LEASE_PATH,request_b)[0]==409
+        assert db.execute("SELECT count(*) FROM quota_v2_reservations WHERE user_id=%s",
+                          (uid,)).fetchone()==(0,)
+        assert db.execute("SELECT count(*) FROM quota_v2_genesis_lease_replies WHERE user_id=%s",
+                          (uid,)).fetchone()==(0,)
+    finally:
+        owner.request("PATCH",user_path,{"nodeTrafficLimits":{},"cdnLimitGb":0})
+    print("Independent Node and CDN limits cannot silently become shared bootstrap grants.")
+
     # Deliberately abandon both first authenticated replies (no Node disk
     # commit). The installed helper must recover precisely the saved bytes.
     first=parallel(lambda item:item[0].request(LEASE_PATH,item[1]),stages)
@@ -271,6 +290,23 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
 
     assert guest_a.request(CAP_PATH,cap_jobs[1][2])[0]==401
     assert guest_a.request(CAP_PATH,dict(cap_jobs[0][2],requestChallenge=cap_jobs[1][2]["requestChallenge"]))[0]==409
+
+    # Even already signed outbox bytes may not be delivered after the
+    # owner's plan has changed. These checks must not consume or renew them.
+    original_caps=db.execute(
+        "SELECT node_id,request_challenge,signed_envelope FROM quota_v2_signed_first_cap_outbox ORDER BY node_id"
+    ).fetchall()
+    owner.request("PATCH",user_path,{
+        "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.000000001,"period":"daily"}},
+        "cdnLimitGb":0.000000001,
+    })
+    try:
+        assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==409
+        assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==409
+        assert db.execute("SELECT node_id,request_challenge,signed_envelope "
+                          "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id").fetchall()==original_caps
+    finally:
+        owner.request("PATCH",user_path,{"nodeTrafficLimits":{},"cdnLimitGb":0})
 
     def install(job):
         item,measurement,request,grant,ceiling=job
