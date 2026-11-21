@@ -29,11 +29,16 @@ class QuarantinedRuntimeTests(unittest.TestCase):
     def setUp(self):
         self.genesis=fixtures.QuarantineFirstGenesisSQL("test_exact_signed_policy_replay_zero_authority_and_no_regular_history")
         self.genesis.setUp()
-        self.user=10
+        # Every test must receive its own *open* account: PostgreSQL
+        # enforces one active epoch per user, and evidence is immutable.
+        self.user=uuid.uuid4().int % (2 ** 51) + 100
         self.epoch=uuid.uuid4()
         self.meter=uuid.uuid4()
         self.reservation=uuid.uuid4()
-        original=self.genesis.stage()
+        candidate=self.genesis.policy(users=[{
+            "userId":self.user,"offlineBudgetBytes":0,"onHold":True
+        }])
+        original=self.genesis.stage(payload=candidate)
         self.policy_digest=original[1]
         with psycopg.connect(DSN) as c:
             c.execute("INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes)"
