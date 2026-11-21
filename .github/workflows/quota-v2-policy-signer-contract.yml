@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'backend/src/quota_v2_cap_signing.rs'
+      - 'backend/src/node_runtime_legacy.rs'
+      - 'backend/src/quota_xray_genesis.rs'
       - 'backend/src/bin/quota_v2_ci_signed_cap.rs'
       - 'backend/Cargo.toml'
       - 'backend/src/main.rs'
@@ -24,6 +26,9 @@ jobs:
       - name: Nexus Ed25519 domain and fail-closed grant invariants
         run: |
           cargo test --manifest-path backend/Cargo.toml quota_v2_cap_signing -- --nocapture
+      - name: Ensure quarantined Node policy cannot issue legacy offline allowances
+        run: |
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- quarantined_policy_cannot_issue_legacy_spend_or_extend_genesis --exact
       - name: Build opt-in disposable SQL signer, NOT the shipping API
         run: |
           cargo build --manifest-path backend/Cargo.toml \
