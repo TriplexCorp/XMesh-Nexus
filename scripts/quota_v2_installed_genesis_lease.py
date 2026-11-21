@@ -57,7 +57,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     # bootstrap confirmations cannot each obtain the full requested MiB.
     _,user=owner.request("POST","/collections/users",{
         "username":"ci_genesis_lease_pair","squads":[squad["id"]],
-        "hold":False,"used":0,"limit":0.001572864,
+        "hold":False,"used":0,"limit":0.001572864,"expireAt":0,
     })
     uid=user["id"]
     for guest,tag in zip(pair,tags):
