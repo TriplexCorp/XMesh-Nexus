@@ -95,7 +95,9 @@ class Guest:
         process = subprocess.Popen(command, stdin=secondary, stdout=secondary, stderr=secondary)
         os.close(secondary)
         log = bytearray()
+        port_confirmed = False
         delivered = False
+        token_bytes = token.encode("ascii")
         deadline = time.monotonic() + 650
         try:
             while time.monotonic() < deadline:
@@ -111,17 +113,25 @@ class Guest:
                         raise
                     break
                 log += chunk
+                if not port_confirmed and b"TCP port for XMesh Node [8443]:" in log:
+                    os.write(primary, b"\n")
+                    port_confirmed = True
                 if not delivered and b"enrollment token (input hidden):" in log:
-                    os.write(primary, token.encode("ascii") + b"\n")
+                    os.write(primary, token_bytes + b"\n")
                     delivered = True
+                complete = log.rfind(b"\n") + 1
+                if complete:
+                    sys.stdout.buffer.write(bytes(log[:complete]).replace(token_bytes, b"[REDACTED]"))
+                    sys.stdout.buffer.flush()
+                    del log[:complete]
             assert process.wait(timeout=5) == 0, f"bootstrap failed on Node {self.node}"
-            assert delivered
+            assert port_confirmed and delivered
         finally:
             os.close(primary)
             if process.poll() is None:
                 process.kill()
                 process.wait(timeout=10)
-            output = bytes(log).replace(token.encode("ascii"), b"[REDACTED]")
+            output = bytes(log).replace(token_bytes, b"[REDACTED]")
             sys.stdout.buffer.write(output)
             sys.stdout.buffer.flush()
 
