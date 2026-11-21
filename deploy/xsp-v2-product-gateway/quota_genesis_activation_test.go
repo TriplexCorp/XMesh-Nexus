@@ -11,6 +11,7 @@ func TestFirstGenesisActivationHeaderRestrictedToExactTunnelPaths(t *testing.T) 
 		"/api/v1/node/desired-config",
 		"/api/v1/node/quota-v2/policy-pin",
 		"/api/v1/node/quota-v2/genesis-reservation",
+		"/api/v1/node/quota-v2/genesis-cap-delivery",
 	}
 	for _, path := range valid {
 		if !allowedTunnelPaths[path] {
