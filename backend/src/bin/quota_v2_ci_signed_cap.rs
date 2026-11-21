@@ -180,6 +180,31 @@ async fn main() -> Result<()> {
     ensure!(now<p.expires_ms && now<lease.valid_until_ms,
         "expired SQL/Genesis reservation");
 
+    // The exact signed envelope is an immutable transaction outbox. A
+    // retry after COMMIT or lost HTTP response must return identical bytes,
+    // not quietly refresh TTL or offer a second signed grant.
+    let existing:Option<(Vec<u8>,String,i64,i64)>=sqlx::query_as(
+        "SELECT signed_envelope,signer_public_key,grant_bytes,install_before_ms
+           FROM quota_v2_signed_first_cap_outbox
+          WHERE node_id=$1 AND request_challenge=$2")
+        .bind(node).bind(&nonce).fetch_optional(&mut *tx).await?;
+    if let Some((saved,old_pub,old_grant,install_before))=existing {
+        ensure!(now<install_before && old_grant==lease.ceiling_bytes,
+            "expired or reallocated signed-cap outbox cannot be replayed");
+        let same=node_policy::PolicySigner::load(&key_path)
+            .context("load original Nexus test signing identity")?;
+        ensure!(same.public_key()==old_pub,
+            "issuer signing identity was rotated during pending delivery");
+        tx.commit().await?;
+        println!("{}",json!({
+            "nodeId":node,"ceiling":old_grant,
+            "signedEnvelope":String::from_utf8(saved)
+                .map_err(|_|anyhow!("non-utf8 stored cap"))?,
+            "publicKeyHex":old_pub,
+            "phase":"sql-committed-nexus-policy-signer-disposable"
+        }));
+        return Ok(());
+    }
     // Do NOT derive positive capacity from user-supplied counters.
     // SQL's existing immutable lease and independently staged Node are the
     // budget source; synthetic inbound membership is fixed by CI only.
@@ -209,14 +234,23 @@ async fn main() -> Result<()> {
     let signer=node_policy::PolicySigner::load(&key_path)
         .context("load disposable exact Nexus PolicySigner")?;
     let bytes=sign_snapshot(&signer,&signing,now)?;
-    // For CI-only test no positive authorization is persisted beyond the
-    // existing immutable preflight; production will need a one-time signed
-    // outbox commit before any actual XSP/2 delivery.
+    let public=signer.public_key();
+    // The SQL function RECHECKS the locked first-Genesis lease, all held
+    // reservations, the immutable source and the signed envelope's critical
+    // byte/time/scope fields. PostgreSQL WAL fsync must complete BEFORE the
+    // caller receives the exact positive spending grant bytes.
+    let saved:(Vec<u8>,String,i64)=sqlx::query_as(
+        "SELECT signed_envelope,signer_public_key,grant_bytes
+           FROM quota_v2_store_signed_first_cap($1,$2,$3,$4)")
+        .bind(node).bind(&nonce).bind(&public).bind(&bytes)
+        .fetch_one(&mut *tx).await?;
+    ensure!(saved.0==bytes && saved.1==public && saved.2==lease.ceiling_bytes,
+        "signed-cap outbox failed exact-byte persistence check");
     tx.commit().await?;
     println!("{}",json!({
-        "nodeId":node,"ceiling":lease.ceiling_bytes,
-        "signedEnvelope":String::from_utf8(bytes).map_err(|_|anyhow!("non-utf8 cap"))?,
-        "publicKeyHex":signer.public_key(),
+        "nodeId":node,"ceiling":saved.2,
+        "signedEnvelope":String::from_utf8(saved.0).map_err(|_|anyhow!("non-utf8 cap"))?,
+        "publicKeyHex":saved.1,
         "phase":"sql-committed-nexus-policy-signer-disposable"
     }));
     Ok(())
