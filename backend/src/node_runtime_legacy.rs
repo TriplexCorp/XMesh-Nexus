@@ -2225,6 +2225,38 @@ pub async fn current_compiled_node_profile_revision(
     Ok(compile_node_profile(state, node_id).await?.revision)
 }
 
+/// Candidate config for an isolated first-Genesis process. This is not a
+/// served desired revision, user permission or legacy offline policy.
+pub async fn first_genesis_config_preview(
+    state: &AppState,
+    node_id: i64,
+) -> Result<Value, ApiError> {
+    let compiled = compile_node_profile(state, node_id).await?;
+    if compiled.tls_provision.is_some() || compiled.geo_data.is_some() {
+        return Err(cap_policy_denied());
+    }
+    let inbounds = compiled.config["inbounds"]
+        .as_array()
+        .ok_or_else(cap_policy_denied)?;
+    if inbounds.iter().any(|inbound| {
+        let protocol = inbound["protocol"].as_str();
+        let tag = inbound["tag"].as_str();
+        !matches!(
+            (protocol, tag),
+            (Some("vless"), Some("vless-main" | "vless-cdn"))
+                | (Some("dokodemo-door"), Some("xmesh_stats_in"))
+        )
+    }) {
+        return Err(cap_policy_denied());
+    }
+    Ok(json!({
+        "profileId":compiled.profile_id,
+        "port":compiled.port,
+        "config":compiled.config,
+        "configSha256":compiled.revision,
+    }))
+}
+
 /// Read-only, zero-authority derivation of the EXACT VLESS MAIN/CDN scope
 /// from the authoritative XRAY STUDIO compilation and the first signed,
 /// immutable quarantine policy. Never accept aliases supplied by the Node.
@@ -2282,6 +2314,9 @@ fn first_genesis_cap_aliases(
     for inbound in inbounds {
         let protocol = inbound["protocol"].as_str().unwrap_or("");
         let tag = inbound["tag"].as_str().unwrap_or("");
+        if protocol != "vless" && (protocol != "dokodemo-door" || tag != "xmesh_stats_in") {
+            return Err(cap_policy_denied());
+        }
         let clients = inbound["settings"]["clients"].as_array();
         if let Some(clients) = clients {
             for client in clients {
@@ -2377,6 +2412,27 @@ pub async fn original_first_genesis_cap_scope(
         return Err(cap_policy_denied());
     }
     let aliases = first_genesis_cap_aliases(&compiled.config, &policy, user_id)?;
+    // The real CDN classification is derived from settings + Node policy,
+    // never from an alias's spelling. First-genesis supports only the
+    // explicit names used by the measured Xray, and rejects a mismatch.
+    let node: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
+    )
+    .bind(node_id)
+    .fetch_one(&state.pool)
+    .await?;
+    let settings = crate::read_settings(&state.pool).await?;
+    let cdn_tags = crate::cdn_quota::tags_for_node(
+        &settings,
+        &node,
+        &managed_inbound_tags(&compiled.config),
+    )?;
+    for alias in &aliases {
+        let tag = alias.email.split_once("--").ok_or_else(cap_policy_denied)?.1;
+        if cdn_tags.contains(tag) != (alias.class == "cdn") {
+            return Err(cap_policy_denied());
+        }
+    }
     Ok(FirstGenesisCapPolicyScope {
         policy_sha256: sha,
         profile_revision: revision,
