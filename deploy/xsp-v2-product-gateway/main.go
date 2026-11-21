@@ -943,6 +943,19 @@ var allowedTunnelPaths = map[string]bool{
 	"/api/v1/node/quota-v2/policy-pin": true,
 }
 
+// Original activation binding is forwarded ONLY on explicitly registered
+// strict-PQ Node paths. Never use request JSON or client HTTP headers here.
+func needsGenesisActivationBinding(path string) bool {
+	switch path {
+	case "/api/v1/node/quota-v2/wal",
+		"/api/v1/node/desired-config",
+		"/api/v1/node/quota-v2/policy-pin":
+		return true
+	default:
+		return false
+	}
+}
+
 func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
 		fail(w, http.StatusUnsupportedMediaType, "POST application/json required")
@@ -1038,9 +1051,7 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	// The quarantined FIRST desired-config needs the same original
 	// product activation binding as the one-shot Genesis preparation.
 	// Only the cryptographically enrolled gateway supplies this header.
-	if inner.Path == "/api/v1/node/quota-v2/wal" ||
-		inner.Path == "/api/v1/node/desired-config" ||
-		inner.Path == "/api/v1/node/quota-v2/policy-pin" {
+	if needsGenesisActivationBinding(inner.Path) {
 		activation := sha256.Sum256(n.Receipt)
 		req.Header.Set("X-XSP-Product-Activation-SHA256", hex.EncodeToString(activation[:]))
 	}
