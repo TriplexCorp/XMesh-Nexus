@@ -8,8 +8,8 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::Row;
 use sha2::{Digest, Sha256};
+use sqlx::{PgConnection, Row};
 
 const PATH: &str = "/api/v1/node/quota-v2/genesis-reservation";
 const MAX_BODY: usize = 3072;
@@ -92,6 +92,148 @@ fn zero_reply(
     })
 }
 
+fn echo_matches(req: &Request, reservation: &Value) -> bool {
+    req.echo.as_ref().is_some_and(|echo| {
+        reservation["epoch"].as_str() == Some(echo.epoch.as_str())
+            && reservation["meterEpoch"].as_str() == Some(echo.meter_epoch.as_str())
+            && reservation["reservationId"].as_str() == Some(echo.reservation_id.as_str())
+    })
+}
+
+async fn saved_reply(
+    conn: &mut PgConnection,
+    state: &AppState,
+    req: &Request,
+    stage: &str,
+) -> Result<Option<Value>, ApiError> {
+    let saved: Option<(Vec<u8>, String, String)> = sqlx::query_as(
+        "SELECT signed_reply,policy_sha256,signer_public_key
+         FROM quota_v2_genesis_lease_replies
+         WHERE node_id=$1 AND user_id=$2 AND stage=$3",
+    )
+    .bind(req.node_id)
+    .bind(req.user_id)
+    .bind(stage)
+    .fetch_optional(conn)
+    .await?;
+    let Some((bytes, sha, key)) = saved else {
+        return Ok(None);
+    };
+    let doc: Value = serde_json::from_slice(&bytes).map_err(|_| deny())?;
+    let payload = &doc["payload"];
+    if sha != req.policy_sha256
+        || key != state.node_policy_signer.public_key()
+        || serde_json::to_vec(&doc).map_err(|_| deny())? != bytes
+        || doc["algorithm"] != "Ed25519"
+        || doc["signature"].as_str()
+            != Some(state.node_policy_signer.sign(payload).map_err(|_| deny())?.as_str())
+        || payload["nodeId"] != req.node_id
+        || payload["userId"] != req.user_id
+        || payload["policySha256"] != req.policy_sha256.as_str()
+        || payload["runtimeId"] != req.runtime_id.as_str()
+        || payload["genesisChallenge"] != req.genesis_challenge.as_str()
+        || payload["authorizedBytes"] != 0
+        || payload["canSpend"] != false
+        || payload["canStart"] != false
+        || payload["canResume"] != false
+        || payload["refundableBytes"] != 0
+        || payload["status"] != if stage == "prepare" { "prepared" } else { "confirmed" }
+    {
+        return Err(deny());
+    }
+    Ok(Some(doc))
+}
+
+/// Recheck the authoritative product activation and original Genesis in
+/// the SAME transaction, after account/lease locks. Expired or replaced
+/// identities never get new reservations or replayed signed receipts.
+async fn recheck_genesis(
+    conn: &mut PgConnection,
+    req: &Request,
+    activation: &str,
+    key: &str,
+) -> Result<(), ApiError> {
+    let live: Option<i64> = sqlx::query_scalar(
+        "SELECT g.node_id FROM quota_v2_xray_genesis g
+         JOIN quota_v2_genesis_quarantine_policies q USING(node_id)
+         JOIN node_xsp_product_nodes p USING(node_id)
+         JOIN panel_records n ON n.id=g.node_id AND n.collection='nodes'
+         WHERE g.node_id=$1 AND NOT g.policy_path_used
+           AND p.state='active' AND encode(p.receipt_sha256,'hex')=$2
+           AND g.first_activation_sha256=$2 AND q.first_activation_sha256=$2
+           AND g.runtime_id=$3 AND q.runtime_id=$3
+           AND g.challenge=$4 AND q.challenge=$4
+           AND q.policy_sha256=$5 AND q.signer_public_key=$6
+           AND (n.data->'disabled') IS DISTINCT FROM 'true'::jsonb
+           AND g.prepared_ms <= (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint
+           AND g.prepared_ms+120000 > (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint
+         FOR SHARE OF g,q,p,n",
+    )
+    .bind(req.node_id)
+    .bind(activation)
+    .bind(&req.runtime_id)
+    .bind(&req.genesis_challenge)
+    .bind(&req.policy_sha256)
+    .bind(key)
+    .fetch_optional(conn)
+    .await?;
+    if live.is_none() {
+        return Err(deny());
+    }
+    Ok(())
+}
+
+async fn recheck_lease(
+    conn: &mut PgConnection,
+    req: &Request,
+    reservation: &Value,
+) -> Result<(), ApiError> {
+    let epoch = reservation["epoch"].as_str().ok_or_else(deny)?;
+    let meter = reservation["meterEpoch"].as_str().ok_or_else(deny)?;
+    let id = reservation["reservationId"].as_str().ok_or_else(deny)?;
+    let revision = reservation["revision"].as_i64().ok_or_else(deny)?;
+    let ceiling = reservation["ceilingBytes"].as_i64().ok_or_else(deny)?;
+    // Account lock first, lease lock second, matching all quota writers.
+    let account: Option<i64> = sqlx::query_scalar(
+        "SELECT user_id FROM quota_v2_accounts WHERE user_id=$1 AND epoch=$2::uuid
+         AND NOT closed FOR UPDATE",
+    )
+    .bind(req.user_id)
+    .bind(epoch)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if account.is_none() {
+        return Err(deny());
+    }
+    let live: Option<i64> = sqlx::query_scalar(
+        "SELECT r.node_id FROM quota_v2_reservations r
+         WHERE r.user_id=$1 AND r.epoch=$2::uuid AND r.node_id=$3
+           AND r.meter_epoch=$4::uuid AND r.reservation_id=$5::uuid
+           AND r.revision=$6 AND r.ceiling_bytes=$7
+           AND r.node_confirmed=$8 AND r.acknowledged_bytes=0
+           AND r.conservative_burn_floor_bytes=0 AND r.conservative_burned_at IS NULL
+           AND r.valid_until>clock_timestamp()
+           AND NOT EXISTS(SELECT 1 FROM quota_v2_revocation_requests v
+             WHERE v.user_id=r.user_id AND v.epoch=r.epoch AND v.node_id=r.node_id
+               AND v.meter_epoch=r.meter_epoch AND v.reservation_id=r.reservation_id)
+         FOR UPDATE OF r",
+    )
+    .bind(req.user_id)
+    .bind(epoch)
+    .bind(req.node_id)
+    .bind(meter)
+    .bind(id)
+    .bind(revision)
+    .bind(ceiling)
+    .bind(req.operation == "confirm")
+    .fetch_optional(conn)
+    .await?;
+    if live.is_none() {
+        return Err(deny());
+    }
+    Ok(())
+}
+
 pub async fn handle(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -148,6 +290,7 @@ pub async fn handle(
     ).await?;
     if verified.policy_sha256 != req.policy_sha256
         || verified.aliases.is_empty()
+        || verified.aliases.iter().any(|a| !matches!(a.class.as_str(), "main" | "cdn"))
     {
         return Err(deny());
     }
@@ -171,47 +314,94 @@ pub async fn handle(
     {
         return Err(deny());
     }
-    // Clone the exact signed per-user policy for the EXISTING serial SQL
-    // allocator. Never mutate the immutable Genesis policy or issue any
-    // offline grant through ordinary desired-config.
-    let mut staged = json!({"version":1,"nodeId":req.node_id,"users":selected});
-    let local = match req.echo.as_ref() {
-        None => vec![],
-        Some(e) => vec![crate::quota_v2::LocalQuotaCounter {
-            user_id:req.user_id, used_bytes:0,
-            epoch:Some(e.epoch.clone()), meter_epoch:Some(e.meter_epoch.clone()),
-            reservation_id:Some(e.reservation_id.clone()),
-        }],
-    };
-    crate::quota_v2::issue(&state.pool, req.node_id, &mut staged, &local, now_ms).await?;
-    let reservation = staged["users"][0]["quotaReservation"].clone();
-    if !reservation.is_object() {
-        return Err(deny());
-    }
-    if req.operation == "prepare" && reservation["ceilingBytes"] != 0 {
-        return Err(deny());
-    }
+    // A new stage and its exact signed response must commit atomically.
+    // Sharing the ordinary allocator's per-user advisory lock prevents two
+    // simultaneous prepare/confirm requests from renewing a lease revision.
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SET LOCAL synchronous_commit TO on")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(req.user_id ^ 0x51_4D_45_53_48_i64)
+        .execute(&mut *tx)
+        .await?;
+    let public = state.node_policy_signer.public_key();
+    let prepared = saved_reply(&mut tx, &state, &req, "prepare").await?;
     if req.operation == "confirm" {
-        let expected = req.echo.as_ref().ok_or_else(deny)?;
-        if reservation["epoch"].as_str() != Some(expected.epoch.as_str())
-            || reservation["meterEpoch"].as_str() != Some(expected.meter_epoch.as_str())
-            || reservation["reservationId"].as_str() != Some(expected.reservation_id.as_str())
-        {
+        let previous = prepared.as_ref().ok_or_else(deny)?;
+        if !echo_matches(&req, &previous["payload"]["reservation"]) {
             return Err(deny());
         }
     }
-    // The response is NOT permission to spend reservation bytes. Only a
-    // FUTURE one-time positive cap signed after independently verified
-    // runtime, WAL, SQL preflight and issuer may reach the measured Xray.
-    let proof = zero_reply(&req, activation, &verified.policy_sha256,
-                           &reservation, now_ms);
+    if let Some(saved) = saved_reply(&mut tx, &state, &req, &req.operation).await? {
+        recheck_lease(&mut tx, &req, &saved["payload"]["reservation"]).await?;
+        recheck_genesis(&mut tx, &req, activation, &public).await?;
+        tx.commit().await?;
+        return Ok(([(header::CACHE_CONTROL, "no-store")], Json(saved)));
+    }
+    if req.operation == "prepare" {
+        let prior: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM quota_v2_reservations
+             WHERE node_id=$1 AND user_id=$2)",
+        )
+        .bind(req.node_id)
+        .bind(req.user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if prior {
+            return Err(deny());
+        }
+    }
+
+    // Clone the exact original user policy. No other desired-config route
+    // is invoked, and the immutable signed quarantine stays zero-spend.
+    let mut user = selected.into_iter().next().ok_or_else(deny)?;
+    let local = req.echo.as_ref().map(|e| crate::quota_v2::LocalQuotaCounter {
+        user_id: req.user_id,
+        used_bytes: 0,
+        epoch: Some(e.epoch.clone()),
+        meter_epoch: Some(e.meter_epoch.clone()),
+        reservation_id: Some(e.reservation_id.clone()),
+    });
+    crate::quota_v2::issue_user(
+        &mut tx, &mut user, req.user_id, req.node_id, local.as_ref(), now_ms,
+    )
+    .await?;
+    let reservation = &user["quotaReservation"];
+    let ceiling = reservation["ceilingBytes"].as_i64().ok_or_else(deny)?;
+    if !user["quotaRevocation"].is_null()
+        || reservation["acknowledgedBytes"] != 0
+        || (req.operation == "prepare" && ceiling != 0)
+        || (req.operation == "confirm" && (ceiling <= 0 || !echo_matches(&req, reservation)))
+    {
+        return Err(deny());
+    }
+    recheck_lease(&mut tx, &req, reservation).await?;
+    recheck_genesis(&mut tx, &req, activation, &public).await?;
+    let proof = zero_reply(&req, activation, &verified.policy_sha256, reservation, now_ms);
     let signature = state.node_policy_signer.sign(&proof)
         .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Lease proof signing failed."))?;
-    Ok(([(header::CACHE_CONTROL, "no-store")], Json(json!({
+    let reply = json!({
         "payload":proof,
         "signature":signature,
         "algorithm":"Ed25519",
-    }))))
+    });
+    let bytes = serde_json::to_vec(&reply).map_err(|_| deny())?;
+    sqlx::query(
+        "INSERT INTO quota_v2_genesis_lease_replies
+         (node_id,user_id,stage,policy_sha256,signer_public_key,signed_reply)
+         VALUES($1,$2,$3,$4,$5,$6)",
+    )
+    .bind(req.node_id)
+    .bind(req.user_id)
+    .bind(&req.operation)
+    .bind(&req.policy_sha256)
+    .bind(public)
+    .bind(bytes)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(([(header::CACHE_CONTROL, "no-store")], Json(reply)))
 }
 
 #[cfg(test)]
