@@ -4,6 +4,7 @@ on:
     paths:
       - 'backend/src/quota_v2_cap_signing.rs'
       - 'backend/src/node_runtime_legacy.rs'
+      - 'backend/src/quota_v2_genesis_reservation.rs'
       - 'backend/src/quota_v2_policy_pin.rs'
       - 'deploy/xsp-v2-product-gateway/main.go'
       - 'backend/src/quota_xray_genesis.rs'
@@ -32,6 +33,8 @@ jobs:
         run: |
           cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- quarantined_policy_cannot_issue_legacy_spend_or_extend_genesis
           cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- policy_key_discovery_is_strictly_gated_and_never_admits
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- first_genesis_cap_scope_tests
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- quota_v2_genesis_reservation::tests
       - name: Build opt-in disposable SQL signer, NOT the shipping API
         run: |
           cargo build --manifest-path backend/Cargo.toml \
