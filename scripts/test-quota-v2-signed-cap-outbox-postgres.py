@@ -7,6 +7,7 @@ test and the two-process instrumented Xray acceptance workflow.
 """
 import concurrent.futures
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -197,6 +198,82 @@ class SignedFirstCapOutboxTests(unittest.TestCase):
                 "SELECT has_function_privilege('quota_v2_cap_untrusted',"
                 "'quota_v2_store_signed_first_cap(bigint,text,text,bytea)','EXECUTE')"
             ).fetchone()[0])
+
+
+class Xsp2CapStagingJournalTests(unittest.TestCase):
+    def setUp(self):
+        self.state=old.StagingAdmissionPreflight(
+            "test_real_two_node_allocator_is_not_reissued_by_runtime_preflight")
+        self.state.setUp()
+        self.node=self.state.node_a
+        self.challenge="a"*64
+        self.state.snapshot(node=self.node,challenge=self.challenge)
+
+    def tearDown(self):
+        self.state.doCleanups()
+
+    def store(self,nonce=b"x"*16,challenge=None,revision=None):
+        raw=b'{"XSP/2":"quarantined original encrypted dual-key assertion"}'
+        raw=raw*8
+        with psycopg.connect(DSN) as c:
+            return c.execute(
+                "INSERT INTO quota_v2_xsp2_cap_attestations("
+                "node_id,request_challenge,user_id,epoch,meter_epoch,"
+                "reservation_id,reservation_revision,key_epoch,"
+                "ed25519_key_id,mldsa65_key_id,xsp_nonce,"
+                "assertion_sha256,signed_envelope) VALUES("
+                "%s,%s,%s,%s,%s,%s,%s,1,'ed-test','pq-test',%s,%s,%s)"
+                " RETURNING authorized_bytes,can_start,can_resume,"
+                "final_meter_verified,refundable_bytes",
+                (self.node,challenge or self.challenge,self.state.user,
+                 self.state.epoch,self.state.meters[self.node],
+                 self.state.ids[self.node],revision or self.state.rev[self.node],
+                 nonce,hashlib.sha256(raw).hexdigest(),raw)
+            ).fetchone()
+
+    def test_quarantined_assertion_cannot_grant_start_or_refund(self):
+        self.assertEqual(self.store(),(0,False,False,False,0))
+        with psycopg.connect(DSN) as c:
+            row=c.execute("SELECT signed_envelope,xsp_nonce FROM "
+                "quota_v2_xsp2_cap_attestations WHERE node_id=%s",
+                (self.node,)).fetchone()
+            self.assertEqual(row[1],b"x"*16)
+            self.assertGreater(len(row[0]),300)
+            for attempt in (
+                "UPDATE quota_v2_xsp2_cap_attestations SET authorized_bytes=1",
+                "UPDATE quota_v2_xsp2_cap_attestations SET can_resume=TRUE",
+                "DELETE FROM quota_v2_xsp2_cap_attestations",
+                "TRUNCATE quota_v2_xsp2_cap_attestations",
+            ):
+                with self.assertRaises(psycopg.Error):
+                    with c.transaction():
+                        c.execute(attempt)
+
+    def test_nonce_and_preflight_challenge_cannot_be_reassigned(self):
+        self.store()
+        other="b"*64
+        self.state.snapshot(node=self.node,challenge=other)
+        with self.assertRaises(psycopg.Error):
+            self.store(challenge=other)  # Reused authenticated XSP/2 nonce.
+        with self.assertRaises(psycopg.Error):
+            self.store(nonce=b"y"*16,challenge=self.challenge)
+        with self.assertRaises(psycopg.Error):
+            self.store(nonce=b"z"*16,challenge="c"*64)
+
+    def test_ordinary_sql_role_cannot_write_staged_attestation(self):
+        with psycopg.connect(DSN) as c:
+            role="quota_v2_xsp2_untrusted"
+            if not c.execute("SELECT EXISTS(SELECT 1 FROM pg_roles "
+                             "WHERE rolname=%s)",(role,)).fetchone()[0]:
+                c.execute("CREATE ROLE quota_v2_xsp2_untrusted NOLOGIN")
+            self.assertFalse(c.execute(
+                "SELECT has_table_privilege(%s,"
+                "'quota_v2_xsp2_cap_attestations','INSERT')",
+                (role,)).fetchone()[0])
+            self.assertFalse(c.execute(
+                "SELECT has_table_privilege(%s,"
+                "'quota_v2_xsp2_cap_attestations','UPDATE')",
+                (role,)).fetchone()[0])
 
 
 if __name__=="__main__":
