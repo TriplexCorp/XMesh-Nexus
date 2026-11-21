@@ -308,6 +308,22 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     finally:
         owner.request("PATCH",user_path,{"nodeTrafficLimits":{},"cdnLimitGb":0})
 
+    # A signed spending-only cap cannot outlive a shortened subscription.
+    # Restore the original expiry only after both fresh deliveries are denied.
+    original_expiry=user.get("expireAt",0)
+    short_expiry=db.execute(
+        "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint+300000"
+    ).fetchone()[0]
+    owner.request("PATCH",user_path,{"expireAt":short_expiry})
+    try:
+        for item,_,request,_,_ in cap_jobs:
+            assert item[0].request(CAP_PATH,request)[0]==409
+        assert db.execute("SELECT node_id,request_challenge,signed_envelope "
+                          "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id").fetchall()==original_caps
+    finally:
+        owner.request("PATCH",user_path,{"expireAt":original_expiry})
+    print("Shortened subscription cannot reuse an already signed longer-lived cap.")
+
     def install(job):
         item,measurement,request,grant,ceiling=job
         guest,_,common=item
