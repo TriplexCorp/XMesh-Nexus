@@ -399,7 +399,7 @@ def main():
     nexus_revision = os.environ["XMESH_INSTALLED_NEXUS_REF"]
     revision = subprocess.check_output(["git", "-C", NODE, "rev-parse", "HEAD"], text=True).strip()
     assert re.fullmatch("[0-9a-f]{40}", nexus_revision) and re.fullmatch("[0-9a-f]{40}", revision)
-    with tempfile.TemporaryDirectory(prefix="xmesh-installed-") as directory, ExitStack() as stack:
+    with tempfile.TemporaryDirectory(prefix="xmesh-installed-", dir=os.environ.get("RUNNER_TEMP")) as directory, ExitStack() as stack:
         root = Path(directory)
         stack.callback(subprocess.run, ["sudo", "chown", "-R", f"{os.getuid()}:{os.getgid()}", root],
                        check=True, timeout=25)
