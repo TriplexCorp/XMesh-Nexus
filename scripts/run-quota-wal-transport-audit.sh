@@ -8,7 +8,7 @@ umask 077
    "$QUOTA_TEST_DSN" == postgresql://quota_test:*@127.0.0.1:* &&
    "$REDIS_URL" == redis://127.0.0.1:* ]] || exit 2
 [[ $# -ge 1 && $# -le 2 && -x "$1" ]] || exit 2
-[[ $# == 1 || "$2" == --with-reconcile ]] || exit 2
+[[ $# == 1 || "$2" == --with-reconcile || "$2" == --with-product ]] || exit 2
 
 run="$(mktemp -d)"
 server=""
@@ -56,8 +56,11 @@ server=""
 start 1 "$1"
 python3 -c 'import sys; from pathlib import Path; sys.stdout.buffer.write(bytes.fromhex("302e020100300506032b657004220420") + Path(sys.argv[1]).read_bytes())' "$CORE_DATA_DIR/node-policy-ed25519.key" |
     openssl pkey -inform DER -pubout -out "$XMESH_TEST_POLICY_PUBLIC_KEY"
-python3 scripts/test-quota-wal-transport.py
-
-if [[ $# == 2 ]]; then
-    python3 scripts/test-quota-wal-reconcile.py
+if [[ "${2:-}" == --with-product ]]; then
+    python3 scripts/test-quota-wal-product-tunnel.py
+else
+    python3 scripts/test-quota-wal-transport.py
+    if [[ "${2:-}" == --with-reconcile ]]; then
+        python3 scripts/test-quota-wal-reconcile.py
+    fi
 fi

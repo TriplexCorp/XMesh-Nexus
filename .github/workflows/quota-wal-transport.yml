@@ -12,6 +12,8 @@ on:
       - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
       - 'scripts/test-quota-wal-transport.py'
       - 'scripts/test-quota-wal-reconcile.py'
+      - 'scripts/test-quota-wal-product-tunnel.py'
+      - 'deploy/xsp-v2-product-gateway/wal_tunnel_fixture_test.go'
       - 'scripts/run-quota-wal-transport-audit.sh'
       - '.github/workflows/quota-wal-transport.yml'
 permissions:
@@ -79,3 +81,12 @@ jobs:
           source "$RUNNER_TEMP/quota-wal/bin/activate"
           python -m pip install 'psycopg[binary]==3.2.3'
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-reconcile
+      - name: Build disposable strict XSP/2 gateway fixture
+        working-directory: deploy/xsp-v2-product-gateway
+        run: go test -mod=readonly -c -o "$RUNNER_TEMP/wal-tunnel-fixture"
+      - name: Enroll two actual Agent binaries and verify WAL over strict XSP/2
+        run: |
+          source "$RUNNER_TEMP/quota-wal/bin/activate"
+          export XMESH_WAL_PRODUCT_AGENT="$RUNNER_TEMP/wal-product-agent"
+          export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
+          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-product
