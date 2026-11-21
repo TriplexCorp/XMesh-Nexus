@@ -24,14 +24,14 @@ mod protocol_credentials;
 mod quota_v2;
 // Verify the future positive cap contract without linking any positive
 // issuer or externally callable route into the shipping backend.
-#[cfg(test)]
-mod quota_v2_cap_signing;
-mod quota_wal_transport;
-mod quota_xray_genesis;
-mod quota_v2_genesis_reservation;
 #[cfg(feature = "quota-v2-installed-cap-rehearsal")]
 mod quota_v2_cap_delivery;
+#[cfg(test)]
+mod quota_v2_cap_signing;
+mod quota_v2_genesis_reservation;
 mod quota_v2_policy_pin;
+mod quota_wal_transport;
+mod quota_xray_genesis;
 mod security;
 mod sub_server;
 mod subscription_finalmask;
@@ -692,14 +692,7 @@ fn experimental_v2_routes(state: &AppState) -> Router<AppState> {
     router
 }
 
-fn application_router(state: AppState) -> Router {
-    let protected = protected_routes(&state);
-    // Experimental staging heartbeat has no control-plane side effects and is
-    // ABSENT from production builds (default features). It stays 404 until
-    // XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only is explicitly set.
-
-    let public_subscription = get(user_subscriptions::portal_route)
-        .layer(middleware::from_fn(subscription_flood::uri_budget_guard));
+fn public_api_routes() -> Router<AppState> {
     let public = Router::new()
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
@@ -722,8 +715,14 @@ fn application_router(state: AppState) -> Router {
         .route("/node/restart/progress", post(node_xray_update::progress))
         .route("/node/desired-config", post(node_runtime::desired_config))
         .route("/node/quota-v2/wal", quota_wal_transport::route())
-        .route("/node/quota-v2/policy-pin", post(quota_v2_policy_pin::handle))
-        .route("/node/quota-v2/genesis-reservation", post(quota_v2_genesis_reservation::handle).layer(RequestBodyLimitLayer::new(3072)))
+        .route(
+            "/node/quota-v2/policy-pin",
+            post(quota_v2_policy_pin::handle),
+        )
+        .route(
+            "/node/quota-v2/genesis-reservation",
+            post(quota_v2_genesis_reservation::handle).layer(RequestBodyLimitLayer::new(3072)),
+        )
         .route("/node/enroll", post(node_enrollment::claim))
         .route(
             "/sub/{token}",
@@ -748,6 +747,15 @@ fn application_router(state: AppState) -> Router {
         "/node/quota-v2/genesis-cap-delivery",
         post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
     );
+
+    public
+}
+
+fn application_router(state: AppState) -> Router {
+    let protected = protected_routes(&state);
+    let public = public_api_routes();
+    let public_subscription = get(user_subscriptions::portal_route)
+        .layer(middleware::from_fn(subscription_flood::uri_budget_guard));
 
     let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
     Router::new()

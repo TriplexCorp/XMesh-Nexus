@@ -111,6 +111,9 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         config=canonical(p["config"])
         assert hashlib.sha256(config).hexdigest()==p["configSha256"]
         assert p["nodeId"]==guest.node and p["publicIngressAllowed"] is False
+        assert p["config"]["api"]=={"tag":"xmesh_stats_api","listen":"127.0.0.1:10085",
+                                     "services":["StatsService"]}
+        assert all(inbound["tag"]!="xmesh_stats_in" for inbound in p["config"]["inbounds"])
         actual=[x for x in p["config"]["inbounds"] if x["tag"]==tag]
         assert len(actual)==1
         clients=actual[0]["settings"]["clients"]
@@ -363,6 +366,42 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             snapshot[path]=raw
         wal_snapshots.append(snapshot)
     print("Both installed Agents fetched genuine Nexus-signed PostgreSQL caps via strict XSP/2, applied them to real Xray, and VLESS/StatsService/WAL exhausted exactly conserved shared bytes.")
+
+    def remote_wal_command(guest, operation):
+        return ["/usr/local/sbin/xmesh-quota-wal", operation,
+                "--panel", panel, "--node-id", str(guest.node)]
+
+    def check_remote_wal(guest, operation):
+        proof = json.loads(guest.exec(*remote_wal_command(guest, operation), timeout=75))
+        for field in ("nexusOffhostSignatureVerified", "offhostFullBirthIndexHeadMatched",
+                      "nodeLocalIndexExtendsNexusHead"):
+            assert proof[field] is True, proof
+        for field in ("canResume", "carryforwardApplied", "finalMeterVerified"):
+            assert proof[field] is False, proof
+        assert proof["refundableBytes"] == 0, proof
+
+    # Transfer the actual inventory born by this VLESS run through each
+    # installed Agent. The witness anchors the birth index, not final usage.
+    parallel(lambda guest: check_remote_wal(guest, "store"), pair)
+    anchor_sql = """SELECT a.inventory_sequence,a.inventory_sha256,a.inventory_bytes,s.witness_bytes
+                    FROM quota_v2_external_wal_birth_anchors a
+                    JOIN quota_v2_external_wal_birth_sources s USING(node_id,inventory_sequence)
+                    WHERE a.node_id=%s ORDER BY a.inventory_sequence DESC LIMIT 1"""
+
+    def remote_anchor(guest):
+        anchor = db.execute(anchor_sql, (guest.node,)).fetchone()
+        assert anchor is not None, guest.node
+        sequence, digest, inventory, witness = anchor
+        local = guest.exec("cat", MEASURED+"/wal/xmesh-meter-inventory-v1.jsonl")
+        assert sequence == len(local.splitlines()) == 2
+        assert bytes(inventory) == local and digest == hashlib.sha256(local).hexdigest()
+        assert json.loads(bytes(witness))["payload"]["nodeId"] == guest.node
+        return anchor
+
+    anchors = [remote_anchor(guest) for guest in pair]
+    assert db.execute(lease_sql,(uid,)).fetchall()==rows
+    print("PASS: real VLESS WAL birth indexes reached PostgreSQL over each installed Agent's XSP/2 tunnel; no settlement or refund.")
+
     # A repeat cannot extend/reinstall the existing positive cap.
     repeated=subprocess.run(["docker","exec",guest_a.name,*commands[0]],
                              capture_output=True,timeout=35)
@@ -404,6 +443,25 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert db.execute(ledger_sql).fetchall()==ledger
     assert db.execute(outbox_sql).fetchall()==committed_caps
     assert db.execute(lease_sql,(uid,)).fetchall()==rows
+    assert [remote_anchor(guest) for guest in pair] == anchors
+    parallel(lambda guest: check_remote_wal(guest, "head"), pair)
     for guest,snapshot in zip(pair,wal_snapshots):
         assert all(guest.exec("cat",path)==raw for path,raw in snapshot.items())
+
+    # Preserve the original inode while testing loss on the replacement.
+    missing = next(iter(wal_snapshots[0]))
+    # Keep the held file outside the directory of authoritative WALs.
+    hidden = MEASURED + "/" + Path(missing).name + ".held"
+    guest_a.exec("mv", missing, hidden)
+    try:
+        failed = subprocess.run(
+            ["docker","exec",guest_a.name,*remote_wal_command(guest_a, "head")],
+            capture_output=True,timeout=75,
+        )
+        assert failed.returncode != 0, "signed Nexus head concealed a missing local WAL"
+        assert probe(stages[0],0,replacement,tags[0]) == {"uplink":0,"downlink":0}
+    finally:
+        guest_a.exec("mv", hidden, missing)
+    check_remote_wal(guest_a, "head")
+    assert remote_anchor(guest_a) == anchors[0]
     print("PASS: real Xray kill and replacement fail closed, peer unaffected, exact WAL and both signed PostgreSQL outboxes survived database restart; no refund or public ingress.")

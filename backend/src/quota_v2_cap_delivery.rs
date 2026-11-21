@@ -6,12 +6,14 @@
 //! start/resume/refund. Default production builds do not contain this route.
 use crate::{ApiError, AppState, node_auth};
 use axum::{
-    Json, body::Bytes, extract::State,
+    Json,
+    body::Bytes,
+    extract::State,
     http::{HeaderMap, StatusCode, header},
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::Row;
+use sqlx::{PgConnection, Row, postgres::PgRow};
 
 const PATH: &str = "/api/v1/node/quota-v2/genesis-cap-delivery";
 const DOMAIN: &[u8] = b"XMESH_QUOTA_V2_XRAY_CAP_ADMISSION_V1\0";
@@ -21,7 +23,8 @@ const DOMAIN: &[u8] = b"XMESH_QUOTA_V2_XRAY_CAP_ADMISSION_V1\0";
 struct Request {
     node_id: i64,
     user_id: i64,
-    request_challenge: String,
+    #[serde(rename = "requestChallenge")]
+    challenge: String,
 }
 
 fn enabled() -> bool {
@@ -32,7 +35,8 @@ fn enabled() -> bool {
         && std::env::var("RUNNER_ENVIRONMENT").as_deref() == Ok("github-hosted")
         && std::env::var("XMESH_INSTALLED_GENESIS_LEASE").as_deref() == Ok("1")
         && std::env::var("XMESH_QUOTA_V2_INSTALLED_CAP_DELIVERY").as_deref() == Ok("1")
-        && std::env::var("DATABASE_URL").ok()
+        && std::env::var("DATABASE_URL")
+            .ok()
             .and_then(|s| reqwest::Url::parse(&s).ok())
             .is_some_and(|u| {
                 u.host_str() == Some("127.0.0.1")
@@ -42,13 +46,19 @@ fn enabled() -> bool {
 }
 
 fn deny() -> ApiError {
-    ApiError::new(StatusCode::CONFLICT, "No current independently staged signed first cap.")
+    ApiError::new(
+        StatusCode::CONFLICT,
+        "No current independently staged signed first cap.",
+    )
 }
 
 fn valid(req: &Request) -> bool {
-    req.node_id > 0 && req.user_id > 0
-        && req.request_challenge.len() == 64
-        && req.request_challenge.bytes()
+    req.node_id > 0
+        && req.user_id > 0
+        && req.challenge.len() == 64
+        && req
+            .challenge
+            .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
@@ -61,7 +71,10 @@ pub async fn handle(
     raw: Bytes,
 ) -> Result<([(header::HeaderName, &'static str); 1], Json<Value>), ApiError> {
     if !enabled() {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "Disposable cap delivery disabled."));
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Disposable cap delivery disabled.",
+        ));
     }
     if raw.is_empty() || raw.len() > 2048 {
         return Err(deny());
@@ -70,12 +83,11 @@ pub async fn handle(
     if !valid(&req) {
         return Err(deny());
     }
-    let activation = node_auth::authenticate_product_activation(
-        &state, &headers, req.node_id, PATH,
-    ).await?;
-    let scope = crate::node_runtime::original_first_genesis_cap_scope(
-        &state, req.node_id, req.user_id,
-    ).await?;
+    let activation =
+        node_auth::authenticate_product_activation(&state, &headers, req.node_id, PATH).await?;
+    let scope =
+        crate::node_runtime::original_first_genesis_cap_scope(&state, req.node_id, req.user_id)
+            .await?;
     let key = state.node_policy_signer.public_key();
     let mut tx = state.pool.begin().await?;
     // Match ensure_account: the per-user advisory lock precedes the
@@ -94,7 +106,9 @@ pub async fn handle(
     .ok_or_else(deny)?;
     let has_cdn = scope.aliases.iter().any(|alias| alias.class == "cdn");
     if !crate::node_runtime::first_genesis_rehearsal_limits_supported(
-        &current_user, req.node_id, has_cdn,
+        &current_user,
+        req.node_id,
+        has_cdn,
     ) {
         return Err(deny());
     }
@@ -107,11 +121,11 @@ pub async fn handle(
     .fetch_optional(&mut *tx)
     .await?;
     let (epoch, limit, floor) = account.ok_or_else(deny)?;
-    let now: i64 = sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
-        .fetch_one(&mut *tx).await?;
-    if !crate::node_runtime::first_genesis_active_until(
-        &current_user, now, now.saturating_add(1),
-    )
+    let now: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&mut *tx)
+            .await?;
+    if !crate::node_runtime::first_genesis_active_until(&current_user, now, now.saturating_add(1))
         || current_user["limit"].as_f64().map(crate::gb_to_bytes_i64) != Some(limit)
     {
         return Err(deny());
@@ -121,12 +135,48 @@ pub async fn handle(
                  GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::bigint
          FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
     )
-    .bind(req.user_id).bind(&epoch)
-    .fetch_one(&mut *tx).await?;
-    if i128::from(held)+i128::from(floor)>i128::from(limit) {
+    .bind(req.user_id)
+    .bind(&epoch)
+    .fetch_one(&mut *tx)
+    .await?;
+    if i128::from(held) + i128::from(floor) > i128::from(limit) {
         return Err(deny());
     }
-    let row = sqlx::query(
+    let row = load_outbox(&mut tx, &req, &scope, &epoch, &key, activation).await?;
+    let install: i64 = row.try_get("install_before_ms")?;
+    let expires: i64 = row.try_get("valid_until_ms")?;
+    // The outbox/lease reads can wait behind a writer. The signed
+    // installation window must still be open after those locks are taken.
+    let delivery_now: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&mut *tx)
+            .await?;
+    if delivery_now < now
+        || delivery_now >= install
+        || !crate::node_runtime::first_genesis_active_until(&current_user, delivery_now, expires)
+    {
+        return Err(deny());
+    }
+    let exact = verified_outbox(&state, &req, &scope, &epoch, activation, &row)?;
+    tx.commit().await?;
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(json!({
+            "status":"committed_first_cap", "nodeId":req.node_id, "userId":req.user_id,
+            "signedEnvelope":exact,
+        })),
+    ))
+}
+
+async fn load_outbox(
+    conn: &mut PgConnection,
+    req: &Request,
+    scope: &crate::node_runtime::FirstGenesisCapPolicyScope,
+    epoch: &str,
+    key: &str,
+    activation: &str,
+) -> Result<PgRow, ApiError> {
+    sqlx::query(
         "SELECT o.signed_envelope,o.runtime_id,o.grant_bytes,o.revision,
                 o.reservation_id::text AS reservation,o.meter_epoch::text AS meter,
                 o.install_before_ms,o.valid_until_ms,c.signed_reply
@@ -171,11 +221,20 @@ pub async fn handle(
                AND old.ceiling_bytes>GREATEST(old.acknowledged_bytes,old.conservative_burn_floor_bytes))
          FOR SHARE OF o,pf,r,g,q,p,n,c,prep",
     )
-    .bind(req.node_id).bind(req.user_id).bind(&req.request_challenge)
-    .bind(&epoch).bind(&scope.policy_sha256).bind(&key).bind(activation)
+    .bind(req.node_id).bind(req.user_id).bind(&req.challenge)
+    .bind(epoch).bind(&scope.policy_sha256).bind(key).bind(activation)
     .bind(&scope.profile_revision)
-    .fetch_optional(&mut *tx).await?.ok_or_else(deny)?;
+    .fetch_optional(conn).await?.ok_or_else(deny)
+}
 
+fn verified_outbox(
+    state: &AppState,
+    req: &Request,
+    scope: &crate::node_runtime::FirstGenesisCapPolicyScope,
+    epoch: &str,
+    activation: &str,
+    row: &PgRow,
+) -> Result<String, ApiError> {
     let raw: Vec<u8> = row.try_get("signed_envelope")?;
     let saved: Vec<u8> = row.try_get("signed_reply")?;
     let runtime: String = row.try_get("runtime_id")?;
@@ -185,53 +244,69 @@ pub async fn handle(
     let meter: String = row.try_get("meter")?;
     let install: i64 = row.try_get("install_before_ms")?;
     let expires: i64 = row.try_get("valid_until_ms")?;
-    if !crate::node_runtime::first_genesis_active_until(&current_user, now, expires) {
-        return Err(deny());
-    }
     let doc: Value = serde_json::from_slice(&raw).map_err(|_| deny())?;
     let p = &doc["payload"];
     let confirm: Value = serde_json::from_slice(&saved).map_err(|_| deny())?;
     let original = &confirm["payload"];
     let mut canonical = serde_json::to_vec(&doc).map_err(|_| deny())?;
     canonical.push(b'\n');
-    let aliases: Vec<Value> = scope.aliases.iter()
-        .map(|a| json!({"email":a.email,"class":a.class})).collect();
-    if raw != canonical || doc["algorithm"] != "Ed25519"
+    let has_cdn = scope.aliases.iter().any(|alias| alias.class == "cdn");
+    let aliases: Vec<Value> = scope
+        .aliases
+        .iter()
+        .map(|a| json!({"email":a.email,"class":a.class}))
+        .collect();
+    if raw != canonical
+        || doc["algorithm"] != "Ed25519"
         || doc["signature"].as_str()
-           != Some(state.node_policy_signer.sign_domain(DOMAIN,p).map_err(|_|deny())?.as_str())
+            != Some(
+                state
+                    .node_policy_signer
+                    .sign_domain(DOMAIN, p)
+                    .map_err(|_| deny())?
+                    .as_str(),
+            )
         || confirm["signature"].as_str()
-           != Some(state.node_policy_signer.sign(original).map_err(|_|deny())?.as_str())
-        || original["status"] != "confirmed" || original["authorizedBytes"] != 0
+            != Some(
+                state
+                    .node_policy_signer
+                    .sign(original)
+                    .map_err(|_| deny())?
+                    .as_str(),
+            )
+        || original["status"] != "confirmed"
+        || original["authorizedBytes"] != 0
         || original["canSpend"] != false
         || original["reservation"]["reservationId"].as_str() != Some(reservation.as_str())
         || original["reservation"]["revision"] != revision
         || original["reservation"]["ceilingBytes"] != ceiling
         || p["kind"] != "xmesh.quota-v2.xray-cap-admission"
-        || p["nodeId"] != req.node_id || p["userId"] != req.user_id
+        || p["nodeId"] != req.node_id
+        || p["userId"] != req.user_id
         || p["activationReceiptSha256"].as_str() != Some(activation)
         || p["runtimeId"].as_str() != Some(runtime.as_str())
         || p["policySha256"].as_str() != Some(scope.policy_sha256.as_str())
-        || p["nonce"].as_str() != Some(req.request_challenge.as_str())
-        || p["accountEpoch"].as_str() != Some(epoch.as_str())
+        || p["nonce"].as_str() != Some(req.challenge.as_str())
+        || p["accountEpoch"].as_str() != Some(epoch)
         || p["meterEpoch"].as_str() != Some(meter.as_str())
         || p["reservationId"].as_str() != Some(reservation.as_str())
         || p["reservationRevision"] != revision
         || p["sharedCeilingBytes"] != ceiling
         || p["nodeCeilingBytes"] != ceiling
         || p["cdnCeilingBytes"] != if has_cdn { ceiling } else { 0 }
-        || p["installBeforeMs"] != install || p["validUntilMs"] != expires
+        || p["installBeforeMs"] != install
+        || p["validUntilMs"] != expires
         || p["aliasScopes"] != json!(aliases)
-        || p["witnessedWalBytes"] != 0 || p["witnessedCdnBytes"] != 0
-        || p["canSpend"] != true || p["canStart"] != false || p["canResume"] != false
-        || p["finalMeterVerified"] != false || p["refundableBytes"] != 0
+        || p["witnessedWalBytes"] != 0
+        || p["witnessedCdnBytes"] != 0
+        || p["canSpend"] != true
+        || p["canStart"] != false
+        || p["canResume"] != false
+        || p["finalMeterVerified"] != false
+        || p["refundableBytes"] != 0
     {
         return Err(deny());
     }
     // Do not mint, refresh, extend or rewrite the immutable cap on retry.
-    let exact = String::from_utf8(raw).map_err(|_|deny())?;
-    tx.commit().await?;
-    Ok(([(header::CACHE_CONTROL,"no-store")],Json(json!({
-        "status":"committed_first_cap", "nodeId":req.node_id, "userId":req.user_id,
-        "signedEnvelope":exact,
-    }))))
+    String::from_utf8(raw).map_err(|_| deny())
 }

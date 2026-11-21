@@ -3,7 +3,9 @@
 //! The holder cannot obtain this route via legacy node signatures/HTTP.
 use crate::{ApiError, AppState, node_auth};
 use axum::{
-    Json, body::Bytes, extract::State,
+    Json,
+    body::Bytes,
+    extract::State,
     http::{HeaderMap, StatusCode, header},
 };
 use serde::Deserialize;
@@ -49,7 +51,8 @@ fn hex64(v: &str) -> bool {
 }
 
 fn valid(req: &Request) -> bool {
-    req.node_id > 0 && req.user_id > 0
+    req.node_id > 0
+        && req.user_id > 0
         && hex64(&req.policy_sha256)
         && hex64(&req.runtime_id)
         && hex64(&req.genesis_challenge)
@@ -58,7 +61,8 @@ fn valid(req: &Request) -> bool {
             "prepare" => req.echo.is_none(),
             "confirm" => req.echo.as_ref().is_some_and(|e| {
                 [&e.epoch, &e.meter_epoch, &e.reservation_id]
-                    .iter().all(|v| uuid::Uuid::parse_str(v).is_ok())
+                    .iter()
+                    .all(|v| uuid::Uuid::parse_str(v).is_ok())
             }),
             _ => false,
         }
@@ -104,7 +108,7 @@ async fn saved_reply(
     conn: &mut PgConnection,
     state: &AppState,
     req: &Request,
-    stage: &str,
+    phase: &str,
 ) -> Result<Option<Value>, ApiError> {
     let saved: Option<(Vec<u8>, String, String)> = sqlx::query_as(
         "SELECT signed_reply,policy_sha256,signer_public_key
@@ -113,7 +117,7 @@ async fn saved_reply(
     )
     .bind(req.node_id)
     .bind(req.user_id)
-    .bind(stage)
+    .bind(phase)
     .fetch_optional(conn)
     .await?;
     let Some((bytes, sha, key)) = saved else {
@@ -126,7 +130,13 @@ async fn saved_reply(
         || serde_json::to_vec(&doc).map_err(|_| deny())? != bytes
         || doc["algorithm"] != "Ed25519"
         || doc["signature"].as_str()
-            != Some(state.node_policy_signer.sign(payload).map_err(|_| deny())?.as_str())
+            != Some(
+                state
+                    .node_policy_signer
+                    .sign(payload)
+                    .map_err(|_| deny())?
+                    .as_str(),
+            )
         || payload["nodeId"] != req.node_id
         || payload["userId"] != req.user_id
         || payload["policySha256"] != req.policy_sha256.as_str()
@@ -137,7 +147,12 @@ async fn saved_reply(
         || payload["canStart"] != false
         || payload["canResume"] != false
         || payload["refundableBytes"] != 0
-        || payload["status"] != if stage == "prepare" { "prepared" } else { "confirmed" }
+        || payload["status"]
+            != if phase == "prepare" {
+                "prepared"
+            } else {
+                "confirmed"
+            }
     {
         return Err(deny());
     }
@@ -234,28 +249,11 @@ async fn recheck_lease(
     Ok(())
 }
 
-pub async fn handle(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    raw: Bytes,
-) -> Result<([(header::HeaderName, &'static str); 1], Json<Value>), ApiError> {
-    if !crate::quota_v2::enabled()
-        || !crate::quota_xray_genesis::quarantine_enabled()
-        || std::env::var("XMESH_QUOTA_V2_GENESIS_RESERVATION_STAGING")
-            .as_deref() != Ok("1")
-    {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "Experimental lease staging disabled."));
-    }
-    if raw.is_empty() || raw.len() > MAX_BODY {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid lease stage request size."));
-    }
-    let req: Request = serde_json::from_slice(&raw).map_err(|_| deny())?;
-    if !valid(&req) {
-        return Err(deny());
-    }
-    let activation = node_auth::authenticate_product_activation(
-        &state, &headers, req.node_id, PATH
-    ).await?;
+async fn verified_scope(
+    state: &AppState,
+    req: &Request,
+    activation: &str,
+) -> Result<crate::node_runtime::FirstGenesisCapPolicyScope, ApiError> {
     let genesis = sqlx::query(
         "SELECT first_activation_sha256,runtime_id,challenge,
                 policy_path_used,prepared_ms
@@ -270,11 +268,10 @@ pub async fn handle(
     let challenge: Option<String> = genesis.try_get("challenge")?;
     let old_policy: bool = genesis.try_get("policy_path_used")?;
     let prepared_ms: Option<i64> = genesis.try_get("prepared_ms")?;
-    let now_ms: i64 = sqlx::query_scalar(
-        "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint"
-    )
-    .fetch_one(&state.pool)
-    .await?;
+    let now_ms: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&state.pool)
+            .await?;
     if original_activation.as_deref() != Some(activation)
         || runtime.as_deref() != Some(req.runtime_id.as_str())
         || challenge.as_deref() != Some(req.genesis_challenge.as_str())
@@ -285,35 +282,49 @@ pub async fn handle(
     }
     // Recompile authoritative profile and verify the ORIGINAL immutable,
     // still-current Nexus-signed quarantined user roster and every alias.
-    let verified = crate::node_runtime::original_first_genesis_cap_scope(
-        &state, req.node_id, req.user_id
-    ).await?;
+    let verified =
+        crate::node_runtime::original_first_genesis_cap_scope(state, req.node_id, req.user_id)
+            .await?;
     if verified.policy_sha256 != req.policy_sha256
         || verified.aliases.is_empty()
-        || verified.aliases.iter().any(|a| !matches!(a.class.as_str(), "main" | "cdn"))
+        || verified
+            .aliases
+            .iter()
+            .any(|a| !matches!(a.class.as_str(), "main" | "cdn"))
     {
         return Err(deny());
     }
-    let signed_raw: Vec<u8> = sqlx::query_scalar(
-        "SELECT signed_policy_bytes FROM quota_v2_genesis_quarantine_policies
-         WHERE node_id=$1 AND runtime_id=$2 AND policy_sha256=$3",
-    )
-    .bind(req.node_id)
-    .bind(&req.runtime_id)
-    .bind(&req.policy_sha256)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(deny)?;
-    let policy: Value = serde_json::from_slice(&signed_raw).map_err(|_| deny())?;
-    let list = policy["users"].as_array().ok_or_else(deny)?;
-    let selected: Vec<Value> = list.iter()
-        .filter(|u| u.get("userId").and_then(Value::as_i64) == Some(req.user_id))
-        .cloned().collect();
-    if selected.len() != 1 || policy["configSha256"] != verified.profile_revision
-        || hex::encode(Sha256::digest(&signed_raw)) != verified.policy_sha256
+    Ok(verified)
+}
+
+pub async fn handle(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    raw: Bytes,
+) -> Result<([(header::HeaderName, &'static str); 1], Json<Value>), ApiError> {
+    if !crate::quota_v2::enabled()
+        || !crate::quota_xray_genesis::quarantine_enabled()
+        || std::env::var("XMESH_QUOTA_V2_GENESIS_RESERVATION_STAGING").as_deref() != Ok("1")
     {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Experimental lease staging disabled.",
+        ));
+    }
+    if raw.is_empty() || raw.len() > MAX_BODY {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid lease stage request size.",
+        ));
+    }
+    let req: Request = serde_json::from_slice(&raw).map_err(|_| deny())?;
+    if !valid(&req) {
         return Err(deny());
     }
+    let activation =
+        node_auth::authenticate_product_activation(&state, &headers, req.node_id, PATH).await?;
+    let verified = verified_scope(&state, &req, activation).await?;
+    let selected = original_policy_user(&state, &req, &verified).await?;
     // A new stage and its exact signed response must commit atomically.
     // Sharing the ordinary allocator's per-user advisory lock prevents two
     // simultaneous prepare/confirm requests from renewing a lease revision.
@@ -332,13 +343,22 @@ pub async fn handle(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(deny)?;
+    // The request may have waited for the account or subscriber lock.
+    // Derive issue time and expiry from the locked transaction.
+    let now_ms: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&mut *tx)
+            .await?;
     if !crate::node_runtime::first_genesis_rehearsal_limits_supported(
-        &current_user, req.node_id, verified.aliases.iter().any(|alias| alias.class == "cdn"),
+        &current_user,
+        req.node_id,
+        verified.aliases.iter().any(|alias| alias.class == "cdn"),
     ) || !crate::node_runtime::first_genesis_active_until(
-        &current_user, now_ms, now_ms.saturating_add(3_600_000),
-    )
-        || current_user["limit"].as_f64().map(crate::gb_to_bytes_i64)
-            != selected[0]["limitBytes"].as_i64()
+        &current_user,
+        now_ms,
+        now_ms.saturating_add(3_600_000),
+    ) || current_user["limit"].as_f64().map(crate::gb_to_bytes_i64)
+        != selected["limitBytes"].as_i64()
     {
         return Err(deny());
     }
@@ -370,18 +390,71 @@ pub async fn handle(
         }
     }
 
+    let reservation = issue_zero_authority_lease(&mut tx, &req, selected, now_ms).await?;
+    let reservation = &reservation;
+    recheck_lease(&mut tx, &req, reservation).await?;
+    recheck_genesis(&mut tx, &req, activation, &public).await?;
+    let reply = persist_lease_reply(&mut tx, &state, &req, activation, reservation, now_ms).await?;
+    tx.commit().await?;
+    Ok(([(header::CACHE_CONTROL, "no-store")], Json(reply)))
+}
+
+async fn original_policy_user(
+    state: &AppState,
+    req: &Request,
+    verified: &crate::node_runtime::FirstGenesisCapPolicyScope,
+) -> Result<Value, ApiError> {
+    let signed_raw: Vec<u8> = sqlx::query_scalar(
+        "SELECT signed_policy_bytes FROM quota_v2_genesis_quarantine_policies
+         WHERE node_id=$1 AND runtime_id=$2 AND policy_sha256=$3",
+    )
+    .bind(req.node_id)
+    .bind(&req.runtime_id)
+    .bind(&req.policy_sha256)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(deny)?;
+    let policy: Value = serde_json::from_slice(&signed_raw).map_err(|_| deny())?;
+    let list = policy["users"].as_array().ok_or_else(deny)?;
+    let mut selected = list
+        .iter()
+        .filter(|u| u.get("userId").and_then(Value::as_i64) == Some(req.user_id))
+        .cloned();
+    let original = selected.next().ok_or_else(deny)?;
+    if selected.next().is_some()
+        || policy["configSha256"] != verified.profile_revision
+        || hex::encode(Sha256::digest(&signed_raw)) != verified.policy_sha256
+    {
+        return Err(deny());
+    }
+    Ok(original)
+}
+
+async fn issue_zero_authority_lease(
+    conn: &mut PgConnection,
+    req: &Request,
+    mut user: Value,
+    now_ms: i64,
+) -> Result<Value, ApiError> {
     // Clone the exact original user policy. No other desired-config route
     // is invoked, and the immutable signed quarantine stays zero-spend.
-    let mut user = selected.into_iter().next().ok_or_else(deny)?;
-    let local = req.echo.as_ref().map(|e| crate::quota_v2::LocalQuotaCounter {
-        user_id: req.user_id,
-        used_bytes: 0,
-        epoch: Some(e.epoch.clone()),
-        meter_epoch: Some(e.meter_epoch.clone()),
-        reservation_id: Some(e.reservation_id.clone()),
-    });
+    let local = req
+        .echo
+        .as_ref()
+        .map(|e| crate::quota_v2::LocalQuotaCounter {
+            user_id: req.user_id,
+            used_bytes: 0,
+            epoch: Some(e.epoch.clone()),
+            meter_epoch: Some(e.meter_epoch.clone()),
+            reservation_id: Some(e.reservation_id.clone()),
+        });
     crate::quota_v2::issue_user(
-        &mut tx, &mut user, req.user_id, req.node_id, local.as_ref(), now_ms,
+        conn,
+        &mut user,
+        req.user_id,
+        req.node_id,
+        local.as_ref(),
+        now_ms,
     )
     .await?;
     let reservation = &user["quotaReservation"];
@@ -389,15 +462,29 @@ pub async fn handle(
     if !user["quotaRevocation"].is_null()
         || reservation["acknowledgedBytes"] != 0
         || (req.operation == "prepare" && ceiling != 0)
-        || (req.operation == "confirm" && (ceiling <= 0 || !echo_matches(&req, reservation)))
+        || (req.operation == "confirm" && (ceiling <= 0 || !echo_matches(req, reservation)))
     {
         return Err(deny());
     }
-    recheck_lease(&mut tx, &req, reservation).await?;
-    recheck_genesis(&mut tx, &req, activation, &public).await?;
-    let proof = zero_reply(&req, activation, &verified.policy_sha256, reservation, now_ms);
-    let signature = state.node_policy_signer.sign(&proof)
-        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Lease proof signing failed."))?;
+    Ok(reservation.clone())
+}
+
+async fn persist_lease_reply(
+    conn: &mut PgConnection,
+    state: &AppState,
+    req: &Request,
+    activation: &str,
+    reservation: &Value,
+    now_ms: i64,
+) -> Result<Value, ApiError> {
+    let public = state.node_policy_signer.public_key();
+    let proof = zero_reply(req, activation, &req.policy_sha256, reservation, now_ms);
+    let signature = state.node_policy_signer.sign(&proof).map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Lease proof signing failed.",
+        )
+    })?;
     let reply = json!({
         "payload":proof,
         "signature":signature,
@@ -415,10 +502,9 @@ pub async fn handle(
     .bind(&req.policy_sha256)
     .bind(public)
     .bind(bytes)
-    .execute(&mut *tx)
+    .execute(conn)
     .await?;
-    tx.commit().await?;
-    Ok(([(header::CACHE_CONTROL, "no-store")], Json(reply)))
+    Ok(reply)
 }
 
 #[cfg(test)]
@@ -427,9 +513,13 @@ mod tests {
 
     fn sample(op: &str, echo: Option<Echo>) -> Request {
         Request {
-            node_id:47, user_id:101, operation:op.to_owned(),
-            policy_sha256:"a".repeat(64), runtime_id:"b".repeat(64),
-            genesis_challenge:"c".repeat(64), echo,
+            node_id: 47,
+            user_id: 101,
+            operation: op.to_owned(),
+            policy_sha256: "a".repeat(64),
+            runtime_id: "b".repeat(64),
+            genesis_challenge: "c".repeat(64),
+            echo,
         }
     }
 
@@ -437,11 +527,14 @@ mod tests {
     fn strict_staging_rejects_missing_identity_or_legacy_shortcuts() {
         assert!(valid(&sample("prepare", None)));
         assert!(!valid(&sample("confirm", None)));
-        assert!(!valid(&sample("prepare", Some(Echo {
-            epoch:"11111111-1111-4111-8111-111111111111".into(),
-            meter_epoch:"22222222-2222-4222-8222-222222222222".into(),
-            reservation_id:"33333333-3333-4333-8333-333333333333".into(),
-        }))));
+        assert!(!valid(&sample(
+            "prepare",
+            Some(Echo {
+                epoch: "11111111-1111-4111-8111-111111111111".into(),
+                meter_epoch: "22222222-2222-4222-8222-222222222222".into(),
+                reservation_id: "33333333-3333-4333-8333-333333333333".into(),
+            })
+        )));
         assert!(!valid(&sample("grant", None)));
         let mut unknown = sample("prepare", None);
         unknown.runtime_id = unknown.genesis_challenge.clone();
@@ -457,8 +550,13 @@ mod tests {
 
     #[test]
     fn signed_reply_cannot_grant_traffic_even_on_confirm() {
-        let reply = zero_reply(&sample("confirm",None), &"a".repeat(64),
-            &"d".repeat(64), &json!({"ceilingBytes":1048576}), 1000);
+        let reply = zero_reply(
+            &sample("confirm", None),
+            &"a".repeat(64),
+            &"d".repeat(64),
+            &json!({"ceilingBytes":1_048_576}),
+            1000,
+        );
         assert_eq!(reply["authorizedBytes"], 0);
         assert_eq!(reply["canSpend"], false);
         assert_eq!(reply["canStart"], false);

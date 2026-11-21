@@ -33,7 +33,11 @@ fn unavailable() -> ApiError {
 }
 
 fn valid_request(req: &Request) -> bool {
-    req.node_id > 0 && matches!(req.operation.as_str(), "discover_policy_signer" | "preview_quarantined_config")
+    req.node_id > 0
+        && matches!(
+            req.operation.as_str(),
+            "discover_policy_signer" | "preview_quarantined_config"
+        )
 }
 
 fn gate() -> bool {
@@ -86,13 +90,8 @@ pub async fn handle(
     // The strictly isolated product gateway forwards the original signed
     // activation SHA; its per-Node product identity is independently enrolled.
     // An HTTP header or JSON field alone is never a trust source.
-    let activation = node_auth::authenticate_product_activation(
-        &state,
-        &headers,
-        request.node_id,
-        PATH,
-    )
-    .await?;
+    let activation =
+        node_auth::authenticate_product_activation(&state, &headers, request.node_id, PATH).await?;
     let row = sqlx::query(
         "SELECT encode(p.receipt_sha256,'hex') AS activation,
                 g.first_activation_sha256,g.policy_path_used,g.prepared_ms
@@ -132,38 +131,7 @@ pub async fn handle(
         if prepared_ms.is_some() {
             return Err(unavailable());
         }
-        let compiled = crate::node_runtime::first_genesis_config_preview(
-            &state, request.node_id,
-        ).await?;
-        let now: i64 = sqlx::query_scalar(
-            "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint",
-        )
-        .fetch_one(&state.pool)
-        .await?;
-        let payload = json!({
-            "schemaVersion":1,
-            "kind":"xmesh.quota-v2.quarantined-config-preview",
-            "nodeId":request.node_id,
-            "activationReceiptSha256":activation,
-            "profileId":compiled["profileId"],
-            "port":compiled["port"],
-            "config":compiled["config"],
-            "configSha256":compiled["configSha256"],
-            "issuedAtMs":now,
-            "validUntilMs":now.saturating_add(120_000),
-            "authorizedBytes":0,
-            "publicIngressAllowed":false,
-            "canStart":false,
-            "canResume":false,
-            "refundableBytes":0,
-        });
-        let signature = state.node_policy_signer
-            .sign_domain(b"XMESH_XRAY_QUARANTINE_CONFIG_V1\0", &payload)
-            .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Config preview signing failed."))?;
-        return Ok((
-            [(header::CACHE_CONTROL, "no-store")],
-            Json(json!({"algorithm":"Ed25519","payload":payload,"signature":signature})),
-        ));
+        return signed_config_preview(&state, request.node_id, activation).await;
     }
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
@@ -172,6 +140,48 @@ pub async fn handle(
             activation,
             &state.node_policy_signer.public_key(),
         )),
+    ))
+}
+
+async fn signed_config_preview(
+    state: &AppState,
+    node_id: i64,
+    activation: &str,
+) -> Result<([(header::HeaderName, &'static str); 1], Json<Value>), ApiError> {
+    let compiled = crate::node_runtime::first_genesis_config_preview(state, node_id).await?;
+    let now: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&state.pool)
+            .await?;
+    let payload = json!({
+        "schemaVersion":1,
+        "kind":"xmesh.quota-v2.quarantined-config-preview",
+        "nodeId":node_id,
+        "activationReceiptSha256":activation,
+        "profileId":compiled["profileId"],
+        "port":compiled["port"],
+        "config":compiled["config"],
+        "configSha256":compiled["configSha256"],
+        "issuedAtMs":now,
+        "validUntilMs":now.saturating_add(120_000),
+        "authorizedBytes":0,
+        "publicIngressAllowed":false,
+        "canStart":false,
+        "canResume":false,
+        "refundableBytes":0,
+    });
+    let signature = state
+        .node_policy_signer
+        .sign_domain(b"XMESH_XRAY_QUARANTINE_CONFIG_V1\0", &payload)
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Config preview signing failed.",
+            )
+        })?;
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(json!({"algorithm":"Ed25519","payload":payload,"signature":signature})),
     ))
 }
 
@@ -187,8 +197,8 @@ mod tests {
         .unwrap();
         assert!(valid_request(&parsed));
         assert!(valid_request(&Request {
-            node_id:123,
-            operation:"preview_quarantined_config".to_owned(),
+            node_id: 123,
+            operation: "preview_quarantined_config".to_owned(),
         }));
         assert!(!valid_request(&Request {
             node_id: 123,

@@ -8,6 +8,7 @@ on:
       - 'backend/migrations/0141_quota_v2_genesis_quarantine_policy.sql'
       - 'backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql'
       - 'backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql'
+      - 'backend/migrations/0144_quota_v2_genesis_lease_replies.sql'
       - 'scripts/test-quota-v2-quarantined-runtime-postgres.py'
       - 'scripts/test-quota-v2-genesis-quarantine-postgres.py'
       - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
@@ -79,6 +80,7 @@ jobs:
                   "backend/migrations/0141_quota_v2_genesis_quarantine_policy.sql",
                   "backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql",
                   "backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql",
+                  "backend/migrations/0144_quota_v2_genesis_lease_replies.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY

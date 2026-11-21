@@ -126,15 +126,18 @@ struct InstalledInput {
 }
 
 fn hex64(value: &str) -> bool {
-    value.len() == 64 && value.bytes()
-        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn installed_args() -> Result<(i64, String, i64, String, InstalledInput)> {
     let v: Vec<String> = env::args().skip(1).collect();
     ensure!(
         env::var("XMESH_INSTALLED_GENESIS_LEASE").as_deref() == Ok("1")
-            && v.len() == 8 && v[0] == "--installed",
+            && v.len() == 8
+            && v[0] == "--installed",
         "installed signer requires the isolated runner test and exact observed inputs"
     );
     let node = v[1].parse::<i64>()?;
@@ -142,16 +145,28 @@ fn installed_args() -> Result<(i64, String, i64, String, InstalledInput)> {
     let pid = v[4].parse::<i64>()?;
     let config = PathBuf::from(&v[7]);
     ensure!(
-        node > 0 && user > 0 && pid > 0 && hex64(&v[3])
-            && hex64(&v[5]) && hex64(&v[6])
+        node > 0
+            && user > 0
+            && pid > 0
+            && hex64(&v[3])
+            && hex64(&v[5])
+            && hex64(&v[6])
             && config.starts_with(PathBuf::from(env::var("RUNNER_TEMP")?))
             && fs::symlink_metadata(&config)?.file_type().is_file()
-            && fs::metadata(&config)?.len() <= 262144,
+            && fs::metadata(&config)?.len() <= 262_144,
         "invalid independently measured disposable installed candidate"
     );
-    Ok((node, v[3].clone(), pid, v[6].clone(), InstalledInput {
-        user_id: user, container: v[5].clone(), config,
-    }))
+    Ok((
+        node,
+        v[3].clone(),
+        pid,
+        v[6].clone(),
+        InstalledInput {
+            user_id: user,
+            container: v[5].clone(),
+            config,
+        },
+    ))
 }
 
 /// The hosted-runner controller owns the disposable guest/root and reads
@@ -178,64 +193,98 @@ async fn installed_scope(
     .fetch_one(&mut *conn)
     .await?;
     let policy: Value = serde_json::from_slice(&q.0)?;
-    ensure!(serde_json::to_vec(&policy)? == q.0
+    ensure!(
+        serde_json::to_vec(&policy)? == q.0
             && hex::encode(Sha256::digest(&q.0)) == p.reported_policy_sha256
-            && signer.public_key() == q.2 && signer.sign(&policy)? == q.1
+            && signer.public_key() == q.2
+            && signer.sign(&policy)? == q.1
             && policy["configSha256"].as_str() == Some(q.3.as_str())
             && policy["nodeId"] == p.node_id,
-            "original installed signed quarantine not verified");
+        "original installed signed quarantine not verified"
+    );
     let raw = fs::read(&candidate.config)?;
     let config: Value = serde_json::from_slice(&raw)?;
-    ensure!(serde_json::to_vec(&config)? == raw
-            && hex::encode(Sha256::digest(&raw)) == q.3,
-            "trusted runner config is not the actual signed profile");
-    let users = policy["users"].as_array().context("signed runtime user roster")?;
+    ensure!(
+        serde_json::to_vec(&config)? == raw && hex::encode(Sha256::digest(&raw)) == q.3,
+        "trusted runner config is not the actual signed profile"
+    );
+    let users = policy["users"]
+        .as_array()
+        .context("signed runtime user roster")?;
     let roster: Vec<_> = users.iter().filter(|u| u["userId"] == p.user_id).collect();
-    ensure!(roster.len() == 1 && roster[0]["onHold"] == true
-            && roster[0]["offlineBudgetBytes"] == 0, "user absent from original scope");
-    let uuid = roster[0]["xrayId"].as_str().context("signed Xray identity")?;
+    ensure!(
+        roster.len() == 1 && roster[0]["onHold"] == true && roster[0]["offlineBudgetBytes"] == 0,
+        "user absent from original scope"
+    );
+    let uuid = roster[0]["xrayId"]
+        .as_str()
+        .context("signed Xray identity")?;
 
     let lease: (Vec<u8>, String) = sqlx::query_as(
         "SELECT signed_reply,signer_public_key FROM quota_v2_genesis_lease_replies
          WHERE node_id=$1 AND user_id=$2 AND stage='confirm' AND policy_sha256=$3",
     )
-    .bind(p.node_id).bind(p.user_id).bind(&p.reported_policy_sha256)
-    .fetch_one(&mut *conn).await?;
-    let signed: Value = serde_json::from_slice(&lease.0)?;
-    let payload = &signed["payload"];
+    .bind(p.node_id)
+    .bind(p.user_id)
+    .bind(&p.reported_policy_sha256)
+    .fetch_one(&mut *conn)
+    .await?;
+    let lease_reply: Value = serde_json::from_slice(&lease.0)?;
+    let payload = &lease_reply["payload"];
     let r = &payload["reservation"];
-    ensure!(signer.public_key() == lease.1
-            && serde_json::to_vec(&signed)? == lease.0
-            && signed["signature"].as_str() == Some(signer.sign(payload)?.as_str())
-            && payload["authorizedBytes"] == 0 && payload["canSpend"] == false
+    ensure!(
+        signer.public_key() == lease.1
+            && serde_json::to_vec(&lease_reply)? == lease.0
+            && lease_reply["signature"].as_str() == Some(signer.sign(payload)?.as_str())
+            && payload["authorizedBytes"] == 0
+            && payload["canSpend"] == false
             && payload["status"] == "confirmed"
             && r["epoch"].as_str() == Some(p.epoch.as_str())
             && r["meterEpoch"].as_str() == Some(p.meter_epoch.as_str())
             && r["reservationId"].as_str() == Some(p.reservation_id.as_str())
-            && r["revision"] == p.revision && r["ceilingBytes"] == p.ceiling_bytes,
-            "installed runner cap does not match original confirmed SQL lease");
+            && r["revision"] == p.revision
+            && r["ceilingBytes"] == p.ceiling_bytes,
+        "installed runner cap does not match original confirmed SQL lease"
+    );
 
+    installed_aliases(&config, p.user_id, uuid)
+}
+
+fn installed_aliases(config: &Value, user_id: i64, uuid: &str) -> Result<Vec<Alias>> {
     let mut aliases = Vec::new();
     for inbound in config["inbounds"].as_array().context("original inbounds")? {
         let tag = inbound["tag"].as_str().context("inbound tag")?;
         if tag == "xmesh_stats_in" && inbound["protocol"] == "dokodemo-door" {
             continue;
         }
-        ensure!(inbound["protocol"] == "vless", "unmetered installed protocol");
+        ensure!(
+            inbound["protocol"] == "vless",
+            "unmetered installed protocol"
+        );
         let class = match tag {
             "vless-main" => "main",
             "vless-cdn" => "cdn",
             _ => anyhow::bail!("unknown installed scope"),
         };
-        let email = format!("xmesh-u{}--{tag}", p.user_id);
-        let clients = inbound["settings"]["clients"].as_array().context("real clients")?;
-        ensure!(clients.len() == 1
-            && clients[0]["email"].as_str() == Some(email.as_str())
-            && clients[0]["id"].as_str() == Some(uuid),
-            "disposable profile must contain exactly the intended real user");
-        aliases.push(Alias { email, class: class.to_owned() });
+        let email = format!("xmesh-u{user_id}--{tag}");
+        let clients = inbound["settings"]["clients"]
+            .as_array()
+            .context("real clients")?;
+        ensure!(
+            clients.len() == 1
+                && clients[0]["email"].as_str() == Some(email.as_str())
+                && clients[0]["id"].as_str() == Some(uuid),
+            "disposable profile must contain exactly the intended real user"
+        );
+        aliases.push(Alias {
+            email,
+            class: class.to_owned(),
+        });
     }
-    ensure!(aliases.len() == 1, "one actual MAIN/CDN VLESS inbound per installed test Node");
+    ensure!(
+        aliases.len() == 1,
+        "one actual MAIN/CDN VLESS inbound per installed test Node"
+    );
     Ok(aliases)
 }
 
@@ -263,13 +312,25 @@ async fn main() -> Result<()> {
 
     let fake_container = "f".repeat(64);
     let expected_user = installed.as_ref().map_or(101, |v| v.user_id);
-    let expected_container = installed.as_ref().map_or(fake_container.as_str(), |v| v.container.as_str());
-    let p = load_preflight(&mut tx, node, &nonce, observed_pid, &policy_sha,
-                           expected_user, expected_container).await?;
+    let expected_container = installed
+        .as_ref()
+        .map_or(fake_container.as_str(), |v| v.container.as_str());
+    let p = load_preflight(
+        &mut tx,
+        node,
+        &nonce,
+        observed_pid,
+        &policy_sha,
+        expected_user,
+        expected_container,
+    )
+    .await?;
     let snapshot = lock_snapshot(&mut tx, &p).await?;
     let scope = if let Some(candidate) = &installed {
         Some(installed_scope(&mut tx, &p, candidate, &key_path).await?)
-    } else { None };
+    } else {
+        None
+    };
     let Snapshot {
         account,
         lease,
@@ -506,9 +567,16 @@ fn signing_input(
     // budget source; synthetic inbound membership is fixed by CI only.
     let until = (now + 3_600_000).min(lease.valid_until_ms);
     let install_before = (now + 60_000).min(p.expires_ms).min(genesis_expires_ms);
-    let cdn_ceiling = installed_scope.as_ref().map_or(150.min(lease.ceiling_bytes), |aliases| {
-        if aliases.iter().any(|a| a.class == "cdn") { lease.ceiling_bytes } else { 0 }
-    });
+    let cdn_ceiling = installed_scope.as_ref().map_or_else(
+        || 150.min(lease.ceiling_bytes),
+        |aliases| {
+            if aliases.iter().any(|a| a.class == "cdn") {
+                lease.ceiling_bytes
+            } else {
+                0
+            }
+        },
+    );
     Ok(SqlSnapshot {
         user_id: p.user_id,
         node_id: p.node_id,
@@ -535,16 +603,18 @@ fn signing_input(
         issued_at_ms: now - 1000,
         install_before_ms: install_before,
         valid_until_ms: until,
-        aliases: installed_scope.unwrap_or_else(|| vec![
-            Alias {
-                email: "xmesh-u101--vless-cdn".into(),
-                class: "cdn".into(),
-            },
-            Alias {
-                email: "xmesh-u101--vless-main".into(),
-                class: "main".into(),
-            },
-        ]),
+        aliases: installed_scope.unwrap_or_else(|| {
+            vec![
+                Alias {
+                    email: "xmesh-u101--vless-cdn".into(),
+                    class: "cdn".into(),
+                },
+                Alias {
+                    email: "xmesh-u101--vless-main".into(),
+                    class: "main".into(),
+                },
+            ]
+        }),
     })
 }
 

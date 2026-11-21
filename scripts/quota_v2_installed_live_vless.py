@@ -114,6 +114,11 @@ def run(xray,uuid,email,ceiling):
                 else:
                     raise AssertionError("VLESS client did not start")
                 if ceiling==0:
+                    # A refusal is meaningful only when the measured server
+                    # has started its actual VLESS and private StatsService.
+                    with socket.create_connection(("127.0.0.1",28401),timeout=4):
+                        pass
+                    assert sum(stats(xray,email).values())==0
                     denied()
                     assert sum(stats(xray,email).values())==0
                     return {"uplink":0,"downlink":0}

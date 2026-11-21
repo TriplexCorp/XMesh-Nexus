@@ -4,6 +4,7 @@ allocator -> strict zero-authority runtime preflight with exact policy digest.
 """
 import concurrent.futures
 import importlib.util
+import json
 import os
 from pathlib import Path
 import unittest
@@ -121,6 +122,40 @@ class QuarantinedRuntimeTests(unittest.TestCase):
                       "WHERE user_id=%s AND node_id=%s",
                       (self.user,self.genesis.node))
         self.deny()
+
+    def test_lease_reply_rollback_and_immutable_exact_bytes(self):
+        raw = json.dumps({
+            "algorithm": "Ed25519", "signature": self.genesis.signature,
+            "payload": {"nodeId": self.genesis.node, "userId": self.user,
+                        "authorizedBytes": 0, "canSpend": False},
+        }, sort_keys=True, separators=(",", ":")).encode()
+        key = (self.genesis.node, self.user)
+        insert = """INSERT INTO quota_v2_genesis_lease_replies
+                    (node_id,user_id,stage,policy_sha256,signer_public_key,signed_reply)
+                    VALUES(%s,%s,'confirm',%s,%s,%s)"""
+        saved = """SELECT signed_reply FROM quota_v2_genesis_lease_replies
+                   WHERE node_id=%s AND user_id=%s AND stage='confirm'"""
+        args = (*key, self.policy_digest, self.genesis.signer, raw)
+        with psycopg.connect(DSN) as writer, psycopg.connect(DSN, autocommit=True) as reader:
+            writer.execute(insert, args)
+            self.assertIsNone(reader.execute(saved, key).fetchone())
+            writer.rollback()
+            self.assertIsNone(reader.execute(saved, key).fetchone())
+
+            writer.execute(insert, args)
+            writer.commit()
+            self.assertEqual(reader.execute(saved, key).fetchone(), (raw,))
+            for statement, params in (
+                (insert, args),
+                ("UPDATE quota_v2_genesis_lease_replies SET signed_reply=%s "
+                 "WHERE node_id=%s AND user_id=%s", (raw+b" ", *key)),
+                ("DELETE FROM quota_v2_genesis_lease_replies WHERE node_id=%s AND user_id=%s", key),
+                ("TRUNCATE quota_v2_genesis_lease_replies", ()),
+            ):
+                with self.subTest(statement=statement), self.assertRaises(psycopg.Error):
+                    with writer.transaction():
+                        writer.execute(statement, params)
+            self.assertEqual(reader.execute(saved, key).fetchone(), (raw,))
 
     def test_12_parallel_same_preflight_remain_zero_authority(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:

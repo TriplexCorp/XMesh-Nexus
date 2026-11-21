@@ -27,7 +27,7 @@ fn enabled() -> bool {
 }
 
 /// Separate opt-in first-genesis handoff. Ordinary desired-config continues
-/// to *permanently* mark policy_path_used=true; it cannot masquerade as a
+/// to *permanently* mark `policy_path_used=true`; it cannot masquerade as a
 /// clean new Xray. This stage only saves a signed, zero-spend policy and
 /// never starts Xray or issues an actual reservation.
 pub fn quarantine_enabled() -> bool {
@@ -76,11 +76,10 @@ pub async fn quarantine_prepared(
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(unavailable)?;
-    let now: i64 = sqlx::query_scalar(
-        "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint",
-    )
-    .fetch_one(&state.pool)
-    .await?;
+    let now: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&state.pool)
+            .await?;
     let prepared_ms = record.prepared_ms.ok_or_else(unavailable)?;
     if record.policy_path_used
         || record.runtime_id.as_deref() != Some(runtime_id)
@@ -117,10 +116,12 @@ pub async fn stage_quarantine_policy(
     policy: &Value,
 ) -> Result<QuarantineSignedPolicy, ApiError> {
     let bytes = serde_json::to_vec(policy).map_err(|_| unavailable())?;
-    let signature = state
-        .node_policy_signer
-        .sign(policy)
-        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Quarantine signing failed."))?;
+    let signature = state.node_policy_signer.sign(policy).map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Quarantine signing failed.",
+        )
+    })?;
     let public = state.node_policy_signer.public_key();
     let saved: (Vec<u8>, String, String) = sqlx::query_as(
         "SELECT signed_policy_bytes,policy_signature,policy_sha256
@@ -139,7 +140,8 @@ pub async fn stage_quarantine_policy(
     .await?;
     // Never serve bytes other than the ones the existing pinned signer
     // actually signed and the immutable PostgreSQL record committed.
-    if saved.0 != bytes || saved.1 != signature
+    if saved.0 != bytes
+        || saved.1 != signature
         || saved.2 != hex::encode(sha2::Sha256::digest(&bytes))
     {
         return Err(unavailable());
