@@ -233,4 +233,70 @@ mod tests {
         let q=parse_quota_cap_attestation_staging(&wire(&extra,now),now).unwrap();
         assert!(validate_claims(&q,47,now).is_err());
     }
+    #[test]
+    fn real_enrolled_ed25519_and_mldsa65_signatures_required() {
+        use ed25519_dalek::{Signer as _,SigningKey};
+        use openssl::{pkey::PKey,sign::Signer as PQSigner};
+        use std::process::Command;
+        let generated=Command::new("openssl")
+            .args(["genpkey","-algorithm","ML-DSA-65"])
+            .output().expect("OpenSSL CLI required");
+        if !generated.status.success() {
+            assert_ne!(std::env::var("XSP_V2_REQUIRE_PQ_CAP_TESTS").as_deref(),
+                Ok("1"),"ML-DSA-65 is REQUIRED in the dedicated crypto job");
+            return;
+        }
+        let pq=PKey::private_key_from_pem(&generated.stdout)
+            .expect("real ML-DSA-65 test key");
+        let der=pq.public_key_to_der().unwrap();
+        let pq_pub=&der[der.len()-1952..];
+        let ed=SigningKey::from_bytes(&[23u8;32]);
+        let ed_pub=ed.verifying_key().to_bytes();
+        let (payload,now)=fixture();
+        let original=wire(&payload,now);
+        let input=crate::xsp_v2_api::quota_cap_signing_input_for_test(
+            &original,now).unwrap();
+        let mut pq_sign=PQSigner::new_without_digest(&pq).unwrap();
+        let pq_signature=pq_sign.sign_oneshot_to_vec(&input).unwrap();
+        let mut envelope:serde_json::Value=
+            serde_json::from_slice(&original).unwrap();
+        envelope["signatures"]["ed25519"]=json!(
+            STANDARD.encode(ed.sign(&input).to_bytes()));
+        envelope["signatures"]["mldsa65"]=json!(STANDARD.encode(pq_signature));
+        let signed=serde_json::to_vec(&envelope).unwrap();
+        let parsed=parse_quota_cap_attestation_staging(&signed,now).unwrap();
+        assert!(verify_quota_cap_dual_signatures_staging(
+            &parsed,&ed_pub,pq_pub).is_ok());
+        assert!(validate_claims(&parsed,47,now).is_ok());
+        // Real Ed25519 alone, or real ML-DSA alone, is never accepted.
+        let mut wrong=envelope.clone();
+        wrong["signatures"]["mldsa65"]=json!(STANDARD.encode([0u8;3309]));
+        let p=parse_quota_cap_attestation_staging(
+            &serde_json::to_vec(&wrong).unwrap(),now).unwrap();
+        assert!(verify_quota_cap_dual_signatures_staging(
+            &p,&ed_pub,pq_pub).is_err());
+        wrong=envelope.clone();
+        wrong["signatures"]["ed25519"]=json!(STANDARD.encode([0u8;64]));
+        let p=parse_quota_cap_attestation_staging(
+            &serde_json::to_vec(&wrong).unwrap(),now).unwrap();
+        assert!(verify_quota_cap_dual_signatures_staging(
+            &p,&ed_pub,pq_pub).is_err());
+        assert!(verify_quota_cap_dual_signatures_staging(
+            &parsed,&[2u8;32],pq_pub).is_err());
+        assert!(verify_quota_cap_dual_signatures_staging(
+            &parsed,&ed_pub,&[2u8;1952]).is_err());
+        wrong=envelope;
+        let raw=STANDARD.decode(wrong["payloadB64"].as_str().unwrap()).unwrap();
+        let mut replaced:String=String::from_utf8(raw).unwrap();
+        replaced=replaced.replace("vless","other");
+        if replaced==String::from_utf8(STANDARD.decode(wrong["payloadB64"].as_str().unwrap()).unwrap()).unwrap() {
+            replaced.push(' ');
+        }
+        wrong["payloadB64"]=json!(STANDARD.encode(replaced.as_bytes()));
+        let p=parse_quota_cap_attestation_staging(
+            &serde_json::to_vec(&wrong).unwrap(),now).unwrap();
+        assert!(verify_quota_cap_dual_signatures_staging(
+            &p,&ed_pub,pq_pub).is_err(),"signed payload bytes cannot change");
+    }
+
 }
