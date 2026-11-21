@@ -10,7 +10,7 @@ umask 077
 [[ $# -ge 1 && $# -le 2 && -x "$1" ]] || exit 2
 [[ $# == 1 || "$2" == --with-reconcile || "$2" == --with-product || "$2" == --with-installed ]] || exit 2
 
-run="$(mktemp -d)"
+run="$(mktemp -d "${RUNNER_TEMP:-/tmp}/xmesh-wal.XXXXXXXX")"
 server=""
 cleanup() {
     if [[ -n "$server" ]]; then
@@ -41,8 +41,12 @@ if [[ "${XMESH_INSTALLED_GENESIS_LEASE:-0}" == 1 ]]; then
     export XMESH_QUOTA_V2_ENABLED=1
     export XMESH_QUOTA_V2_GENESIS_QUARANTINE_STAGING=1
     export XMESH_QUOTA_V2_GENESIS_RESERVATION_STAGING=1
+    export XMESH_QUOTA_V2_INSTALLED_CAP_DELIVERY=1
 fi
 export CORE_DATA_DIR="$run/core"
+if [[ "${XMESH_INSTALLED_GENESIS_LEASE:-0}" == 1 ]]; then
+    export XMESH_CI_CAP_POLICY_KEY="$CORE_DATA_DIR/node-policy-ed25519.key"
+fi
 export XMESH_TEST_POLICY_PUBLIC_KEY="$run/node-policy.pem"
 
 start() {
