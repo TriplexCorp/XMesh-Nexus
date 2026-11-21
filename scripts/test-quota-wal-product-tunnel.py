@@ -12,6 +12,7 @@ import http.client
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import secrets
 import subprocess
@@ -167,6 +168,45 @@ def provision_signed_policies(agents):
     print("Both activated Agent identities received and verified their own Nexus-signed policy over strict XSP/2.")
 
 
+def restart_disposable_database(database):
+    container = os.environ["XMESH_WAL_POSTGRES_CONTAINER"]
+    assert re.fullmatch(r"[0-9a-f]{64}", container)
+    image = subprocess.check_output([
+        "docker", "inspect", "--format", "{{.Config.Image}}", container,
+    ], text=True, timeout=10).strip()
+    assert image == "timescale/timescaledb:2.30.0-pg18", image
+    database.close()
+    subprocess.run(["docker", "restart", "--time", "10", container], check=True, timeout=30)
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        try:
+            return psycopg.connect(suite["DSN"], autocommit=True, connect_timeout=2)
+        except psycopg.OperationalError:
+            time.sleep(0.2)
+    raise RuntimeError("disposable PostgreSQL failed to become ready after restart")
+
+
+def reject_missing_history(agent):
+    journal = agent.local.xray
+    meters = sorted(journal.glob("meter-*.jsonl"))
+    assert len(meters) == 4
+    registry = journal / "xmesh-meter-inventory-v1.jsonl"
+    for missing in (meters[:1], meters[:2], [registry], [registry, *meters]):
+        for path in missing:
+            path.rename(agent.root / path.name)
+        agent.sent.clear()
+        try:
+            agent.sync("sync")
+        except (ValueError, OSError):
+            assert agent.sent == ["head"]
+        else:
+            raise AssertionError(f"missing WAL history accepted ({len(missing)} files)")
+        finally:
+            for path in missing:
+                (agent.root / path.name).rename(path)
+    agent.sync("sync")
+
+
 def main():
     assert os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
     binary = os.environ["XMESH_WAL_PRODUCT_AGENT"]
@@ -244,6 +284,8 @@ def main():
                 else:
                     raise AssertionError("the first committed response was not discarded")
                 assert not second.result()["firstRemoteSnapshotWasOnlyBootstrap"]
+            if binary:
+                database = stack.enter_context(restart_disposable_database(database))
             for agent in agents:
                 agent.sent.clear()
                 agent.run("verify-active", "--panel", panel, "--node-id", str(agent.node))
@@ -254,26 +296,21 @@ def main():
                     "WHERE node_id=%s ORDER BY inventory_sequence", (agent.node,),
                 ).fetchall()
                 assert rows == [(2,), (4,)], rows
-            print("Two activated 6.0.25 agents stored and recovered independent WAL through strict XSP/2.")
+            print("Two activated 6.0.25 agents stored independent WAL and recovered its current receipts over strict XSP/2.")
+            if binary:
+                print("Both authenticated WAL heads survived a restart of the PostgreSQL service container.")
             provision_signed_policies(agents)
             if binary:
                 victim = agents[0]
                 victim.local.crash()
                 victim.sync("sync")
-                next(victim.local.xray.glob("meter-*.jsonl")).unlink()
-                victim.sent.clear()
-                try:
-                    victim.sync("sync")
-                except (ValueError, OSError):
-                    pass
-                else:
-                    raise AssertionError("missing real metered WAL was accepted")
-                assert victim.sent == ["head"]
+                reject_missing_history(victim)
                 assert not victim.local.inspect()["State"]["Running"]
                 assert agents[1].local.inspect()["State"]["Running"]
                 agents[1].sync("sync")
                 print("Real main and CDN VLESS traffic produced both WAL directions. "
-                      "After SIGKILL, one node rejected missing WAL while its peer still verified.")
+                      "After SIGKILL, one node rejected losses of WAL files, the birth index, "
+                      "and both together while its peer still verified.")
 
 
 def wait_for_ready(path):

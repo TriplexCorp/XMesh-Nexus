@@ -107,6 +107,8 @@ jobs:
           echo "XMESH_WAL_XRAY_IMAGE=$(cat "$bundle/image-id")" >> "$GITHUB_ENV"
           echo "XMESH_WAL_XRAY_SHA256=$hash" >> "$GITHUB_ENV"
       - name: Enroll two actual Agent binaries and verify WAL over strict XSP/2
+        env:
+          XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           source "$RUNNER_TEMP/quota-wal/bin/activate"
           export XMESH_WAL_PRODUCT_AGENT="$RUNNER_TEMP/wal-product-agent"
