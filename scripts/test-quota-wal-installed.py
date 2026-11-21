@@ -54,16 +54,18 @@ def reference_identity(root, revision):
     source = root / "reviewed"
     output = root / "build"
     output.mkdir()
+    version = (NODE / "AGENT_VERSION").read_text().strip()
+    assert version in ("control-v6.0.25", "control-v6.0.27")
     subprocess.run(["git", "clone", "--no-hardlinks", "--no-checkout", NODE, source],
                    check=True, timeout=30)
     subprocess.run(["git", "-C", source, "checkout", "--detach", revision], check=True, timeout=30)
     subprocess.run(["sudo", "chown", "-R", "0:0", source], check=True, timeout=30)
     docker("run", "--rm", "-v", f"{source}:/src:ro", "-v", f"{output}:/out", "-w", "/src/agent/xspv2",
            "golang:1.27.3-trixie", "env", "CGO_ENABLED=0", "go", "build", "-trimpath",
-           "-ldflags", f"-X main.version=control-v6.0.25 -X main.sourceRevision={revision}",
+           "-ldflags", f"-X main.version={version} -X main.sourceRevision={revision}",
            "-o", "/out/product", "./cmd/xmesh-agent-xspv2-product", timeout=350)
     digest = hashlib.sha256((output / "product").read_bytes()).hexdigest()
-    expected = {"version": "control-v6.0.25", "sourceRevision": revision, "artifactSha256": digest}
+    expected = {"version": version, "sourceRevision": revision, "artifactSha256": digest}
     assert json.loads(subprocess.check_output([output / "product", "--identity"], timeout=10)) == expected
     return expected
 
@@ -242,21 +244,31 @@ for port in (9443, 28401):
         return int(code), json.loads(document)
 
 
-def start_isolated_candidate(guest, archive, image):
+def start_isolated_candidate(guest, archive, image, config_bytes=XRAY_CONFIG, *, preloaded=False, tag=None, binding=None):
     # This measurement fixture has no data-plane listeners or network.
     # Keep the normal timer from terminating it before the measurement.
     guest.exec("systemctl", "stop", f"{SYNC}.timer", f"{SYNC}.service")
-    with archive.open("rb") as bundle:
-        docker("exec", "-i", guest.name, "docker", "load", stdin=bundle, timeout=90)
+    if not preloaded:
+        with archive.open("rb") as bundle:
+            docker("exec", "-i", guest.name, "docker", "load", stdin=bundle, timeout=90)
     guest.exec("install", "-d", "-m", "0700", "/var/lib/xmesh-measured-lab/wal")
     config = "/var/lib/xmesh-measured-lab/config.json"
     docker("exec", "-i", guest.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", config,
-           input=XRAY_CONFIG)
+           input=config_bytes)
+    cap_env = []
+    if binding is not None:
+        assert tag in ("vless-main", "vless-cdn")
+        location = "/var/lib/xmesh-measured-lab/wal/cap-binding.json"
+        docker("exec", "-i", guest.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", location,
+               input=json.dumps(binding, sort_keys=True, separators=(",", ":")).encode())
+        cap_env = ["-e", "XMESH_EXPERIMENTAL_SIGNED_CAP_BINDING=/run/xmesh-xray-audit/cap-binding.json",
+                   "-e", "XMESH_EXPERIMENTAL_SCOPED_INBOUNDS=" + tag]
     guest.exec("docker", "run", "-d", "--name", XRAY, "--network", "none", "--restart=no",
                "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                "--user", "0:0", "-e", "GITHUB_ACTIONS=true", "-e", "XMESH_EXPERIMENTAL_DRAIN=1",
                "-e", "XMESH_EXPERIMENTAL_OBSERVED_DIR=/run/xmesh-xray-audit",
                "-e", "XMESH_EXPERIMENTAL_DRAIN_SOCKET=/run/xmesh-xray-audit/drain.sock",
+               *cap_env,
                "-v", config + ":/etc/xray/config.json:ro",
                "-v", "/var/lib/xmesh-measured-lab/wal:/run/xmesh-xray-audit:rw",
                image, "run", "-config", "/etc/xray/config.json")
@@ -423,9 +435,9 @@ def main():
         owner = Owner(stack)
         guests = []
         for number in range(2):
-            if number == 0:
+            if number == 0 or os.environ.get("XMESH_INSTALLED_GENESIS_LEASE") == "1":
                 _, record = owner.request("POST", "/collections/nodes", {
-                    "name": "New staging Node", "addr": "192.0.2.1",
+                    "name": f"New staging Node {number}", "addr": f"192.0.2.{1+number}",
                 })
                 node = record["id"]
             else:
@@ -448,7 +460,7 @@ def main():
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             first, second = pool.map(install, guests)
         assert first != second
-        print("Two clean systemd guests installed the pinned 6.0.25 release and activated distinct XSP/2 identities.")
+        print(f"Two clean systemd guests installed pinned {identity['version']} and activated distinct XSP/2 identities.")
 
         def samples(node):
             return db.execute("SELECT count(*) FROM server_metric_samples WHERE node_id=%s", (str(node),)).fetchone()[0]
@@ -458,6 +470,12 @@ def main():
             guest.exec("systemctl", "restart", f"{METRICS}.service")
             guest.check_quarantine()
         print("Installed metrics reached PostgreSQL. The staged reconciler refused to start a cold Xray on either guest.")
+
+        if os.environ.get("XMESH_INSTALLED_GENESIS_LEASE") == "1":
+            from quota_v2_installed_genesis_lease import try_signed_lease_pair
+            assert identity["version"] == "control-v6.0.27"
+            try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, sys.modules[__name__])
+            return
 
         fresh, original, receipt = try_genesis(guests, db, root, panel)
         db = restart_postgres(stack, dsn, db)
