@@ -30,6 +30,8 @@ CONTROL = "xmesh-node-control"
 WAL_PATH = "/api/v1/node/quota-v2/wal"
 DESIRED_PATH = "/api/v1/node/desired-config"
 GENESIS_DOMAIN = b"XMESH_XRAY_GENESIS_PREPARED_V1\0"
+XRAY = "xmesh-managed-xray"
+XRAY_CONFIG = b'{"inbounds":[],"outbounds":[{"protocol":"blackhole"}]}\n'
 
 
 def docker(*args, timeout=40, **kwargs):
@@ -222,22 +224,79 @@ for port in (9443, 28401):
         return int(code), json.loads(document)
 
 
+def start_isolated_candidate(guest, archive, image):
+    # This measurement fixture has no data-plane listeners or network.
+    # Keep the normal timer from terminating it before the measurement.
+    guest.exec("systemctl", "stop", f"{SYNC}.timer", f"{SYNC}.service")
+    with archive.open("rb") as bundle:
+        docker("exec", "-i", guest.name, "docker", "load", stdin=bundle, timeout=90)
+    guest.exec("install", "-d", "-m", "0700", "/var/lib/xmesh-measured-lab/wal")
+    config = "/var/lib/xmesh-measured-lab/config.json"
+    docker("exec", "-i", guest.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", config,
+           input=XRAY_CONFIG)
+    guest.exec("docker", "run", "-d", "--name", XRAY, "--network", "none", "--restart=no",
+               "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+               "--user", "0:0", "-e", "GITHUB_ACTIONS=true", "-e", "XMESH_EXPERIMENTAL_DRAIN=1",
+               "-e", "XMESH_EXPERIMENTAL_OBSERVED_DIR=/run/xmesh-xray-audit",
+               "-e", "XMESH_EXPERIMENTAL_DRAIN_SOCKET=/run/xmesh-xray-audit/drain.sock",
+               "-v", config + ":/etc/xray/config.json:ro",
+               "-v", "/var/lib/xmesh-measured-lab/wal:/run/xmesh-xray-audit:rw",
+               image, "run", "-config", "/etc/xray/config.json")
+    wait_for(lambda: b"true" == guest.exec("docker", "inspect", "-f", "{{.State.Running}}", XRAY).strip(),
+             label=f"isolated candidate Xray on Node {guest.node}")
+
+
 def try_genesis(guests, db, root, panel):
     fresh, prior = [guest for guest, _ in guests]
-    candidate = {"operation": "prepare_genesis", "nodeId": fresh.node,
-                 "candidateRuntimeId": secrets.token_hex(32), "challenge": secrets.token_hex(32)}
-    different_runtime = dict(candidate, candidateRuntimeId=secrets.token_hex(32))
-    assert prior.request(WAL_PATH, dict(candidate, nodeId=prior.node))[0] == 409
-    assert fresh.request(WAL_PATH, dict(candidate, nodeId=prior.node))[0] == 401
+    image = os.environ["XMESH_WAL_XRAY_IMAGE"]
+    assert re.fullmatch(r"sha256:[a-f0-9]{64}", image)
+    archive = root / "xray-image.tar"
+    docker("image", "save", "-o", archive, image)
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(lambda payload: (payload, fresh.request(WAL_PATH, payload)),
-                                [candidate, different_runtime]))
-    assert sorted(result[0] for _, result in results) == [200, 409]
-    winner, (_, receipt) = next(row for row in results if row[1][0] == 200)
-    assert fresh.request(WAL_PATH, winner) == (200, receipt)
-    assert fresh.request(WAL_PATH, dict(winner, challenge=secrets.token_hex(32)))[0] == 409
+        list(pool.map(lambda guest: start_isolated_candidate(guest, archive, image), (fresh, prior)))
+    challenge = secrets.token_hex(32)
+    digest = os.environ["XMESH_WAL_XRAY_SHA256"]
+    config_digest = hashlib.sha256(XRAY_CONFIG).hexdigest()
+
+    def measured(guest, config_pin=config_digest):
+        return ["/usr/local/sbin/xmesh-quota-wal", "prepare-measured-genesis", "--panel", panel,
+                "--node-id", str(guest.node), "--challenge", challenge,
+                "--executable-sha256", digest, "--config-sha256", config_pin]
+
+    def reject(guest, command, reason):
+        failure = subprocess.run(["docker", "exec", guest.name, *command], capture_output=True, timeout=45)
+        assert failure.returncode != 0 and reason in failure.stderr, failure.stderr.decode()
+
+    public_der = subprocess.check_output([
+        "openssl", "pkey", "-pubin", "-in", os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"], "-outform", "DER",
+    ], timeout=5)
+    assert public_der[:12] == bytes.fromhex("302a300506032b6570032100") and len(public_der) == 44
+    pin = "/var/lib/xmesh-xray-sync/policy-public-key"
+    fresh.exec("test", "!", "-e", pin)
+    reject(fresh, measured(fresh), b"policy-public-key")
+
+    def install_pin(guest, key_hex):
+        docker("exec", "-i", guest.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", pin,
+               input=key_hex.encode("ascii") + b"\n")
+
+    for guest in (fresh, prior):
+        install_pin(guest, public_der[12:].hex())
+    reject(fresh, measured(fresh, "0" * 64), b"configuration pin mismatch")
+    assert db.execute("SELECT runtime_id FROM quota_v2_xray_genesis WHERE node_id=%s",
+                      (fresh.node,)).fetchone() == (None,)
+    reject(prior, measured(prior), b"Nexus did not confirm WAL operation")
+    receipt = json.loads(fresh.exec(*measured(fresh), timeout=45))
     assert receipt["algorithm"] == "Ed25519"
     payload = receipt["payload"]
+    winner = {"operation": "prepare_genesis", "nodeId": fresh.node,
+              "candidateRuntimeId": payload["candidateRuntimeId"], "challenge": challenge}
+    assert re.fullmatch(r"[a-f0-9]{64}", winner["candidateRuntimeId"])
+    assert fresh.request(WAL_PATH, dict(winner, nodeId=prior.node))[0] == 401
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        same, other = pool.map(lambda candidate: fresh.request(WAL_PATH, candidate),
+                               (winner, dict(winner, candidateRuntimeId=secrets.token_hex(32))))
+    assert same == (200, receipt) and other[0] == 409
+    assert fresh.request(WAL_PATH, dict(winner, challenge=secrets.token_hex(32)))[0] == 409
     active = json.loads(fresh.exec("cat", "/var/lib/xmesh-agent/product/active.json"))
     assert payload == {
         "schemaVersion": 1, "kind": "xmesh.xray.genesis-prepared", "nodeId": fresh.node,
@@ -254,35 +313,25 @@ def try_genesis(guests, db, root, panel):
     subprocess.run(["openssl", "pkeyutl", "-verify", "-pubin", "-rawin",
                     "-inkey", os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"],
                     "-in", message, "-sigfile", signature], check=True, timeout=5)
-    public_der = subprocess.check_output([
-        "openssl", "pkey", "-pubin", "-in", os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"], "-outform", "DER",
-    ], timeout=5)
-    assert public_der[:12] == bytes.fromhex("302a300506032b6570032100") and len(public_der) == 44
-    pin = "/var/lib/xmesh-xray-sync/policy-public-key"
-    command = ["/usr/local/sbin/xmesh-quota-wal", "prepare-genesis", "--panel", panel,
-               "--node-id", str(fresh.node), "--candidate-runtime", winner["candidateRuntimeId"],
-               "--challenge", winner["challenge"]]
-    fresh.exec("test", "!", "-e", pin)
-    failure = subprocess.run(["docker", "exec", fresh.name, *command], capture_output=True, timeout=35)
-    assert failure.returncode != 0 and b"policy-public-key" in failure.stderr
-    def install_pin(key_hex):
-        docker("exec", "-i", fresh.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", pin,
-               input=key_hex.encode("ascii") + b"\n")
-
-    install_pin(public_der[12:].hex())
-    assert json.loads(fresh.exec(*command)) == receipt
     try:
-        install_pin(secrets.token_hex(32))
-        failure = subprocess.run(["docker", "exec", fresh.name, *command], capture_output=True, timeout=35)
-        assert failure.returncode != 0 and b"signed by foreign key" in failure.stderr
+        install_pin(fresh, secrets.token_hex(32))
+        reject(fresh, measured(fresh), b"signed by foreign key")
     finally:
-        install_pin(public_der[12:].hex())
+        install_pin(fresh, public_der[12:].hex())
     assert db.execute("SELECT count(*) FROM quota_v2_reservations").fetchone() == (0,)
     assert db.execute("SELECT runtime_id,challenge,receipt_signature FROM quota_v2_xray_genesis WHERE node_id=%s",
                       (fresh.node,)).fetchone() == (
         winner["candidateRuntimeId"], winner["challenge"], receipt["signature"],
     )
-    print("Installed XSP/2: one durable zero-byte genesis; installed WAL verifier checked the exact retried receipt.")
+    fresh.exec("docker", "kill", "--signal", "KILL", XRAY)
+    reject(fresh, measured(fresh), b"network-isolated nonrestarting candidate")
+    assert prior.exec("docker", "inspect", "-f", "{{.State.Running}}", XRAY).strip() == b"true"
+    for guest in (fresh, prior):
+        guest.exec("docker", "rm", "-f", XRAY)
+        guest.exec("systemctl", "start", f"{SYNC}.timer")
+        guest.check_quarantine()
+    print("Installed XSP/2: real isolated Xray process and pinned files checked before zero-byte genesis.")
+    print("Killed candidate could not repeat local measurement; the peer Xray was still alive.")
     print("The installed verifier refused both a missing pin and a valid receipt under a foreign pin.")
     print("An existing Node without creation evidence, cross-node identity and competing runtime were rejected.")
     return fresh, winner, receipt
