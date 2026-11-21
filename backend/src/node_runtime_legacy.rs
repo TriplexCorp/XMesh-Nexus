@@ -2356,7 +2356,7 @@ fn first_genesis_cap_aliases(
 
 // The rehearsal has only a shared global reservation ledger. Never
 // translate independent Node/CDN quotas into a global bootstrap allowance.
-fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_cdn: bool) -> bool {
+pub fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_cdn: bool) -> bool {
     if !matches!(crate::node_user_quotas::rule_for(user, node_id), Ok(None)) {
         return false;
     }
