@@ -28,7 +28,7 @@ jobs:
           cargo test --manifest-path backend/Cargo.toml quota_v2_cap_signing -- --nocapture
       - name: Ensure quarantined Node policy cannot issue legacy offline allowances
         run: |
-          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- quarantined_policy_cannot_issue_legacy_spend_or_extend_genesis --exact
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- quarantined_policy_cannot_issue_legacy_spend_or_extend_genesis
       - name: Build opt-in disposable SQL signer, NOT the shipping API
         run: |
           cargo build --manifest-path backend/Cargo.toml \
