@@ -933,13 +933,13 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 }
 
 var allowedTunnelPaths = map[string]bool{
-	"/api/v1/metrics/ingest":        true,
-	"/api/v1/node/heartbeat":        true,
-	"/api/v1/node/restart/poll":     true,
-	"/api/v1/node/restart/ack":      true,
-	"/api/v1/node/restart/progress": true,
-	"/api/v1/node/desired-config":   true,
-	"/api/v1/node/quota-v2/wal":      true,
+	"/api/v1/metrics/ingest":           true,
+	"/api/v1/node/heartbeat":           true,
+	"/api/v1/node/restart/poll":        true,
+	"/api/v1/node/restart/ack":         true,
+	"/api/v1/node/restart/progress":    true,
+	"/api/v1/node/desired-config":      true,
+	"/api/v1/node/quota-v2/wal":        true,
 	"/api/v1/node/quota-v2/policy-pin": true,
 }
 
