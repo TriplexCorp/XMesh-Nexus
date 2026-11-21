@@ -16,6 +16,7 @@ struct Genesis {
     challenge: Option<String>,
     first_activation_sha256: Option<String>,
     prepared_ms: Option<i64>,
+    receipt_signature: Option<String>,
     policy_path_used: bool,
 }
 
@@ -111,7 +112,7 @@ pub async fn prepare(
     let mut tx = state.pool.begin().await?;
     lock_active_node(&mut tx, node_id, activation).await?;
     let record: Genesis = sqlx::query_as(
-        "SELECT runtime_id,challenge,first_activation_sha256,prepared_ms,policy_path_used
+        "SELECT runtime_id,challenge,first_activation_sha256,prepared_ms,receipt_signature,policy_path_used
            FROM quota_v2_xray_genesis WHERE node_id=$1 FOR UPDATE",
     )
     .bind(node_id)
@@ -148,22 +149,8 @@ pub async fn prepare(
         }
         prepared
     } else {
-        sqlx::query("SET LOCAL synchronous_commit TO on")
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query(
-            "UPDATE quota_v2_xray_genesis SET runtime_id=$2,challenge=$3,
-                 prepared_ms=$4 WHERE node_id=$1",
-        )
-        .bind(node_id)
-        .bind(runtime_id)
-        .bind(challenge)
-        .bind(now)
-        .execute(&mut *tx)
-        .await?;
         now
     };
-    tx.commit().await?;
     let payload = json!({
         "schemaVersion":1, "kind":"xmesh.xray.genesis-prepared",
         "nodeId":node_id, "activationReceiptSha256":activation,
@@ -171,14 +158,34 @@ pub async fn prepare(
         "preparedAtMs":prepared, "validUntilMs":prepared.saturating_add(VALID_MS),
         "authorizedBytes":0, "canStart":false, "canResume":false
     });
-    let signature = state
-        .node_policy_signer
-        .sign_domain(DOMAIN, &payload)
-        .map_err(|_| {
-            ApiError::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Xray genesis signing failed.",
-            )
-        })?;
+    let signature = if let Some(signature) = record.receipt_signature {
+        signature
+    } else {
+        let signature = state
+            .node_policy_signer
+            .sign_domain(DOMAIN, &payload)
+            .map_err(|_| {
+                ApiError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Xray genesis signing failed.",
+                )
+            })?;
+        sqlx::query("SET LOCAL synchronous_commit TO on")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(
+            "UPDATE quota_v2_xray_genesis SET runtime_id=$2,challenge=$3,
+                 prepared_ms=$4,receipt_signature=$5 WHERE node_id=$1",
+        )
+        .bind(node_id)
+        .bind(runtime_id)
+        .bind(challenge)
+        .bind(prepared)
+        .bind(&signature)
+        .execute(&mut *tx)
+        .await?;
+        signature
+    };
+    tx.commit().await?;
     Ok(json!({"algorithm":"Ed25519", "payload":payload, "signature":signature}))
 }

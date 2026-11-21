@@ -8,8 +8,9 @@ CREATE TABLE quota_v2_xray_genesis (
     runtime_id TEXT CHECK (runtime_id ~ '^[0-9a-f]{64}$'),
     challenge TEXT CHECK (challenge ~ '^[0-9a-f]{64}$'),
     prepared_ms BIGINT CHECK (prepared_ms > 0),
+    receipt_signature TEXT CHECK (receipt_signature ~ '^[0-9a-f]{128}$'),
     policy_path_used BOOLEAN NOT NULL DEFAULT FALSE,
-    CHECK (num_nonnulls(runtime_id,challenge,prepared_ms) IN (0,3)),
+    CHECK (num_nonnulls(runtime_id,challenge,prepared_ms,receipt_signature) IN (0,4)),
     CHECK (runtime_id IS NULL OR first_activation_sha256 IS NOT NULL)
 );
 
@@ -24,9 +25,9 @@ BEGIN
             NEW.first_activation_sha256 IS DISTINCT FROM OLD.first_activation_sha256)
         OR (OLD.policy_path_used AND NOT NEW.policy_path_used)
         OR (OLD.runtime_id IS NOT NULL AND
-            ROW(NEW.runtime_id,NEW.challenge,NEW.prepared_ms)
+            ROW(NEW.runtime_id,NEW.challenge,NEW.prepared_ms,NEW.receipt_signature)
             IS DISTINCT FROM
-            ROW(OLD.runtime_id,OLD.challenge,OLD.prepared_ms))
+            ROW(OLD.runtime_id,OLD.challenge,OLD.prepared_ms,OLD.receipt_signature))
         OR (NEW.runtime_id IS NOT NULL AND OLD.runtime_id IS NULL AND NEW.policy_path_used)
     THEN
         RAISE EXCEPTION 'Xray genesis evidence cannot be reassigned' USING ERRCODE='22023';

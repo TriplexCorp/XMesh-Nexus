@@ -21,9 +21,11 @@ Xray process exists. Nexus requires the authenticated gateway's activation
 digest to match both the current activation and the first durable binding.
 Preparation locks the Node, activation and genesis records and checks for
 issued policy, WAL, reservation and user traffic history. Competing requests
-can commit only one candidate and challenge. The exact request can recover
-the identical signed preparation for 120 seconds, provided the Node remains
-eligible. An unknown commit outcome never creates another preparation.
+can commit only one candidate and challenge. Nexus persists the signature in
+that same synchronous transaction and only returns it after commit. The
+exact request can recover the identical signed preparation for 120 seconds,
+provided the Node remains eligible. An unknown commit outcome never creates
+another preparation.
 
 The installed WAL operator command requires an independently pinned Nexus
 policy key. It verifies the receipt's domain, signature, lifetime, matching

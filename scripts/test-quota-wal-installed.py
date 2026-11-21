@@ -278,8 +278,10 @@ def try_genesis(guests, db, root, panel):
     finally:
         install_pin(public_der[12:].hex())
     assert db.execute("SELECT count(*) FROM quota_v2_reservations").fetchone() == (0,)
-    assert db.execute("SELECT runtime_id,challenge FROM quota_v2_xray_genesis WHERE node_id=%s",
-                      (fresh.node,)).fetchone() == (winner["candidateRuntimeId"], winner["challenge"])
+    assert db.execute("SELECT runtime_id,challenge,receipt_signature FROM quota_v2_xray_genesis WHERE node_id=%s",
+                      (fresh.node,)).fetchone() == (
+        winner["candidateRuntimeId"], winner["challenge"], receipt["signature"],
+    )
     print("Installed XSP/2: one durable zero-byte genesis; installed WAL verifier checked the exact retried receipt.")
     print("The installed verifier refused both a missing pin and a valid receipt under a foreign pin.")
     print("An existing Node without creation evidence, cross-node identity and competing runtime were rejected.")
@@ -387,8 +389,9 @@ def main():
         fresh, original, receipt = try_genesis(guests, db, root, panel)
         db = restart_postgres(stack, dsn, db)
         wait_for(lambda: db.execute(
-            "SELECT prepared_ms FROM quota_v2_xray_genesis WHERE node_id=%s", (fresh.node,),
-        ).fetchone() == (receipt["payload"]["preparedAtMs"],), label="committed genesis after PostgreSQL restart")
+            "SELECT prepared_ms,receipt_signature FROM quota_v2_xray_genesis WHERE node_id=%s", (fresh.node,),
+        ).fetchone() == (receipt["payload"]["preparedAtMs"], receipt["signature"]),
+            label="committed genesis after PostgreSQL restart")
         for guest, _ in guests:
             before = {peer.node: samples(peer.node) for peer, _ in guests}
             guest.restart()
