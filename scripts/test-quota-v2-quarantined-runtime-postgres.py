@@ -97,15 +97,18 @@ class QuarantinedRuntimeTests(unittest.TestCase):
                                "WHERE user_id=%s",(self.user,)).fetchone()[0]
         self.assertEqual(recorded,0)
 
-    def test_original_normal_desired_config_still_closes_genesis(self):
+    def test_quarantined_stage_prevents_ordinary_legacy_issuance(self):
         with psycopg.connect(DSN) as c:
-            c.execute("UPDATE quota_v2_xray_genesis SET policy_path_used=TRUE "
-                      "WHERE node_id=%s",(self.genesis.node,))
-        self.deny()
-        with psycopg.connect(DSN) as c:
-            self.assertEqual(c.execute("SELECT COUNT(*) "
-                "FROM quota_v2_runtime_admission_preflights WHERE user_id=%s",
-                (self.user,)).fetchone()[0],0)
+            with self.assertRaises(psycopg.Error):
+                with c.transaction():
+                    c.execute("UPDATE quota_v2_xray_genesis SET policy_path_used=TRUE "
+                              "WHERE node_id=%s",(self.genesis.node,))
+            self.assertFalse(c.execute(
+                "SELECT policy_path_used FROM quota_v2_xray_genesis "
+                "WHERE node_id=%s",(self.genesis.node,)).fetchone()[0])
+        # Still NO positive spending authority: strict preflight is a
+        # nonauthorizing record even though the signed quarantine is valid.
+        self.assertEqual(self.record()[4:],(0,False,False,False,0))
 
     def test_node_revocation_and_reservation_invalidation_denied(self):
         with psycopg.connect(DSN) as c:
