@@ -84,6 +84,14 @@ fn args() -> Result<(i64,String,i64,String)> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let (dsn,key_path)=require_ci()?;
+    // Authenticated bootstrap pins the Nexus Ed25519 identity BEFORE
+    // the first signed cap; the caller never trusts the key bundled in a
+    // later grant reply. This command is CI-only, not a real bootstrap API.
+    if env::args().nth(1).as_deref()==Some("--public") {
+        let signer=node_policy::PolicySigner::load(&key_path)?;
+        println!("{}",signer.public_key());
+        return Ok(());
+    }
     let (node,nonce,observed_pid,policy_sha)=args()?;
     let pool=PgPool::connect(&dsn).await?;
     let mut tx=pool.begin().await?;
