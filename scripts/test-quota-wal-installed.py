@@ -191,6 +191,14 @@ class Guest:
         assert b"XMESH_QUOTA_V2_WAL_RECONCILE=1" in environment
         assert self.exec("docker", "inspect", "-f", "{{.State.Running}}", "xmesh-node").strip() == b"true"
         assert b"xmesh-managed-xray" not in self.exec("docker", "ps", "--format", "{{.Names}}").splitlines()
+        self.exec("python3", "-c", """
+import errno
+import socket
+for port in (9443, 28401):
+    with socket.socket() as client:
+        client.settimeout(2)
+        assert client.connect_ex(("127.0.0.1", port)) == errno.ECONNREFUSED, port
+""")
         wait_for(lambda: b"requires a running managed Xray with restart disabled" in
                  self.exec("journalctl", "-u", SYNC, "--no-pager", "-o", "cat"),
                  label=f"cold-start refusal from the reconciler on Node {self.node}")
@@ -257,13 +265,23 @@ def try_genesis(guests, db, root, panel):
     fresh.exec("test", "!", "-e", pin)
     failure = subprocess.run(["docker", "exec", fresh.name, *command], capture_output=True, timeout=35)
     assert failure.returncode != 0 and b"policy-public-key" in failure.stderr
-    docker("exec", "-i", fresh.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", pin,
-           input=public_der[12:].hex().encode("ascii") + b"\n")
+    def install_pin(key_hex):
+        docker("exec", "-i", fresh.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", pin,
+               input=key_hex.encode("ascii") + b"\n")
+
+    install_pin(public_der[12:].hex())
     assert json.loads(fresh.exec(*command)) == receipt
+    try:
+        install_pin(secrets.token_hex(32))
+        failure = subprocess.run(["docker", "exec", fresh.name, *command], capture_output=True, timeout=35)
+        assert failure.returncode != 0 and b"signed by foreign key" in failure.stderr
+    finally:
+        install_pin(public_der[12:].hex())
     assert db.execute("SELECT count(*) FROM quota_v2_reservations").fetchone() == (0,)
     assert db.execute("SELECT runtime_id,challenge FROM quota_v2_xray_genesis WHERE node_id=%s",
                       (fresh.node,)).fetchone() == (winner["candidateRuntimeId"], winner["challenge"])
     print("Installed XSP/2: one durable zero-byte genesis; installed WAL verifier checked the exact retried receipt.")
+    print("The installed verifier refused both a missing pin and a valid receipt under a foreign pin.")
     print("An existing Node without creation evidence, cross-node identity and competing runtime were rejected.")
     return fresh, winner, receipt
 
