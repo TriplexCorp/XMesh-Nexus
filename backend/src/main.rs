@@ -28,6 +28,7 @@ mod quota_v2;
 mod quota_v2_cap_signing;
 mod quota_wal_transport;
 mod quota_xray_genesis;
+mod quota_v2_policy_pin;
 mod security;
 mod sub_server;
 mod subscription_finalmask;
@@ -718,6 +719,7 @@ fn application_router(state: AppState) -> Router {
         .route("/node/restart/progress", post(node_xray_update::progress))
         .route("/node/desired-config", post(node_runtime::desired_config))
         .route("/node/quota-v2/wal", quota_wal_transport::route())
+        .route("/node/quota-v2/policy-pin", post(quota_v2_policy_pin::handle))
         .route("/node/enroll", post(node_enrollment::claim))
         .route(
             "/sub/{token}",
