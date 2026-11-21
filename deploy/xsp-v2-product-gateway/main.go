@@ -942,6 +942,7 @@ var allowedTunnelPaths = map[string]bool{
 	"/api/v1/node/quota-v2/wal":                 true,
 	"/api/v1/node/quota-v2/policy-pin":          true,
 	"/api/v1/node/quota-v2/genesis-reservation": true,
+	"/api/v1/node/quota-v2/genesis-cap-delivery": true,
 }
 
 // Original activation binding is forwarded ONLY on explicitly registered
@@ -951,7 +952,8 @@ func needsGenesisActivationBinding(path string) bool {
 	case "/api/v1/node/quota-v2/wal",
 		"/api/v1/node/desired-config",
 		"/api/v1/node/quota-v2/policy-pin",
-		"/api/v1/node/quota-v2/genesis-reservation":
+		"/api/v1/node/quota-v2/genesis-reservation",
+		"/api/v1/node/quota-v2/genesis-cap-delivery":
 		return true
 	default:
 		return false
@@ -1002,6 +1004,10 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&inner); err != nil || !allowedTunnelPaths[inner.Path] {
 		fail(w, http.StatusBadRequest, "unregistered strict-PQ tunnel operation")
+		return
+	}
+	if inner.Path == "/api/v1/node/quota-v2/genesis-cap-delivery" && os.Getenv("XMESH_QUOTA_V2_INSTALLED_CAP_DELIVERY") != "1" {
+		fail(w, http.StatusNotFound, "disposable cap delivery disabled")
 		return
 	}
 	if err := decoder.Decode(new(any)); err != io.EOF {
