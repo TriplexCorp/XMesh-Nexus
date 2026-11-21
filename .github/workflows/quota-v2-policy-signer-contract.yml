@@ -17,14 +17,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Emit locally formatted isolated XSP2 module for PR formatting review
+      - name: Verify committed Rust formatting
         run: |
           rustup component add rustfmt
-          rustfmt --edition 2024 backend/src/xsp_v2_quota_cap_attestation.rs
-          echo XMESH_FORMATTED_SOURCE_BEGIN
-          base64 -w0 backend/src/xsp_v2_quota_cap_attestation.rs
-          echo
-          echo XMESH_FORMATTED_SOURCE_END
+          cargo fmt --manifest-path backend/Cargo.toml --all -- --check
       - name: Nexus Ed25519 domain and fail-closed grant invariants
         run: |
           cargo test --manifest-path backend/Cargo.toml quota_v2_cap_signing -- --nocapture
