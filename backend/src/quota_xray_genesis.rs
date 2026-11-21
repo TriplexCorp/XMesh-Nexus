@@ -4,6 +4,7 @@
 use crate::{ApiError, AppState, node_auth};
 use axum::http::{HeaderMap, StatusCode};
 use serde_json::{Value, json};
+use sha2::Digest;
 use sqlx::{PgConnection, PgPool};
 
 const FEATURE: &str = "XMESH_QUOTA_V2_XRAY_GENESIS_STAGING";
@@ -23,6 +24,132 @@ struct Genesis {
 fn enabled() -> bool {
     std::env::var(FEATURE).is_ok_and(|v| v == "1")
         && std::env::var("XMESH_QUOTA_V2_WAL_TRANSPORT").is_ok_and(|v| v == "1")
+}
+
+/// Separate opt-in first-genesis handoff. Ordinary desired-config continues
+/// to *permanently* mark policy_path_used=true; it cannot masquerade as a
+/// clean new Xray. This stage only saves a signed, zero-spend policy and
+/// never starts Xray or issues an actual reservation.
+pub fn quarantine_enabled() -> bool {
+    enabled()
+        && std::env::var("XMESH_QUOTA_V2_GENESIS_QUARANTINE_STAGING")
+            .is_ok_and(|value| value == "1")
+}
+
+pub struct QuarantinePrepared {
+    pub prepared_ms: i64,
+    pub activation_sha256: String,
+}
+
+/// Require the real strict product-gateway's authenticated Node/activation
+/// on the existing desired-config URL. This is *not* the final independent
+/// process attestation or the future positive XSP/2 issuer.
+pub async fn quarantine_prepared(
+    state: &AppState,
+    headers: &HeaderMap,
+    node_id: i64,
+    runtime_id: &str,
+    challenge: &str,
+) -> Result<QuarantinePrepared, ApiError> {
+    if !quarantine_enabled() {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Quota-v2 first-genesis quarantine staging is disabled.",
+        ));
+    }
+    if node_id <= 0 || !digest(runtime_id) || !digest(challenge) || runtime_id == challenge {
+        return Err(unavailable());
+    }
+    let activation = node_auth::authenticate_product_activation(
+        state,
+        headers,
+        node_id,
+        "/api/v1/node/desired-config",
+    )
+    .await?;
+    let record: Genesis = sqlx::query_as(
+        "SELECT runtime_id,challenge,first_activation_sha256,prepared_ms,
+                receipt_signature,policy_path_used
+           FROM quota_v2_xray_genesis WHERE node_id=$1",
+    )
+    .bind(node_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(unavailable)?;
+    let now: i64 = sqlx::query_scalar(
+        "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    let prepared_ms = record.prepared_ms.ok_or_else(unavailable)?;
+    if record.policy_path_used
+        || record.runtime_id.as_deref() != Some(runtime_id)
+        || record.challenge.as_deref() != Some(challenge)
+        || record.first_activation_sha256.as_deref() != Some(activation)
+        || record.receipt_signature.is_none()
+        || prepared_ms > now
+        || now >= prepared_ms.saturating_add(120_000)
+    {
+        return Err(unavailable());
+    }
+    Ok(QuarantinePrepared {
+        prepared_ms,
+        activation_sha256: activation.to_owned(),
+    })
+}
+
+pub struct QuarantineSignedPolicy {
+    pub policy: Value,
+    pub signature: String,
+    pub sha256: String,
+}
+
+/// PostgreSQL checks the first ever prepared Genesis, current strict
+/// activation and NO prior desired policy/WAL/reservations under locks.
+/// Immutable exact bytes + Ed25519 signature are fsynced before returning.
+pub async fn stage_quarantine_policy(
+    state: &AppState,
+    node_id: i64,
+    prepared: &QuarantinePrepared,
+    runtime_id: &str,
+    challenge: &str,
+    revision: &str,
+    policy: &Value,
+) -> Result<QuarantineSignedPolicy, ApiError> {
+    let bytes = serde_json::to_vec(policy).map_err(|_| unavailable())?;
+    let signature = state
+        .node_policy_signer
+        .sign(policy)
+        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Quarantine signing failed."))?;
+    let public = state.node_policy_signer.public_key();
+    let saved: (Vec<u8>, String, String) = sqlx::query_as(
+        "SELECT signed_policy_bytes,policy_signature,policy_sha256
+           FROM quota_v2_stage_genesis_quarantine_policy(
+                $1,$2,$3,$4,$5,$6,$7,$8)",
+    )
+    .bind(node_id)
+    .bind(&prepared.activation_sha256)
+    .bind(runtime_id)
+    .bind(challenge)
+    .bind(revision)
+    .bind(bytes.as_slice())
+    .bind(signature.as_str())
+    .bind(public.as_str())
+    .fetch_one(&state.pool)
+    .await?;
+    // Never serve bytes other than the ones the existing pinned signer
+    // actually signed and the immutable PostgreSQL record committed.
+    if saved.0 != bytes || saved.1 != signature
+        || saved.2 != hex::encode(sha2::Sha256::digest(&bytes))
+    {
+        return Err(unavailable());
+    }
+    let signed = serde_json::from_slice(&saved.0).map_err(|_| unavailable())?;
+    Ok(QuarantineSignedPolicy {
+        policy: signed,
+        signature: saved.1,
+        sha256: saved.2,
+    })
 }
 
 pub async fn record_creation(conn: &mut PgConnection, node_id: i64) -> Result<(), ApiError> {
