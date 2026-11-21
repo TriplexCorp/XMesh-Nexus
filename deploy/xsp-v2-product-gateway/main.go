@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -557,6 +558,27 @@ func (g *gateway) issueClientCertificate(nodeID int64, publicDER []byte) (string
 	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})), spki[:], nil
 }
 
+// The isolated WAL rehearsal pins the exact proposed product binary.
+func pinnedWALCandidate(release releaseIdentity, enabled, pin string) bool {
+	if enabled != "1" || release.Version != "control-v6.0.25" {
+		return false
+	}
+	revision, artifact, ok := strings.Cut(pin, ":")
+	return ok && len(revision) == 40 && len(artifact) == 64 &&
+		isLowerHex(revision) && isLowerHex(artifact) &&
+		release.SourceRevision == revision && release.ArtifactSHA256 == artifact
+}
+
+func isLowerHex(value string) bool {
+	for i := range len(value) {
+		c := value[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func (g *gateway) enroll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
 		fail(w, http.StatusUnsupportedMediaType, "POST application/json required")
@@ -568,6 +590,9 @@ func (g *gateway) enroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	versionOK := req.ReleaseIdentity.Version == targetAgentVersion || req.ReleaseIdentity.Version == previousTargetAgentVersion || req.ReleaseIdentity.Version == rollingV615AgentVersion || req.ReleaseIdentity.Version == rollingV614AgentVersion || req.ReleaseIdentity.Version == recentAgentVersion || req.ReleaseIdentity.Version == previousAgentVersion || req.ReleaseIdentity.Version == transitionalAgentVersion || req.ReleaseIdentity.Version == rolloutAgentVersion || req.ReleaseIdentity.Version == recoveryAgentVersion || req.ReleaseIdentity.Version == legacyAgentVersion || req.ReleaseIdentity.Version == olderAgentVersion || req.ReleaseIdentity.Version == repairAgentVersion
+	versionOK = versionOK || pinnedWALCandidate(
+		req.ReleaseIdentity, os.Getenv("XMESH_QUOTA_V2_WAL_TRANSPORT"),
+		os.Getenv("XSP_V2_PRODUCT_WAL_CANDIDATE_PIN"))
 	if req.NodeID <= 0 || req.Purpose != "node_request" || req.KeyEpoch != 1 || !versionOK ||
 		len(req.ReleaseIdentity.SourceRevision) != 40 || len(req.ReleaseIdentity.ArtifactSHA256) != 64 {
 		fail(w, http.StatusBadRequest, "invalid XMesh v6 release identity")
@@ -938,7 +963,11 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	n, err := g.loadNode(ctx, parsed.Env.NodeID)
-	if err != nil || n.State != "active" {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		fail(w, http.StatusServiceUnavailable, "strict-PQ node identity store unavailable")
+		return
+	}
+	if errors.Is(err, pgx.ErrNoRows) || n.State != "active" {
 		fail(w, http.StatusForbidden, "strict-PQ node is not active")
 		return
 	}
@@ -980,7 +1009,12 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err = tx.Exec(ctx, "INSERT INTO node_xsp_product_nonces(node_id,key_epoch,direction,nonce,request_id) VALUES($1,$2,1,$3,$4)", parsed.Env.NodeID, parsed.Env.KeyEpoch, nonce, parsed.Env.RequestID); err != nil {
 		_ = tx.Rollback(ctx)
-		fail(w, http.StatusConflict, "strict-PQ tunnel replay rejected")
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			fail(w, http.StatusConflict, "strict-PQ tunnel replay rejected")
+		} else {
+			fail(w, http.StatusServiceUnavailable, "strict-PQ replay state unavailable")
+		}
 		return
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -998,6 +1032,10 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("X-XSP-Product-Internal", g.internalToken)
 	req.Header.Set("X-XSP-Product-Node-Id", strconv.FormatInt(parsed.Env.NodeID, 10))
 	req.Header.Set("X-XSP-Product-Path", inner.Path)
+	if inner.Path == "/api/v1/node/quota-v2/wal" {
+		activation := sha256.Sum256(n.Receipt)
+		req.Header.Set("X-XSP-Product-Activation-SHA256", hex.EncodeToString(activation[:]))
+	}
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
 		fail(w, http.StatusBadGateway, "internal panel operation unavailable")

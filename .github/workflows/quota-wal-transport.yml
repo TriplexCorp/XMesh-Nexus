@@ -3,13 +3,23 @@ on:
   pull_request:
     paths:
       - 'backend/src/quota_wal_transport.rs'
+      - 'backend/src/quota_xray_genesis.rs'
+      - 'backend/src/node_runtime_legacy.rs'
       - 'backend/src/node_auth.rs'
       - 'backend/src/node_policy.rs'
       - 'backend/src/main.rs'
+      - 'compose.yaml'
       - 'deploy/xsp-v2-product-gateway/main.go'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
+      - 'backend/migrations/0137_quota_v2_xray_genesis.sql'
       - 'scripts/test-quota-wal-transport.py'
+      - 'scripts/test-quota-wal-reconcile.py'
+      - 'scripts/test-quota-wal-product-tunnel.py'
+      - 'scripts/quota_wal_real_xray.py'
+      - 'scripts/quota-wal-systemd.Dockerfile'
+      - 'scripts/test-quota-wal-installed.py'
+      - 'deploy/xsp-v2-product-gateway/wal_tunnel_fixture_test.go'
       - 'scripts/run-quota-wal-transport-audit.sh'
       - '.github/workflows/quota-wal-transport.yml'
 permissions:
@@ -17,7 +27,7 @@ permissions:
 jobs:
   signed-http:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     env:
       XMESH_AUDIT_DISPOSABLE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_test
@@ -43,8 +53,29 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 165c4759bc89a1077b76129c520b1b8c7dca9cb4
+          ref: 7f062cad45d035f7072616bf16dc425caffa6e2e
           path: .ci-reviewed-node
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: .ci-reviewed-node/agent/xspv2/go.mod
+          cache: false
+      - name: Build and verify the pinned staging Agent
+        working-directory: .ci-reviewed-node/agent/xspv2
+        run: |
+          set -euo pipefail
+          revision="$(git rev-parse HEAD)"
+          version="$(tr -d '\r\n' < ../../AGENT_VERSION)"
+          test "$revision" = '7f062cad45d035f7072616bf16dc425caffa6e2e'
+          test "$version" = 'control-v6.0.25'
+          go build -trimpath -ldflags "-X main.version=$version -X main.sourceRevision=$revision" \
+            -o "$RUNNER_TEMP/wal-product-agent" ./cmd/xmesh-agent-xspv2-product
+          "$RUNNER_TEMP/wal-product-agent" --identity | python3 -c '
+          import hashlib, json, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          assert json.load(sys.stdin) == {
+              "version": sys.argv[2], "sourceRevision": sys.argv[3],
+              "artifactSha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+          }' "$RUNNER_TEMP/wal-product-agent" "$version" "$revision"
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
         env:
@@ -55,4 +86,50 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/quota-wal"
           source "$RUNNER_TEMP/quota-wal/bin/activate"
           python -m pip install 'psycopg[binary]==3.2.3'
-          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api
+          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-reconcile
+      - name: Build disposable strict XSP/2 gateway fixture
+        working-directory: deploy/xsp-v2-product-gateway
+        run: go test -mod=readonly -c -o "$RUNNER_TEMP/wal-tunnel-fixture"
+      - name: Build the reviewed instrumented Xray and record its binary hash
+        env:
+          GOTOOLCHAIN: go1.27.4
+        run: |
+          set -euo pipefail
+          source="$RUNNER_TEMP/xray-source"
+          bundle="$RUNNER_TEMP/xray-image"
+          git init "$source"
+          git -C "$source" fetch --depth=1 https://github.com/XTLS/Xray-core.git a4a3dff5b20c2faae567b742c172c7b95e75c083
+          git -C "$source" checkout --detach FETCH_HEAD
+          test "$(git -C "$source" rev-parse HEAD)" = a4a3dff5b20c2faae567b742c172c7b95e75c083
+          python3 .ci-reviewed-node/experiments/xray-dataplane-fence/apply-experiment.py "$source"
+          mkdir "$bundle"
+          (cd "$source" && CGO_ENABLED=0 go build -trimpath -o "$bundle/xray" ./main)
+          printf 'FROM scratch\nCOPY xray /xray\nENTRYPOINT ["/xray"]\n' > "$bundle/Dockerfile"
+          docker build --iidfile "$bundle/image-id" "$bundle"
+          read -r hash _ < <(sha256sum "$bundle/xray")
+          echo "Instrumented Xray SHA-256 $hash"
+          echo "XMESH_WAL_XRAY_BINARY=$bundle/xray" >> "$GITHUB_ENV"
+          echo "XMESH_WAL_XRAY_IMAGE=$(cat "$bundle/image-id")" >> "$GITHUB_ENV"
+          echo "XMESH_WAL_XRAY_SHA256=$hash" >> "$GITHUB_ENV"
+      - name: Enroll two actual Agent binaries and verify WAL over strict XSP/2
+        env:
+          XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/quota-wal/bin/activate"
+          docker exec "$XMESH_WAL_POSTGRES_CONTAINER" createdb -U quota_test quota_wal_product
+          export QUOTA_TEST_DSN="${QUOTA_TEST_DSN%/*}/quota_wal_product"
+          export XMESH_WAL_PRODUCT_AGENT="$RUNNER_TEMP/wal-product-agent"
+          export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
+          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-product
+      - name: Install two isolated systemd Nodes and verify cold-start quarantine
+        env:
+          XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          XMESH_INSTALLED_NEXUS_REF: 18b6aaa09d6bdf635f1348076ac86e1b30c72c53
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/quota-wal/bin/activate"
+          docker exec "$XMESH_WAL_POSTGRES_CONTAINER" createdb -U quota_test quota_wal_installed
+          export QUOTA_TEST_DSN="${QUOTA_TEST_DSN%/*}/quota_wal_installed"
+          export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
+          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-installed

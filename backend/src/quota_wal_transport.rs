@@ -40,6 +40,11 @@ enum Request {
         node_id: i64,
         challenge: String,
     },
+    PrepareGenesis {
+        node_id: i64,
+        candidate_runtime_id: String,
+        challenge: String,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -427,17 +432,38 @@ async fn handle(
     }
     let request: Request = serde_json::from_slice(&raw).map_err(|_| invalid())?;
     let node_id = match &request {
-        Request::Store { node_id, .. } | Request::Head { node_id, .. } => *node_id,
+        Request::Store { node_id, .. }
+        | Request::Head { node_id, .. }
+        | Request::PrepareGenesis { node_id, .. } => *node_id,
     };
     if node_id <= 0 {
         return Err(invalid());
     }
-    node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
     let result = match request {
         Request::Store {
             witness, inventory, ..
-        } => store(&state, node_id, &witness, &inventory).await?,
-        Request::Head { challenge, .. } => head(&state, node_id, &challenge).await?,
+        } => {
+            node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
+            store(&state, node_id, &witness, &inventory).await?
+        }
+        Request::Head { challenge, .. } => {
+            node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
+            head(&state, node_id, &challenge).await?
+        }
+        Request::PrepareGenesis {
+            candidate_runtime_id,
+            challenge,
+            ..
+        } => {
+            crate::quota_xray_genesis::prepare(
+                &state,
+                &headers,
+                node_id,
+                &candidate_runtime_id,
+                &challenge,
+            )
+            .await?
+        }
     };
     Ok(([(header::CACHE_CONTROL, "no-store")], Json(result)))
 }

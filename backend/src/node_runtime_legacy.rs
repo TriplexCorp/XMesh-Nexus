@@ -2238,12 +2238,13 @@ struct DesiredConfigRequest {
 /// Authenticated, outbound-only desired Xray configuration retrieval.
 /// The node signs the request with its registered Ed25519 identity.
 /// Inbounds are bound to loopback so the edge router alone owns public TCP ports.
-async fn apply_quota_v2_if_enabled(
+async fn prepare_policy_issuance(
     state: &AppState,
     request: &DesiredConfigRequest,
     policy: &mut Value,
     now_ms: i64,
 ) -> Result<(), ApiError> {
+    crate::quota_xray_genesis::close_for_policy(&state.pool, request.node_id).await?;
     if crate::quota_v2::enabled() {
         crate::quota_v2::issue(
             &state.pool,
@@ -2358,7 +2359,7 @@ pub async fn desired_config(
     } = compile_node_profile(&state, request.node_id).await?;
     let mut policy =
         build_offline_policy(&config, &users, request.node_id, now, &digest, active_nodes);
-    apply_quota_v2_if_enabled(&state, &request, &mut policy, now).await?;
+    prepare_policy_issuance(&state, &request, &mut policy, now).await?;
     if let Some(tls) = tls_provision {
         policy["tlsProvision"] = tls;
     }

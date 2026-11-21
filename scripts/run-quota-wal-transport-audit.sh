@@ -7,7 +7,8 @@ umask 077
 [[ "${XMESH_AUDIT_DISPOSABLE:-}" == 1 &&
    "$QUOTA_TEST_DSN" == postgresql://quota_test:*@127.0.0.1:* &&
    "$REDIS_URL" == redis://127.0.0.1:* ]] || exit 2
-[[ $# == 1 && -x "$1" ]] || exit 2
+[[ $# -ge 1 && $# -le 2 && -x "$1" ]] || exit 2
+[[ $# == 1 || "$2" == --with-reconcile || "$2" == --with-product || "$2" == --with-installed ]] || exit 2
 
 run="$(mktemp -d)"
 server=""
@@ -27,6 +28,10 @@ export ADMIN_PASSWORD="$(openssl rand -hex 24)"
 export SUBSCRIPTION_ENCRYPTION_KEY="$(openssl rand -hex 32)"
 export XSP_V2_PRODUCT_INTERNAL_TOKEN="$(openssl rand -hex 32)"
 export XMESH_QUOTA_V2_ENABLED=0
+export XMESH_QUOTA_V2_XRAY_GENESIS_STAGING=0
+if [[ "${2:-}" == --with-installed ]]; then
+    export XMESH_QUOTA_V2_XRAY_GENESIS_STAGING=1
+fi
 export CORE_DATA_DIR="$run/core"
 export XMESH_TEST_POLICY_PUBLIC_KEY="$run/node-policy.pem"
 
@@ -55,4 +60,13 @@ server=""
 start 1 "$1"
 python3 -c 'import sys; from pathlib import Path; sys.stdout.buffer.write(bytes.fromhex("302e020100300506032b657004220420") + Path(sys.argv[1]).read_bytes())' "$CORE_DATA_DIR/node-policy-ed25519.key" |
     openssl pkey -inform DER -pubout -out "$XMESH_TEST_POLICY_PUBLIC_KEY"
-python3 scripts/test-quota-wal-transport.py
+if [[ "${2:-}" == --with-product ]]; then
+    python3 scripts/test-quota-wal-product-tunnel.py
+elif [[ "${2:-}" == --with-installed ]]; then
+    python3 scripts/test-quota-wal-installed.py
+else
+    python3 scripts/test-quota-wal-transport.py
+    if [[ "${2:-}" == --with-reconcile ]]; then
+        python3 scripts/test-quota-wal-reconcile.py
+    fi
+fi

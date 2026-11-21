@@ -120,6 +120,8 @@ services:
       XSP_V2_PRODUCT_PUBLIC_ADDRESS: ${PANEL_DOMAIN:?Run ./install.sh first}:443
       XSP_V2_PRODUCT_SERVER_NAME: node-ingress.xsp.invalid
       XSP_V2_PRODUCT_PANEL_URL: http://panel:8080
+      XMESH_QUOTA_V2_WAL_TRANSPORT: ${XMESH_QUOTA_V2_WAL_TRANSPORT:-0}
+      XSP_V2_PRODUCT_WAL_CANDIDATE_PIN: ${XSP_V2_PRODUCT_WAL_CANDIDATE_PIN:-}
     depends_on:
       db:
         condition: service_healthy
