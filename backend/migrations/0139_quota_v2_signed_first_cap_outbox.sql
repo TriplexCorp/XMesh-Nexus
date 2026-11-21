@@ -48,7 +48,7 @@ DECLARE
   payload JSONB;
   held NUMERIC;
   now_ms BIGINT;
-  grant BIGINT;
+  grant_value BIGINT;
   issued BIGINT;
   install_by BIGINT;
   expires BIGINT;
@@ -154,14 +154,14 @@ BEGIN
   -- Strict duplicate/unknown JSON keys are rejected in the Rust builder and
   -- Go Xray verifier. PostgreSQL JSONB checks are only defense in depth.
   BEGIN
-    grant:=(payload->>'sharedCeilingBytes')::BIGINT;
+    grant_value:=(payload->>'sharedCeilingBytes')::BIGINT;
     issued:=(payload->>'issuedAtMs')::BIGINT;
     install_by:=(payload->>'installBeforeMs')::BIGINT;
     expires:=(payload->>'validUntilMs')::BIGINT;
   EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'non-integer signed-cap clock or budget' USING ERRCODE='22023';
   END;
-  IF grant NOT BETWEEN 1 AND 67108864 OR issued>now_ms OR issued<now_ms-120000
+  IF grant_value NOT BETWEEN 1 AND 67108864 OR issued>now_ms OR issued<now_ms-120000
      OR install_by<=now_ms OR install_by>now_ms+120000
      OR install_by>(EXTRACT(EPOCH FROM pre.expires_at)*1000)::BIGINT
      OR expires<=install_by
@@ -188,7 +188,7 @@ BEGIN
   ) VALUES(
     p_node,p_challenge,pre.user_id,pre.epoch,pre.meter_epoch,pre.reservation_id,
     pre.revision,pre.reported_policy_sha256,pre.prepared_runtime_id,
-    p_signer_public_key,grant,issued,install_by,expires,p_envelope
+    p_signer_public_key,grant_value,issued,install_by,expires,p_envelope
   ) RETURNING * INTO stored;
   RETURN stored;
 END;
