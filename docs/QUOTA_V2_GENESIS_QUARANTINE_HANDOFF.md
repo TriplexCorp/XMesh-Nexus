@@ -1,0 +1,101 @@
+# Quota V2: immutable, first-ever signed policy in quarantine
+
+**Draft-only experiment, not production activation.** This work continues
+Nexus #553 over #552 and Node #170. `XMESH_QUOTA_V2_ENABLED=0` in
+production remains unchanged.
+
+## Fixed architectural deadlock
+
+Before this change, ordinary `POST /api/v1/node/desired-config`
+called `quota_xray_genesis::close_for_policy()` and saved
+`node_desired_revisions`. Both permanently disqualified a fresh Node
+from the first-Genesis reservation path. Deleting the marker or allowing
+the already-used Node to masquerade as new would refill previously spent
+traffic after a restart.
+
+**The legacy path remains unchanged in its intended semantics.**
+A separate, opt-in, zero-authority request now stages a signed policy
+without executing either destructive transition.
+
+## Exact staging order
+
+Only in a disposable, strict-XSP/2-backed test environment:
+
+1. Enroll and activate a newly created Node. The original creation
+   transaction must already have inserted `quota_v2_xray_genesis`.
+   No existing `node_desired_revisions`, Node quota reservation, local
+   lifetime quota, prior telemetry, or external WAL birth inventory may exist.
+2. Under verified strict product-gateway identity, call the existing
+   `POST /api/v1/node/quota-v2/wal` with
+   `{"operation":"prepare_genesis","nodeId":N,"candidateRuntimeId":"<64 lowercase hex>","challenge":"<64 lowercase hex>"}`.
+   The signed, zero-authority receipt is tied to the original product
+   activation and valid for 120 seconds. Do NOT use a new activation,
+   reset the WAL or forge a fresh runtime on an existing Node.
+3. A Node aware of the future quarantine protocol can opt into
+   `POST /api/v1/node/desired-config` with
+   `{"node_id":N,"quotaProtocolVersion":2,"quotaGenesisQuarantine":true,"quotaGenesisRuntimeId":"<same runtime>","quotaGenesisChallenge":"<same challenge>"}`.
+   This accepts ONLY the strict-PQ product gateway, not an old Ed25519
+   Node request or a user-selected Node ID. The server compiles the normal
+   authoritative XRAY STUDIO profile and user mappings, but signs a
+   special `xmesh.quota-v2.genesis-quarantine-policy` with every
+   `offlineBudgetBytes=0`, every user `onHold=true`, a 120-second
+   Genesis lifetime, `authorizedBytes=0`, `canStart=false` and
+   `canResume=false`.
+4. Migration **0141** checks the original activation and Genesis, absence
+   of policy, WAL and traffic history, and every zero-budget field.
+   PostgreSQL saves the exact signed policy bytes, SHA256, signer key and
+   profile revision in an immutable record using synchronous commit.
+   Exact retries are byte-identical. Conflicting retry, new runtime,
+   stale policy or expired Genesis fails closed.
+   **This does not set `policy_path_used` or
+   `node_desired_revisions`.**
+5. A verified, independent runtime/policy/WAL process can now use
+   migration **0142** to create a **zero-authority** preflight against the
+   existing confirmed reservation, but ONLY for a user present in the
+   original signed staged policy and with its exact policy SHA.
+   Migration 0138 still supplies all original account/lease locks,
+   epoch, expiration, overcommit and replay checks.
+6. Migration **0143**, alongside the Rust transaction guard, forbids
+   ordinary desired-config from subsequently setting
+   `policy_path_used=true` on a staged Node. No legacy reconciliation
+   may turn the staged configuration into an active offline allowance.
+   A future positive protocol must use a separate signed admission
+   state; **never reset the historical flag**.
+
+## Immediate Node safety
+
+The existing `xmesh-xray-sync.sh` is NOT a positive-admission client.
+In the stacked Node #170 draft it rejects and physically stops managed
+Xray on any HTTP 200 desired-config response with
+`status=quarantined`, `publicIngressAllowed=false`, or a
+`policy.quotaV2Genesis` object. The experimental signed local Unix
+socket is a **different component** and remains the only prospective
+route for positive, process-bound cap installation. The Node version
+policy requires an Agent release bump for this changed deployed guard;
+the draft proposes `control-v6.0.26` but nothing has been shipped.
+
+## Intentionally unimplemented boundary
+
+The above is **NOT** an end-to-end positive grant. The live installed
+Agent does not request the new quarantine mode, no actual public
+XSP/2 positive cap issuer delivers signed reservations to installed
+Agent, and no installed systemd Agent invokes the verified Xray local
+installer with independent kernel PID/config/WAL proof. The current
+positive Rust signer is still a feature-gated disposable CI binary.
+
+Before any release, the installed strict-PQ Agent must:
+
+- independently inspect and pin the actual Xray process, cgroup/container,
+  config SHA and all MAIN/CDN aliases, including old writer shutdown;
+- authenticate an exact signed XSP/2 attestation bound to the original
+  staged signed policy and the immutable off-host WAL witness;
+- atomically obtain the **one-time**, account-conserved 0139 positive
+  cap through the actual Nexus private PolicySigner and deliver it;
+- validate the pinned Nexus key, reserve/revision/epoch, real process
+  and local WAL before root-private Unix socket installation;
+- keep VLESS public ingress physically closed until verified installation,
+  and never refund or replenish bytes on restart, crash or lost response.
+
+**No working VPS, main branch or production feature flag is changed by
+this staging work.** GitHub CI validation is required before treating
+even the zero-authority flow as qualified.
