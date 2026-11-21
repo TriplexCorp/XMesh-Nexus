@@ -31,7 +31,7 @@ WAL_PATH = "/api/v1/node/quota-v2/wal"
 DESIRED_PATH = "/api/v1/node/desired-config"
 GENESIS_DOMAIN = b"XMESH_XRAY_GENESIS_PREPARED_V1\0"
 XRAY = "xmesh-managed-xray"
-XRAY_CONFIG = b'{"inbounds":[],"outbounds":[{"protocol":"blackhole"}]}\n'
+XRAY_CONFIG = b'{"inbounds":[],"outbounds":[{"protocol":"blackhole"}],"stats":{}}\n'
 
 
 def docker(*args, timeout=40, **kwargs):
@@ -242,8 +242,14 @@ def start_isolated_candidate(guest, archive, image):
                "-v", config + ":/etc/xray/config.json:ro",
                "-v", "/var/lib/xmesh-measured-lab/wal:/run/xmesh-xray-audit:rw",
                image, "run", "-config", "/etc/xray/config.json")
-    wait_for(lambda: b"true" == guest.exec("docker", "inspect", "-f", "{{.State.Running}}", XRAY).strip(),
-             label=f"isolated candidate Xray on Node {guest.node}")
+    def candidate_ready():
+        status = guest.exec("docker", "inspect", "-f", "{{.State.Running}}", XRAY).strip()
+        if status != b"true":
+            raise AssertionError(guest.exec("docker", "logs", "--tail", "30", XRAY).decode(errors="replace"))
+        command = ["docker", "exec", guest.name, "test", "-S", "/var/lib/xmesh-measured-lab/wal/drain.sock"]
+        return subprocess.run(command, timeout=10, capture_output=True).returncode == 0
+
+    wait_for(candidate_ready, timeout=20, label=f"isolated Xray observation socket on Node {guest.node}")
 
 
 def try_genesis(guests, db, root, panel):
