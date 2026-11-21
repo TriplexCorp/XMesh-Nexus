@@ -268,6 +268,20 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         cap_request=dict(lookup,measurement={
             "containerId":container,"hostPid":pid,"runtimeId":runtime,
         })
+        if not cap_jobs:
+            db.execute("ALTER TABLE quota_v2_signed_first_cap_outbox ADD CONSTRAINT "
+                       "ci_reject_cap_write CHECK (false) NOT VALID")
+            try:
+                status,_=guest.request(CAP_PATH,cap_request)
+                assert status==500, status
+                assert db.execute("SELECT count(*) FROM quota_v2_runtime_admission_preflights "
+                                  "WHERE node_id=%s AND request_challenge=%s",
+                                  (guest.node,nonce)).fetchone()==(0,)
+                assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox "
+                                  "WHERE node_id=%s",(guest.node,)).fetchone()==(0,)
+            finally:
+                db.execute("ALTER TABLE quota_v2_signed_first_cap_outbox "
+                           "DROP CONSTRAINT ci_reject_cap_write")
         issued=parallel(lambda _: guest.request(CAP_PATH,cap_request),range(2))
         code,signed=issued[0]
         assert code==200,(code,signed)

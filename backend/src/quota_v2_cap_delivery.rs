@@ -220,6 +220,10 @@ async fn load_outbox(
          JOIN quota_v2_xray_genesis g ON g.node_id=o.node_id
          JOIN quota_v2_genesis_quarantine_policies q ON q.node_id=o.node_id
          JOIN node_xsp_product_nodes p ON p.node_id=o.node_id
+         JOIN node_xsp_public_keysets k ON k.node_id=p.node_id
+              AND k.purpose='node_request' AND k.key_epoch=p.key_epoch
+              AND k.ed25519_key_id=p.ed25519_key_id AND k.mldsa65_key_id=p.mldsa65_key_id
+              AND k.revoked_at IS NULL
          JOIN panel_records n ON n.id=o.node_id AND n.collection='nodes'
          JOIN quota_v2_genesis_lease_replies c ON c.node_id=o.node_id
               AND c.user_id=o.user_id AND c.stage='confirm'
@@ -228,10 +232,6 @@ async fn load_outbox(
          WHERE o.node_id=$1 AND o.user_id=$2 AND o.request_challenge=$3
            AND o.epoch=$4::uuid AND o.policy_sha256=$5 AND o.signer_public_key=$6
            AND p.state='active' AND encode(p.receipt_sha256,'hex')=$7
-           AND EXISTS(SELECT 1 FROM node_xsp_public_keysets k WHERE k.node_id=p.node_id
-               AND k.purpose='node_request' AND k.key_epoch=p.key_epoch
-               AND k.ed25519_key_id=p.ed25519_key_id AND k.mldsa65_key_id=p.mldsa65_key_id
-               AND k.revoked_at IS NULL)
            AND g.first_activation_sha256=$7 AND q.first_activation_sha256=$7
            AND pf.first_activation_sha256=$7 AND g.runtime_id=o.runtime_id
            AND ($9::text IS NULL OR (pf.prepared_runtime_id=$9
@@ -257,7 +257,7 @@ async fn load_outbox(
              JOIN quota_v2_accounts oa USING(user_id,epoch)
              WHERE old.user_id=o.user_id AND oa.closed
                AND old.ceiling_bytes>GREATEST(old.acknowledged_bytes,old.conservative_burn_floor_bytes))
-         FOR SHARE OF o,pf,r,g,q,p,n,c,prep",
+         FOR SHARE OF o,pf,r,g,q,p,n,c,prep,k",
     )
     .bind(req.node_id).bind(req.user_id).bind(&req.challenge)
     .bind(epoch).bind(&scope.policy_sha256).bind(key).bind(activation)
