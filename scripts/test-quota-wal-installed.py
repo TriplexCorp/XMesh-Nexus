@@ -111,7 +111,25 @@ class Guest:
         docker("run", "--detach", "--name", self.name, "--network", network,
                "--cgroupns", "private", "--privileged", "--tmpfs", "/run:rw,nosuid,nodev",
                "--tmpfs", "/run/lock:rw,nosuid,nodev", image)
-        stack.callback(docker, "rm", "-fv", self.name)
+        stack.callback(self.close)
+
+    def close(self):
+        # The guest owns its nested containerd shims and mounts. Let systemd
+        # stop those services before removing the containing Docker guest.
+        try:
+            if self.ready():
+                self.exec("bash", "-ec", """
+systemctl stop xmesh-xray-sync.timer xmesh-node-metrics.timer xmesh-node-user-meter.timer 2>/dev/null || true
+for name in xmesh-managed-xray xmesh-node; do
+    if docker inspect --type container "$name" >/dev/null 2>&1; then
+        docker rm -f "$name"
+    fi
+done
+systemctl stop docker.socket docker.service containerd.service
+""", timeout=55)
+            docker("stop", "--timeout", "30", self.name, timeout=50)
+        finally:
+            docker("rm", "-fv", self.name, timeout=120)
 
     def exec(self, *command, timeout=30):
         return docker("exec", self.name, *command, timeout=timeout)
