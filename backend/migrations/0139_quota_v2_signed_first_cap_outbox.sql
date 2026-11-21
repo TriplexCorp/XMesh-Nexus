@@ -106,12 +106,8 @@ BEGIN
         ceiling_bytes::NUMERIC-GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0
       )),0) INTO held FROM quota_v2_reservations
        WHERE user_id=pre.user_id AND epoch=pre.epoch;
-  IF held<>pre.all_node_held_bytes
-      OR GREATEST(account.settled_bytes,account.observed_floor_bytes)
-            <>pre.account_floor_bytes
-      OR account.limit_bytes<>pre.account_limit_bytes
-      OR held+GREATEST(account.settled_bytes,account.observed_floor_bytes)>account.limit_bytes THEN
-    RAISE EXCEPTION 'signed-cap account budget changed since SQL preflight'
+  IF held+GREATEST(account.settled_bytes,account.observed_floor_bytes)>account.limit_bytes THEN
+    RAISE EXCEPTION 'signed-cap account has no conserved global budget'
       USING ERRCODE='22023';
   END IF;
   BEGIN
@@ -180,6 +176,17 @@ BEGIN
         USING ERRCODE='22023';
     END IF;
     RETURN existing;
+  END IF;
+  -- Only a NEW positive issuance requires the exact original shared
+  -- preflight snapshot. A previously fsynced signed reply may be returned
+  -- after ANOTHER Node reserved additional capacity, provided no current
+  -- overcommit, revocation, closed epoch or lease mismatch is present.
+  IF held<>pre.all_node_held_bytes
+      OR GREATEST(account.settled_bytes,account.observed_floor_bytes)
+            <>pre.account_floor_bytes
+      OR account.limit_bytes<>pre.account_limit_bytes THEN
+    RAISE EXCEPTION 'shared budget changed before NEW signed-cap issuance'
+      USING ERRCODE='22023';
   END IF;
   INSERT INTO quota_v2_signed_first_cap_outbox(
     node_id,request_challenge,user_id,epoch,meter_epoch,reservation_id,
