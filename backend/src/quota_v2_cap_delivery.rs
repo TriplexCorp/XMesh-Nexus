@@ -109,7 +109,9 @@ pub async fn handle(
     let (epoch, limit, floor) = account.ok_or_else(deny)?;
     let now: i64 = sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
         .fetch_one(&mut *tx).await?;
-    if !crate::user_can_connect(&current_user, now)
+    if !crate::node_runtime::first_genesis_active_until(
+        &current_user, now, now.saturating_add(1),
+    )
         || current_user["limit"].as_f64().map(crate::gb_to_bytes_i64) != Some(limit)
     {
         return Err(deny());
@@ -183,6 +185,9 @@ pub async fn handle(
     let meter: String = row.try_get("meter")?;
     let install: i64 = row.try_get("install_before_ms")?;
     let expires: i64 = row.try_get("valid_until_ms")?;
+    if !crate::node_runtime::first_genesis_active_until(&current_user, now, expires) {
+        return Err(deny());
+    }
     let doc: Value = serde_json::from_slice(&raw).map_err(|_| deny())?;
     let p = &doc["payload"];
     let confirm: Value = serde_json::from_slice(&saved).map_err(|_| deny())?;
