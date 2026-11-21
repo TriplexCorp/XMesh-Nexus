@@ -90,24 +90,25 @@ BEGIN
     RAISE EXCEPTION 'invalid signed quarantine policy JSON'
       USING ERRCODE='22023';
   END;
-  IF jsonb_typeof(parsed)<>'object'
-    OR parsed->>'kind'<>'xmesh.quota-v2.genesis-quarantine-policy'
-    OR parsed->>'version'<>'1'
-    OR parsed->>'nodeId'<>p_node::TEXT
-    OR parsed->>'configSha256'<>p_revision
-    OR parsed->>'issuedAtMs'<>genesis.prepared_ms::TEXT
-    OR parsed->>'validUntilMs'<>(genesis.prepared_ms+120000)::TEXT
-    OR parsed->'quotaV2Genesis'->>'mode'<>'quarantined'
-    OR parsed->'quotaV2Genesis'->>'runtimeId'<>p_runtime
-    OR parsed->'quotaV2Genesis'->>'challenge'<>p_challenge
-    OR parsed->'quotaV2Genesis'->>'firstActivationReceiptSha256'<>p_activation
-    OR parsed->'quotaV2Genesis'->>'authorizedBytes'<>'0'
-    OR parsed->'quotaV2Genesis'->>'canStart'<>'false'
-    OR parsed->'quotaV2Genesis'->>'canResume'<>'false'
-    OR parsed->'quotaV2Genesis'->>'refundableBytes'<>'0'
-    OR jsonb_typeof(parsed->'users')<>'array'
+  IF jsonb_typeof(parsed) IS DISTINCT FROM 'object'
+    OR parsed->>'kind' IS DISTINCT FROM 'xmesh.quota-v2.genesis-quarantine-policy'
+    OR parsed->>'version' IS DISTINCT FROM '1'
+    OR parsed->>'nodeId' IS DISTINCT FROM p_node::TEXT
+    OR parsed->>'configSha256' IS DISTINCT FROM p_revision
+    OR parsed->>'issuedAtMs' IS DISTINCT FROM genesis.prepared_ms::TEXT
+    OR parsed->>'validUntilMs' IS DISTINCT FROM (genesis.prepared_ms+120000)::TEXT
+    OR parsed->'quotaV2Genesis'->>'mode' IS DISTINCT FROM 'quarantined'
+    OR parsed->'quotaV2Genesis'->>'runtimeId' IS DISTINCT FROM p_runtime
+    OR parsed->'quotaV2Genesis'->>'challenge' IS DISTINCT FROM p_challenge
+    OR parsed->'quotaV2Genesis'->>'firstActivationReceiptSha256' IS DISTINCT FROM p_activation
+    OR parsed->'quotaV2Genesis'->>'authorizedBytes' IS DISTINCT FROM '0'
+    OR parsed->'quotaV2Genesis'->>'canStart' IS DISTINCT FROM 'false'
+    OR parsed->'quotaV2Genesis'->>'canResume' IS DISTINCT FROM 'false'
+    OR parsed->'quotaV2Genesis'->>'refundableBytes' IS DISTINCT FROM '0'
+    OR jsonb_typeof(parsed->'users') IS DISTINCT FROM 'array'
     OR EXISTS(SELECT 1 FROM jsonb_array_elements(
-                 COALESCE(parsed->'users','[]'::jsonb)) AS u
+                 CASE WHEN jsonb_typeof(parsed->'users')='array'
+                      THEN parsed->'users' ELSE '[]'::jsonb END) AS u
            WHERE u->>'offlineBudgetBytes' IS DISTINCT FROM '0'
               OR u->>'onHold' IS DISTINCT FROM 'true')
   THEN
