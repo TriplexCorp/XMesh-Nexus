@@ -262,18 +262,47 @@ class StagingAdmissionPreflight(unittest.TestCase):
         self.assertEqual(recorded,0)
 
     def test_expired_preparation_and_deleted_genesis_never_authorize(self):
+        # Genesis rows are intentionally immutable after first preparation.
+        # Create a THIRD node with old first-preparation time rather than
+        # rewriting a recorded identity to simulate expiry.
+        node=self.node_b+100
+        meter=uuid.uuid4()
+        rid=uuid.uuid4()
         with psycopg.connect(DSN) as c:
-            c.execute("UPDATE quota_v2_xray_genesis SET "
-                      "prepared_ms=(EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT-121000 "
-                      "WHERE node_id=%s",(self.node_a,))
-        self.deny()
-        # The Xray genesis row is protected against deletion even by an SQL
-        # owner; a missing preparation can never appear as first activation.
+            c.execute("UPDATE quota_v2_accounts SET limit_bytes=1100 "
+                      "WHERE user_id=%s AND epoch=%s",(self.user,self.epoch))
+            lease=c.execute(
+                "SELECT revision,ceiling_bytes FROM quota_v2_reserve("
+                "%s,%s,%s,%s,%s,50,0,NOW()+INTERVAL '1 hour')",
+                (self.user,self.epoch,node,meter,rid)).fetchone()
+            self.assertEqual(lease[1],50)
+            c.execute(
+                "UPDATE quota_v2_reservations SET node_confirmed=TRUE "
+                "WHERE user_id=%s AND node_id=%s",(self.user,node))
+            c.execute(
+                "INSERT INTO quota_v2_xray_genesis("
+                "node_id,first_activation_sha256,runtime_id,challenge,"
+                "prepared_ms,receipt_signature) VALUES("
+                "%s,%s,%s,%s,"
+                "(EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT-121000,%s)",
+                (node,h("5"),h("6"),h("7"),"0"*128))
+        self.meters[node]=meter
+        self.ids[node]=rid
+        self.rev[node]=lease[0]
+        self.runtime[node]=h("6")
+        self.activation[node]=h("5")
+        self.deny(node=node,challenge=h("8"))
+        # The old genesis cannot be silently replaced or deleted to fake
+        # a clean new process and reissue a previously reserved allowance.
         with psycopg.connect(DSN) as c:
             with self.assertRaises(psycopg.Error):
                 with c.transaction():
-                    c.execute("DELETE FROM quota_v2_xray_genesis WHERE node_id=%s",
-                              (self.node_a,))
+                    c.execute("UPDATE quota_v2_xray_genesis SET "
+                              "prepared_ms=(EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT "
+                              "WHERE node_id=%s",(node,))
+            with self.assertRaises(psycopg.Error):
+                with c.transaction():
+                    c.execute("DELETE FROM quota_v2_xray_genesis WHERE node_id=%s",(node,))
 
     def test_immutable_evidence_and_public_execute_denied(self):
         self.snapshot()
