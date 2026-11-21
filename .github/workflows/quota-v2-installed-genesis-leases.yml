@@ -1,0 +1,101 @@
+name: Quota V2 installed two-Node Genesis lease recovery (disposable)
+on:
+  pull_request:
+    paths:
+      - 'backend/src/quota_v2*.rs'
+      - 'backend/src/quota_xray_genesis.rs'
+      - 'backend/src/node_runtime_legacy.rs'
+      - 'backend/src/main.rs'
+      - 'backend/migrations/014*.sql'
+      - 'deploy/xsp-v2-product-gateway/**'
+      - 'scripts/run-quota-wal-transport-audit.sh'
+      - 'scripts/test-quota-wal-installed.py'
+      - 'scripts/quota_v2_installed_genesis_lease.py'
+      - '.github/workflows/quota-v2-installed-genesis-leases.yml'
+permissions:
+  contents: read
+jobs:
+  installed-leases:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      XMESH_AUDIT_DISPOSABLE: '1'
+      XMESH_INSTALLED_GENESIS_LEASE: '1'
+      QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
+      REDIS_URL: redis://127.0.0.1:6379/0
+    services:
+      postgres:
+        image: timescale/timescaledb:2.30.0-pg18
+        env:
+          POSTGRES_USER: quota_test
+          POSTGRES_PASSWORD: quota_test_disposable
+          POSTGRES_DB: quota_wal_installed
+        ports: ['127.0.0.1:5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+      redis:
+        image: redis:8
+        ports: ['127.0.0.1:6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 84bcf5d8efc9f8df39576717f62a578261b2a8cb
+          path: .ci-reviewed-node
+          persist-credentials: false
+      - name: Verify exact draft Agent source
+        run: |
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '84bcf5d8efc9f8df39576717f62a578261b2a8cb'
+          test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
+          python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build the real Nexus API
+        env:
+          CARGO_PROFILE_DEV_DEBUG: '0'
+        run: cargo build --manifest-path backend/Cargo.toml --bin xmesh-api
+      - name: Prepare disposable test dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/quota-wal"
+          "$RUNNER_TEMP/quota-wal/bin/pip" install 'psycopg[binary]==3.2.3'
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: .ci-reviewed-node/agent/xspv2/go.mod
+          cache: false
+      - name: Build the reviewed instrumented Xray and record its binary hash
+        env:
+          GOTOOLCHAIN: go1.27.4
+        run: |
+          set -euo pipefail
+          source="$RUNNER_TEMP/xray-source"
+          bundle="$RUNNER_TEMP/xray-image"
+          git init "$source"
+          git -C "$source" fetch --depth=1 https://github.com/XTLS/Xray-core.git a4a3dff5b20c2faae567b742c172c7b95e75c083
+          git -C "$source" checkout --detach FETCH_HEAD
+          test "$(git -C "$source" rev-parse HEAD)" = a4a3dff5b20c2faae567b742c172c7b95e75c083
+          python3 .ci-reviewed-node/experiments/xray-dataplane-fence/apply-experiment.py "$source"
+          mkdir "$bundle"
+          (cd "$source" && CGO_ENABLED=0 go build -trimpath -o "$bundle/xray" ./main)
+          printf 'FROM scratch\nCOPY xray /xray\nENTRYPOINT ["/xray"]\n' > "$bundle/Dockerfile"
+          docker build --iidfile "$bundle/image-id" "$bundle"
+          read -r hash _ < <(sha256sum "$bundle/xray")
+          echo "Instrumented Xray SHA-256 $hash"
+          echo "XMESH_WAL_XRAY_BINARY=$bundle/xray" >> "$GITHUB_ENV"
+          echo "XMESH_WAL_XRAY_IMAGE=$(cat "$bundle/image-id")" >> "$GITHUB_ENV"
+          echo "XMESH_WAL_XRAY_SHA256=$hash" >> "$GITHUB_ENV"
+      - name: Build real strict XSP/2 gateway fixture
+        working-directory: deploy/xsp-v2-product-gateway
+        run: go test -mod=readonly -c -o "$RUNNER_TEMP/wal-tunnel-fixture"
+      - name: Two clean installed Nodes, real isolated Xray, immutable reserve replay and PostgreSQL restart
+        env:
+          XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          XMESH_INSTALLED_NEXUS_REF: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/quota-wal/bin/activate"
+          export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
+          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-installed
