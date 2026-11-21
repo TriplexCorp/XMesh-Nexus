@@ -1,0 +1,26 @@
+name: Quota V2 genuine Nexus PolicySigner first-genesis contract (disposable)
+on:
+  pull_request:
+    paths:
+      - 'backend/src/quota_v2_cap_signing.rs'
+      - 'backend/src/bin/quota_v2_ci_signed_cap.rs'
+      - 'backend/Cargo.toml'
+      - 'backend/src/main.rs'
+      - '.github/workflows/quota-v2-policy-signer-contract.yml'
+permissions:
+  contents: read
+jobs:
+  signed-first-genesis:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Nexus Ed25519 domain and fail-closed grant invariants
+        run: |
+          cargo test --locked --manifest-path backend/Cargo.toml quota_v2_cap_signing -- --nocapture
+      - name: Build opt-in disposable SQL signer, NOT the shipping API
+        run: |
+          cargo build --locked --manifest-path backend/Cargo.toml \
+            --features quota-v2-disposable-cap-issuer --bin quota-v2-ci-signed-cap
