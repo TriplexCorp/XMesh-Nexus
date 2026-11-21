@@ -2233,6 +2233,49 @@ struct DesiredConfigRequest {
     quota_protocol_version: Option<u8>,
     #[serde(default, alias = "quotaLocalCounters")]
     quota_local_counters: Option<Vec<crate::quota_v2::LocalQuotaCounter>>,
+    #[serde(default, alias = "quotaGenesisQuarantine")]
+    quota_genesis_quarantine: bool,
+    #[serde(default, alias = "quotaGenesisRuntimeId")]
+    quota_genesis_runtime_id: Option<String>,
+    #[serde(default, alias = "quotaGenesisChallenge")]
+    quota_genesis_challenge: Option<String>,
+}
+
+/// This is only a sealed policy candidate for an already prepared, first-ever
+/// Xray. It cannot authorize legacy offline spending or open public ingress.
+/// The signed policy may later be compared with independent Xray measurements,
+/// but its existence is NOT an admission or a complete WAL witness.
+fn quarantine_first_genesis_policy(
+    policy: &mut Value,
+    prepared: &crate::quota_xray_genesis::QuarantinePrepared,
+    runtime: &str,
+    challenge: &str,
+) -> Result<(), ApiError> {
+    let users = policy
+        .get_mut("users")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid first-genesis policy users."))?;
+    for user in users {
+        let object = user
+            .as_object_mut()
+            .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid user policy in quarantine."))?;
+        object.insert("offlineBudgetBytes".to_owned(), json!(0));
+        object.insert("onHold".to_owned(), json!(true));
+    }
+    let record = policy
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid first-genesis policy."))?;
+    record.insert("kind".to_owned(), json!("xmesh.quota-v2.genesis-quarantine-policy"));
+    record.insert("issuedAtMs".to_owned(), json!(prepared.prepared_ms));
+    record.insert("validUntilMs".to_owned(), json!(prepared.prepared_ms.saturating_add(120_000)));
+    record.insert("quotaV2Genesis".to_owned(), json!({
+        "mode":"quarantined",
+        "runtimeId":runtime,"challenge":challenge,
+        "firstActivationReceiptSha256":prepared.activation_sha256,
+        "authorizedBytes":0,"canStart":false,"canResume":false,
+        "refundableBytes":0
+    }));
+    Ok(())
 }
 
 /// Authenticated, outbound-only desired Xray configuration retrieval.
@@ -2319,6 +2362,20 @@ pub async fn desired_config(
             "Quota-v2 requires an upgraded node agent.",
         ));
     }
+    if request.quota_genesis_quarantine && request.quota_protocol_version != Some(2) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "First-genesis quarantine requires quota protocol v2.",
+        ));
+    }
+    if !request.quota_genesis_quarantine
+        && (request.quota_genesis_runtime_id.is_some() || request.quota_genesis_challenge.is_some())
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Unexpected Xray genesis fields on the normal policy path.",
+        ));
+    }
     reject_legacy_policy_after_v2_issuance(&state.pool).await?;
     // Enrollment precedes profile authoring. Authenticated nodes without a
     // profile receive a non-successful-to-apply but healthy pending response.
@@ -2357,15 +2414,74 @@ pub async fn desired_config(
         active_nodes,
         revision: digest,
     } = compile_node_profile(&state, request.node_id).await?;
+    let quarantined = if request.quota_genesis_quarantine {
+        let runtime = request
+            .quota_genesis_runtime_id
+            .as_deref()
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Missing prepared Xray runtime."))?;
+        let challenge = request
+            .quota_genesis_challenge
+            .as_deref()
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Missing genesis challenge."))?;
+        Some(
+            crate::quota_xray_genesis::quarantine_prepared(
+                &state, &headers, request.node_id, runtime, challenge,
+            )
+            .await?,
+        )
+    } else {
+        None
+    };
+    let policy_time = quarantined.as_ref().map_or(now, |prepared| prepared.prepared_ms);
     let mut policy =
-        build_offline_policy(&config, &users, request.node_id, now, &digest, active_nodes);
-    prepare_policy_issuance(&state, &request, &mut policy, now).await?;
+        build_offline_policy(&config, &users, request.node_id, policy_time, &digest, active_nodes);
+    if let Some(prepared) = &quarantined {
+        quarantine_first_genesis_policy(
+            &mut policy,
+            prepared,
+            request.quota_genesis_runtime_id.as_deref().unwrap_or_default(),
+            request.quota_genesis_challenge.as_deref().unwrap_or_default(),
+        )?;
+    } else {
+        // The existing desired-config path remains unchanged and marks the
+        // Node's first-genesis eligibility as permanently consumed.
+        prepare_policy_issuance(&state, &request, &mut policy, now).await?;
+    }
     if let Some(tls) = tls_provision {
         policy["tlsProvision"] = tls;
     }
     // Metadata is covered by the existing Ed25519 node-policy signature.
     if let Some(manifest) = geo_data {
         policy["geoData"] = manifest;
+    }
+    if let Some(prepared) = quarantined.as_ref() {
+        let signed = crate::quota_xray_genesis::stage_quarantine_policy(
+            &state,
+            request.node_id,
+            prepared,
+            request.quota_genesis_runtime_id.as_deref().unwrap_or_default(),
+            request.quota_genesis_challenge.as_deref().unwrap_or_default(),
+            &digest,
+            &policy,
+        )
+        .await?;
+        // Crucially DO NOT write node_desired_revisions or call
+        // close_for_policy: both permanently end first-genesis eligibility.
+        // The response uses a separate status and exposes no positive cap.
+        return Ok((
+            StatusCode::OK,
+            Json(json!({
+                "status":"quarantined",
+                "nodeId":request.node_id,"profileId":profile_id,
+                "listen":"127.0.0.1","port":port,"revision":digest,
+                "config":config,"policy":signed.policy,
+                "policySignature":signed.signature,
+                "policyPublicKey":state.node_policy_signer.public_key(),
+                "policySha256":signed.sha256,
+                "publicIngressAllowed":false,"canStart":false,
+                "canResume":false,"authorizedBytes":0
+            })),
+        ));
     }
     let signature = state.node_policy_signer.sign(&policy).map_err(|_| {
         ApiError::new(
@@ -2397,6 +2513,39 @@ pub async fn desired_config(
 #[cfg(test)]
 mod provision_tests {
     use super::*;
+    #[test]
+    fn quarantined_policy_cannot_issue_legacy_spend_or_extend_genesis() {
+        let prepared = crate::quota_xray_genesis::QuarantinePrepared {
+            prepared_ms: 1_800_000_000_000,
+            activation_sha256: "c".repeat(64),
+        };
+        let mut original = json!({
+            "version":1,"nodeId":47,"configSha256":"d".repeat(64),
+            "issuedAtMs":1_800_000_000_999_i64,
+            "validUntilMs":1_900_000_000_000_i64,
+            "users":[
+                {"userId":1,"offlineBudgetBytes":null,"onHold":false},
+                {"userId":2,"offlineBudgetBytes":67108864,"onHold":false}
+            ]
+        });
+        quarantine_first_genesis_policy(
+            &mut original,&prepared,&"a".repeat(64),&"b".repeat(64),
+        ).unwrap();
+        assert_eq!(original["kind"],"xmesh.quota-v2.genesis-quarantine-policy");
+        assert_eq!(original["issuedAtMs"],prepared.prepared_ms);
+        assert_eq!(original["validUntilMs"],prepared.prepared_ms+120_000);
+        assert_eq!(original["quotaV2Genesis"]["authorizedBytes"],0);
+        assert_eq!(original["quotaV2Genesis"]["canStart"],false);
+        assert_eq!(original["quotaV2Genesis"]["canResume"],false);
+        for user in original["users"].as_array().unwrap() {
+            assert_eq!(user["offlineBudgetBytes"],0);
+            assert_eq!(user["onHold"],true);
+        }
+        let mut broken = json!({"users":[1]});
+        assert!(quarantine_first_genesis_policy(
+            &mut broken,&prepared,&"a".repeat(64),&"b".repeat(64)).is_err());
+    }
+
     #[test]
     fn profile_assignment_is_optional_until_provisioning() {
         for node in [
