@@ -731,6 +731,8 @@ func (g *gateway) loadNode(ctx context.Context, nodeID int64) (nodeIdentity, err
 		        COALESCE(p.receipt_envelope,''::bytea),COALESCE(p.activation_request_id,''),k.ed25519_public,k.mldsa65_public
 		   FROM node_xsp_product_nodes p JOIN node_xsp_public_keysets k
 		     ON k.node_id=p.node_id AND k.purpose='node_request' AND k.key_epoch=p.key_epoch
+		    AND k.ed25519_key_id=p.ed25519_key_id AND k.mldsa65_key_id=p.mldsa65_key_id
+		    AND k.revoked_at IS NULL
 		  WHERE p.node_id=$1`, nodeID).
 		Scan(&n.State, &n.KeyEpoch, &n.EdKeyID, &n.PQKeyID, &n.TLSSPKI, &n.ReleaseRev, &n.Receipt, &n.ActivationRequestID, &n.EdPublic, &n.PQPublic)
 	return n, err

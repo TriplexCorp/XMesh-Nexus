@@ -458,6 +458,29 @@ def main():
         fresh.check_quarantine()
         print("The exact receipt survived PostgreSQL and guest restarts. An ordinary signed policy closed genesis permanently.")
 
+        peer = next(guest for guest, _ in guests if guest is not fresh)
+        peer.exec("systemctl", "stop", f"{METRICS}.timer", f"{METRICS}.service")
+        request = {"operation": "head", "nodeId": peer.node, "challenge": secrets.token_hex(32)}
+        assert peer.request(WAL_PATH, request)[0] == 404
+        nonce_sql = "SELECT count(*) FROM node_xsp_product_nonces WHERE node_id=%s"
+        now = db.execute(
+            "UPDATE node_xsp_public_keysets SET revoked_at=NOW() WHERE node_id=%s AND purpose='node_request'",
+            (peer.node,),
+        )
+        assert now.rowcount == 1
+        previous = db.execute(nonce_sql, (peer.node,)).fetchone()
+        failure = subprocess.run(
+            ["docker", "exec", peer.name, "bash", "-ec",
+             'tmp=$(mktemp); trap \'rm -f "$tmp"\' EXIT; printf "%s" "$1" > "$tmp"; '
+             '"$2" request --path "$3" --body-file "$tmp"',
+             "--", json.dumps(request), PRODUCT, WAL_PATH],
+            capture_output=True, timeout=30,
+        )
+        assert failure.returncode != 0 and b"HTTP 403" in failure.stderr
+        assert db.execute(nonce_sql, (peer.node,)).fetchone() == previous
+        assert fresh.request(WAL_PATH, original)[0] == 409
+        print("Strict XSP/2 rejected the revoked peer key before recording a nonce. The other identity was unaffected.")
+
 
 if __name__ == "__main__":
     main()
