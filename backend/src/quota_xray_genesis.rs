@@ -48,12 +48,38 @@ pub async fn close_for_policy(pool: &PgPool, node_id: i64) -> Result<(), ApiErro
 }
 
 fn unavailable() -> ApiError {
-    ApiError::new(StatusCode::CONFLICT, "Xray genesis preparation unavailable.")
+    ApiError::new(
+        StatusCode::CONFLICT,
+        "Xray genesis preparation unavailable.",
+    )
 }
 
 fn digest(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+async fn lock_active_node(
+    conn: &mut PgConnection,
+    node_id: i64,
+    activation: &str,
+) -> Result<(), ApiError> {
+    let active: Option<String> = sqlx::query_scalar(
+        "SELECT encode(p.receipt_sha256,'hex')
+           FROM panel_records n JOIN node_xsp_product_nodes p ON p.node_id=n.id
+          WHERE n.id=$1 AND n.collection='nodes' AND p.state='active'
+            AND (n.data->'disabled') IS DISTINCT FROM 'true'::jsonb
+          FOR UPDATE OF n,p",
+    )
+    .bind(node_id)
+    .fetch_optional(conn)
+    .await?;
+    if active.as_deref() != Some(activation) {
+        return Err(unavailable());
+    }
+    Ok(())
 }
 
 pub async fn prepare(
@@ -64,29 +90,26 @@ pub async fn prepare(
     challenge: &str,
 ) -> Result<Value, ApiError> {
     if !enabled() {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "Xray genesis disabled."));
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Xray genesis disabled.",
+        ));
     }
     if !digest(runtime_id) || !digest(challenge) || runtime_id == challenge {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid Xray genesis request."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid Xray genesis request.",
+        ));
     }
     let activation = node_auth::authenticate_product_activation(
-        state, headers, node_id, crate::quota_wal_transport::PATH,
+        state,
+        headers,
+        node_id,
+        crate::quota_wal_transport::PATH,
     )
     .await?;
     let mut tx = state.pool.begin().await?;
-    let active: Option<String> = sqlx::query_scalar(
-        "SELECT encode(p.receipt_sha256,'hex')
-           FROM panel_records n JOIN node_xsp_product_nodes p ON p.node_id=n.id
-          WHERE n.id=$1 AND n.collection='nodes' AND p.state='active'
-            AND (n.data->'disabled') IS DISTINCT FROM 'true'::jsonb
-          FOR UPDATE OF n,p",
-    )
-    .bind(node_id)
-    .fetch_optional(&mut *tx)
-    .await?;
-    if active.as_deref() != Some(activation) {
-        return Err(unavailable());
-    }
+    lock_active_node(&mut tx, node_id, activation).await?;
     let record: Genesis = sqlx::query_as(
         "SELECT runtime_id,challenge,first_activation_sha256,prepared_ms,policy_path_used
            FROM quota_v2_xray_genesis WHERE node_id=$1 FOR UPDATE",
@@ -103,22 +126,29 @@ pub async fn prepare(
     .bind(node_id)
     .fetch_one(&mut *tx)
     .await?;
-    if record.policy_path_used || history || record.first_activation_sha256.as_deref() != Some(activation) {
+    if record.policy_path_used
+        || history
+        || record.first_activation_sha256.as_deref() != Some(activation)
+    {
         return Err(unavailable());
     }
-    let now: i64 = sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
-        .fetch_one(&mut *tx)
-        .await?;
+    let now: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&mut *tx)
+            .await?;
     let prepared = if let Some(prepared) = record.prepared_ms {
         if record.runtime_id.as_deref() != Some(runtime_id)
             || record.challenge.as_deref() != Some(challenge)
-            || now < prepared || now >= prepared.saturating_add(VALID_MS)
+            || now < prepared
+            || now >= prepared.saturating_add(VALID_MS)
         {
             return Err(unavailable());
         }
         prepared
     } else {
-        sqlx::query("SET LOCAL synchronous_commit TO on").execute(&mut *tx).await?;
+        sqlx::query("SET LOCAL synchronous_commit TO on")
+            .execute(&mut *tx)
+            .await?;
         sqlx::query(
             "UPDATE quota_v2_xray_genesis SET runtime_id=$2,challenge=$3,
                  prepared_ms=$4 WHERE node_id=$1",
@@ -139,8 +169,14 @@ pub async fn prepare(
         "preparedAtMs":prepared, "validUntilMs":prepared.saturating_add(VALID_MS),
         "authorizedBytes":0, "canStart":false, "canResume":false
     });
-    let signature = state.node_policy_signer.sign_domain(DOMAIN, &payload).map_err(|_| {
-        ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Xray genesis signing failed.")
-    })?;
+    let signature = state
+        .node_policy_signer
+        .sign_domain(DOMAIN, &payload)
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Xray genesis signing failed.",
+            )
+        })?;
     Ok(json!({"algorithm":"Ed25519", "payload":payload, "signature":signature}))
 }

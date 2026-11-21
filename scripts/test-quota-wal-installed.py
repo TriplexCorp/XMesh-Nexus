@@ -214,7 +214,7 @@ class Guest:
         return int(code), json.loads(document)
 
 
-def try_genesis(guests, db, root):
+def try_genesis(guests, db, root, panel):
     fresh, prior = [guest for guest, _ in guests]
     candidate = {"operation": "prepare_genesis", "nodeId": fresh.node,
                  "candidateRuntimeId": secrets.token_hex(32), "challenge": secrets.token_hex(32)}
@@ -246,10 +246,24 @@ def try_genesis(guests, db, root):
     subprocess.run(["openssl", "pkeyutl", "-verify", "-pubin", "-rawin",
                     "-inkey", os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"],
                     "-in", message, "-sigfile", signature], check=True, timeout=5)
+    public_der = subprocess.check_output([
+        "openssl", "pkey", "-pubin", "-in", os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"], "-outform", "DER",
+    ], timeout=5)
+    assert public_der[:12] == bytes.fromhex("302a300506032b6570032100") and len(public_der) == 44
+    pin = "/var/lib/xmesh-xray-sync/policy-public-key"
+    command = ["/usr/local/sbin/xmesh-quota-wal", "prepare-genesis", "--panel", panel,
+               "--node-id", str(fresh.node), "--candidate-runtime", winner["candidateRuntimeId"],
+               "--challenge", winner["challenge"]]
+    fresh.exec("test", "!", "-e", pin)
+    failure = subprocess.run(["docker", "exec", fresh.name, *command], capture_output=True, timeout=35)
+    assert failure.returncode != 0 and b"policy-public-key" in failure.stderr
+    docker("exec", "-i", fresh.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", pin,
+           input=public_der[12:].hex().encode("ascii") + b"\n")
+    assert json.loads(fresh.exec(*command)) == receipt
     assert db.execute("SELECT count(*) FROM quota_v2_reservations").fetchone() == (0,)
     assert db.execute("SELECT runtime_id,challenge FROM quota_v2_xray_genesis WHERE node_id=%s",
                       (fresh.node,)).fetchone() == (winner["candidateRuntimeId"], winner["challenge"])
-    print("Installed XSP/2: durable zero-byte genesis prepared once, exact retry returned the same signed receipt.")
+    print("Installed XSP/2: one durable zero-byte genesis; installed WAL verifier checked the exact retried receipt.")
     print("An existing Node without creation evidence, cross-node identity and competing runtime were rejected.")
     return fresh, winner, receipt
 
@@ -336,7 +350,7 @@ def main():
             guest.check_quarantine()
         print("Installed metrics reached PostgreSQL. The staged reconciler refused to start a cold Xray on either guest.")
 
-        fresh, original, receipt = try_genesis(guests, db, root)
+        fresh, original, receipt = try_genesis(guests, db, root, panel)
         for guest, _ in guests:
             before = {peer.node: samples(peer.node) for peer, _ in guests}
             guest.restart()

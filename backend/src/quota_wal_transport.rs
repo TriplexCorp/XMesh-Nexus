@@ -450,10 +450,19 @@ async fn handle(
             node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
             head(&state, node_id, &challenge).await?
         }
-        Request::PrepareGenesis { candidate_runtime_id, challenge, .. } => {
+        Request::PrepareGenesis {
+            candidate_runtime_id,
+            challenge,
+            ..
+        } => {
             crate::quota_xray_genesis::prepare(
-                &state, &headers, node_id, &candidate_runtime_id, &challenge,
-            ).await?
+                &state,
+                &headers,
+                node_id,
+                &candidate_runtime_id,
+                &challenge,
+            )
+            .await?
         }
     };
     Ok(([(header::CACHE_CONTROL, "no-store")], Json(result)))
