@@ -2229,10 +2229,16 @@ pub async fn current_compiled_node_profile_revision(
 /// from the authoritative XRAY STUDIO compilation and the first signed,
 /// immutable quarantine policy. Never accept aliases supplied by the Node.
 #[derive(Clone, Debug)]
+pub struct FirstGenesisCapAlias {
+    pub email: String,
+    pub class: String,
+}
+
+#[derive(Clone, Debug)]
 pub struct FirstGenesisCapPolicyScope {
     pub policy_sha256: String,
     pub profile_revision: String,
-    pub aliases: Vec<crate::quota_v2_cap_signing::Alias>,
+    pub aliases: Vec<FirstGenesisCapAlias>,
 }
 
 fn cap_policy_denied() -> ApiError {
@@ -2246,7 +2252,7 @@ fn first_genesis_cap_aliases(
     config: &Value,
     policy: &Value,
     user_id: i64,
-) -> Result<Vec<crate::quota_v2_cap_signing::Alias>, ApiError> {
+) -> Result<Vec<FirstGenesisCapAlias>, ApiError> {
     if user_id <= 0
         || policy.get("kind").and_then(Value::as_str)
             != Some("xmesh.quota-v2.genesis-quarantine-policy")
@@ -2299,7 +2305,7 @@ fn first_genesis_cap_aliases(
                 {
                     return Err(cap_policy_denied());
                 }
-                aliases.push(crate::quota_v2_cap_signing::Alias {
+                aliases.push(FirstGenesisCapAlias {
                     email: email.to_owned(),
                     class: class.to_owned(),
                 });
