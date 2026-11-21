@@ -14,6 +14,8 @@ on:
       - 'scripts/test-quota-wal-reconcile.py'
       - 'scripts/test-quota-wal-product-tunnel.py'
       - 'scripts/quota_wal_real_xray.py'
+      - 'scripts/quota-wal-systemd.Dockerfile'
+      - 'scripts/test-quota-wal-installed.py'
       - 'deploy/xsp-v2-product-gateway/wal_tunnel_fixture_test.go'
       - 'scripts/run-quota-wal-transport-audit.sh'
       - '.github/workflows/quota-wal-transport.yml'
@@ -22,7 +24,7 @@ permissions:
 jobs:
   signed-http:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       XMESH_AUDIT_DISPOSABLE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_test
@@ -48,7 +50,7 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 286386081c8f57a2ec8cd94ab02cda6d92b96238
+          ref: c8503580a16ce2f6b4ae245912630b169ec35ace
           path: .ci-reviewed-node
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
@@ -60,7 +62,7 @@ jobs:
           set -euo pipefail
           revision="$(git rev-parse HEAD)"
           version="$(tr -d '\r\n' < ../../AGENT_VERSION)"
-          test "$revision" = '286386081c8f57a2ec8cd94ab02cda6d92b96238'
+          test "$revision" = 'c8503580a16ce2f6b4ae245912630b169ec35ace'
           test "$version" = 'control-v6.0.25'
           go build -trimpath -ldflags "-X main.version=$version -X main.sourceRevision=$revision" \
             -o "$RUNNER_TEMP/wal-product-agent" ./cmd/xmesh-agent-xspv2-product
@@ -117,3 +119,14 @@ jobs:
           export XMESH_WAL_PRODUCT_AGENT="$RUNNER_TEMP/wal-product-agent"
           export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-product
+      - name: Install two isolated systemd Nodes and verify cold-start quarantine
+        env:
+          XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          XMESH_INSTALLED_NEXUS_REF: 18b6aaa09d6bdf635f1348076ac86e1b30c72c53
+        run: |
+          set -euo pipefail
+          source "$RUNNER_TEMP/quota-wal/bin/activate"
+          docker exec "$XMESH_WAL_POSTGRES_CONTAINER" createdb -U quota_test quota_wal_installed
+          export QUOTA_TEST_DSN="${QUOTA_TEST_DSN%/*}/quota_wal_installed"
+          export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
+          bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-installed

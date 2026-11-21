@@ -37,6 +37,15 @@ func TestServeWALTunnelFixture(t *testing.T) {
 		dsn.User.Username() != "quota_test" || os.Getenv("XMESH_AUDIT_DISPOSABLE") != "1" {
 		t.Fatal("disposable loopback database required")
 	}
+	address := "127.0.0.1"
+	if bridge := os.Getenv("XMESH_WAL_TEST_BRIDGE"); bridge != "" {
+		ip := net.ParseIP(bridge)
+		if ip == nil || ip.To4() == nil || !ip.IsPrivate() ||
+			os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("RUNNER_ENVIRONMENT") != "github-hosted" {
+			t.Fatal("a private bridge is allowed only in the hosted lab")
+		}
+		address = bridge
+	}
 	db, err := pgxpool.New(context.Background(), dsn.String())
 	requireFixture(t, err)
 	defer db.Close()
@@ -64,7 +73,7 @@ func TestServeWALTunnelFixture(t *testing.T) {
 	requireFixture(t, err)
 	serverCert := &x509.Certificate{
 		SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: "WAL loopback server"},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+		IPAddresses: []net.IP{net.ParseIP(address)},
 		KeyUsage:    x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour),
 	}
@@ -84,7 +93,7 @@ func TestServeWALTunnelFixture(t *testing.T) {
 			"mldsa65PublicB64": b64.EncodeToString(pqPub),
 		},
 		clientCA: cert, clientCAKey: clientCAKey, serverCAPEM: string(serverPEM),
-		panelURL: os.Getenv("XMESH_TEST_URL"), serverName: "127.0.0.1",
+		panelURL: os.Getenv("XMESH_TEST_URL"), serverName: address,
 		internalToken: os.Getenv("XSP_V2_PRODUCT_INTERNAL_TOKEN"),
 		httpClient:    &http.Client{Timeout: 20 * time.Second},
 	}
@@ -113,6 +122,11 @@ func TestServeWALTunnelFixture(t *testing.T) {
 		ClientAuth: tls.RequireAndVerifyClientCert, CurvePreferences: []tls.CurveID{tls.X25519MLKEM768},
 		MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13,
 	}
+	if address != "127.0.0.1" {
+		requireFixture(t, strict.Listener.Close())
+		strict.Listener, err = net.Listen("tcp4", net.JoinHostPort(address, "0"))
+		requireFixture(t, err)
+	}
 	strict.StartTLS()
 	defer strict.Close()
 
@@ -121,6 +135,11 @@ func TestServeWALTunnelFixture(t *testing.T) {
 	enrollment.HandleFunc("/api/v2/product/enroll", g.enroll)
 	bootstrap := httptest.NewUnstartedServer(enrollment)
 	bootstrap.TLS = &tls.Config{Certificates: []tls.Certificate{tlsIdentity}, MinVersion: tls.VersionTLS13}
+	if address != "127.0.0.1" {
+		requireFixture(t, bootstrap.Listener.Close())
+		bootstrap.Listener, err = net.Listen("tcp4", net.JoinHostPort(address, "0"))
+		requireFixture(t, err)
+	}
 	bootstrap.StartTLS()
 	defer bootstrap.Close()
 	info, err := json.Marshal(map[string]string{"enrollment": bootstrap.URL, "strict": strict.URL})
@@ -129,6 +148,9 @@ func TestServeWALTunnelFixture(t *testing.T) {
 	requireFixture(t, os.Rename(filepath.Join(dir, "ready.tmp"), filepath.Join(dir, "ready.json")))
 
 	deadline := time.Now().Add(3 * time.Minute)
+	if address != "127.0.0.1" {
+		deadline = time.Now().Add(20 * time.Minute)
+	}
 	for time.Now().Before(deadline) {
 		if _, err := os.Stat(filepath.Join(dir, "done")); err == nil {
 			return
