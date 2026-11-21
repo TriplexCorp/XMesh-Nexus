@@ -1,14 +1,8 @@
 //! Disposable CI-only SQL -> genuine persistent `PolicySigner` -> Xray cap.
 //! Not installed in Docker, not enabled by default Cargo features and cannot
-//! be reached through Nexus HTTP or the live XSP/2 gateway.
-//! Cross-process Xray process/scope attestation is simulated by CI fixtures.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "this disposable binary only uses domain-separated signing"
-    )
-)]
+//! be reached through the production Nexus API or gateway. The disposable
+//! installed rehearsal delivers only committed outbox bytes; its trusted
+//! runner observes both local guests, not arbitrary remote production Nodes.
 #[path = "../node_policy.rs"]
 mod node_policy;
 #[path = "../quota_v2_cap_signing.rs"]
