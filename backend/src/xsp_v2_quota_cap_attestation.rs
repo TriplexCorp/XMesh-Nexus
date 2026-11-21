@@ -299,4 +299,131 @@ mod tests {
             &p,&ed_pub,pq_pub).is_err(),"signed payload bytes cannot change");
     }
 
+    #[tokio::test]
+    async fn real_postgres_owner_enrolled_dual_signature_and_nonce_commit() {
+        use ed25519_dalek::{Signer as _,SigningKey};
+        use openssl::{pkey::PKey,sign::Signer as PQSigner};
+        use std::process::Command;
+        let required=std::env::var("XSP_V2_REQUIRE_PQ_CAP_DB_TESTS").as_deref()==Ok("1");
+        let Ok(url)=std::env::var("XSP_V2_TEST_DATABASE_URL") else {
+            assert!(!required,"disposable XSP PostgreSQL service required");
+            return;
+        };
+        let generated=Command::new("openssl").args([
+            "genpkey","-algorithm","ML-DSA-65"
+        ]).output().expect("OpenSSL CLI");
+        if !generated.status.success() {
+            assert!(!required,"OpenSSL 3.5 ML-DSA-65 required");
+            return;
+        }
+        let pq=PKey::private_key_from_pem(&generated.stdout).unwrap();
+        let pub_der=pq.public_key_to_der().unwrap();
+        let pq_pub=&pub_der[pub_der.len()-1952..];
+        let ed=SigningKey::from_bytes(&[91u8;32]);
+        let ed_pub=ed.verifying_key().to_bytes();
+        let pool=sqlx::PgPool::connect(&url).await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        let (mut data,_)=fixture();
+        let now=i64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)
+            .unwrap().as_millis()).unwrap();
+        data["observedAtMs"]=json!(now);
+        let mut tx=pool.begin().await.unwrap();
+        // These are real Nexus schema objects and real v2 allocator, not
+        // a mocked quota function or substitute dual-sign key store.
+        sqlx::query("INSERT INTO node_metric_keys(node_id,public_key)
+            VALUES(47,repeat('ab',32))")
+          .execute(&mut *tx).await.unwrap();
+        sqlx::query("INSERT INTO node_xsp_suite_state(
+            node_id,minimum_suite,activation_phase,key_epoch)
+            VALUES(47,1,'dual_enrolled',1)")
+          .execute(&mut *tx).await.unwrap();
+        sqlx::query("INSERT INTO node_xsp_public_keysets(
+            node_id,purpose,key_epoch,ed25519_key_id,mldsa65_key_id,
+            ed25519_public,mldsa65_public)
+            VALUES(47,'node_request',1,'ed-test','pq-test',$1,$2)")
+            .bind(ed_pub.to_vec()).bind(pq_pub)
+            .execute(&mut *tx).await.unwrap();
+        sqlx::query("INSERT INTO node_xsp_product_nodes(
+            node_id,state,key_epoch,ed25519_key_id,mldsa65_key_id,
+            tls_spki_sha256,release_version,release_source_revision,
+            release_artifact_sha256,receipt_sha256,receipt_envelope,activated_at)
+            VALUES(47,'active',1,'ed-test','pq-test',
+               decode(repeat('f1',32),'hex'),'ci-xsp-attest',
+               repeat('a',40),repeat('b',64),
+               decode(repeat('c',32),'hex'),decode(repeat('ab',32),'hex'),NOW())")
+           .execute(&mut *tx).await.unwrap();
+        sqlx::query("INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes)
+            VALUES(101,'11111111-1111-4111-8111-111111111111',1000)")
+           .execute(&mut *tx).await.unwrap();
+        let reservation:(i64,i64)=sqlx::query_as(
+            "SELECT revision,ceiling_bytes FROM quota_v2_reserve(
+             101,'11111111-1111-4111-8111-111111111111'::uuid,47,
+             '22222222-2222-4222-8222-222222222247'::uuid,
+             '33333333-3333-4333-8333-333333333347'::uuid,700,0,
+             NOW()+INTERVAL '1 hour')")
+           .fetch_one(&mut *tx).await.unwrap();
+        assert_eq!(reservation,(1,700));
+        sqlx::query("UPDATE quota_v2_reservations SET node_confirmed=TRUE
+              WHERE user_id=101 AND node_id=47")
+           .execute(&mut *tx).await.unwrap();
+        sqlx::query("INSERT INTO quota_v2_xray_genesis(
+            node_id,first_activation_sha256,runtime_id,challenge,
+            prepared_ms,receipt_signature)
+            VALUES(47,repeat('c',64),repeat('b',64),repeat('e',64),
+             (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint,repeat('0',128))")
+           .execute(&mut *tx).await.unwrap();
+        let snapshot:bool=sqlx::query_scalar(
+            "SELECT can_start FROM quota_v2_record_runtime_admission_preflight(
+            101,'11111111-1111-4111-8111-111111111111'::uuid,47,
+            '22222222-2222-4222-8222-222222222247'::uuid,
+            '33333333-3333-4333-8333-333333333347'::uuid,1,
+            repeat('a',64),repeat('b',64),repeat('f',64),31415,
+            repeat('d',64),repeat('c',64),0)")
+           .fetch_one(&mut *tx).await.unwrap();
+        assert!(!snapshot);
+        tx.commit().await.unwrap();
+        let sign_claim=|value:&serde_json::Value,nonce:&str|{
+            let mut msg:serde_json::Value=serde_json::from_slice(&wire(value,now)).unwrap();
+            msg["nonceHex"]=json!(nonce);
+            let raw=serde_json::to_vec(&msg).unwrap();
+            let signing=crate::xsp_v2_api::quota_cap_signing_input_for_test(
+                &raw,now).unwrap();
+            let mut pq_sign=PQSigner::new_without_digest(&pq).unwrap();
+            msg["signatures"]["ed25519"]=json!(
+                STANDARD.encode(ed.sign(&signing).to_bytes()));
+            msg["signatures"]["mldsa65"]=json!(
+                STANDARD.encode(pq_sign.sign_oneshot_to_vec(&signing).unwrap()));
+            serde_json::to_vec(&msg).unwrap()
+        };
+        let original=sign_claim(&data,&"12".repeat(16));
+        assert!(record_staging(&pool,48,&original).await.is_err(),
+            "signed Node 47 cannot be authenticated as TLS Node 48");
+        let mut wrong=data.clone();
+        wrong["hostPid"]=json!(31416);
+        assert!(record_staging(&pool,47,&sign_claim(&wrong,&"33".repeat(16)))
+            .await.is_err(),"signed but changed PID must not match SQL source");
+        let mut wrong=data.clone();
+        wrong["policySha256"]=json!("e".repeat(64));
+        assert!(record_staging(&pool,47,&sign_claim(&wrong,&"34".repeat(16)))
+            .await.is_err(),"signed but unrelated policy cannot attest Xray");
+        assert!(record_staging(&pool,47,&original).await.is_ok(),
+            "owner-enrolled Ed25519+ML-DSA-65 exact SQL preflight required");
+        assert!(record_staging(&pool,47,&original).await.is_err(),
+            "original XSP nonce may be consumed only once");
+        assert!(record_staging(&pool,47,&sign_claim(&data,&"14".repeat(16)))
+            .await.is_err(),"new nonce cannot rebind a stored challenge");
+        let row:(i64,bool,i64,i64)=sqlx::query_as(
+            "SELECT authorized_bytes,can_resume,refundable_bytes,
+                    (SELECT count(*) FROM node_xsp_replay_nonces
+                     WHERE node_id=47)::bigint
+             FROM quota_v2_xsp2_cap_attestations WHERE node_id=47")
+           .fetch_one(&pool).await.unwrap();
+        assert_eq!(row,(0,false,0,1));
+        sqlx::query("UPDATE node_xsp_public_keysets
+               SET revoked_at=NOW() WHERE node_id=47")
+           .execute(&pool).await.unwrap();
+        assert!(record_staging(&pool,47,&sign_claim(&data,&"15".repeat(16)))
+            .await.is_err(),"revoked owner-approved Node key pair cannot attest");
+    }
+
 }
