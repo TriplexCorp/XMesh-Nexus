@@ -97,6 +97,32 @@ class SignedFirstCapOutboxTests(unittest.TestCase):
         forged["payload"]["issuedAtMs"]+=1
         self.deny((json.dumps(forged,sort_keys=True,separators=(",",":"))+"\n").encode())
 
+    def test_other_node_ack_changes_shared_snapshot_but_original_reply_survives(self):
+        raw=self.signed()
+        original=self.store(raw)
+        # Node B independently sends a legitimate signed/verified absolute
+        # metering ACK. It changes global settled + outstanding bytes but
+        # cannot invalidate Node A's already fsynced exact original reply.
+        other=self.state.node_b
+        with psycopg.connect(DSN) as c:
+            c.execute(
+                "SELECT quota_v2_ack(%s,%s,%s,%s,%s,100)",
+                (self.state.user,self.state.epoch,other,
+                 self.state.meters[other],self.state.ids[other]))
+        self.assertEqual(self.store(raw),original)
+        with psycopg.connect(DSN) as c:
+            settled,held=c.execute(
+                "SELECT a.settled_bytes,"
+                "COALESCE(SUM(r.ceiling_bytes-r.acknowledged_bytes),0)::bigint "
+                "FROM quota_v2_accounts a JOIN quota_v2_reservations r "
+                "USING(user_id,epoch) WHERE a.user_id=%s "
+                "GROUP BY a.settled_bytes",(self.state.user,)).fetchone()
+        self.assertEqual((settled,held),(100,900))
+        newer=json.loads(raw)
+        newer["payload"]["issuedAtMs"]+=1
+        different=(json.dumps(newer,sort_keys=True,separators=(",",":"))+"\\n").encode()
+        self.deny(different)
+
     def test_parallel_identical_packets_use_one_outbox_record(self):
         raw=self.signed()
         def call(_):return self.store(raw)
