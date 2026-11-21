@@ -199,7 +199,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert db.execute("SELECT count(*) FROM node_desired_revisions").fetchone()==(0,)
     print("Both original zero-authority replies recovered after lost responses; simultaneous reservations conserve global quota.")
 
-    def measure(item):
+    def measure(item, *, replacement=False):
         guest,req,_=item
         original=json.loads(guest.exec("cat",STATE+"/genesis-quarantine-envelope.json"))
         profile=original["reply"]["revision"]
@@ -210,7 +210,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             "print(json.dumps(wal_transport._measure_quarantined_runtime(tuple(sys.argv[1:]))))"
         )
         observed=json.loads(guest.exec("python3","-c",code,digest,profile))
-        assert observed[3]==req["runtimeId"]
+        assert (observed[3]!=req["runtimeId"]) if replacement else (observed[3]==req["runtimeId"])
         raw=guest.exec("cat",MEASURED+"/config.json")
         assert hashlib.sha256(raw).hexdigest()==profile
         path=root/f"actual-profile-{guest.node}.json"
@@ -328,6 +328,23 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                           capture_output=True,timeout=25)
     assert failed.returncode!=0
     assert guest_b.exec("docker","inspect","-f","{{.State.Running}}",lab.XRAY).strip()==b"true"
+    # A fresh isolated process with the exact same image, config and old WAL
+    # must not inherit the consumed grant or reopen data-plane admission.
+    original=json.loads(guest_a.exec("cat",STATE+"/genesis-quarantine-envelope.json"))
+    binding={"nodeId":guest_a.node,
+             "activationReceiptSha256":original["prepared"]["payload"]["activationReceiptSha256"],
+             "policyPublicKey":public}
+    config=guest_a.exec("cat",MEASURED+"/config.json")
+    guest_a.exec("docker","rm",lab.XRAY)
+    lab.start_isolated_candidate(guest_a,archive,image,config,preloaded=True,
+                                 tag=tags[0],binding=binding)
+    replacement=measure(stages[0],replacement=True)[0]
+    assert replacement[0]!=measurements[0][0][0]
+    failed=subprocess.run(["docker","exec",guest_a.name,*commands[0]],
+                          capture_output=True,timeout=35)
+    assert failed.returncode!=0, "old grant accepted by replacement Xray"
+    assert probe(stages[0],0,replacement,tags[0])=={"uplink":0,"downlink":0}
+    assert all(guest_a.exec("cat",path)==raw for path,raw in wal_snapshots[0].items())
     ledger_sql="SELECT node_id,stage,signed_reply FROM quota_v2_genesis_lease_replies ORDER BY node_id,stage"
     ledger=db.execute(ledger_sql).fetchall()
     assert len(ledger)==4
@@ -337,4 +354,4 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert db.execute(lease_sql,(uid,)).fetchall()==rows
     for guest,snapshot in zip(pair,wal_snapshots):
         assert all(guest.exec("cat",path)==raw for path,raw in snapshot.items())
-    print("PASS: real Xray kill, peer unaffected, exact WAL and both signed PostgreSQL outboxes survived database restart; no refund or public ingress.")
+    print("PASS: real Xray kill and replacement fail closed, peer unaffected, exact WAL and both signed PostgreSQL outboxes survived database restart; no refund or public ingress.")
