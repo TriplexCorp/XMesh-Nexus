@@ -33,7 +33,7 @@ fn unavailable() -> ApiError {
 }
 
 fn valid_request(req: &Request) -> bool {
-    req.node_id > 0 && req.operation == "discover_policy_signer"
+    req.node_id > 0 && matches!(req.operation.as_str(), "discover_policy_signer" | "preview_quarantined_config")
 }
 
 fn gate() -> bool {
@@ -80,7 +80,7 @@ pub async fn handle(
     if !valid_request(&request) {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
-            "Only an original zero-authority policy-key discovery is supported.",
+            "Only zero-authority original policy-key or config preview requests are supported.",
         ));
     }
     // The strictly isolated product gateway forwards the original signed
@@ -95,7 +95,7 @@ pub async fn handle(
     .await?;
     let row = sqlx::query(
         "SELECT encode(p.receipt_sha256,'hex') AS activation,
-                g.first_activation_sha256,g.policy_path_used
+                g.first_activation_sha256,g.policy_path_used,g.prepared_ms
            FROM quota_v2_xray_genesis AS g
            JOIN node_xsp_product_nodes AS p ON p.node_id=g.node_id
           WHERE g.node_id=$1 AND p.state='active'
@@ -127,6 +127,44 @@ pub async fn handle(
     if previous {
         return Err(unavailable());
     }
+    if request.operation == "preview_quarantined_config" {
+        let prepared_ms: Option<i64> = row.try_get("prepared_ms")?;
+        if prepared_ms.is_some() {
+            return Err(unavailable());
+        }
+        let compiled = crate::node_runtime::first_genesis_config_preview(
+            &state, request.node_id,
+        ).await?;
+        let now: i64 = sqlx::query_scalar(
+            "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint",
+        )
+        .fetch_one(&state.pool)
+        .await?;
+        let payload = json!({
+            "schemaVersion":1,
+            "kind":"xmesh.quota-v2.quarantined-config-preview",
+            "nodeId":request.node_id,
+            "activationReceiptSha256":activation,
+            "profileId":compiled["profileId"],
+            "port":compiled["port"],
+            "config":compiled["config"],
+            "configSha256":compiled["configSha256"],
+            "issuedAtMs":now,
+            "validUntilMs":now.saturating_add(120_000),
+            "authorizedBytes":0,
+            "publicIngressAllowed":false,
+            "canStart":false,
+            "canResume":false,
+            "refundableBytes":0,
+        });
+        let signature = state.node_policy_signer
+            .sign_domain(b"XMESH_XRAY_QUARANTINE_CONFIG_V1\0", &payload)
+            .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Config preview signing failed."))?;
+        return Ok((
+            [(header::CACHE_CONTROL, "no-store")],
+            Json(json!({"algorithm":"Ed25519","payload":payload,"signature":signature})),
+        ));
+    }
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
         Json(zero_authority_response(
@@ -148,6 +186,10 @@ mod tests {
         )
         .unwrap();
         assert!(valid_request(&parsed));
+        assert!(valid_request(&Request {
+            node_id:123,
+            operation:"preview_quarantined_config".to_owned(),
+        }));
         assert!(!valid_request(&Request {
             node_id: 123,
             operation: "request_positive_cap".to_owned(),
