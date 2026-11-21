@@ -162,7 +162,7 @@ fn parse(raw: &[u8], now_ms: i64) -> Result<Parsed, ApiError> {
 /// handler or evidence of a live Xray kernel PID / physical writer drain.
 /// The future caller must independently authenticate the PQ TLS Node and
 /// establish the measured process and complete off-host WAL first.
-pub(crate) struct ParsedQuotaCapAttestation {
+pub struct ParsedQuotaCapAttestation {
     parsed: Parsed,
     pub(crate) node_id: i64,
     pub(crate) key_epoch: i64,
@@ -174,7 +174,7 @@ pub(crate) struct ParsedQuotaCapAttestation {
     pub(crate) payload: Vec<u8>,
 }
 
-pub(crate) fn parse_quota_cap_attestation_staging(
+pub fn parse_quota_cap_attestation_staging(
     raw: &[u8],
     now_ms: i64,
 ) -> Result<ParsedQuotaCapAttestation, ApiError> {
@@ -202,7 +202,7 @@ pub(crate) fn parse_quota_cap_attestation_staging(
     Ok(result)
 }
 
-pub(crate) fn verify_quota_cap_dual_signatures_staging(
+pub fn verify_quota_cap_dual_signatures_staging(
     request: &ParsedQuotaCapAttestation,
     enrolled_ed: &[u8],
     enrolled_pq: &[u8],
@@ -213,10 +213,7 @@ pub(crate) fn verify_quota_cap_dual_signatures_staging(
 /// Tests sign the EXACT preexisting canonical XSP2 message; do not introduce
 /// another ad-hoc encoding into Quota V2.
 #[cfg(test)]
-pub(crate) fn quota_cap_signing_input_for_test(
-    raw: &[u8],
-    now_ms: i64,
-) -> Result<Vec<u8>, ApiError> {
+pub fn quota_cap_signing_input_for_test(raw: &[u8], now_ms: i64) -> Result<Vec<u8>, ApiError> {
     parse_quota_cap_attestation_staging(raw, now_ms).map(|p| p.parsed.canonical)
 }
 

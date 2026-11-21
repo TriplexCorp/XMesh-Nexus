@@ -1,7 +1,14 @@
-//! Disposable CI-only SQL -> genuine persistent PolicySigner -> Xray cap.
+//! Disposable CI-only SQL -> genuine persistent `PolicySigner` -> Xray cap.
 //! Not installed in Docker, not enabled by default Cargo features and cannot
 //! be reached through Nexus HTTP or the live XSP/2 gateway.
 //! Cross-process Xray process/scope attestation is simulated by CI fixtures.
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "this disposable binary only uses domain-separated signing"
+    )
+)]
 #[path = "../node_policy.rs"]
 mod node_policy;
 #[path = "../quota_v2_cap_signing.rs"]
@@ -10,8 +17,11 @@ mod quota_v2_cap_signing;
 use anyhow::{Context, Result, anyhow, ensure};
 use quota_v2_cap_signing::{Alias, SqlSnapshot, sign_snapshot};
 use serde_json::json;
-use sqlx::{FromRow, PgPool};
-use std::{env, path::PathBuf};
+use sqlx::{FromRow, PgConnection, PgPool};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 #[derive(FromRow)]
 struct Preflight {
@@ -31,8 +41,8 @@ struct Preflight {
     account_limit_bytes: i64,
     account_floor_bytes: i64,
     all_node_held_bytes: i64,
-    lease_acknowledged_bytes: i64,
-    lease_ceiling_bytes: i64,
+    acknowledged_bytes: i64,
+    ceiling_bytes: i64,
     expires_ms: i64,
 }
 
@@ -72,8 +82,13 @@ fn require_ci() -> Result<(String, PathBuf)> {
         "positive issuer is NOT available outside disposable GitHub-hosted CI"
     );
     let dsn = env::var("QUOTA_TEST_DSN")?;
+    let address = reqwest::Url::parse(&dsn)?;
     ensure!(
-        dsn.contains("/quota_test") && dsn.contains("127.0.0.1"),
+        matches!(address.scheme(), "postgres" | "postgresql")
+            && address.host_str() == Some("127.0.0.1")
+            && address.path() == "/quota_test"
+            && address.query().is_none()
+            && address.fragment().is_none(),
         "refuse non-disposable PostgreSQL"
     );
     let root = PathBuf::from(env::var("RUNNER_TEMP")?);
@@ -122,139 +137,14 @@ async fn main() -> Result<()> {
     let pool = PgPool::connect(&dsn).await?;
     let mut tx = pool.begin().await?;
 
-    // Immutable preflight identifies account/epoch; cannot itself grant.
-    let p: Preflight = sqlx::query_as(
-        "SELECT user_id,node_id,epoch::text,meter_epoch::text,
-            reservation_id::text,revision,request_challenge,prepared_runtime_id,
-            reported_container_id,reported_pid,reported_policy_sha256,
-            first_activation_sha256,reported_wal_floor_bytes,account_limit_bytes,
-            account_floor_bytes,all_node_held_bytes,lease_acknowledged_bytes,
-            lease_ceiling_bytes,(EXTRACT(EPOCH FROM expires_at)*1000)::bigint AS expires_ms
-         FROM quota_v2_runtime_admission_preflights
-         WHERE node_id=$1 AND request_challenge=$2",
-    )
-    .bind(node)
-    .bind(&nonce)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    ensure!(
-        p.user_id == 101 && p.node_id == node && p.request_challenge == nonce,
-        "foreign candidate or wrong Node"
-    );
-    ensure!(
-        p.reported_pid == observed_pid
-            && p.reported_policy_sha256 == policy_sha
-            && p.reported_container_id == "f".repeat(64),
-        "unproven candidate process/container/policy mismatch"
-    );
-    // Match the actual account-first, lease-second transaction order.
-    sqlx::query("SET LOCAL synchronous_commit TO on")
-        .execute(&mut *tx)
-        .await?;
-    let account: Account = sqlx::query_as(
-        "SELECT limit_bytes,settled_bytes,observed_floor_bytes,closed
-           FROM quota_v2_accounts WHERE user_id=$1 AND epoch=$2::uuid FOR UPDATE",
-    )
-    .bind(p.user_id)
-    .bind(&p.epoch)
-    .fetch_one(&mut *tx)
-    .await?;
-    let lease: Lease = sqlx::query_as(
-        "SELECT reservation_id::text,revision,node_confirmed,acknowledged_bytes,
-              ceiling_bytes,(EXTRACT(EPOCH FROM valid_until)*1000)::bigint AS valid_until_ms,
-              conservative_burn_floor_bytes,
-              (EXTRACT(EPOCH FROM conservative_burned_at)*1000)::bigint AS conservative_burned_at
-         FROM quota_v2_reservations
-         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
-           AND meter_epoch=$4::uuid FOR UPDATE",
-    )
-    .bind(p.user_id)
-    .bind(&p.epoch)
-    .bind(node)
-    .bind(&p.meter_epoch)
-    .fetch_one(&mut *tx)
-    .await?;
-    let genesis: Genesis = sqlx::query_as(
-        "SELECT first_activation_sha256,runtime_id,prepared_ms,challenge,
-                receipt_signature,policy_path_used
-           FROM quota_v2_xray_genesis WHERE node_id=$1 FOR SHARE",
-    )
-    .bind(node)
-    .fetch_one(&mut *tx)
-    .await?;
-    let active: (String, Vec<u8>) =
-        sqlx::query_as("SELECT state,receipt_sha256 FROM node_xsp_product_nodes WHERE node_id=$1")
-            .bind(node)
-            .fetch_one(&mut *tx)
-            .await?;
-    ensure!(
-        active.0 == "active" && hex::encode(active.1) == p.first_activation_sha256,
-        "only active exact first activation may issue"
-    );
-    let held:i64=sqlx::query_scalar(
-        "SELECT COALESCE(SUM(GREATEST(
-            r.ceiling_bytes::numeric-GREATEST(r.acknowledged_bytes,r.conservative_burn_floor_bytes),0
-        )),0)::bigint FROM quota_v2_reservations AS r
-        WHERE r.user_id=$1 AND r.epoch=$2::uuid")
-        .bind(p.user_id).bind(&p.epoch).fetch_one(&mut *tx).await?;
-    let revoked: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM quota_v2_revocation_requests
-          WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3 AND
-           meter_epoch=$4::uuid AND reservation_id=$5::uuid)",
-    )
-    .bind(p.user_id)
-    .bind(&p.epoch)
-    .bind(node)
-    .bind(&p.meter_epoch)
-    .bind(&p.reservation_id)
-    .fetch_one(&mut *tx)
-    .await?;
-    let old_epoch_debt: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM quota_v2_reservations r
-           JOIN quota_v2_accounts a USING(user_id,epoch)
-          WHERE r.user_id=$1 AND a.closed
-            AND r.ceiling_bytes>GREATEST(
-                 r.acknowledged_bytes,r.conservative_burn_floor_bytes))",
-    )
-    .bind(p.user_id)
-    .fetch_one(&mut *tx)
-    .await?;
-    let now: i64 =
-        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
-            .fetch_one(&mut *tx)
-            .await?;
-
-    ensure!(
-        !account.closed
-            && !revoked
-            && !old_epoch_debt
-            && lease.node_confirmed
-            && !genesis.policy_path_used
-            && lease.conservative_burn_floor_bytes == 0
-            && lease.conservative_burned_at.is_none()
-            && lease.reservation_id == p.reservation_id
-            && lease.revision == p.revision
-            && lease.acknowledged_bytes == p.lease_acknowledged_bytes
-            && lease.ceiling_bytes == p.lease_ceiling_bytes
-            && p.reported_wal_floor_bytes == 0
-            && genesis.runtime_id == p.prepared_runtime_id
-            && genesis.first_activation_sha256 == p.first_activation_sha256
-            && !genesis.receipt_signature.is_empty()
-            && !genesis.challenge.is_empty()
-            && genesis.prepared_ms <= now
-            && now < genesis.prepared_ms + 120000
-            && (i128::from(held)
-                + i128::from(account.settled_bytes.max(account.observed_floor_bytes)))
-                <= i128::from(account.limit_bytes),
-        "stale, unsafe, changed or already spent signed reservation preflight"
-    );
-    // Prevent the only first-genesis cap from being minted after stage expiry.
-    ensure!(
-        now < p.expires_ms && now < lease.valid_until_ms,
-        "expired SQL/Genesis reservation"
-    );
-
+    let p = load_preflight(&mut tx, node, &nonce, observed_pid, &policy_sha).await?;
+    let snapshot = lock_snapshot(&mut tx, &p).await?;
+    let Snapshot {
+        account,
+        lease,
+        held,
+        now,
+    } = snapshot;
     // The exact signed envelope is an immutable transaction outbox. A
     // retry after COMMIT or lost HTTP response must return identical bytes,
     // not quietly refresh TTL or offer a second signed grant.
@@ -279,18 +169,189 @@ async fn main() -> Result<()> {
             "issuer signing identity was rotated during pending delivery"
         );
         tx.commit().await?;
-        println!(
-            "{}",
-            json!({
-                "nodeId":node,"ceiling":old_grant,
-                "signedEnvelope":String::from_utf8(saved)
-                    .map_err(|_|anyhow!("non-utf8 stored cap"))?,
-                "publicKeyHex":old_pub,
-                "phase":"sql-committed-nexus-policy-signer-disposable"
-            })
-        );
+        print_cap(node, (saved, old_pub, old_grant))?;
         return Ok(());
     }
+    let ceiling = lease.ceiling_bytes;
+    let signing = signing_input(p, &account, &lease, held, now)?;
+    let saved = persist_cap(&mut tx, &key_path, &signing, now).await?;
+    ensure!(saved.2 == ceiling, "stored cap ceiling changed");
+    tx.commit().await?;
+    print_cap(node, saved)?;
+    Ok(())
+}
+
+async fn load_preflight(
+    conn: &mut PgConnection,
+    node: i64,
+    nonce: &str,
+    observed_pid: i64,
+    policy_sha: &str,
+) -> Result<Preflight> {
+    // Immutable preflight identifies account/epoch; cannot itself grant.
+    let p: Preflight = sqlx::query_as(
+        "SELECT user_id,node_id,epoch::text,meter_epoch::text,
+            reservation_id::text,revision,request_challenge,prepared_runtime_id,
+            reported_container_id,reported_pid,reported_policy_sha256,
+            first_activation_sha256,reported_wal_floor_bytes,account_limit_bytes,
+            account_floor_bytes,all_node_held_bytes,lease_acknowledged_bytes AS acknowledged_bytes,
+            lease_ceiling_bytes AS ceiling_bytes,(EXTRACT(EPOCH FROM expires_at)*1000)::bigint AS expires_ms
+         FROM quota_v2_runtime_admission_preflights
+         WHERE node_id=$1 AND request_challenge=$2",
+    )
+    .bind(node)
+    .bind(nonce)
+    .fetch_one(&mut *conn)
+    .await?;
+
+    ensure!(
+        p.user_id == 101 && p.node_id == node && p.request_challenge == nonce,
+        "foreign candidate or wrong Node"
+    );
+    ensure!(
+        p.reported_pid == observed_pid
+            && p.reported_policy_sha256 == policy_sha
+            && p.reported_container_id == "f".repeat(64),
+        "unproven candidate process/container/policy mismatch"
+    );
+    Ok(p)
+}
+
+struct Snapshot {
+    account: Account,
+    lease: Lease,
+    held: i64,
+    now: i64,
+}
+
+async fn lock_snapshot(conn: &mut PgConnection, p: &Preflight) -> Result<Snapshot> {
+    let node = p.node_id;
+    // Match the actual account-first, lease-second transaction order.
+    sqlx::query("SET LOCAL synchronous_commit TO on")
+        .execute(&mut *conn)
+        .await?;
+    let account: Account = sqlx::query_as(
+        "SELECT limit_bytes,settled_bytes,observed_floor_bytes,closed
+           FROM quota_v2_accounts WHERE user_id=$1 AND epoch=$2::uuid FOR UPDATE",
+    )
+    .bind(p.user_id)
+    .bind(&p.epoch)
+    .fetch_one(&mut *conn)
+    .await?;
+    let lease: Lease = sqlx::query_as(
+        "SELECT reservation_id::text,revision,node_confirmed,acknowledged_bytes,
+              ceiling_bytes,(EXTRACT(EPOCH FROM valid_until)*1000)::bigint AS valid_until_ms,
+              conservative_burn_floor_bytes,
+              (EXTRACT(EPOCH FROM conservative_burned_at)*1000)::bigint AS conservative_burned_at
+         FROM quota_v2_reservations
+         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
+           AND meter_epoch=$4::uuid FOR UPDATE",
+    )
+    .bind(p.user_id)
+    .bind(&p.epoch)
+    .bind(node)
+    .bind(&p.meter_epoch)
+    .fetch_one(&mut *conn)
+    .await?;
+    let genesis: Genesis = sqlx::query_as(
+        "SELECT first_activation_sha256,runtime_id,prepared_ms,challenge,
+                receipt_signature,policy_path_used
+           FROM quota_v2_xray_genesis WHERE node_id=$1 FOR SHARE",
+    )
+    .bind(node)
+    .fetch_one(&mut *conn)
+    .await?;
+    let active: (String, Vec<u8>) =
+        sqlx::query_as("SELECT state,receipt_sha256 FROM node_xsp_product_nodes WHERE node_id=$1")
+            .bind(node)
+            .fetch_one(&mut *conn)
+            .await?;
+    ensure!(
+        active.0 == "active" && hex::encode(active.1) == p.first_activation_sha256,
+        "only active exact first activation may issue"
+    );
+    let held:i64=sqlx::query_scalar(
+        "SELECT COALESCE(SUM(GREATEST(
+            r.ceiling_bytes::numeric-GREATEST(r.acknowledged_bytes,r.conservative_burn_floor_bytes),0
+        )),0)::bigint FROM quota_v2_reservations AS r
+        WHERE r.user_id=$1 AND r.epoch=$2::uuid")
+        .bind(p.user_id).bind(&p.epoch).fetch_one(&mut *conn).await?;
+    let blocked = has_revocation_or_old_debt(conn, p).await?;
+    let now: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&mut *conn)
+            .await?;
+
+    ensure!(
+        !account.closed
+            && !blocked
+            && lease.node_confirmed
+            && !genesis.policy_path_used
+            && lease.conservative_burn_floor_bytes == 0
+            && lease.conservative_burned_at.is_none()
+            && lease.reservation_id == p.reservation_id
+            && lease.revision == p.revision
+            && lease.acknowledged_bytes == p.acknowledged_bytes
+            && lease.ceiling_bytes == p.ceiling_bytes
+            && p.reported_wal_floor_bytes == 0
+            && genesis.runtime_id == p.prepared_runtime_id
+            && genesis.first_activation_sha256 == p.first_activation_sha256
+            && !genesis.receipt_signature.is_empty()
+            && !genesis.challenge.is_empty()
+            && genesis.prepared_ms <= now
+            && now < genesis.prepared_ms.saturating_add(120_000)
+            && (i128::from(held)
+                + i128::from(account.settled_bytes.max(account.observed_floor_bytes)))
+                <= i128::from(account.limit_bytes),
+        "stale, unsafe, changed or already spent signed reservation preflight"
+    );
+    // Prevent the only first-genesis cap from being minted after stage expiry.
+    ensure!(
+        now < p.expires_ms && now < lease.valid_until_ms,
+        "expired SQL/Genesis reservation"
+    );
+
+    Ok(Snapshot {
+        account,
+        lease,
+        held,
+        now,
+    })
+}
+
+async fn has_revocation_or_old_debt(conn: &mut PgConnection, p: &Preflight) -> Result<bool> {
+    let revoked: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM quota_v2_revocation_requests
+          WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3 AND
+           meter_epoch=$4::uuid AND reservation_id=$5::uuid)",
+    )
+    .bind(p.user_id)
+    .bind(&p.epoch)
+    .bind(p.node_id)
+    .bind(&p.meter_epoch)
+    .bind(&p.reservation_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let old_epoch_debt: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM quota_v2_reservations r
+           JOIN quota_v2_accounts a USING(user_id,epoch)
+          WHERE r.user_id=$1 AND a.closed
+            AND r.ceiling_bytes>GREATEST(
+                 r.acknowledged_bytes,r.conservative_burn_floor_bytes))",
+    )
+    .bind(p.user_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(revoked || old_epoch_debt)
+}
+
+fn signing_input(
+    p: Preflight,
+    account: &Account,
+    lease: &Lease,
+    held: i64,
+    now: i64,
+) -> Result<SqlSnapshot> {
     // For NEW issuance, the immutable preflight must still match the
     // account-wide snapshot. For an ALREADY fsynced outbox replay, other
     // Nodes are allowed to reserve more of the still-conserved account
@@ -307,7 +368,7 @@ async fn main() -> Result<()> {
     // budget source; synthetic inbound membership is fixed by CI only.
     let until = (now + 3_600_000).min(lease.valid_until_ms);
     let install_before = (now + 60_000).min(p.expires_ms);
-    let signing = SqlSnapshot {
+    Ok(SqlSnapshot {
         user_id: p.user_id,
         node_id: p.node_id,
         activation_sha: p.first_activation_sha256,
@@ -343,11 +404,18 @@ async fn main() -> Result<()> {
                 class: "main".into(),
             },
         ],
-    };
+    })
+}
 
-    let signer = node_policy::PolicySigner::load(&key_path)
+async fn persist_cap(
+    conn: &mut PgConnection,
+    key_path: &Path,
+    signing: &SqlSnapshot,
+    now: i64,
+) -> Result<(Vec<u8>, String, i64)> {
+    let signer = node_policy::PolicySigner::load(key_path)
         .context("load disposable exact Nexus PolicySigner")?;
-    let bytes = sign_snapshot(&signer, &signing, now)?;
+    let bytes = sign_snapshot(&signer, signing, now)?;
     let public = signer.public_key();
     // The SQL function RECHECKS the locked first-Genesis lease, all held
     // reservations, the immutable source and the signed envelope's critical
@@ -357,17 +425,20 @@ async fn main() -> Result<()> {
         "SELECT signed_envelope,signer_public_key,grant_bytes
            FROM quota_v2_store_signed_first_cap($1,$2,$3,$4)",
     )
-    .bind(node)
-    .bind(&nonce)
+    .bind(signing.node_id)
+    .bind(&signing.nonce)
     .bind(&public)
     .bind(&bytes)
-    .fetch_one(&mut *tx)
+    .fetch_one(conn)
     .await?;
     ensure!(
-        saved.0 == bytes && saved.1 == public && saved.2 == lease.ceiling_bytes,
+        saved.0 == bytes && saved.1 == public && saved.2 == signing.ceiling,
         "signed-cap outbox failed exact-byte persistence check"
     );
-    tx.commit().await?;
+    Ok(saved)
+}
+
+fn print_cap(node: i64, saved: (Vec<u8>, String, i64)) -> Result<()> {
     println!(
         "{}",
         json!({

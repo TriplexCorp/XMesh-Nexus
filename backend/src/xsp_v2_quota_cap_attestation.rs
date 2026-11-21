@@ -11,7 +11,7 @@ use crate::{
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sqlx::{PgPool, Row};
+use sqlx::{PgConnection, PgPool, Row};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const KIND: &str = "xmesh.quota-v2.first-genesis-cap-attestation";
@@ -28,7 +28,7 @@ fn hex64(v: &str) -> bool {
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct Claims {
+struct Claims {
     schema_version: u8,
     kind: String,
     node_id: i64,
@@ -91,14 +91,14 @@ fn validate_claims(
 
 /// Record an authenticated owner-enrolled *claim* from a caller whose Node
 /// identity and X25519MLKEM768 TLS channel were separately verified by the
-/// future strict ingress. Never take trusted_pq_tls_node_id from client JSON.
+/// future strict ingress. Never take `trusted_pq_tls_node_id` from client JSON.
 /// This function cannot generate traffic authority and has no public route.
 ///
 /// # Errors
 /// Denies wrong path, key epoch, signatures, Node identity, scope, nonce,
 /// stale immutable preflight, reenrollment, rotation, or SQL failure.
 #[allow(dead_code)]
-pub(crate) async fn record_staging(
+pub async fn record_staging(
     pool: &PgPool,
     trusted_pq_tls_node_id: i64,
     signed_wire: &[u8],
@@ -148,67 +148,13 @@ pub(crate) async fn record_staging(
     let ed: Vec<u8> = registered.try_get("ed25519_public")?;
     let pq: Vec<u8> = registered.try_get("mldsa65_public")?;
     verify_quota_cap_dual_signatures_staging(&req, &ed, &pq)?;
-    let product = sqlx::query(
-        "SELECT state,encode(receipt_sha256,'hex') AS activation
-        FROM node_xsp_product_nodes WHERE node_id=$1",
+    verify_product_activation(
+        &mut tx,
+        trusted_pq_tls_node_id,
+        &claim.activation_receipt_sha256,
     )
-    .bind(trusted_pq_tls_node_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(deny)?;
-    let product_state: String = product.try_get("state")?;
-    let active_receipt: Option<String> = product.try_get("activation")?;
-    if product_state != "active"
-        || active_receipt.as_deref() != Some(claim.activation_receipt_sha256.as_str())
-    {
-        return Err(deny());
-    }
-    // Preflight is immutable and still ZERO AUTHORITY. This compares
-    // signed claims against the original SQL source, NOT self-reported
-    // Node/PID/policy fields pretending to be independent attestation.
-    let p = sqlx::query(
-        "SELECT user_id,epoch::text AS epoch,
-       meter_epoch::text AS meter_epoch,reservation_id::text AS reservation_id,
-       revision,prepared_runtime_id,reported_container_id,reported_pid,
-       reported_policy_sha256,first_activation_sha256,reported_wal_floor_bytes,
-       lease_acknowledged_bytes,expires_at>clock_timestamp() AS current
-       FROM quota_v2_runtime_admission_preflights
-       WHERE node_id=$1 AND request_challenge=$2 FOR SHARE",
-    )
-    .bind(trusted_pq_tls_node_id)
-    .bind(&claim.request_challenge)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(deny)?;
-    let current: bool = p.try_get("current")?;
-    let user: i64 = p.try_get("user_id")?;
-    let epoch: String = p.try_get("epoch")?;
-    let meter: String = p.try_get("meter_epoch")?;
-    let reserve: String = p.try_get("reservation_id")?;
-    let revision: i64 = p.try_get("revision")?;
-    let runtime: String = p.try_get("prepared_runtime_id")?;
-    let container: String = p.try_get("reported_container_id")?;
-    let pid: i64 = p.try_get("reported_pid")?;
-    let policy: String = p.try_get("reported_policy_sha256")?;
-    let activation: String = p.try_get("first_activation_sha256")?;
-    let floor: i64 = p.try_get("reported_wal_floor_bytes")?;
-    let ack: i64 = p.try_get("lease_acknowledged_bytes")?;
-    if !current
-        || user != claim.user_id
-        || epoch != claim.account_epoch
-        || meter != claim.meter_epoch
-        || reserve != claim.reservation_id
-        || revision != claim.reservation_revision
-        || runtime != claim.runtime_id
-        || container != claim.container_id
-        || pid != claim.host_pid
-        || policy != claim.policy_sha256
-        || activation != claim.activation_receipt_sha256
-        || floor != 0
-        || ack != 0
-    {
-        return Err(deny());
-    }
+    .await?;
+    verify_preflight(&mut tx, trusted_pq_tls_node_id, &claim).await?;
     // Replay protection shares the same one-use, owner-enrolled XSP
     // nonce ledger as the existing heartbeat/recovery authentication.
     sqlx::query("SET LOCAL synchronous_commit TO on")
@@ -252,6 +198,81 @@ pub(crate) async fn record_staging(
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
+    Ok(())
+}
+
+async fn verify_product_activation(
+    conn: &mut PgConnection,
+    node_id: i64,
+    required_digest: &str,
+) -> Result<(), ApiError> {
+    let product = sqlx::query(
+        "SELECT state,encode(receipt_sha256,'hex') AS activation
+        FROM node_xsp_product_nodes WHERE node_id=$1",
+    )
+    .bind(node_id)
+    .fetch_optional(conn)
+    .await?
+    .ok_or_else(deny)?;
+    let product_state: String = product.try_get("state")?;
+    let active_receipt: Option<String> = product.try_get("activation")?;
+    if product_state != "active" || active_receipt.as_deref() != Some(required_digest) {
+        return Err(deny());
+    }
+    Ok(())
+}
+
+async fn verify_preflight(
+    conn: &mut PgConnection,
+    node_id: i64,
+    claim: &Claims,
+) -> Result<(), ApiError> {
+    // Preflight is immutable and still ZERO AUTHORITY. This compares
+    // signed claims against the original SQL source, NOT self-reported
+    // Node/PID/policy fields pretending to be independent attestation.
+    let p = sqlx::query(
+        "SELECT user_id,epoch::text AS epoch,
+       meter_epoch::text AS meter_epoch,reservation_id::text AS reservation_id,
+       revision,prepared_runtime_id,reported_container_id,reported_pid,
+       reported_policy_sha256,first_activation_sha256,reported_wal_floor_bytes,
+       lease_acknowledged_bytes,expires_at>clock_timestamp() AS current
+       FROM quota_v2_runtime_admission_preflights
+       WHERE node_id=$1 AND request_challenge=$2 FOR SHARE",
+    )
+    .bind(node_id)
+    .bind(&claim.request_challenge)
+    .fetch_optional(conn)
+    .await?
+    .ok_or_else(deny)?;
+    let current: bool = p.try_get("current")?;
+    let user: i64 = p.try_get("user_id")?;
+    let epoch: String = p.try_get("epoch")?;
+    let meter: String = p.try_get("meter_epoch")?;
+    let reserve: String = p.try_get("reservation_id")?;
+    let revision: i64 = p.try_get("revision")?;
+    let runtime: String = p.try_get("prepared_runtime_id")?;
+    let container: String = p.try_get("reported_container_id")?;
+    let pid: i64 = p.try_get("reported_pid")?;
+    let policy: String = p.try_get("reported_policy_sha256")?;
+    let activation: String = p.try_get("first_activation_sha256")?;
+    let floor: i64 = p.try_get("reported_wal_floor_bytes")?;
+    let ack: i64 = p.try_get("lease_acknowledged_bytes")?;
+    if !current
+        || user != claim.user_id
+        || epoch != claim.account_epoch
+        || meter != claim.meter_epoch
+        || reserve != claim.reservation_id
+        || revision != claim.reservation_revision
+        || runtime != claim.runtime_id
+        || container != claim.container_id
+        || pid != claim.host_pid
+        || policy != claim.policy_sha256
+        || activation != claim.activation_receipt_sha256
+        || floor != 0
+        || ack != 0
+    {
+        return Err(deny());
+    }
     Ok(())
 }
 
@@ -318,14 +339,14 @@ mod tests {
             ("canResume", json!(true)),
             ("refundableBytes", json!(1)),
             ("inventoryTailDigest", json!("f".repeat(64))),
-            ("observedAtMs", json!(now - 120001)),
+            ("observedAtMs", json!(now - 120_001)),
         ] {
             let mut altered = v.clone();
             altered[field] = value;
             let q = parse_quota_cap_attestation_staging(&wire(&altered, now), now).unwrap();
             assert!(validate_claims(&q, 47, now).is_err(), "{field}");
         }
-        let mut extra = v.clone();
+        let mut extra = v;
         extra["unknownGrant"] = json!(1);
         let q = parse_quota_cap_attestation_staging(&wire(&extra, now), now).unwrap();
         assert!(validate_claims(&q, 47, now).is_err());
@@ -402,47 +423,15 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn real_postgres_owner_enrolled_dual_signature_and_nonce_commit() {
-        use ed25519_dalek::{Signer as _, SigningKey};
-        use openssl::{pkey::PKey, sign::Signer as PQSigner};
-        use std::process::Command;
-        let required = std::env::var("XSP_V2_REQUIRE_PQ_CAP_DB_TESTS").as_deref() == Ok("1");
-        let Ok(url) = std::env::var("XSP_V2_TEST_DATABASE_URL") else {
-            assert!(!required, "disposable XSP PostgreSQL service required");
-            return;
-        };
-        let generated = Command::new("openssl")
-            .args(["genpkey", "-algorithm", "ML-DSA-65"])
-            .output()
-            .expect("OpenSSL CLI");
-        if !generated.status.success() {
-            assert!(!required, "OpenSSL 3.5 ML-DSA-65 required");
-            return;
-        }
-        let pq = PKey::private_key_from_pem(&generated.stdout).unwrap();
-        let pub_der = pq.public_key_to_der().unwrap();
-        let pq_pub = &pub_der[pub_der.len() - 1952..];
-        let ed = SigningKey::from_bytes(&[91u8; 32]);
-        let ed_pub = ed.verifying_key().to_bytes();
-        let pool = sqlx::PgPool::connect(&url).await.unwrap();
-        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
-        let (mut data, _) = fixture();
-        let now = i64::try_from(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis(),
-        )
-        .unwrap();
-        data["observedAtMs"] = json!(now);
+    async fn seed_disposable_preflight(pool: &PgPool, ed_pub: [u8; 32], pq_pub: &[u8]) {
         let mut tx = pool.begin().await.unwrap();
         // These are real Nexus schema objects and real v2 allocator, not
         // a mocked quota function or substitute dual-sign key store.
         sqlx::query(
             "INSERT INTO node_metric_keys(node_id,public_key)
-            VALUES(47,repeat('ab',32))",
+            VALUES(47,$1)",
         )
+        .bind(hex::encode(ed_pub))
         .execute(&mut *tx)
         .await
         .unwrap();
@@ -526,6 +515,47 @@ mod tests {
         .unwrap();
         assert!(!snapshot);
         tx.commit().await.unwrap();
+    }
+
+    fn current_test_time() -> i64 {
+        i64::try_from(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn real_postgres_owner_enrolled_dual_signature_and_nonce_commit() {
+        use ed25519_dalek::{Signer as _, SigningKey};
+        use openssl::{pkey::PKey, sign::Signer as PQSigner};
+        use std::process::Command;
+        let required = std::env::var("XSP_V2_REQUIRE_PQ_CAP_DB_TESTS").as_deref() == Ok("1");
+        let Ok(url) = std::env::var("XSP_V2_TEST_DATABASE_URL") else {
+            assert!(!required, "disposable XSP PostgreSQL service required");
+            return;
+        };
+        let generated = Command::new("openssl")
+            .args(["genpkey", "-algorithm", "ML-DSA-65"])
+            .output()
+            .expect("OpenSSL CLI");
+        if !generated.status.success() {
+            assert!(!required, "OpenSSL 3.5 ML-DSA-65 required");
+            return;
+        }
+        let pq = PKey::private_key_from_pem(&generated.stdout).unwrap();
+        let pub_der = pq.public_key_to_der().unwrap();
+        let pq_pub = &pub_der[pub_der.len() - 1952..];
+        let ed = SigningKey::from_bytes(&[91u8; 32]);
+        let ed_pub = ed.verifying_key().to_bytes();
+        let pool = sqlx::PgPool::connect(&url).await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        let (mut data, _) = fixture();
+        let now = current_test_time();
+        data["observedAtMs"] = json!(now);
+        seed_disposable_preflight(&pool, ed_pub, pq_pub).await;
         let sign_claim = |value: &serde_json::Value, nonce: &str| {
             let mut msg: serde_json::Value = serde_json::from_slice(&wire(value, now)).unwrap();
             msg["nonceHex"] = json!(nonce);

@@ -28,3 +28,9 @@ jobs:
         run: |
           cargo build --manifest-path backend/Cargo.toml \
             --features quota-v2-disposable-cap-issuer --bin quota-v2-ci-signed-cap
+      - name: Run strict Clippy on the disposable signer
+        run: |
+          rustup component add clippy
+          cargo clippy --manifest-path backend/Cargo.toml \
+            --features quota-v2-disposable-cap-issuer --bin quota-v2-ci-signed-cap -- \
+            -D warnings -D clippy::pedantic -D clippy::nursery -F unsafe-code

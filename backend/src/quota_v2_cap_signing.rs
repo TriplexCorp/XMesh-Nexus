@@ -5,7 +5,7 @@
 //! verify XSP/2 Node identity, independently measured kernel Xray process,
 //! registered policy scope and off-host historical WAL before invoking this.
 use crate::node_policy::PolicySigner;
-use anyhow::{Result, anyhow, ensure};
+use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashSet;
@@ -251,12 +251,12 @@ mod tests {
         msg.extend_from_slice(&data);
         let public: [u8; 32] = hex::decode(signer.public_key())?
             .try_into()
-            .map_err(|_| anyhow!("bad Ed25519 key"))?;
+            .map_err(|_| anyhow::anyhow!("bad Ed25519 key"))?;
         let verify = VerifyingKey::from_bytes(&public)?;
         let sig = Signature::from_slice(&hex::decode(
             root["signature"]
                 .as_str()
-                .ok_or_else(|| anyhow!("missing cap signature"))?,
+                .ok_or_else(|| anyhow::anyhow!("missing cap signature"))?,
         )?)?;
         verify.verify(&msg, &sig)?;
         assert_eq!(root["payload"]["nodeId"], 47);
@@ -271,70 +271,45 @@ mod tests {
 
     #[test]
     fn invalid_signer_input_matrix_fails_closed() {
+        type Case = (&'static str, fn(&mut SqlSnapshot));
         let now = 2_010_000;
-        let mut tests: Vec<(&str, Box<dyn Fn(&mut SqlSnapshot)>)> = vec![
-            ("shared overcommit", Box::new(|s| s.all_node_held = 1001)),
-            ("foreign user", Box::new(|s| s.user_id = 102)),
-            ("ack nonzero", Box::new(|s| s.acknowledged = 1)),
-            ("previous WAL", Box::new(|s| s.measured_wal = 1)),
-            (
-                "other WAL head",
-                Box::new(|s| s.original_inventory_head = "e".repeat(64)),
-            ),
-            ("negative shared", Box::new(|s| s.ceiling = -1)),
-            ("greater 64 MB", Box::new(|s| s.ceiling = MAX_CAP + 1)),
-            (
-                "node ceiling below shared",
-                Box::new(|s| s.node_ceiling = 10),
-            ),
-            ("cdn > total", Box::new(|s| s.cdn_ceiling = 800)),
-            (
-                "no CDN scope",
-                Box::new(|s| {
-                    s.aliases.remove(0);
-                }),
-            ),
-            (
-                "duplicate alias",
-                Box::new(|s| s.aliases[0] = s.aliases[1].clone()),
-            ),
-            (
-                "reclassified main",
-                Box::new(|s| s.aliases[0].class = "main".into()),
-            ),
-            ("unsorted aliases", Box::new(|s| s.aliases.swap(0, 1))),
-            (
-                "noncanonical uuid",
-                Box::new(|s| s.account_epoch = "BAD".into()),
-            ),
-            (
-                "bad policy hash",
-                Box::new(|s| s.policy_sha = "fF".repeat(32)),
-            ),
-            (
-                "expired preflight",
-                Box::new(|s| s.sql_preflight_expires_ms = 2_020_000),
-            ),
-            (
-                "expired lease",
-                Box::new(|s| s.lease_expires_ms = 2_020_000),
-            ),
-            (
-                "already expired install",
-                Box::new(|s| s.install_before_ms = 2_010_000),
-            ),
-            ("later issue", Box::new(|s| s.issued_at_ms = 2_010_001)),
-            (
-                "long install",
-                Box::new(|s| s.install_before_ms = s.issued_at_ms + 120001),
-            ),
-            (
-                "large grant lifetime",
-                Box::new(|s| s.valid_until_ms = s.issued_at_ms + MAX_LEASE_MS + 1),
-            ),
-            ("zero Node", Box::new(|s| s.node_id = 0)),
+        let tests: &[Case] = &[
+            ("shared overcommit", |s| s.all_node_held = 1001),
+            ("foreign user", |s| s.user_id = 102),
+            ("ack nonzero", |s| s.acknowledged = 1),
+            ("previous WAL", |s| s.measured_wal = 1),
+            ("other WAL head", |s| {
+                s.original_inventory_head = "e".repeat(64);
+            }),
+            ("negative shared", |s| s.ceiling = -1),
+            ("greater 64 MB", |s| s.ceiling = MAX_CAP + 1),
+            ("node ceiling below shared", |s| s.node_ceiling = 10),
+            ("cdn > total", |s| s.cdn_ceiling = 800),
+            ("no CDN scope", |s| {
+                s.aliases.remove(0);
+            }),
+            ("duplicate alias", |s| s.aliases[0] = s.aliases[1].clone()),
+            ("reclassified main", |s| s.aliases[0].class = "main".into()),
+            ("unsorted aliases", |s| s.aliases.swap(0, 1)),
+            ("noncanonical uuid", |s| s.account_epoch = "BAD".into()),
+            ("bad policy hash", |s| s.policy_sha = "fF".repeat(32)),
+            ("expired preflight", |s| {
+                s.sql_preflight_expires_ms = 2_020_000;
+            }),
+            ("expired lease", |s| s.lease_expires_ms = 2_020_000),
+            ("already expired install", |s| {
+                s.install_before_ms = 2_010_000;
+            }),
+            ("later issue", |s| s.issued_at_ms = 2_010_001),
+            ("long install", |s| {
+                s.install_before_ms = s.issued_at_ms + 120_001;
+            }),
+            ("large grant lifetime", |s| {
+                s.valid_until_ms = s.issued_at_ms + MAX_LEASE_MS + 1;
+            }),
+            ("zero Node", |s| s.node_id = 0),
         ];
-        for (name, mutate) in tests.drain(..) {
+        for (name, mutate) in tests {
             let mut snapshot = fixture();
             mutate(&mut snapshot);
             assert!(validate(&snapshot, now).is_err(), "{name}");
