@@ -120,7 +120,7 @@ class SignedFirstCapOutboxTests(unittest.TestCase):
         self.assertEqual((settled,held),(100,900))
         newer=json.loads(raw)
         newer["payload"]["issuedAtMs"]+=1
-        different=(json.dumps(newer,sort_keys=True,separators=(",",":"))+"\\n").encode()
+        different=(json.dumps(newer,sort_keys=True,separators=(",",":"))+"\n").encode()
         self.deny(different)
 
     def test_parallel_identical_packets_use_one_outbox_record(self):
