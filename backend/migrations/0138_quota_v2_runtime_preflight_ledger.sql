@@ -88,6 +88,10 @@ BEGIN
         RAISE EXCEPTION 'invalid nonauthorizing Xray preflight'
           USING ERRCODE='22023';
     END IF;
+    -- A prepared record must not be acknowledged and then vanish on
+    -- an asynchronous PostgreSQL crash/restart. The caller must COMMIT its
+    -- transaction before returning any signed preflight reply.
+    PERFORM set_config('synchronous_commit','on',true);
     -- Preserve the existing global reservation lock ordering. Every v2
     -- allocator and settlement first locks the account, then the lease.
     SELECT * INTO STRICT account FROM quota_v2_accounts
