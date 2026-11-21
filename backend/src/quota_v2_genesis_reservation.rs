@@ -325,6 +325,21 @@ pub async fn handle(
         .bind(req.user_id ^ 0x51_4D_45_53_48_i64)
         .execute(&mut *tx)
         .await?;
+    let current_user: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
+    )
+    .bind(req.user_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(deny)?;
+    if !crate::node_runtime::first_genesis_rehearsal_limits_supported(
+        &current_user, req.node_id, verified.aliases.iter().any(|alias| alias.class == "cdn"),
+    ) || !crate::user_can_connect(&current_user, now_ms)
+        || current_user["limit"].as_f64().map(crate::gb_to_bytes_i64)
+            != selected[0]["limitBytes"].as_i64()
+    {
+        return Err(deny());
+    }
     let public = state.node_policy_signer.public_key();
     let prepared = saved_reply(&mut tx, &state, &req, "prepare").await?;
     if req.operation == "confirm" {
