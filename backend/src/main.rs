@@ -22,11 +22,7 @@ mod panel_version;
 
 mod protocol_credentials;
 mod quota_v2;
-// Verify the future positive cap contract without linking any positive
-// issuer or externally callable route into the shipping backend.
-#[cfg(feature = "quota-v2-installed-cap-rehearsal")]
 mod quota_v2_cap_delivery;
-#[cfg(test)]
 mod quota_v2_cap_signing;
 mod quota_v2_genesis_reservation;
 mod quota_v2_policy_pin;
@@ -742,13 +738,10 @@ fn public_api_routes() -> Router<AppState> {
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
         .route("/auth/logout", post(auth::logout));
 
-    #[cfg(feature = "quota-v2-installed-cap-rehearsal")]
-    let public = public.route(
+    public.route(
         "/node/quota-v2/genesis-cap-delivery",
         post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
-    );
-
-    public
+    )
 }
 
 fn application_router(state: AppState) -> Router {

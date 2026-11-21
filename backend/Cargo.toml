@@ -29,7 +29,6 @@ default = []
 # CI-only PostgreSQL -> real PolicySigner, absent from production Docker and
 # default builds. Positive result is NOT a shipping XSP/2 admission endpoint.
 quota-v2-disposable-cap-issuer = []
-quota-v2-installed-cap-rehearsal = ["quota-v2-disposable-cap-issuer"]
 # Build only in an audited OpenSSL 3.5+ environment; disabled in production Docker.
 xsp-v2-experimental = ["dep:openssl"]
 # Operator-only read path; disabled by default and not built into production Docker.

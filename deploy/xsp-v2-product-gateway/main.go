@@ -32,22 +32,22 @@ import (
 )
 
 const (
-	maxEnvelopeBytes         = 1024 * 1024
-	maxPayloadBytes          = 768 * 1024
-	suite                    = "Ed25519+ML-DSA-65"
-	issuerID                 = "xmesh-nexus-panel"
-	targetAgentVersion       = "control-v6.0.24"
+	maxEnvelopeBytes           = 1024 * 1024
+	maxPayloadBytes            = 768 * 1024
+	suite                      = "Ed25519+ML-DSA-65"
+	issuerID                   = "xmesh-nexus-panel"
+	targetAgentVersion         = "control-v6.0.24"
 	previousTargetAgentVersion = "control-v6.0.23"
-	rollingV615AgentVersion  = "control-v6.0.15"
-	recentAgentVersion       = "control-v6.0.13"
-	rollingV614AgentVersion  = "control-v6.0.14"
-	previousAgentVersion     = "control-v6.0.12"
-	transitionalAgentVersion = "control-v6.0.11"
-	rolloutAgentVersion      = "control-v6.0.10"
-	recoveryAgentVersion     = "control-v6.0.9"
-	legacyAgentVersion       = "control-v6.0.8"
-	olderAgentVersion        = "control-v6.0.7"
-	repairAgentVersion       = "control-v6.0.0"
+	rollingV615AgentVersion    = "control-v6.0.15"
+	recentAgentVersion         = "control-v6.0.13"
+	rollingV614AgentVersion    = "control-v6.0.14"
+	previousAgentVersion       = "control-v6.0.12"
+	transitionalAgentVersion   = "control-v6.0.11"
+	rolloutAgentVersion        = "control-v6.0.10"
+	recoveryAgentVersion       = "control-v6.0.9"
+	legacyAgentVersion         = "control-v6.0.8"
+	olderAgentVersion          = "control-v6.0.7"
+	repairAgentVersion         = "control-v6.0.0"
 )
 
 var b64 = base64.StdEncoding
@@ -933,15 +933,15 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 }
 
 var allowedTunnelPaths = map[string]bool{
-	"/api/v1/metrics/ingest":                    true,
-	"/api/v1/node/heartbeat":                    true,
-	"/api/v1/node/restart/poll":                 true,
-	"/api/v1/node/restart/ack":                  true,
-	"/api/v1/node/restart/progress":             true,
-	"/api/v1/node/desired-config":               true,
-	"/api/v1/node/quota-v2/wal":                 true,
-	"/api/v1/node/quota-v2/policy-pin":          true,
-	"/api/v1/node/quota-v2/genesis-reservation": true,
+	"/api/v1/metrics/ingest":                     true,
+	"/api/v1/node/heartbeat":                     true,
+	"/api/v1/node/restart/poll":                  true,
+	"/api/v1/node/restart/ack":                   true,
+	"/api/v1/node/restart/progress":              true,
+	"/api/v1/node/desired-config":                true,
+	"/api/v1/node/quota-v2/wal":                  true,
+	"/api/v1/node/quota-v2/policy-pin":           true,
+	"/api/v1/node/quota-v2/genesis-reservation":  true,
 	"/api/v1/node/quota-v2/genesis-cap-delivery": true,
 }
 
@@ -1004,10 +1004,6 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&inner); err != nil || !allowedTunnelPaths[inner.Path] {
 		fail(w, http.StatusBadRequest, "unregistered strict-PQ tunnel operation")
-		return
-	}
-	if inner.Path == "/api/v1/node/quota-v2/genesis-cap-delivery" && os.Getenv("XMESH_QUOTA_V2_INSTALLED_CAP_DELIVERY") != "1" {
-		fail(w, http.StatusNotFound, "disposable cap delivery disabled")
 		return
 	}
 	if err := decoder.Decode(new(any)); err != io.EOF {

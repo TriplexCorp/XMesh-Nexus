@@ -1,8 +1,8 @@
 """Actual installed 6.0.27 Agent + real Xray + PostgreSQL signed cap rehearsal.
 
 Run ONLY from the controlled disposable systemd harness. There is NO public
-or production ingress. The trusted hosted runner owns both guests and stages
-the original SQL cap after independent process/WAL observations.
+or production ingress. Nexus signs and commits caps from its own confirmed
+leases. The runner independently checks both guests and their PostgreSQL rows.
 """
 import concurrent.futures
 import hashlib
@@ -235,9 +235,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert (observed[3]!=req["runtimeId"]) if replacement else (observed[3]==req["runtimeId"])
         raw=guest.exec("cat",MEASURED+"/config.json")
         assert hashlib.sha256(raw).hexdigest()==profile
-        path=root/f"actual-profile-{guest.node}.json"
-        path.write_bytes(raw)
-        return observed,path
+        return observed
 
     def probe(item,ceiling,observed,tag):
         guest,_,_=item
@@ -247,7 +245,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         return json.loads(raw)
 
     measurements=parallel(measure,stages)
-    before=parallel(lambda job:probe(job[0],0,job[1][0],job[2]),
+    before=parallel(lambda job:probe(job[0],0,job[1],job[2]),
                     zip(stages,measurements,tags))
     assert before==[{"uplink":0,"downlink":0}]*2
     # The CI host owns the disposable guest/root. It directly reads the
@@ -262,26 +260,24 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     cap_jobs=[]
     for item,measurement,saved in zip(stages,measurements,confirmed):
         guest,req,_=item
-        observed,path=measurement
-        container,_,pid,runtime=observed
-        payload=saved[1]["payload"]
-        lease=payload["reservation"]
+        container,_,pid,runtime=measurement
+        lease=saved[1]["payload"]["reservation"]
         nonce=secrets.token_hex(32)
-        cap_request={"nodeId":guest.node,"userId":uid,"requestChallenge":nonce}
-        assert guest.request(CAP_PATH,cap_request)[0]==409, "unstaged cap accessible"
-        preflight=db.execute(
-            "SELECT authorized_bytes,can_start,can_resume,final_meter_verified,refundable_bytes "
-            "FROM quota_v2_record_quarantined_runtime_preflight("
-            "%s,%s::uuid,%s,%s::uuid,%s::uuid,%s,%s,%s,%s,%s,%s,%s,%s)",
-            (uid,lease["epoch"],guest.node,lease["meterEpoch"],lease["reservationId"],
-             lease["revision"],nonce,runtime,container,pid,req["policySha256"],
-             payload["activationReceiptSha256"],0)).fetchone()
-        assert preflight==(0,False,False,False,0)
-        signed=json.loads(subprocess.check_output(
-            [os.environ["XMESH_CI_CAP_SIGNER"],"--installed",str(guest.node),str(uid),
-             nonce,str(pid),container,req["policySha256"],str(path)],timeout=20))
+        lookup={"nodeId":guest.node,"userId":uid,"requestChallenge":nonce}
+        assert guest.request(CAP_PATH,lookup)[0]==409, "read-only lookup minted a cap"
+        cap_request=dict(lookup,measurement={
+            "containerId":container,"hostPid":pid,"runtimeId":runtime,
+        })
+        issued=parallel(lambda _: guest.request(CAP_PATH,cap_request),range(2))
+        code,signed=issued[0]
+        assert code==200,(code,signed)
+        assert issued[1]==issued[0]
+        assert signed["status"]=="committed_first_cap"
         grant=signed["signedEnvelope"].encode()
-        assert signed["publicKeyHex"]==public
+        assert guest.request(CAP_PATH,lookup)==(200,signed)
+        assert guest.request(CAP_PATH,dict(cap_request,measurement={
+            **cap_request["measurement"],"hostPid":pid+1,
+        }))[0]==409
         cap=json.loads(grant)
         independent_signature(root,f"cap-{guest.node}",cap,CAP_DOMAIN)
         assert cap["payload"]["sharedCeilingBytes"]==lease["ceilingBytes"]
@@ -338,7 +334,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
              "--user-id",str(uid),"--socket",MEASURED+"/wal/drain.sock",
              "--executable-sha256",digest,"--request-challenge",request["requestChallenge"]]
         receipt=json.loads(guest.exec(*cmd,timeout=48))
-        assert receipt=={"runtimeId":measurement[0][3],
+        assert receipt=={"runtimeId":measurement[3],
                          "grantSha256":hashlib.sha256(grant).hexdigest()}
         saved=json.loads(guest.exec("cat",STATE+f"/genesis-positive-cap-u{uid}.json"))
         assert saved["signedEnvelope"].encode()==grant
@@ -349,14 +345,14 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     commands=parallel(install,cap_jobs)
     assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone()==(2,)
     results=parallel(lambda value:probe(value[0][0],value[0][4],
-                                       value[0][1][0],value[1]),zip(cap_jobs,tags))
+                                       value[0][1],value[1]),zip(cap_jobs,tags))
     assert sum(sum(result.values()) for result in results)==account[0]
     wal_snapshots=[]
     for job,tag,result in zip(cap_jobs,tags,results):
         item,measurement,_,grant,ceiling=job
         guest,_,_=item
         assert sum(result.values())==ceiling
-        runtime=measurement[0][3]
+        runtime=measurement[3]
         snapshot={}
         for direction in ("uplink","downlink"):
             key=f"{runtime}\0xmesh-u{uid}--{tag}\0{direction}".encode()
@@ -429,8 +425,8 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     guest_a.exec("docker","rm",lab.XRAY)
     lab.start_isolated_candidate(guest_a,archive,image,config,preloaded=True,
                                  tag=tags[0],binding=binding)
-    replacement=measure(stages[0],replacement=True)[0]
-    assert replacement[0]!=measurements[0][0][0]
+    replacement=measure(stages[0],replacement=True)
+    assert replacement[0]!=measurements[0][0]
     failed=subprocess.run(["docker","exec",guest_a.name,*commands[0]],
                           capture_output=True,timeout=35)
     assert failed.returncode!=0, "old grant accepted by replacement Xray"

@@ -1,9 +1,7 @@
-//! First-genesis signed positive *spending-only* cap contract.
-//!
-//! This module is compiled only by unit tests and the disposable CI issuer.
-//! No shipping API route calls it. The production issuer MUST additionally
-//! verify XSP/2 Node identity, independently measured kernel Xray process,
-//! registered policy scope and off-host historical WAL before invoking this.
+//! Canonical first-genesis spending-only cap contract for Nexus and Xray.
+//! Caller must authenticate the registered Node, verify policy scope and
+//! hold the PostgreSQL reservation. The signed runtime binding is not an
+//! attestation of the remote kernel or proof of final traffic accounting.
 use crate::node_policy::PolicySigner;
 use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
