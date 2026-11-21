@@ -29,6 +29,8 @@ mod quota_v2_cap_signing;
 mod quota_wal_transport;
 mod quota_xray_genesis;
 mod quota_v2_genesis_reservation;
+#[cfg(feature = "quota-v2-installed-cap-rehearsal")]
+mod quota_v2_cap_delivery;
 mod quota_v2_policy_pin;
 mod security;
 mod sub_server;
@@ -740,6 +742,12 @@ fn application_router(state: AppState) -> Router {
         )
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
         .route("/auth/logout", post(auth::logout));
+
+    #[cfg(feature = "quota-v2-installed-cap-rehearsal")]
+    let public = public.route(
+        "/node/quota-v2/genesis-cap-delivery",
+        post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
+    );
 
     let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
     Router::new()
