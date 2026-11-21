@@ -185,6 +185,23 @@ class StagingAdmissionPreflight(unittest.TestCase):
                        uuid.uuid4(),uuid.uuid4()))
         self.deny(challenge=h("6"))
 
+    def test_preflight_forces_synchronous_commit_over_session_disabled_mode(self):
+        with psycopg.connect(DSN) as c:
+            c.execute("SET synchronous_commit=off")
+            self.assertEqual(c.execute(
+                "SELECT current_setting('synchronous_commit')").fetchone()[0],"off")
+            row=c.execute(FUNC,self.args(challenge=h("4"))).fetchone()
+            self.assertEqual(row[8],0)
+            # The function changes only the transaction-local durability
+            # setting. It cannot permit ACK before actual COMMIT.
+            self.assertEqual(c.execute(
+                "SELECT current_setting('synchronous_commit')").fetchone()[0],"on")
+            c.commit()
+            self.assertEqual(c.execute(
+                "SELECT current_setting('synchronous_commit')").fetchone()[0],"off")
+        # The immutable record really survived the committed transaction.
+        self.assertEqual(self.snapshot(challenge=h("4")),row)
+
     def test_many_parallel_exact_retries_never_mutate_account(self):
         args=self.args()
         def request(_):
