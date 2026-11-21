@@ -940,6 +940,7 @@ var allowedTunnelPaths = map[string]bool{
 	"/api/v1/node/restart/progress": true,
 	"/api/v1/node/desired-config":   true,
 	"/api/v1/node/quota-v2/wal":      true,
+	"/api/v1/node/quota-v2/policy-pin": true,
 }
 
 func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
@@ -1038,7 +1039,8 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	// product activation binding as the one-shot Genesis preparation.
 	// Only the cryptographically enrolled gateway supplies this header.
 	if inner.Path == "/api/v1/node/quota-v2/wal" ||
-		inner.Path == "/api/v1/node/desired-config" {
+		inner.Path == "/api/v1/node/desired-config" ||
+		inner.Path == "/api/v1/node/quota-v2/policy-pin" {
 		activation := sha256.Sum256(n.Receipt)
 		req.Header.Set("X-XSP-Product-Activation-SHA256", hex.EncodeToString(activation[:]))
 	}
