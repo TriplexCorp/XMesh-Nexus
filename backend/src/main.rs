@@ -22,6 +22,10 @@ mod panel_version;
 
 mod protocol_credentials;
 mod quota_v2;
+// Verify the future positive cap contract without linking any positive
+// issuer or externally callable route into the shipping backend.
+#[cfg(test)]
+mod quota_v2_cap_signing;
 mod quota_wal_transport;
 mod quota_xray_genesis;
 mod security;
