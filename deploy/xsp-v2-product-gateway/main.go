@@ -1032,6 +1032,10 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("X-XSP-Product-Internal", g.internalToken)
 	req.Header.Set("X-XSP-Product-Node-Id", strconv.FormatInt(parsed.Env.NodeID, 10))
 	req.Header.Set("X-XSP-Product-Path", inner.Path)
+	if inner.Path == "/api/v1/node/quota-v2/wal" {
+		activation := sha256.Sum256(n.Receipt)
+		req.Header.Set("X-XSP-Product-Activation-SHA256", hex.EncodeToString(activation[:]))
+	}
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
 		fail(w, http.StatusBadGateway, "internal panel operation unavailable")

@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'backend/src/quota_wal_transport.rs'
+      - 'backend/src/quota_xray_genesis.rs'
+      - 'backend/src/node_runtime_legacy.rs'
       - 'backend/src/node_auth.rs'
       - 'backend/src/node_policy.rs'
       - 'backend/src/main.rs'
@@ -10,6 +12,7 @@ on:
       - 'deploy/xsp-v2-product-gateway/main.go'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
+      - 'backend/migrations/0137_quota_v2_xray_genesis.sql'
       - 'scripts/test-quota-wal-transport.py'
       - 'scripts/test-quota-wal-reconcile.py'
       - 'scripts/test-quota-wal-product-tunnel.py'

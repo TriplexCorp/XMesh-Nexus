@@ -2358,6 +2358,7 @@ pub async fn desired_config(
     } = compile_node_profile(&state, request.node_id).await?;
     let mut policy =
         build_offline_policy(&config, &users, request.node_id, now, &digest, active_nodes);
+    crate::quota_xray_genesis::close_for_policy(&state.pool, request.node_id).await?;
     apply_quota_v2_if_enabled(&state, &request, &mut policy, now).await?;
     if let Some(tls) = tls_provision {
         policy["tlsProvision"] = tls;

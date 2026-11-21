@@ -23,6 +23,7 @@ mod panel_version;
 mod protocol_credentials;
 mod quota_v2;
 mod quota_wal_transport;
+mod quota_xray_genesis;
 mod security;
 mod sub_server;
 mod subscription_finalmask;
@@ -1380,6 +1381,12 @@ async fn create_record(
             ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Created user has no ID")
         })?;
         user_subscriptions::provision_new_user(&state, id, &mut tx).await?;
+    }
+    if collection == "nodes" {
+        let id = result.get("id").and_then(Value::as_i64).ok_or_else(|| {
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Created node has no ID")
+        })?;
+        quota_xray_genesis::record_creation(&mut tx, id).await?;
     }
     tx.commit().await?;
     let record_id = result.get("id").and_then(Value::as_i64);

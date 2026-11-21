@@ -4,6 +4,7 @@ import concurrent.futures
 from contextlib import ExitStack
 import errno
 import hashlib
+import http.client
 import ipaddress
 import json
 import os
@@ -26,6 +27,9 @@ PRODUCT = "/usr/local/bin/xmesh-agent-xspv2-product"
 SYNC = "xmesh-xray-sync"
 METRICS = "xmesh-node-metrics"
 CONTROL = "xmesh-node-control"
+WAL_PATH = "/api/v1/node/quota-v2/wal"
+DESIRED_PATH = "/api/v1/node/desired-config"
+GENESIS_DOMAIN = b"XMESH_XRAY_GENESIS_PREPARED_V1\0"
 
 
 def docker(*args, timeout=40, **kwargs):
@@ -60,6 +64,42 @@ def reference_identity(root, revision):
     expected = {"version": "control-v6.0.25", "sourceRevision": revision, "artifactSha256": digest}
     assert json.loads(subprocess.check_output([output / "product", "--identity"], timeout=10)) == expected
     return expected
+
+
+class Owner:
+    def __init__(self, stack):
+        address = urlsplit(os.environ["XMESH_TEST_URL"])
+        assert address.hostname == "127.0.0.1" and address.scheme == "http"
+        self.http = http.client.HTTPConnection(address.hostname, address.port, timeout=20)
+        stack.callback(self.http.close)
+        self.headers = {"Content-Type": "application/json", "Origin": address.geturl()}
+        response, _ = self.request("POST", "/auth/login", {
+            "username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"],
+        })
+        self.headers["Cookie"] = next(value.split(";", 1)[0] for name, value in response.getheaders()
+                                      if name.lower() == "set-cookie" and value.startswith("xmesh_session="))
+
+    def request(self, method, path, payload):
+        self.http.request(method, "/api/v1" + path, json.dumps(payload), self.headers)
+        response = self.http.getresponse()
+        body = json.loads(response.read())
+        assert response.status == (201 if path.startswith("/collections/") and method == "POST" else 200), (
+            path, response.status, body)
+        return response, body
+
+    def assign_profile(self, node):
+        _, profile = self.request("POST", "/collections/profiles", {
+            "name": "Genesis closure profile",
+            "config": json.dumps({
+                "inbounds": [{"tag": "DE_VLESS", "listen": "127.0.0.1", "port": 28401,
+                              "protocol": "vless", "settings": {"decryption": "none", "clients": []},
+                              "streamSettings": {"network": "tcp", "security": "none"}}],
+                "outbounds": [{"tag": "direct", "protocol": "freedom"}], "routing": {"rules": []},
+            }),
+        })
+        self.request("PATCH", f"/collections/nodes/{node}", {
+            "profileId": profile["id"], "xrayLocalPort": 28401,
+        })
 
 
 class Guest:
@@ -161,6 +201,58 @@ class Guest:
         wait_for(self.ready, label=f"systemd after restart on Node {self.node}")
         assert self.exec("cat", "/proc/1/stat").split()[21] != before
 
+    def request(self, path, payload):
+        script = (
+            'tmp=$(mktemp -d /run/xmesh-lab.XXXXXXXX); trap \'rm -rf "$tmp"\' EXIT; '
+            'cat > "$tmp/body"; "$1" request --path "$2" --body-file "$tmp/body" '
+            '--status-file "$tmp/status" --output-file "$tmp/response"; '
+            'cat "$tmp/status" "$tmp/response"'
+        )
+        raw = docker("exec", "-i", self.name, "bash", "-ec", script, "--", PRODUCT, path,
+                     input=json.dumps(payload).encode(), timeout=30)
+        code, document = raw.split(b"\n", 1)
+        return int(code), json.loads(document)
+
+
+def try_genesis(guests, db, root):
+    fresh, prior = [guest for guest, _ in guests]
+    candidate = {"operation": "prepare_genesis", "nodeId": fresh.node,
+                 "candidateRuntimeId": secrets.token_hex(32), "challenge": secrets.token_hex(32)}
+    different_runtime = dict(candidate, candidateRuntimeId=secrets.token_hex(32))
+    assert prior.request(WAL_PATH, dict(candidate, nodeId=prior.node))[0] == 409
+    assert fresh.request(WAL_PATH, dict(candidate, nodeId=prior.node))[0] == 401
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda payload: (payload, fresh.request(WAL_PATH, payload)),
+                                [candidate, different_runtime]))
+    assert sorted(result[0] for _, result in results) == [200, 409]
+    winner, (_, receipt) = next(row for row in results if row[1][0] == 200)
+    assert fresh.request(WAL_PATH, winner) == (200, receipt)
+    assert fresh.request(WAL_PATH, dict(winner, challenge=secrets.token_hex(32)))[0] == 409
+    assert receipt["algorithm"] == "Ed25519"
+    payload = receipt["payload"]
+    active = json.loads(fresh.exec("cat", "/var/lib/xmesh-agent/product/active.json"))
+    assert payload == {
+        "schemaVersion": 1, "kind": "xmesh.xray.genesis-prepared", "nodeId": fresh.node,
+        "activationReceiptSha256": active["receiptSha256"],
+        "candidateRuntimeId": winner["candidateRuntimeId"], "challenge": winner["challenge"],
+        "preparedAtMs": payload["preparedAtMs"], "validUntilMs": payload["preparedAtMs"] + 120000,
+        "authorizedBytes": 0, "canStart": False, "canResume": False,
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    signature = root / "genesis.sig"
+    message = root / "genesis.message"
+    signature.write_bytes(bytes.fromhex(receipt["signature"]))
+    message.write_bytes(GENESIS_DOMAIN + canonical)
+    subprocess.run(["openssl", "pkeyutl", "-verify", "-pubin", "-rawin",
+                    "-inkey", os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"],
+                    "-in", message, "-sigfile", signature], check=True, timeout=5)
+    assert db.execute("SELECT count(*) FROM quota_v2_reservations").fetchone() == (0,)
+    assert db.execute("SELECT runtime_id,challenge FROM quota_v2_xray_genesis WHERE node_id=%s",
+                      (fresh.node,)).fetchone() == (winner["candidateRuntimeId"], winner["challenge"])
+    print("Installed XSP/2: durable zero-byte genesis prepared once, exact retry returned the same signed receipt.")
+    print("An existing Node without creation evidence, cross-node identity and competing runtime were rejected.")
+    return fresh, winner, receipt
+
 
 def main():
     assert os.environ.get("GITHUB_ACTIONS") == "true"
@@ -205,12 +297,21 @@ def main():
         panel = json.loads(ready.read_text())["enrollment"]
         assert urlsplit(panel).hostname == bridge
         db = stack.enter_context(psycopg.connect(dsn, autocommit=True))
+        owner = Owner(stack)
         guests = []
         for number in range(2):
-            node, = db.execute(
-                "INSERT INTO panel_records(collection,data) VALUES ('nodes',jsonb_build_object('name',%s::text)) RETURNING id",
-                (f"installed-wal-node-{number}",),
-            ).fetchone()
+            if number == 0:
+                _, record = owner.request("POST", "/collections/nodes", {
+                    "name": "New staging Node", "addr": "192.0.2.1",
+                })
+                node = record["id"]
+            else:
+                # Fixture for a pre-existing Node with no local WAL and no
+                # durable creation attestation, enrolled using current keys.
+                node, = db.execute(
+                    "INSERT INTO panel_records(collection,data) VALUES ('nodes',jsonb_build_object('name',%s::text)) RETURNING id",
+                    ("Existing staging Node without genesis evidence",),
+                ).fetchone()
             token = secrets.token_hex(32)
             db.execute("INSERT INTO node_enrollment_tokens(token_hash,node_id,expires_at) VALUES(%s,%s,NOW()+INTERVAL '20 minutes')",
                        (hashlib.sha256(token.encode()).hexdigest(), node))
@@ -235,6 +336,7 @@ def main():
             guest.check_quarantine()
         print("Installed metrics reached PostgreSQL. The staged reconciler refused to start a cold Xray on either guest.")
 
+        fresh, original, receipt = try_genesis(guests, db, root)
         for guest, _ in guests:
             before = {peer.node: samples(peer.node) for peer, _ in guests}
             guest.restart()
@@ -243,6 +345,14 @@ def main():
                 peer.exec(PRODUCT, "verify-active", "--panel", panel, "--node-id", str(peer.node))
                 peer.check_quarantine()
         print("Both PID 1 instances restarted independently. Timers, active receipts, metrics and Xray quarantine survived.")
+        assert fresh.request(WAL_PATH, original) == (200, receipt)
+        owner.assign_profile(fresh.node)
+        assert fresh.request(DESIRED_PATH, {
+            "node_id": fresh.node, "quotaProtocolVersion": 2, "quotaLocalCounters": [],
+        })[0] == 200
+        assert fresh.request(WAL_PATH, original)[0] == 409
+        fresh.check_quarantine()
+        print("The exact receipt survived guest restarts. Issuing an ordinary signed policy closed genesis permanently.")
 
 
 if __name__ == "__main__":

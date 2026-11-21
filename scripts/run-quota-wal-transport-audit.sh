@@ -28,6 +28,10 @@ export ADMIN_PASSWORD="$(openssl rand -hex 24)"
 export SUBSCRIPTION_ENCRYPTION_KEY="$(openssl rand -hex 32)"
 export XSP_V2_PRODUCT_INTERNAL_TOKEN="$(openssl rand -hex 32)"
 export XMESH_QUOTA_V2_ENABLED=0
+export XMESH_QUOTA_V2_XRAY_GENESIS_STAGING=0
+if [[ "${2:-}" == --with-installed ]]; then
+    export XMESH_QUOTA_V2_XRAY_GENESIS_STAGING=1
+fi
 export CORE_DATA_DIR="$run/core"
 export XMESH_TEST_POLICY_PUBLIC_KEY="$run/node-policy.pem"
 
