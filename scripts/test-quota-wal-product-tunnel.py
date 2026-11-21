@@ -8,6 +8,7 @@ import concurrent.futures
 from contextlib import ExitStack
 import copy
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
@@ -25,6 +26,7 @@ import witness_inventory as producer
 from quota_wal_real_xray import MeteredXray
 
 STATE_ROOT = "/var/lib/xmesh-agent"
+DESIRED_PATH = "/api/v1/node/desired-config"
 
 
 class Agent:
@@ -70,14 +72,18 @@ class Agent:
 
     def post(self, body):
         self.sent.append(body["operation"])
-        request = self.root / "request"
-        request.write_text(json.dumps(body), encoding="utf-8")
-        status = self.root / "status"
-        raw = self.run("request", "--path", suite["PATH"], "--body-file", request, "--status-file", status)
-        assert subprocess.check_output(["sudo", "cat", status], timeout=5).strip() == b"200", raw
+        raw = self.request(suite["PATH"], body)
         if self.drop_ack and body["operation"] == "store":
             self.drop_ack = False
             raise ConnectionError("discarded committed XSP/2 response")
+        return raw
+
+    def request(self, path, body):
+        request = self.root / "request"
+        request.write_text(json.dumps(body), encoding="utf-8")
+        status = self.root / "status"
+        raw = self.run("request", "--path", path, "--body-file", request, "--status-file", status)
+        assert subprocess.check_output(["sudo", "cat", status], timeout=5).strip() == b"200", raw
         return raw
 
     def sign(self, _, message):
@@ -103,6 +109,62 @@ class Agent:
         assert proof["offhostFullBirthIndexHeadMatched"]
         assert not proof["canResume"] and proof["refundableBytes"] == 0
         return proof
+
+
+def provision_signed_policies(agents):
+    origin = suite["URL"]
+    owner = http.client.HTTPConnection(origin.hostname, origin.port, timeout=20)
+    headers = {"Content-Type": "application/json", "Origin": origin.geturl()}
+
+    def request(method, path, body, expected):
+        owner.request(method, "/api/v1" + path, json.dumps(body), headers)
+        response = owner.getresponse()
+        data = json.loads(response.read())
+        assert response.status == expected, (path, response.status, data)
+        return response, data
+
+    try:
+        response, _ = request("POST", "/auth/login", {
+            "username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"],
+        }, 200)
+        headers["Cookie"] = next(value.split(";", 1)[0] for name, value in response.getheaders()
+                                 if name.lower() == "set-cookie" and value.startswith("xmesh_session="))
+        tag = "DE_VLESS"
+        _, profile = request("POST", "/collections/profiles", {
+            "name": "Strict XSP WAL test profile",
+            "config": json.dumps({
+                "inbounds": [{"tag": tag, "listen": "127.0.0.1", "port": 28401,
+                              "protocol": "vless", "settings": {"decryption": "none", "clients": []},
+                              "streamSettings": {"network": "tcp", "security": "none"}}],
+                "outbounds": [{"tag": "direct", "protocol": "freedom"}], "routing": {"rules": []},
+            }),
+        }, 201)
+        _, squad = request("POST", "/collections/squads", {"name": "Strict XSP WAL test squad", "inb": [tag]}, 201)
+        _, user = request("POST", "/collections/users", {
+            "username": "ci_strict_xsp_wal", "squads": [squad["id"]], "hold": False, "limit": 1, "used": 0,
+        }, 201)
+        for index, agent in enumerate(agents, start=1):
+            request("PATCH", f"/collections/nodes/{agent.node}", {
+                "addr": f"192.0.2.{index}", "profileId": profile["id"], "xrayLocalPort": 28401,
+            }, 200)
+    finally:
+        owner.close()
+
+    guard = runpy.run_path(str(suite["NODE"] / "deploy/xmesh-policy-guard-base.py"))
+    public = subprocess.check_output([
+        "openssl", "pkey", "-pubin", "-in", os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"], "-outform", "DER",
+    ], timeout=5)
+    for agent in agents:
+        state = agent.root / "policy"
+        state.mkdir(mode=0o700)
+        document = json.loads(agent.request(DESIRED_PATH, {
+            "node_id": agent.node, "quotaProtocolVersion": 2, "quotaLocalCounters": [],
+        }))
+        assert document["policyPublicKey"] == public[-32:].hex()
+        policy = guard["verify_envelope"](document, state, agent.node, first_contact=True)
+        assert policy["version"] == 1
+        assert any(row["userId"] == user["id"] for row in policy["users"])
+    print("Both activated Agent identities received and verified their own Nexus-signed policy over strict XSP/2.")
 
 
 def main():
@@ -193,6 +255,7 @@ def main():
                 ).fetchall()
                 assert rows == [(2,), (4,)], rows
             print("Two activated 6.0.25 agents stored and recovered independent WAL through strict XSP/2.")
+            provision_signed_policies(agents)
             if binary:
                 victim = agents[0]
                 victim.local.crash()
