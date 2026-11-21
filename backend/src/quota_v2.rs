@@ -1340,7 +1340,7 @@ async fn lease_identity(
     Ok((meter, uuid::Uuid::new_v4().to_string(), false))
 }
 
-async fn issue_user(
+pub(crate) async fn issue_user(
     conn: &mut sqlx::PgConnection,
     user: &mut Value,
     user_id: i64,
