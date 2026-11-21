@@ -203,6 +203,78 @@ class StagingAdmissionPreflight(unittest.TestCase):
         self.assertEqual(preflights,1)
         self.assertEqual(account,(0,0))
 
+    def test_competing_allocator_ack_cannot_turn_stale_preflight_into_new_grant(self):
+        # Transactional stress: the existing real allocator acknowledges
+        # bytes and bumps a lease revision while a preflight attempts to
+        # snapshot the *old* revision. Whichever acquires the account lock
+        # first, no replay can mint capacity and no stale revision can be
+        # accepted AFTER the allocator commits.
+        import threading
+        barrier=threading.Barrier(2)
+        def writer():
+            barrier.wait(timeout=15)
+            with psycopg.connect(DSN) as c:
+                return c.execute(
+                    "SELECT revision,acknowledged_bytes,ceiling_bytes "
+                    "FROM quota_v2_reserve("
+                    "%s,%s,%s,%s,%s,700,100,NOW()+INTERVAL '1 hour')",
+                    (self.user,self.epoch,self.node_a,self.meters[self.node_a],
+                     self.ids[self.node_a])).fetchone()
+        def reader():
+            barrier.wait(timeout=15)
+            try:
+                return self.snapshot(challenge=h("7"))
+            except psycopg.Error:
+                return None
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            w=pool.submit(writer)
+            r=pool.submit(reader)
+            updated=w.result(timeout=30)
+            attempted=r.result(timeout=30)
+        self.assertEqual((updated[1],updated[2]),(100,700))
+        self.assertEqual(updated[0],self.rev[self.node_a]+1)
+        if attempted is not None:
+            self.assertEqual(attempted[8],0)
+            self.assertEqual(attempted[9:12],(False,False,False))
+            self.assertEqual(attempted[2],self.rev[self.node_a])
+        self.deny(challenge=h("8"))
+        live=self.snapshot(challenge=h("9"),revision=updated[0],wal_floor=100)
+        self.assertEqual(live[6:8],(100,700))
+        self.assertEqual(live[8],0)
+        with psycopg.connect(DSN) as c:
+            settled,held=c.execute(
+                "SELECT a.settled_bytes,COALESCE(SUM("
+                "r.ceiling_bytes-r.acknowledged_bytes),0)::BIGINT "
+                "FROM quota_v2_accounts AS a JOIN quota_v2_reservations AS r "
+                "USING(user_id,epoch) WHERE a.user_id=%s "
+                "GROUP BY a.settled_bytes",(self.user,)).fetchone()
+        self.assertEqual((settled,held),(100,900))
+
+    def test_invalid_database_overcommit_never_gets_signed_candidate_snapshot(self):
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_accounts SET limit_bytes=800 "
+                      "WHERE user_id=%s AND epoch=%s",(self.user,self.epoch))
+        self.deny()
+        with psycopg.connect(DSN) as c:
+            recorded=c.execute(
+                "SELECT COUNT(*) FROM quota_v2_runtime_admission_preflights "
+                "WHERE user_id=%s",(self.user,)).fetchone()[0]
+        self.assertEqual(recorded,0)
+
+    def test_expired_preparation_and_deleted_genesis_never_authorize(self):
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_xray_genesis SET "
+                      "prepared_ms=(EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT-121000 "
+                      "WHERE node_id=%s",(self.node_a,))
+        self.deny()
+        # The Xray genesis row is protected against deletion even by an SQL
+        # owner; a missing preparation can never appear as first activation.
+        with psycopg.connect(DSN) as c:
+            with self.assertRaises(psycopg.Error):
+                with c.transaction():
+                    c.execute("DELETE FROM quota_v2_xray_genesis WHERE node_id=%s",
+                              (self.node_a,))
+
     def test_immutable_evidence_and_public_execute_denied(self):
         self.snapshot()
         with psycopg.connect(DSN) as c:
