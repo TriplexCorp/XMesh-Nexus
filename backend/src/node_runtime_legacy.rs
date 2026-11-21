@@ -2354,6 +2354,51 @@ fn first_genesis_cap_aliases(
     Ok(aliases)
 }
 
+// The rehearsal has only a shared global reservation ledger. Never
+// translate independent Node/CDN quotas into a global bootstrap allowance.
+fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_cdn: bool) -> bool {
+    if !matches!(crate::node_user_quotas::rule_for(user, node_id), Ok(None)) {
+        return false;
+    }
+    if has_cdn {
+        match user.get("cdnLimitGb") {
+            None => {}
+            Some(value) if value.as_f64() == Some(0.0) => {}
+            _ => return false,
+        }
+    }
+    user.get("limit").and_then(Value::as_f64)
+        .is_some_and(|limit| limit.is_finite() && crate::gb_to_bytes_i64(limit) > 0)
+}
+
+#[cfg(test)]
+mod first_genesis_rehearsal_limit_tests {
+    use super::first_genesis_rehearsal_limits_supported as supported;
+    use serde_json::json;
+
+    #[test]
+    fn independent_quotas_are_not_global_bootstrap_bytes() {
+        assert!(supported(&json!({"limit":0.001572864}),47,true));
+        assert!(!supported(&json!({"limit":0}),47,false));
+        for period in ["daily","weekly","monthly","lifetime"] {
+            let limited = json!({"limit":2,
+                "nodeTrafficLimits":{"47":{"limitGb":0.000000001,"period":period}}});
+            assert!(!supported(&limited,47,false));
+            assert!(!supported(&limited,47,true));
+            assert!(supported(&limited,48,false));
+        }
+        for malformed in [json!(null),json!([]),json!({"47":{"limitGb":0}})] {
+            assert!(!supported(&json!({"limit":2,"nodeTrafficLimits":malformed}),47,false));
+        }
+        for cap in [json!(0.000000001),json!(1),json!("1"),json!(null),json!(-1)] {
+            let limited = json!({"limit":2,"cdnLimitGb":cap});
+            assert!(!supported(&limited,47,true));
+            assert!(supported(&limited,47,false));
+        }
+        assert!(supported(&json!({"limit":2,"cdnLimitGb":0}),47,true));
+    }
+}
+
 /// Future issuer prerequisite, NOT positive authority. Refuses profile
 /// changes, policy key rotation, invalid original signatures and unknown
 /// users instead of building synthetic xmesh-u101 test aliases.
@@ -2432,6 +2477,14 @@ pub async fn original_first_genesis_cap_scope(
         if cdn_tags.contains(tag) != (alias.class == "cdn") {
             return Err(cap_policy_denied());
         }
+    }
+    let current_user = compiled.users.iter()
+        .find(|user| user["id"].as_i64() == Some(user_id))
+        .ok_or_else(cap_policy_denied)?;
+    if !first_genesis_rehearsal_limits_supported(
+        current_user, node_id, aliases.iter().any(|a| a.class == "cdn"),
+    ) {
+        return Err(cap_policy_denied());
     }
     Ok(FirstGenesisCapPolicyScope {
         policy_sha256: sha,
