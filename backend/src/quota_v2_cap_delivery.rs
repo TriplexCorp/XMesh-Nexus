@@ -78,6 +78,26 @@ pub async fn handle(
     ).await?;
     let key = state.node_policy_signer.public_key();
     let mut tx = state.pool.begin().await?;
+    // Match ensure_account: the per-user advisory lock precedes the
+    // user record and accounting rows. A changed plan cannot be serviced
+    // from a stale outbox just because the Xray config hash is unchanged.
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(req.user_id ^ 0x51_4D_45_53_48_i64)
+        .execute(&mut *tx)
+        .await?;
+    let current_user: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
+    )
+    .bind(req.user_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(deny)?;
+    let has_cdn = scope.aliases.iter().any(|alias| alias.class == "cdn");
+    if !crate::node_runtime::first_genesis_rehearsal_limits_supported(
+        &current_user, req.node_id, has_cdn,
+    ) {
+        return Err(deny());
+    }
     // Account first, as in every reserve/settle/revoke writer.
     let account: Option<(String, i64, i64)> = sqlx::query_as(
         "SELECT epoch::text,limit_bytes,GREATEST(settled_bytes,observed_floor_bytes)
@@ -87,6 +107,13 @@ pub async fn handle(
     .fetch_optional(&mut *tx)
     .await?;
     let (epoch, limit, floor) = account.ok_or_else(deny)?;
+    let now: i64 = sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+        .fetch_one(&mut *tx).await?;
+    if !crate::user_can_connect(&current_user, now)
+        || current_user["limit"].as_f64().map(crate::gb_to_bytes_i64) != Some(limit)
+    {
+        return Err(deny());
+    }
     let held: i64 = sqlx::query_scalar(
         "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::numeric-
                  GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::bigint
@@ -186,6 +213,7 @@ pub async fn handle(
         || p["reservationRevision"] != revision
         || p["sharedCeilingBytes"] != ceiling
         || p["nodeCeilingBytes"] != ceiling
+        || p["cdnCeilingBytes"] != if has_cdn { ceiling } else { 0 }
         || p["installBeforeMs"] != install || p["validUntilMs"] != expires
         || p["aliasScopes"] != json!(aliases)
         || p["witnessedWalBytes"] != 0 || p["witnessedCdnBytes"] != 0
