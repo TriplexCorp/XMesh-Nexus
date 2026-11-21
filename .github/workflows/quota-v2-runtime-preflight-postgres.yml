@@ -5,6 +5,8 @@ on:
       - 'backend/migrations/0138_quota_v2_runtime_preflight_ledger.sql'
       - 'backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql'
       - 'backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql'
+      - 'backend/migrations/0141_quota_v2_genesis_quarantine_policy.sql'
+      - 'scripts/test-quota-v2-genesis-quarantine-postgres.py'
       - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
       - 'scripts/test-quota-v2-runtime-preflight-postgres.py'
       - '.github/workflows/quota-v2-runtime-preflight-postgres.yml'
@@ -52,6 +54,16 @@ jobs:
                     receipt_sha256 BYTEA
                   )
               """)
+              # Disposable shadows of earlier production v1/WAL tables.
+              # Their mere presence is what the REAL 0141 history guard
+              # checks; never stub a quota reserve or signed-cap allocator.
+              for historical in (
+                  "node_desired_revisions",
+                  "quota_v2_external_wal_birth_anchors",
+                  "user_node_quota_lifetime",
+                  "verified_traffic_deltas",
+              ):
+                  c.execute("CREATE TABLE "+historical+" (node_id BIGINT)")
               for path in (
                   "backend/migrations/0125_quota_v2_reservations.sql",
                   "backend/migrations/0126_quota_v2_revocation_requests.sql",
@@ -61,6 +73,7 @@ jobs:
                   "backend/migrations/0138_quota_v2_runtime_preflight_ledger.sql",
                   "backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql",
                   "backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql",
+                  "backend/migrations/0141_quota_v2_genesis_quarantine_policy.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
@@ -72,3 +85,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/test-quota-v2-signed-cap-outbox-postgres.py
           python3 scripts/test-quota-v2-signed-cap-outbox-postgres.py -v
+      - name: Strict first-genesis quarantined policy never grants traffic or clears historical evidence
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-genesis-quarantine-postgres.py
+          python3 scripts/test-quota-v2-genesis-quarantine-postgres.py -v
