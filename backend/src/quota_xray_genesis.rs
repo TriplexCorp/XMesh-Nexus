@@ -163,15 +163,42 @@ pub async fn record_creation(conn: &mut PgConnection, node_id: i64) -> Result<()
 }
 
 pub async fn close_for_policy(pool: &PgPool, node_id: i64) -> Result<(), ApiError> {
-    // Run even with the gate off. A temporarily disabled staging feature must
-    // not forget that the ordinary policy path served this installation.
+    // Permanently close Genesis for normal desired-config as before.
+    // Serialize with the special zero-spend stage: whichever path acquires
+    // the Genesis row lock first wins. Once a quarantined policy exists,
+    // a LEGACY desired-config must not re-enable offline budgets while the
+    // installed Xray awaits a separately proven positive admission.
+    let mut tx = pool.begin().await?;
+    let used: Option<bool> = sqlx::query_scalar(
+        "SELECT policy_path_used FROM quota_v2_xray_genesis
+          WHERE node_id=$1 FOR UPDATE",
+    )
+    .bind(node_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if used == Some(false) {
+        let quarantined: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM quota_v2_genesis_quarantine_policies
+             WHERE node_id=$1)",
+        )
+        .bind(node_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if quarantined {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Node has a quarantined first-genesis policy: ordinary desired-config cannot activate it.",
+            ));
+        }
+    }
     sqlx::query(
         "UPDATE quota_v2_xray_genesis SET policy_path_used=TRUE
          WHERE node_id=$1 AND NOT policy_path_used",
     )
     .bind(node_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+    tx.commit().await?;
     Ok(())
 }
 
