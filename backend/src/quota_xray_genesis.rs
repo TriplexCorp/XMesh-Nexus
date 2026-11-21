@@ -121,6 +121,8 @@ pub async fn prepare(
     let history: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM quota_v2_external_wal_birth_anchors WHERE node_id=$1)
              OR EXISTS(SELECT 1 FROM quota_v2_reservations WHERE node_id=$1)
+             OR EXISTS(SELECT 1 FROM user_node_quota_lifetime WHERE node_id=$1)
+             OR EXISTS(SELECT 1 FROM verified_traffic_deltas WHERE node_id=$1)
              OR EXISTS(SELECT 1 FROM node_desired_revisions WHERE node_id=$1)",
     )
     .bind(node_id)

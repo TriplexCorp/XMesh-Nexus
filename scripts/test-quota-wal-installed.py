@@ -268,6 +268,22 @@ def try_genesis(guests, db, root, panel):
     return fresh, winner, receipt
 
 
+def restart_postgres(stack, dsn, db):
+    container = os.environ["XMESH_WAL_POSTGRES_CONTAINER"]
+    assert re.fullmatch("[0-9a-f]{64}", container)
+    assert docker("inspect", "--format", "{{.Config.Image}}", container).strip() == b"timescale/timescaledb:2.30.0-pg18"
+    db.close()
+    docker("restart", "--timeout", "15", container, timeout=45)
+
+    def connect():
+        try:
+            return psycopg.connect(dsn, autocommit=True, connect_timeout=3)
+        except psycopg.OperationalError:
+            return None
+
+    return stack.enter_context(wait_for(connect, timeout=20, label="restarted disposable PostgreSQL"))
+
+
 def main():
     assert os.environ.get("GITHUB_ACTIONS") == "true"
     assert os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
@@ -351,6 +367,10 @@ def main():
         print("Installed metrics reached PostgreSQL. The staged reconciler refused to start a cold Xray on either guest.")
 
         fresh, original, receipt = try_genesis(guests, db, root, panel)
+        db = restart_postgres(stack, dsn, db)
+        wait_for(lambda: db.execute(
+            "SELECT prepared_ms FROM quota_v2_xray_genesis WHERE node_id=%s", (fresh.node,),
+        ).fetchone() == (receipt["payload"]["preparedAtMs"],), label="committed genesis after PostgreSQL restart")
         for guest, _ in guests:
             before = {peer.node: samples(peer.node) for peer, _ in guests}
             guest.restart()
@@ -366,7 +386,7 @@ def main():
         })[0] == 200
         assert fresh.request(WAL_PATH, original)[0] == 409
         fresh.check_quarantine()
-        print("The exact receipt survived guest restarts. Issuing an ordinary signed policy closed genesis permanently.")
+        print("The exact receipt survived PostgreSQL and guest restarts. An ordinary signed policy closed genesis permanently.")
 
 
 if __name__ == "__main__":
