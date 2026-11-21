@@ -16,6 +16,7 @@ import re
 import runpy
 import secrets
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -28,6 +29,10 @@ from quota_wal_real_xray import MeteredXray
 
 STATE_ROOT = "/var/lib/xmesh-agent"
 DESIRED_PATH = "/api/v1/node/desired-config"
+
+
+class GatewayUnavailable(Exception):
+    pass
 
 
 class Agent:
@@ -64,12 +69,18 @@ class Agent:
         self.drop_ack = False
 
     def run(self, *args):
-        return subprocess.check_output([
+        response = subprocess.run([
             "sudo", "unshare", "--mount", "--propagation", "private", "bash", "-ec",
             'mount --bind "$1" /var/lib/xmesh-agent; shift; exec "$@"',
             "wal-test", self.state, "env", f"SSL_CERT_FILE={self.ca}",
             os.environ["XMESH_WAL_PRODUCT_AGENT"], *args,
-        ], timeout=45)
+        ], capture_output=True, timeout=45)
+        if response.returncode:
+            if response.stderr.strip() == b"strict-PQ request failed: strict-PQ tunnel rejected: HTTP 503":
+                raise GatewayUnavailable("strict XSP/2 gateway temporarily unavailable")
+            sys.stderr.buffer.write(response.stderr)
+            response.check_returncode()
+        return response.stdout
 
     def post(self, body):
         self.sent.append(body["operation"])
@@ -168,7 +179,7 @@ def provision_signed_policies(agents):
     print("Both activated Agent identities received and verified their own Nexus-signed policy over strict XSP/2.")
 
 
-def restart_disposable_database(database):
+def restart_disposable_database(database, agent):
     container = os.environ["XMESH_WAL_POSTGRES_CONTAINER"]
     assert re.fullmatch(r"[0-9a-f]{64}", container)
     image = subprocess.check_output([
@@ -176,7 +187,17 @@ def restart_disposable_database(database):
     ], text=True, timeout=10).strip()
     assert image == "timescale/timescaledb:2.30.0-pg18", image
     database.close()
-    subprocess.run(["docker", "restart", "--time", "10", container], check=True, timeout=30)
+    subprocess.run(["docker", "stop", "--timeout", "10", container], check=True, timeout=30)
+    try:
+        agent.sent.clear()
+        try:
+            agent.sync("head")
+        except GatewayUnavailable:
+            assert agent.sent == ["head"]
+        else:
+            raise AssertionError("WAL gateway answered after PostgreSQL stopped")
+    finally:
+        subprocess.run(["docker", "start", container], check=True, timeout=30)
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         try:
@@ -184,6 +205,21 @@ def restart_disposable_database(database):
         except psycopg.OperationalError:
             time.sleep(0.2)
     raise RuntimeError("disposable PostgreSQL failed to become ready after restart")
+
+
+def recover_wal_head(agent, retry_unavailable):
+    deadline = time.monotonic() + 20
+    while True:
+        agent.sent.clear()
+        try:
+            agent.sync("sync")
+            assert agent.sent == ["head"]
+            return
+        except GatewayUnavailable:
+            if not retry_unavailable or time.monotonic() >= deadline:
+                raise
+            assert agent.sent == ["head"]
+            time.sleep(0.2)
 
 
 def reject_missing_history(agent):
@@ -285,12 +321,10 @@ def main():
                     raise AssertionError("the first committed response was not discarded")
                 assert not second.result()["firstRemoteSnapshotWasOnlyBootstrap"]
             if binary:
-                database = stack.enter_context(restart_disposable_database(database))
+                database = stack.enter_context(restart_disposable_database(database, agents[0]))
             for agent in agents:
-                agent.sent.clear()
                 agent.run("verify-active", "--panel", panel, "--node-id", str(agent.node))
-                agent.sync("sync")
-                assert agent.sent == ["head"]
+                recover_wal_head(agent, retry_unavailable=bool(binary))
                 rows = database.execute(
                     "SELECT inventory_sequence FROM quota_v2_external_wal_birth_anchors "
                     "WHERE node_id=%s ORDER BY inventory_sequence", (agent.node,),

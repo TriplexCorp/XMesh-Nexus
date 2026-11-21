@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -962,7 +963,11 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	n, err := g.loadNode(ctx, parsed.Env.NodeID)
-	if err != nil || n.State != "active" {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		fail(w, http.StatusServiceUnavailable, "strict-PQ node identity store unavailable")
+		return
+	}
+	if errors.Is(err, pgx.ErrNoRows) || n.State != "active" {
 		fail(w, http.StatusForbidden, "strict-PQ node is not active")
 		return
 	}
@@ -1004,7 +1009,12 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err = tx.Exec(ctx, "INSERT INTO node_xsp_product_nonces(node_id,key_epoch,direction,nonce,request_id) VALUES($1,$2,1,$3,$4)", parsed.Env.NodeID, parsed.Env.KeyEpoch, nonce, parsed.Env.RequestID); err != nil {
 		_ = tx.Rollback(ctx)
-		fail(w, http.StatusConflict, "strict-PQ tunnel replay rejected")
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			fail(w, http.StatusConflict, "strict-PQ tunnel replay rejected")
+		} else {
+			fail(w, http.StatusServiceUnavailable, "strict-PQ replay state unavailable")
+		}
 		return
 	}
 	if err = tx.Commit(ctx); err != nil {
