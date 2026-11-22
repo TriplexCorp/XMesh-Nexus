@@ -366,10 +366,22 @@ pub async fn handle(
     // owner's newly configured per-Node quota. The CURRENT locked user
     // record is authoritative for any positive reservation budget.
     let mut selected = selected;
-    if let Some(rule) = current_user.get("nodeTrafficLimits") {
-        selected["nodeTrafficLimits"] = rule.clone();
-    } else if let Some(map) = selected.as_object_mut() {
-        map.remove("nodeTrafficLimits");
+    for field in ["nodeTrafficLimits", "cdnLimitGb"] {
+        if let Some(value) = current_user.get(field) {
+            selected[field] = value.clone();
+        } else if let Some(map) = selected.as_object_mut() {
+            map.remove(field);
+        }
+    }
+    let inbound_class = if verified.aliases.iter().all(|alias| alias.class == "cdn") {
+        "cdn"
+    } else if verified.aliases.iter().all(|alias| alias.class == "main") {
+        "main"
+    } else {
+        "mixed"
+    };
+    if !crate::quota_v2_cdn_lifetime::supported(&current_user, inbound_class) {
+        return Err(deny());
     }
     let public = state.node_policy_signer.public_key();
     let prepared = saved_reply(&mut tx, &state, &req, "prepare").await?;
@@ -399,7 +411,8 @@ pub async fn handle(
         }
     }
 
-    let reservation = issue_zero_authority_lease(&mut tx, &req, selected, now_ms).await?;
+    let reservation =
+        issue_zero_authority_lease(&mut tx, &req, selected, now_ms, inbound_class).await?;
     let reservation = &reservation;
     recheck_lease(&mut tx, &req, reservation).await?;
     recheck_genesis(&mut tx, &req, activation, &public).await?;
@@ -444,6 +457,7 @@ async fn issue_zero_authority_lease(
     req: &Request,
     mut user: Value,
     now_ms: i64,
+    inbound_class: &str,
 ) -> Result<Value, ApiError> {
     // Clone the exact original user policy. No other desired-config route
     // is invoked, and the immutable signed quarantine stays zero-spend.
@@ -464,6 +478,7 @@ async fn issue_zero_authority_lease(
         req.node_id,
         local.as_ref(),
         now_ms,
+        inbound_class,
     )
     .await?;
     let reservation = &user["quotaReservation"];
