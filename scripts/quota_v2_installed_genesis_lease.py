@@ -273,9 +273,17 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert baseline == (0,), ("Node lifetime baseline missing",baseline)
     assert {row[0]:row[2] for row in rows}[guest_b.node] == cdn_pool_lifetime, (
         "Shared lifetime CDN pool not enforced",rows)
-    assert db.execute(
-        "SELECT baseline_bytes FROM quota_v2_cdn_lifetime_baselines WHERE user_id=%s",
-        (uid,)).fetchone() == (0,)
+    if monthly_cdn:
+        bindings = db.execute(
+            "SELECT r.node_id,b.period,b.calendar_window @> statement_timestamp(),"
+            "r.valid_until <= upper(b.calendar_window) FROM quota_v2_reservations r "
+            "JOIN quota_v2_cdn_calendar_bindings b USING(reservation_id) "
+            "WHERE r.user_id=%s", (uid,)).fetchall()
+        assert bindings == [(guest_b.node, "monthly", True, True)], bindings
+    else:
+        assert db.execute(
+            "SELECT baseline_bytes FROM quota_v2_cdn_lifetime_baselines WHERE user_id=%s",
+            (uid,)).fetchone() == (0,)
     assert dict(db.execute(
         "SELECT node_id,class FROM quota_v2_reservation_classes "
         "WHERE user_id=%s",(uid,)).fetchall()) == {
