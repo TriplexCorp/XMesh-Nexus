@@ -67,10 +67,14 @@ fn verified_saved(
     let p = &doc["payload"];
     if serde_json::to_vec(&doc).map_err(|_| deny())? != raw
         || doc["algorithm"] != "Ed25519"
-        || doc["signature"].as_str() != Some(
-            state.node_policy_signer.sign_domain(DOMAIN, p)
-                .map_err(|_| deny())?.as_str()
-        )
+        || doc["signature"].as_str()
+            != Some(
+                state
+                    .node_policy_signer
+                    .sign_domain(DOMAIN, p)
+                    .map_err(|_| deny())?
+                    .as_str(),
+            )
         || p["schemaVersion"] != 1
         || p["kind"] != "xmesh.quota-v2.calendar-successor-prepared"
         || p["nodeId"] != req.node_id
@@ -135,9 +139,14 @@ async fn original_predecessor(
            AND c.observed_at >= c.boundary_at
            AND NOT EXISTS (SELECT 1 FROM quota_v2_revocation_requests v
               WHERE v.reservation_id=r.reservation_id)
-         FOR SHARE OF r,c,q,p,k,n"
+         FOR SHARE OF r,c,q,p,k,n",
     )
-    .bind(&req.calendar_successor.as_ref().ok_or_else(deny)?.predecessor_id)
+    .bind(
+        &req.calendar_successor
+            .as_ref()
+            .ok_or_else(deny)?
+            .predecessor_id,
+    )
     .bind(req.node_id)
     .bind(req.user_id)
     .bind(activation)
@@ -156,17 +165,19 @@ pub(super) async fn prepare(
 ) -> Result<String, ApiError> {
     if !canonical_predecessor(&fields.predecessor_id)
         || req.challenge != expected_challenge(&fields.predecessor_id)
-        || req.measurement.is_some() || req.renewal.is_some()
+        || req.measurement.is_some()
+        || req.renewal.is_some()
     {
         return Err(deny());
     }
     let mut tx = state.pool.begin().await?;
     lock_signed_user(&mut tx, req.user_id)
-        .await?.ok_or_else(deny)?;
+        .await?
+        .ok_or_else(deny)?;
     let (_open_epoch, _limit, _floor) = lock_open_account(&mut tx, req.user_id).await?;
     let earlier_epoch: String = sqlx::query_scalar(
         "SELECT epoch::text FROM quota_v2_reservations
-         WHERE reservation_id=$1::uuid AND node_id=$2 AND user_id=$3"
+         WHERE reservation_id=$1::uuid AND node_id=$2 AND user_id=$3",
     )
     .bind(&fields.predecessor_id)
     .bind(req.node_id)
@@ -183,13 +194,11 @@ pub(super) async fn prepare(
     tx.commit().await?;
     let mut tx = state.pool.begin().await?;
     let current_user = lock_signed_user(&mut tx, req.user_id)
-        .await?.ok_or_else(deny)?;
-    let (open_epoch, _limit, _floor) =
-        lock_open_account(&mut tx, req.user_id).await?;
+        .await?
+        .ok_or_else(deny)?;
+    let (open_epoch, _limit, _floor) = lock_open_account(&mut tx, req.user_id).await?;
     let now = database_now_ms(&mut tx).await?;
-    if !crate::node_runtime::first_genesis_active_until(
-        &current_user, now, now.saturating_add(1)
-    ) {
+    if !crate::node_runtime::first_genesis_active_until(&current_user, now, now.saturating_add(1)) {
         return Err(deny());
     }
     let signer = state.node_policy_signer.public_key();
@@ -210,7 +219,7 @@ pub(super) async fn prepare(
                 candidate_reservation_id::text AS candidate_reservation_id,
                 issued_at_ms,valid_until_ms
          FROM quota_v2_calendar_successor_preparations
-         WHERE predecessor_id=$1::uuid FOR SHARE"
+         WHERE predecessor_id=$1::uuid FOR SHARE",
     )
     .bind(&fields.predecessor_id)
     .fetch_optional(&mut *tx)
@@ -223,10 +232,13 @@ pub(super) async fn prepare(
         let account_epoch: String = row.try_get("account_epoch")?;
         let runtime: String = row.try_get("predecessor_runtime_id")?;
         let policy: String = row.try_get("policy_sha256")?;
-        if node != req.node_id || user != req.user_id
-            || challenge != req.challenge || public != signer
+        if node != req.node_id
+            || user != req.user_id
+            || challenge != req.challenge
+            || public != signer
             || account_epoch != old.account_epoch
-            || runtime != old.predecessor_runtime_id || policy != old.policy_sha256
+            || runtime != old.predecessor_runtime_id
+            || policy != old.policy_sha256
         {
             return Err(deny());
         }
@@ -270,11 +282,14 @@ pub(super) async fn prepare(
         "canResume": false, "finalMeterVerified": false,
         "refundableBytes": 0
     });
-    let signature = state.node_policy_signer
-        .sign_domain(DOMAIN, &payload).map_err(|_| deny())?;
+    let signature = state
+        .node_policy_signer
+        .sign_domain(DOMAIN, &payload)
+        .map_err(|_| deny())?;
     let exact = serde_json::to_string(&json!({
         "algorithm": "Ed25519", "payload": payload, "signature": signature
-    })).map_err(|_| deny())?;
+    }))
+    .map_err(|_| deny())?;
     if exact.len() > 8192 {
         return Err(deny());
     }
@@ -284,7 +299,7 @@ pub(super) async fn prepare(
           account_epoch,predecessor_runtime_id,policy_sha256,
           candidate_meter_epoch,candidate_reservation_id,
           issued_at_ms,valid_until_ms,signed_envelope)
-         VALUES($1::uuid,$2,$3,$4,$5,$6::uuid,$7,$8,$9::uuid,$10::uuid,$11,$12,$13)"
+         VALUES($1::uuid,$2,$3,$4,$5,$6::uuid,$7,$8,$9::uuid,$10::uuid,$11,$12,$13)",
     )
     .bind(&fields.predecessor_id)
     .bind(req.node_id)
@@ -317,10 +332,16 @@ mod tests {
             expected_challenge(original),
             "f349433b9bd3422baecb87c6b2ef6003a9e9f16650428b8783e5e3a7a79c64da"
         );
-        assert!(!canonical_predecessor("11111111-1111-4111-8111-11111111111Z"));
-        assert!(!canonical_predecessor("11111111-1111-4111-8111-111111111111 "));
-        assert_ne!(expected_challenge(original), expected_challenge(
-            "22222222-2222-4222-8222-222222222222"));
+        assert!(!canonical_predecessor(
+            "11111111-1111-4111-8111-11111111111Z"
+        ));
+        assert!(!canonical_predecessor(
+            "11111111-1111-4111-8111-111111111111 "
+        ));
+        assert_ne!(
+            expected_challenge(original),
+            expected_challenge("22222222-2222-4222-8222-222222222222")
+        );
     }
 
     #[test]
@@ -329,9 +350,15 @@ mod tests {
         // Historical bytes replay after a lost COMMIT response, but no
         // future-dated, pre-boundary or overlong preparation is accepted.
         let valid = json!({"issuedAtMs":120_000,"validUntilMs":240_000});
-        assert!(valid_archived_preparation_lifetime(&valid, 119_999, 300_000));
-        assert!(!valid_archived_preparation_lifetime(&valid, 120_001, 300_000));
-        assert!(!valid_archived_preparation_lifetime(&valid, 119_999, 119_999));
+        assert!(valid_archived_preparation_lifetime(
+            &valid, 119_999, 300_000
+        ));
+        assert!(!valid_archived_preparation_lifetime(
+            &valid, 120_001, 300_000
+        ));
+        assert!(!valid_archived_preparation_lifetime(
+            &valid, 119_999, 119_999
+        ));
         for invalid in [
             json!({"issuedAtMs":120_000,"validUntilMs":120_000}),
             json!({"issuedAtMs":120_000,"validUntilMs":119_999}),
@@ -339,7 +366,9 @@ mod tests {
             json!({"issuedAtMs":120_000.5,"validUntilMs":240_000}),
             json!({"issuedAtMs":120_000,"validUntilMs":"240000"}),
         ] {
-            assert!(!valid_archived_preparation_lifetime(&invalid, 119_999, 300_000));
+            assert!(!valid_archived_preparation_lifetime(
+                &invalid, 119_999, 300_000
+            ));
         }
     }
 }
