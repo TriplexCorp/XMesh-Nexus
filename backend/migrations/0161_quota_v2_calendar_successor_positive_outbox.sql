@@ -25,6 +25,8 @@ CREATE TABLE quota_v2_calendar_successor_positive_caps (
     install_before_ms BIGINT NOT NULL,
     valid_until_ms BIGINT NOT NULL,
     signed_envelope BYTEA NOT NULL CHECK(octet_length(signed_envelope) BETWEEN 100 AND 8192),
+    fresh_genesis_envelope BYTEA NOT NULL
+        CHECK(octet_length(fresh_genesis_envelope) BETWEEN 100 AND 4096),
     can_start BOOLEAN NOT NULL DEFAULT FALSE CHECK(NOT can_start),
     can_resume BOOLEAN NOT NULL DEFAULT FALSE CHECK(NOT can_resume),
     final_meter_verified BOOLEAN NOT NULL DEFAULT FALSE CHECK(NOT final_meter_verified),
@@ -50,6 +52,8 @@ DECLARE
     account quota_v2_accounts%ROWTYPE;
     doc JSONB;
     payload JSONB;
+    fresh_doc JSONB;
+    fresh_payload JSONB;
     held NUMERIC;
 BEGIN
     SELECT * INTO STRICT pre FROM quota_v2_calendar_successor_meter_preflights
@@ -125,6 +129,8 @@ BEGIN
     BEGIN
         doc := convert_from(NEW.signed_envelope,'UTF8')::JSONB;
         payload := doc->'payload';
+        fresh_doc := convert_from(NEW.fresh_genesis_envelope,'UTF8')::JSONB;
+        fresh_payload := fresh_doc->'payload';
     EXCEPTION WHEN OTHERS THEN
         RAISE EXCEPTION 'invalid successor cap envelope JSON' USING ERRCODE='23514';
     END;
@@ -160,9 +166,65 @@ BEGIN
         RAISE EXCEPTION 'signed successor bytes differ from immutable PostgreSQL funded reservation'
             USING ERRCODE='23514';
     END IF;
+    IF jsonb_typeof(fresh_doc)<>'object' OR
+       (SELECT count(*) FROM jsonb_object_keys(fresh_doc))<>3 OR
+       fresh_doc->>'algorithm'<>'Ed25519' OR
+       fresh_doc->>'signature' !~ '^[0-9a-f]{128}
+BEFORE INSERT ON quota_v2_calendar_successor_positive_caps
+FOR EACH ROW EXECUTE FUNCTION quota_v2_guard_successor_positive_cap();
+
+-- Zero-byte preparation remains non-authorizing. If an application ever
+-- inserts a candidate reservation by itself, it MUST atomically commit the
+-- corresponding exact signed positive outbox or the whole tx rolls back.
+CREATE FUNCTION quota_v2_require_successor_outbox_on_commit()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS (
+      SELECT 1 FROM quota_v2_calendar_successor_preparations p
+      WHERE p.candidate_reservation_id=NEW.reservation_id
+    ) AND NOT EXISTS (
+      SELECT 1 FROM quota_v2_calendar_successor_positive_caps o
+      WHERE o.reservation_id=NEW.reservation_id
+    ) THEN
+      RAISE EXCEPTION 'unfunded or unsigned successor reservation cannot commit'
+        USING ERRCODE='23514';
+    END IF;
     RETURN NEW;
 END
 $$;
+
+CREATE CONSTRAINT TRIGGER quota_v2_successor_must_sign_reservation
+AFTER INSERT OR UPDATE ON quota_v2_reservations
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION quota_v2_require_successor_outbox_on_commit();
+
+REVOKE ALL ON quota_v2_calendar_successor_positive_caps FROM PUBLIC;
+REVOKE ALL ON FUNCTION quota_v2_guard_successor_positive_cap() FROM PUBLIC;
+REVOKE ALL ON FUNCTION quota_v2_require_successor_outbox_on_commit() FROM PUBLIC;
+
+COMMENT ON TABLE quota_v2_calendar_successor_positive_caps IS
+'Exact immutable signed successor cap, atomically paired with fresh-WAL reservation; never releases old WAL debt or refund. Separate authenticated issuer required.';
+ OR
+       jsonb_typeof(fresh_payload)<>'object' OR
+       fresh_payload->>'kind'<>'xmesh.xray.genesis-prepared' OR
+       fresh_payload->>'schemaVersion'<>'1' OR
+       fresh_payload->>'nodeId'<>NEW.node_id::TEXT OR
+       fresh_payload->>'activationReceiptSha256'<>payload->>'activationReceiptSha256' OR
+       fresh_payload->>'candidateRuntimeId'<>NEW.fresh_runtime_id OR
+       fresh_payload->>'challenge'<>NEW.nonce OR
+       fresh_payload->>'preparedAtMs'<>NEW.issued_at_ms::TEXT OR
+       fresh_payload->>'validUntilMs'<>
+            (NEW.issued_at_ms+120000)::TEXT OR
+       fresh_payload->>'authorizedBytes'<>'0' OR
+       fresh_payload->>'canStart'<>'false' OR
+       fresh_payload->>'canResume'<>'false' OR
+       NEW.install_before_ms > NEW.issued_at_ms + 120000 THEN
+       RAISE EXCEPTION 'fresh Xray genesis zero-authority proof differs from signed permit'
+           USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END
+$;
 
 CREATE TRIGGER quota_v2_successor_positive_validate
 BEFORE INSERT ON quota_v2_calendar_successor_positive_caps
