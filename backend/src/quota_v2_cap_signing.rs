@@ -268,6 +268,25 @@ mod tests {
     }
 
     #[test]
+    fn unlimited_sql_budget_never_turns_into_an_unbounded_xray_grant() {
+        let mut snapshot = fixture();
+        snapshot.shared_account_limit = i64::MAX;
+        snapshot.all_node_held = snapshot.ceiling;
+        assert!(validate(&snapshot, 2_010_000).is_ok());
+
+        // The signed cap's physical ceiling remains the original finite
+        // Xray block, NOT i64::MAX from the unlimited SQL account.
+        assert_eq!(snapshot.ceiling, 700);
+        assert_eq!(snapshot.node_ceiling, 700);
+        let mut malicious = snapshot.clone();
+        malicious.ceiling = i64::MAX;
+        malicious.node_ceiling = i64::MAX;
+        malicious.cdn_ceiling = i64::MAX;
+        malicious.all_node_held = i64::MAX;
+        assert!(validate(&malicious, 2_010_000).is_err());
+    }
+
+    #[test]
     fn invalid_signer_input_matrix_fails_closed() {
         type Case = (&'static str, fn(&mut SqlSnapshot));
         let now = 2_010_000;
