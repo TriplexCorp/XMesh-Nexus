@@ -347,6 +347,25 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             "cdnLimitGb":0,
         })
 
+    # Lowering only A's lifetime quota below its already committed grant
+    # must stop fresh delivery on A but not disable the unaffected B cap.
+    owner.request("PATCH",user_path,{
+        "nodeTrafficLimits":{str(guest_a.node):{
+            "limitGb":0.000000001,"period":"lifetime"}},
+        "cdnLimitGb":0,
+    })
+    try:
+        assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==409
+        assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==200
+        assert db.execute("SELECT node_id,request_challenge,signed_envelope "
+            "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id").fetchall()==original_caps
+    finally:
+        owner.request("PATCH",user_path,{
+            "nodeTrafficLimits":{str(guest_a.node):{
+                "limitGb":0.003,"period":"lifetime"}},
+            "cdnLimitGb":0,
+        })
+
     # A signed spending-only cap cannot outlive a shortened subscription.
     # Restore the original expiry only after both fresh deliveries are denied.
     original_expiry=user.get("expireAt",0)
