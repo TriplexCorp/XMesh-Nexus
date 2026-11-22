@@ -144,20 +144,22 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
             db.execute(
                 "PREPARE xmesh_node_cap_guard(bigint,bigint,bigint) AS " + production_sql)
             limit = held + 120_000
-            check = "EXECUTE xmesh_node_cap_guard(%s,%s,%s)"
-            self.assertTrue(db.execute(check,(USER,node,limit)).fetchone()[0])
+            # EXECUTE's arguments are SQL constants, not server-side
+            # parameter placeholders. All values here are fixture integers.
+            check = f"EXECUTE xmesh_node_cap_guard({USER},{node},{limit})"
+            self.assertTrue(db.execute(check).fetchone()[0])
             # This valid newer V1 receipt makes baseline + held look safe,
             # but effective V1 high-water + held exceeds the lifetime plan.
             db.execute(
                 "UPDATE user_node_quota_lifetime SET uplink_bytes=%s "
                 "WHERE user_id=%s AND node_id=%s",(250_000,USER,node))
-            self.assertFalse(db.execute(check,(USER,node,limit)).fetchone()[0])
+            self.assertFalse(db.execute(check).fetchone()[0])
             # More verified cumulative V1 consumption cannot increase
             # available V2 capacity or reactivate a signed stale grant.
             db.execute(
                 "UPDATE user_node_quota_lifetime SET uplink_bytes=%s "
                 "WHERE user_id=%s AND node_id=%s",(300_000,USER,node))
-            self.assertFalse(db.execute(check,(USER,node,limit)).fetchone()[0])
+            self.assertFalse(db.execute(check).fetchone()[0])
 
     def test_immutable_class_scope_and_baseline(self):
         with psycopg.connect(DSN) as db:
