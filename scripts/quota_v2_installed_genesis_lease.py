@@ -535,64 +535,98 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     barrier = MEASURED + "/renewal-" + secrets.token_hex(12)
     half = 256 * 1024
     assert cumulative >= 2 * half
+
+    # Let the actual installed systemd timer perform both renewals. The
+    # controller only changes an owner's plan and observes signed disk and SQL
+    # evidence; no test fixture signs the grant or manually calls Agent helpers.
+    guest_a.exec("systemctl","start","xmesh-quota-v2-renewal.timer")
+    guest_a.exec("systemctl","is-active","--quiet","xmesh-quota-v2-renewal.timer")
+
+    def signed_auto_renewal(revision):
+        target = STATE + f"/genesis-renewal-u{uid}-r{revision}.json"
+        deadline = time.monotonic() + 110
+        while time.monotonic() < deadline:
+            raw = guest_a.exec("bash","-ec",
+                'test ! -s "$1" || cat "$1"', "bash", target, timeout=7)
+            if raw:
+                evidence = json.loads(raw)
+                assert evidence["status"] == "committed_renewal"
+                assert evidence["nodeId"] == guest_a.node and evidence["userId"] == uid
+                return evidence
+            time.sleep(.8)
+        logs = guest_a.exec("journalctl","-u","xmesh-quota-v2-renewal.service",
+                            "-n","70","--no-pager","-o","cat",timeout=15)
+        raise AssertionError(f"installed Agent did not auto-renew revision {revision}: {logs[-6000:]!r}")
+
+    def wait_wal_floor(minimum):
+        deadline = time.monotonic() + 110
+        while time.monotonic() < deadline:
+            saved = db.execute(
+                "SELECT conservative_burn_floor_bytes FROM quota_v2_reservations "
+                "WHERE node_id=%s AND user_id=%s", (guest_a.node,uid)).fetchone()
+            if saved and saved[0] >= minimum:
+                return saved[0]
+            time.sleep(.8)
+        logs = guest_a.exec("journalctl","-u","xmesh-quota-v2-renewal.service",
+                            "-n","70","--no-pager","-o","cat",timeout=15)
+        raise AssertionError(f"staged Agent did not settle real VLESS WAL {minimum}: {logs[-6000:]!r}")
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as live_pool:
         for step, increment in enumerate((2 * half, half)):
             expected_limit += increment
             owner.request("PATCH", user_path, {"limit": expected_limit / 1_000_000_000})
-            request = dict(original_request, requestChallenge=secrets.token_hex(32), renewal={
+            saved = signed_auto_renewal(installed["reservationRevision"] + 1)
+            raw = saved["signedEnvelope"].encode()
+            doc = json.loads(raw)
+            independent_signature(root, f"auto-renewed-{step}", doc, CAP_DOMAIN)
+            new = doc["payload"]
+            # Replay the exact request made autonomously by Agent and prove
+            # that a competing nonce can neither reserve nor deliver bytes.
+            request = dict(original_request, requestChallenge=new["nonce"], renewal={
                 "reservationId": installed["reservationId"],
                 "previousRevision": installed["reservationRevision"],
             })
-            results = parallel(lambda _: guest_a.request(CAP_PATH, request), range(2))
-            status, reply = results[0]
-            assert status == 200 and results[1] == (status, reply), results
-            assert reply["status"] == "committed_renewal"
+            results = parallel(lambda _: guest_a.request(CAP_PATH,request), range(2))
+            assert results == [(200,saved)]*2, results
             if previous_request is not None:
                 assert guest_a.request(CAP_PATH, previous_request)[0] == 409
-            assert guest_a.request(CAP_PATH, dict(request, requestChallenge=secrets.token_hex(32)))[0] == 409
-            raw = reply["signedEnvelope"].encode()
-            doc = json.loads(raw)
-            independent_signature(root, f"renewed-{step}", doc, CAP_DOMAIN)
-            new = doc["payload"]
+            assert guest_a.request(CAP_PATH, dict(
+                request, requestChallenge=secrets.token_hex(32)))[0] == 409
             assert new["reservationRevision"] == installed["reservationRevision"] + 1
             assert new["sharedCeilingBytes"] == installed["sharedCeilingBytes"] + increment
             assert new["validUntilMs"] == installed["validUntilMs"]
             assert new["witnessedWalBytes"] == cumulative
-            command = [*commands[0][:-1], request["requestChallenge"],
-                       "--previous-revision", str(installed["reservationRevision"])]
-            receipt = json.loads(guest_a.exec(*command, timeout=48))
-            saved = guest_a.exec("cat", STATE + f"/genesis-renewal-u{uid}-r{new['reservationRevision']}.json")
-            assert json.loads(saved)["signedEnvelope"].encode() == raw
-            assert receipt == {"runtimeId":measured[3], "grantSha256":hashlib.sha256(raw).hexdigest()}
+            assert new["runtimeId"] == measured[3]
+            assert measure(item) == measured
+            # The signed file is persisted ONLY after the local Unix-socket
+            # peer's receipt from the original process was verified.
             if step == 0:
                 active = live_pool.submit(
                     probe, item, 3 * half, measured, tags[0], cumulative, barrier, half)
                 deadline = time.monotonic() + 30
                 while True:
                     if active.done():
-                        raise AssertionError(f"VLESS ended before the second renewal: {active.result()}")
+                        raise AssertionError(
+                            f"VLESS ended before the second automatic renewal: {active.result()}")
                     if time.monotonic() >= deadline:
-                        raise TimeoutError("VLESS failed to reach the renewal barrier")
+                        raise TimeoutError("VLESS failed to reach the automatic renewal barrier")
                     if guest_a.exec("sh", "-c", 'test -f "$1" && printf ready || true',
                                     "sh", barrier + ".ready") == b"ready":
                         break
                     time.sleep(.15)
                 cumulative += half
             else:
-                assert not active.done(), "VLESS ended before the new cap was applied"
+                assert not active.done(), "VLESS ended before the automatic cap was applied"
                 guest_a.exec("touch", barrier + ".continue")
                 live = active.result(timeout=30)
                 cumulative += 2 * half
                 assert sum(live.values()) == cumulative
-            assert measure(item) == measured
+            # No operator WAL upload: the systemd timer settles newly
+            # fsynced bytes over strict XSP/2 and advances the SQL charge floor.
+            wait_wal_floor(cumulative)
             for path, prior in list(wal_snapshots[0].items()):
                 updated = guest_a.exec("cat", path)
                 assert updated.startswith(prior) and updated != prior
-                batch = charge_request(guest_a, raw, path, updated[len(prior):])
-                status, ack = guest_a.request(WAL_PATH, batch)
-                assert status == 200, ack
-                assert guest_a.request(WAL_PATH, batch) == (200, ack)
-                charges[0].append((batch, ack))
                 wal_snapshots[0][path] = updated
             installed = new
             previous_request = request
@@ -602,7 +636,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     charged_rows = db.execute(charge_sql).fetchall()
     charged_balance = db.execute(balance_sql, (uid,)).fetchone()
     assert charged_balance == (expected_limit, account[2])
-    print("PASS: Nexus signed both renewals; one live VLESS stream crossed its earlier ceiling after the second install.")
+    print("PASS: installed systemd Agent settled WAL and auto-renewed twice via Nexus; one uninterrupted VLESS stream crossed its earlier ceiling.")
 
     # A repeat cannot extend/reinstall the existing positive cap.
     repeated=subprocess.run(["docker","exec",guest_a.name,*commands[0]],
