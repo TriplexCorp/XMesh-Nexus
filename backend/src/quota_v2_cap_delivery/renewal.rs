@@ -181,6 +181,10 @@ pub(super) async fn issue(
         return Err(deny());
     }
     let (epoch, original_limit, floor) = super::lock_open_account(&mut tx, req.user_id).await?;
+    if super::observe_closed_calendars(&mut tx, req.user_id, req.node_id, &epoch).await? {
+        tx.commit().await?;
+        return Err(deny());
+    }
     let lease = lock_lease(&mut tx, req, fields, activation, &scope.policy_sha256).await?;
     if lease.epoch != epoch {
         return Err(deny());

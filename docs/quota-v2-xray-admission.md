@@ -87,6 +87,13 @@ Xray closes idle transports for that permit's user at its monotonic deadline.
 The pre-write and post-fsync checks also reject spending at the signed
 deadline while retaining any intent that already reached durable storage.
 
+A cap request or verified WAL charge can permanently record that the
+earliest bound Node or CDN window ended. That reservation cannot be
+confirmed, renewed, or redelivered after the recorded boundary even if
+the database clock moves backwards. The closure preserves held capacity
+and accepts late WAL for the original reservation. A signed renewal in
+Xray retains the original monotonic expiration.
+
 A periodic V2 reservation needs an immutable accounting epoch and an expiry
 at or before the next applicable UTC boundary. A later period may open only
 after the old spending authority has expired or been fenced. Outstanding

@@ -335,6 +335,15 @@ pub(super) async fn charge(
     let birth = load_anchored_birth(&mut tx, node_id, activation, filename).await?;
     let (is_cdn, cdn_ceiling) =
         cap_cdn_ceiling(state, &cap, &birth, activation, node_id, reservation)?;
+    // Charge transactions may arrive after Xray has stopped at the
+    // boundary. Persist that observation without refusing old debt.
+    crate::quota_v2_cap_delivery::observe_closed_calendars(
+        &mut tx,
+        cap.user_id,
+        node_id,
+        &cap.epoch,
+    )
+    .await?;
     let replay: Option<(Vec<u8>, Vec<u8>)> = sqlx::query_as(
         "SELECT journal,signed_receipt FROM quota_v2_wal_charges
          WHERE reservation_id=$1::uuid AND filename=$2 AND first_sequence=$3",

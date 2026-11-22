@@ -150,6 +150,22 @@ async fn database_now_ms(conn: &mut PgConnection) -> Result<i64, sqlx::Error> {
         .await
 }
 
+pub(crate) async fn observe_closed_calendars(
+    conn: &mut PgConnection,
+    user: i64,
+    node: i64,
+    epoch: &str,
+) -> Result<bool, sqlx::Error> {
+    let created: i64 =
+        sqlx::query_scalar("SELECT quota_v2_observe_calendar_closures($1,$2,$3::uuid)")
+            .bind(user)
+            .bind(node)
+            .bind(epoch)
+            .fetch_one(conn)
+            .await?;
+    Ok(created > 0)
+}
+
 async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<String, ApiError> {
     let scope =
         crate::node_runtime::original_first_genesis_cap_scope(state, req.node_id, req.user_id)
@@ -171,6 +187,11 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     }
     // Account first, as in every reserve/settle/revoke writer.
     let (epoch, limit, floor) = lock_open_account(&mut tx, req.user_id).await?;
+    if observe_closed_calendars(&mut tx, req.user_id, req.node_id, &epoch).await? {
+        // A refused request must still commit the irreversible boundary.
+        tx.commit().await?;
+        return Err(deny());
+    }
     let now = database_now_ms(&mut tx).await?;
     if !crate::node_runtime::first_genesis_active_until(&current_user, now, now.saturating_add(1))
         || crate::quota_v2::authoritative_shared_limit(&current_user).ok() != Some(limit)
@@ -603,6 +624,15 @@ async fn check_reservation_calendars(
     class: &str,
     expires: i64,
 ) -> Result<(), ApiError> {
+    let closed: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM quota_v2_calendar_closures WHERE reservation_id=$1::uuid)",
+    )
+    .bind(reservation)
+    .fetch_one(&mut *conn)
+    .await?;
+    if closed {
+        return Err(deny());
+    }
     let node = crate::quota_v2_node_lifetime::permit_deadline(conn, req.node_id, user, reservation)
         .await?;
     let cdn = crate::quota_v2_cdn_lifetime::permit_deadline(conn, user, reservation, class).await?;

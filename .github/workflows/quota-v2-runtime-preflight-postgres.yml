@@ -18,6 +18,7 @@ on:
       - 'backend/migrations/0152_quota_v2_node_calendar.sql'
       - 'backend/migrations/0153_quota_v2_cdn_calendar.sql'
       - 'backend/migrations/0154_quota_v2_cdn_day_week.sql'
+      - 'backend/migrations/0155_quota_v2_calendar_closures.sql'
       - 'scripts/test-quota-v2-node-calendar-postgres.py'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
       - 'scripts/benchmark-quota-v2-postgres-allocator.py'
@@ -116,6 +117,7 @@ jobs:
                   "backend/migrations/0152_quota_v2_node_calendar.sql",
                   "backend/migrations/0153_quota_v2_cdn_calendar.sql",
                   "backend/migrations/0154_quota_v2_cdn_day_week.sql",
+                  "backend/migrations/0155_quota_v2_calendar_closures.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY

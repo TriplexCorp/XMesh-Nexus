@@ -26,6 +26,70 @@ def verify_boundaries(db):
         assert row == (True, True, True), (period, row)
 
 
+def verify_calendar_closure(db, dsn):
+    user, epoch = 2_637_315_404, uuid4()
+    db.execute("INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes) VALUES (%s,%s,100)",
+               (user, epoch))
+    reservations = {}
+    for node in (201, 202):
+        meter, reservation = uuid4(), uuid4()
+        reservations[node] = (meter, reservation)
+        with db.transaction():
+            # Insert the historical zero lease first, then seed a past grant
+            # without advancing a revision against the system clock.
+            db.execute("INSERT INTO quota_v2_reservations "
+                       "(user_id,epoch,node_id,meter_epoch,reservation_id,valid_until) "
+                       "VALUES (%s,%s,%s,%s,%s,'2024-01-02Z')",
+                       (user, epoch, node, meter, reservation))
+            db.execute("INSERT INTO quota_v2_node_calendar_bindings VALUES "
+                       "(%s,'daily',quota_v2_calendar_window('daily','2024-01-01Z'))",
+                       (reservation,))
+            db.execute("UPDATE quota_v2_reservations SET ceiling_bytes=30 "
+                       "WHERE reservation_id=%s", (reservation,))
+
+    def observe(node):
+        with psycopg.connect(dsn) as concurrent:
+            return concurrent.execute("SELECT quota_v2_observe_calendar_closures(%s,%s,%s)",
+                                      (user, node, epoch)).fetchone()[0]
+
+    assert observe(203) == 0, "another Node cannot mark either reservation"
+    with ThreadPoolExecutor(4) as pool:
+        assert sum(pool.map(observe, (201, 202, 201, 202))) == 2
+    assert observe(201) == observe(202) == 0, "committed boundaries are idempotent"
+    meter, reservation = reservations[201]
+    assert db.execute("SELECT boundary_at='2024-01-02Z', observed_at>=boundary_at "
+                      "FROM quota_v2_calendar_closures WHERE reservation_id=%s",
+                      (reservation,)).fetchone() == (True, True)
+    try:
+        db.execute("UPDATE quota_v2_reservations SET node_confirmed=true WHERE reservation_id=%s",
+                   (reservation,))
+    except psycopg.errors.CheckViolation:
+        pass
+    else:
+        raise AssertionError("a closed reservation was confirmed after its boundary")
+    try:
+        db.execute("UPDATE quota_v2_reservations SET revision=revision+1 "
+                   "WHERE reservation_id=%s", (reservation,))
+    except psycopg.errors.CheckViolation as error:
+        assert error.diag.message_primary == "calendar reservation is permanently closed"
+    else:
+        raise AssertionError("a closed reservation acquired another spending revision")
+    try:
+        db.execute("DELETE FROM quota_v2_calendar_closures WHERE reservation_id=%s", (reservation,))
+    except psycopg.errors.InvalidParameterValue:
+        pass
+    else:
+        raise AssertionError("a committed calendar closure was removed")
+    for _ in range(2):
+        db.execute("SELECT quota_v2_ack(%s,%s,201,%s,%s,17)",
+                   (user, epoch, meter, reservation))
+    assert db.execute("SELECT settled_bytes FROM quota_v2_accounts WHERE user_id=%s",
+                      (user,)).fetchone() == (17,)
+    assert db.execute("SELECT acknowledged_bytes,ceiling_bytes FROM quota_v2_reservations "
+                      "WHERE reservation_id=%s", (reservation,)).fetchone() == (17, 30)
+    print("PASS: calendar closure is immutable and idempotent; late debt and holds survive")
+
+
 def verify_monthly_cdn(db, dsn):
     mib = 1024 * 1024
     user = 2_637_315_401
@@ -250,6 +314,7 @@ def main():
         verify_monthly_cdn(db, dsn)
         verify_shared_budget(db, dsn)
         verify_cdn_submonth_history(db)
+        verify_calendar_closure(db, dsn)
 
 
 if __name__ == "__main__":
