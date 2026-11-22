@@ -160,6 +160,15 @@ pub(super) async fn prepare(
     // Preserve a crossed calendar boundary even if an operator turns the
     // clock back. Holding the per-user allocator lock serializes issuance.
     super::observe_closed_calendars(&mut tx, req.user_id, req.node_id, &earlier_epoch).await?;
+    // A denied successor must not undo an already observed boundary. Commit
+    // closure separately from the future outbox write: rollback of signing,
+    // current-user checks or lost XSP replies must never reopen the old cap.
+    tx.commit().await?;
+    let mut tx = state.pool.begin().await?;
+    let current_user = lock_signed_user(&mut tx, req.user_id)
+        .await?.ok_or_else(deny)?;
+    let (_open_epoch, _limit, _floor) =
+        lock_open_account(&mut tx, req.user_id).await?;
     let now = database_now_ms(&mut tx).await?;
     if !crate::node_runtime::first_genesis_active_until(
         &current_user, now, now.saturating_add(1)
