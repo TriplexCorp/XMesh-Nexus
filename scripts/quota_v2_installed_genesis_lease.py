@@ -461,6 +461,32 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     def upload(job):
         guest, batches = job
         committed = []
+        if guest.node == guest_a.node:
+            # For Node A, the installed opt-in Agent performs the FIRST
+            # charge itself through systemd and strict XSP/2. No controller
+            # inserts SQL, fabricates a receipt or invokes a signing fixture.
+            guest.exec("systemctl","start","xmesh-quota-v2-renewal.service",timeout=180)
+            grant = json.loads(cap_jobs[0][3])["payload"]
+            saved = db.execute(
+                "SELECT filename,journal,signed_receipt FROM quota_v2_wal_charges "
+                "WHERE reservation_id=%s::uuid ORDER BY filename,first_sequence",
+                (grant["reservationId"],)).fetchall()
+            assert len(saved) == len(batches), ("Agent did not settle every Xray WAL", saved)
+            for filename, journal, signature in saved:
+                raw, receipt = bytes(journal), bytes(signature)
+                request = charge_request(guest, cap_jobs[0][3], MEASURED+"/wal/"+filename, raw)
+                reply = {"receipt":base64.b64encode(receipt).decode()}
+                assert guest.request(WAL_PATH, request) == (200, reply)
+                independent_signature(root, f"agent-charge-{filename}", json.loads(receipt),
+                                      WAL_CHARGE_DOMAIN)
+                last = json.loads(raw.splitlines()[-1])
+                key = hashlib.sha256(filename.encode("ascii")).hexdigest()
+                stored = json.loads(guest.exec("cat", STATE+
+                    f"/wal-charge-{key}-s{last['sequence']}.json"))
+                assert stored["signedReceipt"] == reply["receipt"]
+                assert stored["reservationId"] == grant["reservationId"]
+                committed.append((request,reply))
+            return committed
         for split in batches:
             for request in split:
                 first = guest.request(WAL_PATH, request)
@@ -481,9 +507,11 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                 committed.append((request, reply))
         return committed
 
-    charges = parallel(upload, charge_jobs)
+    # Keep the controller's negative/corrupt-order tests for the other
+    # installed Node. Avoid a shared psycopg connection across workers.
+    charges = [upload(charge_jobs[0]), upload(charge_jobs[1])]
     charged_rows = db.execute(charge_sql).fetchall()
-    assert len(charged_rows) == 8
+    assert len(charged_rows) == 6
     charged_balance = db.execute(balance_sql, (uid,)).fetchone()
     assert charged_balance == (account[0], account[2]), charged_balance
     floors = db.execute("SELECT node_id,conservative_burn_floor_bytes FROM quota_v2_reservations "
