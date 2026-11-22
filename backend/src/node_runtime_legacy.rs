@@ -2418,12 +2418,8 @@ pub fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_
     {
         return false;
     }
-    if has_cdn {
-        match user.get("cdnLimitGb") {
-            None => {}
-            Some(value) if value.as_f64() == Some(0.0) => {}
-            _ => return false,
-        }
+    if has_cdn && crate::quota_v2_cdn_lifetime::limit(user).is_err() {
+        return false;
     }
     user.get("limit")
         .and_then(Value::as_f64)
@@ -2492,16 +2488,18 @@ mod first_genesis_rehearsal_limit_tests {
                 false
             ));
         }
-        for cap in [
-            json!(0.000_000_001),
-            json!(1),
-            json!("1"),
-            json!(null),
-            json!(-1),
-        ] {
+        for cap in [json!(0.000_000_001),json!(1)] {
+            let limited = json!({"limit":2,"cdnLimitGb":cap});
+            assert!(supported(&limited, 47, true));
+            // A positive CDN cap is admitted only after the real signed
+            // inbound compiler establishes a homogeneous CDN-only scope.
+            assert!(crate::quota_v2_cdn_lifetime::supported(&limited, "cdn"));
+            assert!(!crate::quota_v2_cdn_lifetime::supported(&limited, "mixed"));
+            assert!(supported(&limited, 47, false));
+        }
+        for cap in [json!("1"),json!(null),json!(-1)] {
             let limited = json!({"limit":2,"cdnLimitGb":cap});
             assert!(!supported(&limited, 47, true));
-            assert!(supported(&limited, 47, false));
         }
         assert!(supported(&json!({"limit":2,"cdnLimitGb":0}), 47, true));
     }
@@ -2604,6 +2602,16 @@ pub async fn signed_first_genesis_scope(
         .iter()
         .find(|user| user["id"].as_i64() == Some(user_id))
         .ok_or_else(cap_policy_denied)?;
+    let class = if aliases.iter().all(|a| a.class == "cdn") {
+        "cdn"
+    } else if aliases.iter().all(|a| a.class == "main") {
+        "main"
+    } else {
+        "mixed"
+    };
+    if !crate::quota_v2_cdn_lifetime::supported(current_user, class) {
+        return Err(cap_policy_denied());
+    }
     if !first_genesis_rehearsal_limits_supported(
         current_user,
         node_id,
