@@ -1546,16 +1546,19 @@ mod unlimited_shared_account_tests {
     #[test]
     fn zero_global_quota_is_a_database_sentinel_not_a_signed_xray_ceiling() {
         assert_eq!(
-            authoritative_shared_limit(&json!({"limit":0})).unwrap(),
+            authoritative_shared_limit(&json!({"limit": 0})).unwrap(),
             i64::MAX,
         );
         assert_eq!(
-            authoritative_shared_limit(&json!({"limit":0.001_572_864})).unwrap(),
+            authoritative_shared_limit(&json!({"limit": 0.001_572_864})).unwrap(),
             1_572_864,
         );
         for invalid in [
-            json!({}), json!({"limit":null}), json!({"limit":"0"}),
-            json!({"limit":-1}), json!({"limit":1_000_001}),
+            json!({}),
+            json!({"limit": null}),
+            json!({"limit": "0"}),
+            json!({"limit": -1}),
+            json!({"limit": 1_000_001}),
         ] {
             assert!(authoritative_shared_limit(&invalid).is_err());
         }
@@ -1563,20 +1566,31 @@ mod unlimited_shared_account_tests {
 
     #[test]
     fn unlimited_v2_entitlement_requires_a_real_signed_inbound_class() {
-        let signed = json!({"limitBytes":0});
-        assert_eq!(policy_shared_limit(&signed, "main").unwrap(),Some(i64::MAX));
-        assert_eq!(policy_shared_limit(&signed, "cdn").unwrap(),Some(i64::MAX));
-        assert_eq!(policy_shared_limit(&signed, "unclassified").unwrap(),None);
+        let signed = json!({"limitBytes": 0});
+        assert_eq!(
+            policy_shared_limit(&signed, "main").unwrap(),
+            Some(i64::MAX),
+        );
+        assert_eq!(
+            policy_shared_limit(&signed, "cdn").unwrap(),
+            Some(i64::MAX),
+        );
+        assert_eq!(
+            policy_shared_limit(&signed, "unclassified").unwrap(),
+            None,
+        );
         assert!(policy_shared_limit(&signed, "mixed").is_err());
-        assert!(policy_shared_limit(&json!({"limitBytes":-1}),"main").is_err());
-        assert_eq!(policy_shared_limit(
-            &json!({"limitBytes":1024}),"main").unwrap(),Some(1024));
+        assert!(policy_shared_limit(&json!({"limitBytes": -1}), "main").is_err());
+        assert_eq!(
+            policy_shared_limit(&json!({"limitBytes": 1024}), "main").unwrap(),
+            Some(1024),
+        );
     }
 
     #[test]
     fn a_finite_operator_limit_is_stricter_than_the_unlimited_account() {
-        let account_limit = authoritative_shared_limit(&json!({"limit":0})).unwrap();
-        let reduced = authoritative_shared_limit(&json!({"limit":0.002})).unwrap();
+        let account_limit = authoritative_shared_limit(&json!({"limit": 0})).unwrap();
+        let reduced = authoritative_shared_limit(&json!({"limit": 0.002})).unwrap();
         assert!(reduced < account_limit);
         // A signed cap from the unlimited epoch cannot be renewed after
         // the owner lowers the plan unless an explicit new epoch exists.
