@@ -25,6 +25,7 @@ on:
       - 'backend/migrations/0159_quota_v2_successor_predecessor_binding.sql'
       - 'backend/migrations/0160_quota_v2_successor_fresh_meter_staging.sql'
       - 'scripts/test-quota-v2-calendar-successor-postgres.py'
+      - 'scripts/test-quota-v2-sql-migration-delimiters.py'
       - 'scripts/test-quota-v2-node-calendar-postgres.py'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
       - 'scripts/benchmark-quota-v2-postgres-allocator.py'
@@ -63,6 +64,8 @@ jobs:
           persist-credentials: false
       - name: Install disposable SQL test driver
         run: python3 -m pip install 'psycopg[binary]==3.2.3' --break-system-packages
+      - name: Reject malformed quota calendar PL/pgSQL dollar delimiters before migration
+        run: python3 scripts/test-quota-v2-sql-migration-delimiters.py
       - name: Apply REAL existing allocator and staged Xray preparation migrations
         run: |
           python3 - <<'PY'
