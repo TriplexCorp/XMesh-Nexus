@@ -13,6 +13,7 @@ on:
       - 'backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
       - 'scripts/benchmark-quota-v2-postgres-allocator.py'
+      - 'scripts/test-quota-v2-unlimited-main-postgres.py'
       - 'scripts/test-quota-v2-quarantined-runtime-postgres.py'
       - 'scripts/test-quota-v2-genesis-quarantine-postgres.py'
       - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
@@ -110,6 +111,10 @@ jobs:
         run: |
           python3 -m py_compile scripts/test-quota-v2-lifetime-dimensional-postgres.py
           python3 scripts/test-quota-v2-lifetime-dimensional-postgres.py -v
+      - name: Lifetime CDN never constrains MAIN on an unlimited subscriber
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-unlimited-main-postgres.py
+          python3 scripts/test-quota-v2-unlimited-main-postgres.py
       - name: Real global SQL allocator stress - 10, 100 and 500 users, two concurrent Nodes each
         run: |
           python3 -m py_compile scripts/benchmark-quota-v2-postgres-allocator.py
