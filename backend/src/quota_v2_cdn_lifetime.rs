@@ -560,7 +560,8 @@ mod tests {
     fn only_verified_cdn_spend_and_independent_pool_funds_a_topup() {
         assert_eq!(next_mixed_cdn_refill(0, 700, 400, 300, 1_000), Some(0));
         assert_eq!(next_mixed_cdn_refill(200, 700, 700, 0, 1_200), Some(0));
-        assert_eq!(next_mixed_cdn_refill(200, 700, 700, 300, 1_200), Some(200));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 700, 300, 1_200), Some(0));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 700, 350, 1_200), Some(200));
         assert_eq!(next_mixed_cdn_refill(200, 700, 700, 500, 750), Some(50));
         assert_eq!(next_mixed_cdn_refill(200, 700, 400, 0, 1_200), Some(0));
         assert_eq!(next_mixed_cdn_refill(200, 700, 400, 100, 1_200), Some(0));
