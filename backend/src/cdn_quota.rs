@@ -45,10 +45,13 @@ pub fn validate_settings(value: &Value) -> Result<(), ApiError> {
         }
     }
     if let Some(period) = value.get("cdnResetPeriod")
-        && !matches!(period.as_str(), Some("lifetime" | "monthly"))
+        && !matches!(
+            period.as_str(),
+            Some("lifetime" | "daily" | "weekly" | "monthly")
+        )
     {
         return Err(bad_request(
-            "CDN: режим сброса должен быть lifetime или monthly.",
+            "CDN: режим сброса должен быть lifetime, daily, weekly или monthly.",
         ));
     }
     Ok(())
@@ -132,10 +135,11 @@ pub fn tags_for_node(
 pub fn reset_period(settings: &Value) -> Result<&'static str, ApiError> {
     validate_settings(settings)?;
     Ok(
-        if settings.get("cdnResetPeriod").and_then(Value::as_str) == Some("monthly") {
-            "monthly"
-        } else {
-            "lifetime"
+        match settings.get("cdnResetPeriod").and_then(Value::as_str) {
+            Some("daily") => "daily",
+            Some("weekly") => "weekly",
+            Some("monthly") => "monthly",
+            _ => "lifetime",
         },
     )
 }
@@ -168,7 +172,18 @@ pub async fn attach_usage(pool: &PgPool, users: &mut [Value]) -> Result<(), ApiE
     // Monthly deltas are recorded when signed telemetry is accepted, in UTC.
     // This durable ledger survives node deletion and policy edits. Existing
     // cumulative meters cannot accurately reconstruct historic months.
-    let rows = if reset_period(&settings)? == "monthly" {
+    let period = reset_period(&settings)?;
+    let rows = if matches!(period, "daily" | "weekly") {
+        sqlx::query(
+            "SELECT user_id, LEAST(9223372036854775807,SUM(bytes))::bigint AS bytes
+             FROM quota_v2_cdn_legacy_windows
+             WHERE span && quota_v2_calendar_window($1,statement_timestamp())
+             GROUP BY user_id",
+        )
+        .bind(period)
+        .fetch_all(pool)
+        .await?
+    } else if period == "monthly" {
         sqlx::query(
             "SELECT user_id, COALESCE(SUM(quota_uplink_bytes + quota_downlink_bytes),0)::BIGINT AS bytes
              FROM user_inbound_traffic_monthly
@@ -217,7 +232,18 @@ pub async fn usage_for_user(
     settings: &Value,
     user_id: i64,
 ) -> Result<i64, ApiError> {
-    let row = if reset_period(settings)? == "monthly" {
+    let period = reset_period(settings)?;
+    let row = if matches!(period, "daily" | "weekly") {
+        sqlx::query(
+            "SELECT LEAST(9223372036854775807,COALESCE(SUM(bytes),0))::bigint AS bytes
+             FROM quota_v2_cdn_legacy_windows WHERE user_id=$1
+               AND span && quota_v2_calendar_window($2,statement_timestamp())",
+        )
+        .bind(user_id)
+        .bind(period)
+        .fetch_one(pool)
+        .await?
+    } else if period == "monthly" {
         sqlx::query(
             "SELECT COALESCE(SUM(quota_uplink_bytes + quota_downlink_bytes),0)::BIGINT AS bytes
              FROM user_inbound_traffic_monthly
@@ -360,7 +386,13 @@ mod tests {
                 .contains("MAIN_DE")
         );
         assert!(validate_node(&json!({"cdnMode":"selected","cdnInboundTags":[]})).is_err());
-        assert!(validate_settings(&json!({"cdnResetPeriod":"weekly"})).is_err());
+        for period in ["daily", "weekly", "monthly", "lifetime"] {
+            assert_eq!(
+                reset_period(&json!({"cdnResetPeriod":period})).unwrap(),
+                period
+            );
+        }
+        assert!(validate_settings(&json!({"cdnResetPeriod":"quarterly"})).is_err());
     }
 
     #[test]

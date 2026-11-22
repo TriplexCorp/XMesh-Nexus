@@ -129,15 +129,21 @@ async fn panel_settings(conn: &mut PgConnection) -> Result<Value, ApiError> {
     )
 }
 
-async fn monthly(conn: &mut PgConnection, user: &Value) -> Result<bool, ApiError> {
-    if limit(user)?.is_none() || cdn_quota::reset_period(&panel_settings(conn).await?)? != "monthly"
-    {
-        return Ok(false);
+async fn calendar_period(
+    conn: &mut PgConnection,
+    user: &Value,
+) -> Result<Option<&'static str>, ApiError> {
+    if limit(user)?.is_none() {
+        return Ok(None);
+    }
+    let period = cdn_quota::reset_period(&panel_settings(conn).await?)?;
+    if period == "lifetime" {
+        return Ok(None);
     }
     if std::env::var("XMESH_QUOTA_V2_CDN_CALENDAR_STAGING").as_deref() != Ok("1") {
         return Err(deny());
     }
-    Ok(true)
+    Ok(Some(period))
 }
 
 pub async fn bind_deadline(
@@ -146,14 +152,17 @@ pub async fn bind_deadline(
     reservation: &str,
     class: &str,
 ) -> Result<Option<i64>, ApiError> {
-    if matches!(class, "cdn" | "mixed") && monthly(conn, user).await? {
+    if matches!(class, "cdn" | "mixed")
+        && let Some(period) = calendar_period(conn, user).await?
+    {
         // Avoid invoking the insert guard on an already issued reservation.
         sqlx::query(
             "INSERT INTO quota_v2_cdn_calendar_bindings(reservation_id,period,calendar_window)
-             SELECT $1::uuid,'monthly',quota_v2_calendar_window('monthly',statement_timestamp())
+             SELECT $1::uuid,$2,quota_v2_calendar_window($2,statement_timestamp())
              WHERE NOT EXISTS (SELECT 1 FROM quota_v2_cdn_calendar_bindings WHERE reservation_id=$1::uuid)",
         )
         .bind(reservation)
+        .bind(period)
         .execute(&mut *conn)
         .await?;
     }
@@ -167,18 +176,22 @@ pub async fn permit_deadline(
     reservation: &str,
     class: &str,
 ) -> Result<Option<i64>, ApiError> {
-    let requires_window = matches!(class, "cdn" | "mixed") && monthly(conn, user).await?;
-    let existing: Option<(i64, bool)> = sqlx::query_as(
-        "SELECT (extract(epoch FROM upper(calendar_window))*1000)::bigint,
+    let period = if matches!(class, "cdn" | "mixed") {
+        calendar_period(conn, user).await?
+    } else {
+        None
+    };
+    let existing: Option<(String, i64, bool)> = sqlx::query_as(
+        "SELECT period,(extract(epoch FROM upper(calendar_window))*1000)::bigint,
                 calendar_window @> statement_timestamp()
          FROM quota_v2_cdn_calendar_bindings WHERE reservation_id=$1::uuid",
     )
     .bind(reservation)
     .fetch_optional(conn)
     .await?;
-    match (requires_window, existing) {
-        (false, None) => Ok(None),
-        (true, Some((end, true))) => Ok(Some(end)),
+    match (period, existing) {
+        (None, None) => Ok(None),
+        (Some(period), Some((bound, end, true))) if period == bound => Ok(Some(end)),
         _ => Err(deny()),
     }
 }
@@ -186,14 +199,18 @@ pub async fn permit_deadline(
 async fn calendar_remaining(
     conn: &mut PgConnection,
     user_id: i64,
+    period: &str,
     limit: i64,
 ) -> Result<i64, ApiError> {
     Ok(
-        sqlx::query_scalar("SELECT quota_v2_cdn_calendar_remaining($1,$2,statement_timestamp())")
-            .bind(user_id)
-            .bind(limit)
-            .fetch_one(conn)
-            .await?,
+        sqlx::query_scalar(
+            "SELECT quota_v2_cdn_calendar_remaining($1,$2,$3,statement_timestamp())",
+        )
+        .bind(user_id)
+        .bind(period)
+        .bind(limit)
+        .fetch_one(conn)
+        .await?,
     )
 }
 
@@ -222,8 +239,8 @@ async fn legacy_cdn_usage(conn: &mut PgConnection, user_id: i64) -> Result<i64, 
     // budget when an old CDN Node was deleted or subsequently reclassified
     // as MAIN. This is a floor, never a refund or proof of delivered bytes.
     let durable_history: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(quota_uplink_bytes+quota_downlink_bytes),0)::bigint
-         FROM user_inbound_traffic_monthly WHERE user_id=$1",
+        "SELECT LEAST(9223372036854775807,COALESCE(SUM(bytes),0))::bigint
+         FROM quota_v2_cdn_legacy_windows WHERE user_id=$1",
     )
     .bind(user_id)
     .fetch_one(&mut *conn)
@@ -239,8 +256,12 @@ pub async fn headroom(
     let Some(limit) = limit(user)? else {
         return Ok(None);
     };
-    if monthly(conn, user).await? {
-        return Ok(Some(calendar_remaining(conn, user_id, limit).await?.max(0)));
+    if let Some(period) = calendar_period(conn, user).await? {
+        return Ok(Some(
+            calendar_remaining(conn, user_id, period, limit)
+                .await?
+                .max(0),
+        ));
     }
     let observed = legacy_cdn_usage(conn, user_id).await?;
     sqlx::query(
@@ -619,8 +640,8 @@ pub async fn issued_within_limit(
     let Some(limit) = limit(user)? else {
         return Ok(true);
     };
-    if monthly(conn, user).await? {
-        return Ok(calendar_remaining(conn, user_id, limit).await? >= 0);
+    if let Some(period) = calendar_period(conn, user).await? {
+        return Ok(calendar_remaining(conn, user_id, period, limit).await? >= 0);
     }
     let _ = headroom(conn, user_id, user).await?;
     let anchor: i64 = sqlx::query_scalar(

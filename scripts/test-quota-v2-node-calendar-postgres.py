@@ -132,6 +132,34 @@ def verify_shared_budget(db, dsn):
     print("PASS: two competing Nodes settle an exact shared 1000 MiB SQL budget through retries")
 
 
+def verify_cdn_submonth_history(db):
+    user = 2_637_315_403
+    db.execute(
+        "INSERT INTO user_inbound_traffic_monthly VALUES ('2028-02-01',%s,8,2,'2028-02-29T23:30:00Z')",
+        (user,),
+    )
+    # The user's legacy reset clears its display bucket but cannot release
+    # the 7-byte migration floor or the 10 bytes accepted after migration.
+    db.execute("UPDATE user_inbound_traffic_monthly "
+               "SET quota_uplink_bytes=0, quota_downlink_bytes=0 WHERE user_id=%s", (user,))
+    db.execute(
+        "INSERT INTO user_inbound_traffic_monthly VALUES ('2028-03-01',%s,2,1,'2028-03-01T00:00:00Z')",
+        (user,),
+    )
+    for period, at, expected in (
+        ("daily", "2028-02-28T23:59:59Z", 93),
+        ("daily", "2028-02-29T23:59:59Z", 83),
+        ("daily", "2028-03-01T00:00:00Z", 97),
+        ("weekly", "2028-03-01T00:00:00Z", 80),
+        ("weekly", "2028-03-06T00:00:00Z", 100),
+        ("monthly", "2028-02-29T23:59:59Z", 83),
+        ("monthly", "2028-03-01T00:00:00Z", 97),
+    ):
+        assert db.execute("SELECT quota_v2_cdn_calendar_remaining(%s,%s,100,%s)",
+                          (user, period, at)).fetchone() == (expected,), (period, at)
+    print("PASS: daily, ISO-weekly and monthly CDN windows retain historical debt across a legacy reset")
+
+
 def main():
     dsn = os.environ["QUOTA_TEST_DSN"]
     assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
@@ -221,6 +249,7 @@ def main():
         print("PASS: UTC boundaries, concurrent Node funding, immutable deadlines and historical debt")
         verify_monthly_cdn(db, dsn)
         verify_shared_budget(db, dsn)
+        verify_cdn_submonth_history(db)
 
 
 if __name__ == "__main__":

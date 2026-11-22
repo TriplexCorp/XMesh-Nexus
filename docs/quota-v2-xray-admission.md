@@ -63,7 +63,7 @@ previous committed checkpoint intact.
 
 The existing Node counters use UTC. Days start at midnight, weeks at Monday
 00:00, and months at 00:00 on the first calendar day. The existing CDN panel
-setting supports lifetime and UTC-monthly counting. For individual Node
+setting supports lifetime and UTC daily, weekly, and monthly counting. For individual Node
 quotas, `XMESH_QUOTA_V2_NODE_CALENDAR_STAGING=1` enables funding within the
 original daily, weekly or monthly UTC window on the signed staging path.
 PostgreSQL pins the window before issuance and rejects another revision
@@ -73,9 +73,13 @@ reservations with overlapping windows. Changing the rule does not move a
 bound reservation. This staging switch defaults to off.
 
 `XMESH_QUOTA_V2_CDN_CALENDAR_STAGING=1` uses the panel's existing
-`cdnResetPeriod=monthly` rule for classified CDN or mixed reservations. The
-monthly pool includes legacy CDN telemetry, unbound reservations and
-overlapping CDN commitments across all nodes. Mixed reservations account for
+`cdnResetPeriod` daily, weekly, and monthly rules for classified CDN or
+mixed reservations. Each pool includes legacy CDN telemetry, unbound
+reservations and overlapping CDN commitments across all nodes. Migration
+0154 retains positive telemetry increments independently of the resettable
+panel counter. Older monthly aggregates do not carry daily attribution,
+so each intersecting window conservatively covers their entire retained
+amount. Mixed reservations account for
 their immutable CDN sub-cap and funded CDN top-ups. MAIN-only reservations
 are outside this pool. When a mixed reservation has both a Node window and
 a CDN window, its shared signed permit expires at the earlier deadline.

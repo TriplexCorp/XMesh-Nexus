@@ -17,6 +17,7 @@ on:
       - 'backend/migrations/0151_quota_v2_cdn_signed_revision_integrity.sql'
       - 'backend/migrations/0152_quota_v2_node_calendar.sql'
       - 'backend/migrations/0153_quota_v2_cdn_calendar.sql'
+      - 'backend/migrations/0154_quota_v2_cdn_day_week.sql'
       - 'scripts/test-quota-v2-node-calendar-postgres.py'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
       - 'scripts/benchmark-quota-v2-postgres-allocator.py'
@@ -89,7 +90,10 @@ jobs:
                        PRIMARY KEY ({start},node_id,user_id))""")
               c.execute("""CREATE TABLE user_inbound_traffic_monthly
                   (month_start DATE NOT NULL,user_id BIGINT NOT NULL,
-                   quota_uplink_bytes BIGINT NOT NULL,quota_downlink_bytes BIGINT NOT NULL)""")
+                   quota_uplink_bytes BIGINT NOT NULL,quota_downlink_bytes BIGINT NOT NULL,
+                   updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+              c.execute("""INSERT INTO user_inbound_traffic_monthly
+                  VALUES ('2028-02-01',2637315403,7,0,'2028-02-01T00:00:00Z')""")
               for path in (
                   "backend/migrations/0125_quota_v2_reservations.sql",
                   "backend/migrations/0126_quota_v2_revocation_requests.sql",
@@ -111,6 +115,7 @@ jobs:
                   "backend/migrations/0151_quota_v2_cdn_signed_revision_integrity.sql",
                   "backend/migrations/0152_quota_v2_node_calendar.sql",
                   "backend/migrations/0153_quota_v2_cdn_calendar.sql",
+                  "backend/migrations/0154_quota_v2_cdn_day_week.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY

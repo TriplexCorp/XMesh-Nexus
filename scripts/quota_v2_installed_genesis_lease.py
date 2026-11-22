@@ -390,6 +390,17 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert guest_a.request(CAP_PATH,cap_jobs[1][2])[0]==401
     assert guest_a.request(CAP_PATH,dict(cap_jobs[0][2],requestChallenge=cap_jobs[1][2]["requestChallenge"]))[0]==409
 
+    if monthly_cdn:
+        try:
+            for policy_period in ("daily", "weekly"):
+                owner.request("PATCH", "/settings", {"cdnResetPeriod": policy_period})
+                # A changed window cannot fund or replay the old CDN
+                # entitlement. The other node's MAIN permit stays valid.
+                assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==409
+                assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==200
+        finally:
+            owner.request("PATCH", "/settings", {"cdnResetPeriod": "monthly"})
+
     # Even already signed outbox bytes may not be delivered after the
     # owner's plan has changed. These checks must not consume or renew them.
     original_caps=db.execute(

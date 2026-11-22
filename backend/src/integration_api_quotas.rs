@@ -137,10 +137,11 @@ async fn view(state: &AppState, id: i64) -> Result<(Value, i64), Problem> {
     } else {
         None
     };
-    let cdn_period = if settings.get("cdnResetPeriod").and_then(Value::as_str) == Some("monthly") {
-        "month"
-    } else {
-        "lifetime"
+    let cdn_period = match cdn_quota::reset_period(&settings).map_err(Problem::from)? {
+        "daily" => "day",
+        "weekly" => "week",
+        "monthly" => "month",
+        _ => "lifetime",
     };
     let node_usage = node_user_quotas::usage_for_user(&state.pool, id)
         .await
