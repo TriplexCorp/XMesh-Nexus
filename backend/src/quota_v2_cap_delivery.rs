@@ -199,7 +199,13 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     {
         return Err(deny());
     }
-    let exact = verified_outbox(state, req, &scope, &epoch, activation, &row)?;
+    let expected_cdn = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
+        &mut tx, &reservation, req.user_id, req.node_id,
+        &current_user, inbound_class, row.try_get("grant_bytes")?,
+    ).await?;
+    let exact = verified_outbox(
+        state, req, &scope, &epoch, activation, &row, expected_cdn,
+    )?;
     tx.commit().await?;
     Ok(exact)
 }
@@ -311,6 +317,7 @@ fn verified_outbox(
     epoch: &str,
     activation: &str,
     row: &PgRow,
+    expected_cdn: i64,
 ) -> Result<String, ApiError> {
     let raw: Vec<u8> = row.try_get("signed_envelope")?;
     let saved: Vec<u8> = row.try_get("signed_reply")?;
@@ -327,7 +334,6 @@ fn verified_outbox(
     let original = &confirm["payload"];
     let mut canonical = serde_json::to_vec(&doc).map_err(|_| deny())?;
     canonical.push(b'\n');
-    let has_cdn = scope.aliases.iter().any(|alias| alias.class == "cdn");
     let aliases: Vec<Value> = scope
         .aliases
         .iter()
@@ -370,7 +376,8 @@ fn verified_outbox(
         || p["reservationRevision"] != revision
         || p["sharedCeilingBytes"] != ceiling
         || p["nodeCeilingBytes"] != ceiling
-        || p["cdnCeilingBytes"] != if has_cdn { ceiling } else { 0 }
+        || p["cdnCeilingBytes"] != expected_cdn
+        || expected_cdn < 0 || expected_cdn > ceiling
         || p["installBeforeMs"] != install
         || p["validUntilMs"] != expires
         || p["aliasScopes"] != json!(aliases)
