@@ -11,14 +11,14 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 
 
-def must_refuse(connection, statement, params=()):
+def must_refuse(connection, statement, params=(), states=None):
     try:
         with connection.transaction():
             connection.execute(statement, params)
     except psycopg.Error as error:
         # Reject only the intended constraints/immutability guards. Syntax,
         # missing relations or programming mistakes are test failures.
-        assert error.sqlstate in {"22023", "23505", "23503", "23514"}, (
+        assert error.sqlstate in (states or {"22023", "23505", "23503", "23514"}), (
             "unexpected SQL failure instead of an immutability denial",
             error.sqlstate,
         )
@@ -41,12 +41,12 @@ def main():
         db.execute(
             "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes) VALUES(%s,%s,1000)",
             (user, epoch))
+        boundary = datetime.now(timezone.utc) - timedelta(minutes=1)
         db.execute(
             "INSERT INTO quota_v2_reservations "
             "(user_id,epoch,node_id,meter_epoch,reservation_id,valid_until) "
             "VALUES(%s,%s,%s,%s,%s,%s)",
-            (user, epoch, node, meter, predecessor,
-             datetime.now(timezone.utc) + timedelta(days=1)))
+            (user, epoch, node, meter, predecessor, boundary))
         cols = (
             "predecessor_id,node_id,user_id,request_challenge,signer_public_key,"
             "account_epoch,predecessor_runtime_id,policy_sha256,"
@@ -58,6 +58,26 @@ def main():
                issued, issued + 60000, sample)
         insert = ("INSERT INTO quota_v2_calendar_successor_preparations "
                   f"({cols}) VALUES ({','.join(['%s'] * 13)})")
+        # The SQL stage must refuse an identity without a committed
+        # observation of the old calendar boundary.
+        must_refuse(db, insert, row, {"23514"})
+        db.execute(
+            "INSERT INTO quota_v2_calendar_closures "
+            "(reservation_id,boundary_at,observed_at) VALUES(%s,%s,%s)",
+            (predecessor, boundary, datetime.now(timezone.utc)))
+        def altered(index, value):
+            copy = list(row)
+            copy[index] = value
+            return tuple(copy)
+        for invalid in (
+            altered(1, node + 1),  # foreign Node
+            altered(2, user + 1),  # foreign user
+            altered(5, uuid.uuid4()),  # wrong account epoch
+            altered(8, meter),  # reuse old WAL meter epoch
+            altered(9, meter),  # reuse meter epoch as candidate reservation
+            altered(10, int(boundary.timestamp() * 1000) - 1),
+        ):
+            must_refuse(db, insert, invalid, {"23514"})
         db.execute(insert, row)
         saved = db.execute(
             "SELECT signed_envelope FROM quota_v2_calendar_successor_preparations "
