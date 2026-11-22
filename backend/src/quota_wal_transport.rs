@@ -163,6 +163,46 @@ fn valid_email(value: &str) -> bool {
             .any(|c| c <= ' ' || matches!(c, '<' | '>' | '&' | '\u{2028}' | '\u{2029}'))
 }
 
+/// The admission transaction holds the same per-node lock as WAL storage.
+pub async fn require_unused_first_cap_user(
+    conn: &mut PgConnection,
+    node_id: i64,
+    user_id: i64,
+    runtime: &str,
+    peer_grant: bool,
+) -> Result<(), ApiError> {
+    let latest: Option<(Vec<u8>, String)> = sqlx::query_as(
+        "SELECT inventory_bytes,inventory_sha256 FROM quota_v2_external_wal_birth_anchors
+         WHERE node_id=$1 ORDER BY inventory_sequence DESC LIMIT 1",
+    )
+    .bind(node_id)
+    .fetch_optional(conn)
+    .await?;
+    if let Some((index, hash)) = latest {
+        if !peer_grant || sha256(&index) != hash {
+            return Err(conflict());
+        }
+        check_first_cap_history(&index, user_id, runtime)?;
+    }
+    Ok(())
+}
+
+fn check_first_cap_history(index: &[u8], user_id: i64, runtime: &str) -> Result<(), ApiError> {
+    if index.len() > INDEX_LIMIT {
+        return Err(conflict());
+    }
+    let lines = index.strip_suffix(b"\n").ok_or_else(conflict)?;
+    let user_prefix = format!("xmesh-u{user_id}--");
+    // The stored anchor was authenticated and its chain was verified before insertion.
+    for line in lines.split(|byte| *byte == b'\n') {
+        let birth: Birth = serde_json::from_slice(line).map_err(|_| conflict())?;
+        if birth.runtime_id != runtime || birth.email.starts_with(&user_prefix) {
+            return Err(conflict());
+        }
+    }
+    Ok(())
+}
+
 fn verify_index(index: &[u8], witness: &Witness) -> Result<(), ApiError> {
     let raw_lines = index.strip_suffix(b"\n").ok_or_else(invalid)?;
     let mut previous = "0".repeat(64);
@@ -500,4 +540,35 @@ async fn handle(
         }
     };
     Ok(([(header::CACHE_CONTROL, "no-store")], Json(result)))
+}
+
+#[cfg(test)]
+mod first_admission_history_tests {
+    use super::*;
+
+    #[test]
+    fn permits_only_peer_wal_from_the_same_runtime() {
+        let mut peer = Birth {
+            schema_version: 1,
+            sequence: 1,
+            filename: "meter-peer.jsonl".into(),
+            runtime_id: "a".repeat(64),
+            email: "xmesh-u102--vless-main".into(),
+            direction: "uplink".into(),
+            first_wal_digest: "b".repeat(64),
+            previous_digest: "0".repeat(64),
+            digest: "c".repeat(64),
+        };
+        let runtime = peer.runtime_id.clone();
+        let encode = |record: &Birth| {
+            let mut line = serde_json::to_vec(record).unwrap();
+            line.push(b'\n');
+            line
+        };
+        assert!(check_first_cap_history(&encode(&peer), 10, &runtime).is_ok());
+        assert!(check_first_cap_history(&encode(&peer), 102, &runtime).is_err());
+        peer.runtime_id = "d".repeat(64);
+        assert!(check_first_cap_history(&encode(&peer), 10, &runtime).is_err());
+        assert!(check_first_cap_history(b"{\n", 10, &runtime).is_err());
+    }
 }

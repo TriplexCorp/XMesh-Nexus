@@ -649,22 +649,31 @@ async fn lock_first_lease(
     if active.is_none() {
         return Err(deny());
     }
-    // Share WAL storage's per-Node transaction lock. An external WAL
-    // anchor and the first grant cannot both observe an empty prior history.
+    // Serialize first admission against the immutable off-host WAL ledger.
     sqlx::query("SELECT pg_advisory_xact_lock(1794501,hashtext($1::text))")
         .bind(req.node_id.to_string())
         .execute(&mut *conn)
         .await?;
-    let already_used: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM quota_v2_signed_first_cap_outbox WHERE node_id=$1)
-          OR EXISTS(SELECT 1 FROM quota_v2_external_wal_birth_anchors WHERE node_id=$1)",
+    let (incompatible_grant, peer_grant): (bool, bool) = sqlx::query_as(
+        "SELECT COALESCE(bool_or(user_id=$2 OR runtime_id<>$3),false), count(*)<>0
+           FROM quota_v2_signed_first_cap_outbox WHERE node_id=$1",
     )
     .bind(req.node_id)
+    .bind(req.user_id)
+    .bind(&measurement.runtime_id)
     .fetch_one(&mut *conn)
     .await?;
-    if already_used {
+    if incompatible_grant {
         return Err(deny());
     }
+    crate::quota_wal_transport::require_unused_first_cap_user(
+        conn,
+        req.node_id,
+        req.user_id,
+        &measurement.runtime_id,
+        peer_grant,
+    )
+    .await?;
 
     Ok(lease)
 }

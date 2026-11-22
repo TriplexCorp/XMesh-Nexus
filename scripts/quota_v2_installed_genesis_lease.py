@@ -80,6 +80,16 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             "profileId":profile["id"],"xrayLocalPort":28401,
             "cdnMode":"all" if tag=="vless-cdn" else "standard",
         })
+    peer_limit = 4 * 64 * 1024
+    _,peer=owner.request("POST","/collections/users",{
+        "username":"ci_genesis_lease_peer","squads":[squad["id"]],
+        "hold":False,"used":0,"limit":2 * peer_limit / 1_000_000_000,"expireAt":0,
+        "nodeTrafficLimits":{
+            str(guest.node):{"limitGb":peer_limit / 1_000_000_000,"period":"lifetime"}
+            for guest in pair
+        },
+    })
+    peer_id=peer["id"]
     image=os.environ["XMESH_WAL_XRAY_IMAGE"]
     assert re.fullmatch(r"sha256:[a-f0-9]{64}",image)
     archive=root/"xray-image.tar"
@@ -126,8 +136,10 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         actual=[x for x in p["config"]["inbounds"] if x["tag"]==tag]
         assert len(actual)==1
         clients=actual[0]["settings"]["clients"]
-        assert len(clients)==1 and clients[0]["email"]==f"xmesh-u{uid}--{tag}"
-        assert clients[0]["id"]==user["xrayId"]
+        assert {client["email"]:client["id"] for client in clients} == {
+            f"xmesh-u{uid}--{tag}":user["xrayId"],
+            f"xmesh-u{peer_id}--{tag}":peer["xrayId"],
+        }
         binding={"nodeId":guest.node,"activationReceiptSha256":p["activationReceiptSha256"],
                  "policyPublicKey":public}
         lab.start_isolated_candidate(guest,archive,image,config,
@@ -271,11 +283,11 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert hashlib.sha256(raw).hexdigest()==profile
         return observed
 
-    def probe(item,ceiling,observed,tag,previous=0,barrier=None,pause_after=0):
+    def probe(item,ceiling,observed,tag,previous=0,barrier=None,pause_after=0,subscriber=user):
         guest,_,_=item
         raw=guest.exec("nsenter","--target",str(observed[2]),"--net","--",
                        "python3",MEASURED+"/live-vless.py",MEASURED+"/xray-client",
-                       user["xrayId"],f"xmesh-u{uid}--{tag}",str(ceiling),str(previous),
+                       subscriber["xrayId"],f"xmesh-u{subscriber['id']}--{tag}",str(ceiling),str(previous),
                        *([barrier,str(pause_after)] if barrier else []),
                        timeout=120 if barrier else 48)
         return json.loads(raw)
@@ -284,6 +296,8 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     before=parallel(lambda job:probe(job[0],0,job[1],job[2]),
                     zip(stages,measurements,tags))
     assert before==[{"uplink":0,"downlink":0}]*2
+    assert parallel(lambda job:probe(job[0],0,job[1],job[2],subscriber=peer),
+                    zip(stages,measurements,tags))==before
     # The CI host owns the disposable guest/root. It directly reads the
     # measured kernel process and private WAL directory, not a Node claim.
     # Verify both original isolated processes have no historic WAL or cap.
@@ -356,7 +370,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     # Even already signed outbox bytes may not be delivered after the
     # owner's plan has changed. These checks must not consume or renew them.
     original_caps=db.execute(
-        "SELECT node_id,request_challenge,signed_envelope FROM quota_v2_signed_first_cap_outbox ORDER BY node_id"
+        "SELECT node_id,request_challenge,signed_envelope FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge"
     ).fetchall()
     owner.request("PATCH",user_path,{
         "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.000000001,"period":"daily"}},
@@ -366,7 +380,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==409
         assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==409
         assert db.execute("SELECT node_id,request_challenge,signed_envelope "
-                          "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id").fetchall()==original_caps
+                          "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge").fetchall()==original_caps
     finally:
         owner.request("PATCH",user_path,{
             "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.003,"period":"lifetime"}},
@@ -384,7 +398,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==409
         assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==200
         assert db.execute("SELECT node_id,request_challenge,signed_envelope "
-            "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id").fetchall()==original_caps
+            "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge").fetchall()==original_caps
     finally:
         owner.request("PATCH",user_path,{
             "nodeTrafficLimits":{str(guest_a.node):{
@@ -404,7 +418,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==409
         assert db.execute(
             "SELECT node_id,request_challenge,signed_envelope "
-            "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id"
+            "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge"
         ).fetchall()==original_caps
     finally:
         owner.request("PATCH",user_path,{
@@ -423,7 +437,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         for item,_,request,_,_ in cap_jobs:
             assert item[0].request(CAP_PATH,request)[0]==409
         assert db.execute("SELECT node_id,request_challenge,signed_envelope "
-                          "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id").fetchall()==original_caps
+                          "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge").fetchall()==original_caps
     finally:
         owner.request("PATCH",user_path,{"expireAt":original_expiry})
     print("Shortened subscription cannot reuse an already signed longer-lived cap.")
@@ -446,7 +460,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
 
     commands=parallel(install,cap_jobs)
     print("PASS: the installed systemd Agent acquired and installed each first cap after signed quarantine.")
-    assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone()==(2,)
+    assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone()==(4,)
     results=parallel(lambda value:probe(value[0][0],value[0][4],
                                        value[0][1],value[1]),zip(cap_jobs,tags))
     assert sum(sum(result.values()) for result in results)==account[0]
@@ -487,12 +501,12 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                     JOIN quota_v2_external_wal_birth_sources s USING(node_id,inventory_sequence)
                     WHERE a.node_id=%s ORDER BY a.inventory_sequence DESC LIMIT 1"""
 
-    def remote_anchor(guest):
+    def remote_anchor(guest,expected_streams=2):
         anchor = db.execute(anchor_sql, (guest.node,)).fetchone()
         assert anchor is not None, guest.node
         sequence, digest, inventory, witness = anchor
         local = guest.exec("cat", MEASURED+"/wal/xmesh-meter-inventory-v1.jsonl")
-        assert sequence == len(local.splitlines()) == 2
+        assert sequence == len(local.splitlines()) == expected_streams
         assert bytes(inventory) == local and digest == hashlib.sha256(local).hexdigest()
         assert json.loads(bytes(witness))["payload"]["nodeId"] == guest.node
         return anchor
@@ -717,13 +731,36 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert charged_balance == (expected_limit, account[2])
     print("PASS: installed systemd Agent settled WAL and auto-renewed twice via Nexus; one uninterrupted VLESS stream crossed its earlier ceiling.")
 
+    # Reuse the SAME live Xray processes. The first subscriber already
+    # exhausted both original reservations and renewed on A. The second
+    # subscriber must still be able to spend its own independent budget.
+    guest_a.exec("systemctl","stop","xmesh-quota-v2-renewal.timer",
+                 "xmesh-quota-v2-renewal.service")
+    assert parallel(
+        lambda job:probe(job[0],peer_limit,job[1],job[2],subscriber=peer),
+        zip(stages,measurements,tags),
+    ) == [{"uplink":peer_limit//2,"downlink":peer_limit//2}]*2
+    parallel(lambda guest: guest.exec(
+        "systemctl","start","xmesh-quota-v2-renewal.service",timeout=95),pair)
+    peer_settled=db.execute(
+        "SELECT r.node_id, SUM(c.stream_bytes), count(DISTINCT c.filename) "
+        "FROM quota_v2_reservations r JOIN quota_v2_wal_charges c USING(reservation_id) "
+        "WHERE r.user_id=%s GROUP BY r.node_id ORDER BY r.node_id",(peer_id,),
+    ).fetchall()
+    assert peer_settled == sorted((guest.node,peer_limit,2) for guest in pair),peer_settled
+    assert db.execute(balance_sql,(peer_id,)).fetchone()==(2*peer_limit,0)
+    assert db.execute(balance_sql,(uid,)).fetchone()==charged_balance
+    charged_rows=db.execute(charge_sql).fetchall()
+    anchors=[remote_anchor(guest,expected_streams=4) for guest in pair]
+    print("PASS: two users spent independent signed budgets on the same two Xray processes; Agent settled both users' WAL.")
+
     # A repeat cannot extend/reinstall the existing positive cap.
     repeated=subprocess.run(["docker","exec",guest_a.name,*commands[0]],
                              capture_output=True,timeout=35)
     assert repeated.returncode!=0, "positive cap replay was admitted twice"
-    outbox_sql="SELECT node_id,request_challenge,signed_envelope FROM quota_v2_signed_first_cap_outbox ORDER BY node_id"
+    outbox_sql="SELECT node_id,request_challenge,signed_envelope FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge"
     committed_caps=db.execute(outbox_sql).fetchall()
-    assert len(committed_caps)==2
+    assert len(committed_caps)==4
 
     for guest in pair:
         assert guest.exec("docker","inspect","-f","{{.HostConfig.NetworkMode}}",lab.XRAY).strip()==b"none"
@@ -751,9 +788,9 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert failed.returncode!=0, "old grant accepted by replacement Xray"
     assert probe(stages[0],0,replacement,tags[0])=={"uplink":0,"downlink":0}
     assert all(guest_a.exec("cat",path)==raw for path,raw in wal_snapshots[0].items())
-    ledger_sql="SELECT node_id,stage,signed_reply FROM quota_v2_genesis_lease_replies ORDER BY node_id,stage"
+    ledger_sql="SELECT node_id,stage,signed_reply FROM quota_v2_genesis_lease_replies ORDER BY node_id,user_id,stage"
     ledger=db.execute(ledger_sql).fetchall()
-    assert len(ledger)==4
+    assert len(ledger)==8
     db=lab.restart_postgres(stack,dsn,db)
     assert db.execute(ledger_sql).fetchall()==ledger
     assert db.execute(outbox_sql).fetchall()==committed_caps
@@ -764,7 +801,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     for guest, receipts in zip(pair, charges):
         for request, reply in receipts:
             assert guest.request(WAL_PATH, request) == (200, reply)
-    assert [remote_anchor(guest) for guest in pair] == anchors
+    assert [remote_anchor(guest,expected_streams=4) for guest in pair] == anchors
     parallel(lambda guest: check_remote_wal(guest, "head"), pair)
     for guest,snapshot in zip(pair,wal_snapshots):
         assert all(guest.exec("cat",path)==raw for path,raw in snapshot.items())
@@ -784,5 +821,5 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     finally:
         guest_a.exec("mv", hidden, missing)
     check_remote_wal(guest_a, "head")
-    assert remote_anchor(guest_a) == anchors[0]
+    assert remote_anchor(guest_a,expected_streams=4) == anchors[0]
     print("PASS: real Xray kill and replacement fail closed, peer unaffected, exact WAL and both signed PostgreSQL outboxes survived database restart; no refund or public ingress.")
