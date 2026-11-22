@@ -1451,6 +1451,18 @@ pub async fn issue_user(
     let bounded_target = crate::quota_v2_cdn_lifetime::bounded_target(
         conn, user_id, node_id, user, &reservation, node_target, inbound_class,
     ).await?;
+    // A mixed MAIN/CDN Node draws a finite CDN sub-ceiling from its own
+    // lifetime pool, independently of its MAIN/shared grant. Snapshot this
+    // headroom BEFORE quota_v2_reserve increases the shared SQL ceiling.
+    // The same user-account lock serializes all competing CDN Nodes.
+    let mixed_cdn_free_before = if inbound_class == "mixed"
+        && confirmed
+        && revoke_id.is_none()
+    {
+        crate::quota_v2_cdn_lifetime::headroom(conn, user_id, user).await?
+    } else {
+        None
+    };
     let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
     let lease = sqlx::query(
         "SELECT acknowledged_bytes,ceiling_bytes,revision,
@@ -1481,6 +1493,12 @@ pub async fn issue_user(
     crate::quota_v2_cdn_lifetime::record_class(
         conn, user_id, node_id, &reservation, inbound_class,
     ).await?;
+    if confirmed && revoke_id.is_none() {
+        crate::quota_v2_cdn_lifetime::fund_mixed(
+            conn, user_id, node_id, user, &reservation,
+            inbound_class, mixed_cdn_free_before,
+        ).await?;
+    }
 
     user["quotaReservation"] = json!({
         "epoch": epoch,
