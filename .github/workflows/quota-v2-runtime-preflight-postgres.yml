@@ -12,6 +12,7 @@ on:
       - 'backend/migrations/0147_quota_v2_node_lifetime_baselines.sql'
       - 'backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
+      - 'scripts/benchmark-quota-v2-postgres-allocator.py'
       - 'scripts/test-quota-v2-quarantined-runtime-postgres.py'
       - 'scripts/test-quota-v2-genesis-quarantine-postgres.py'
       - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
@@ -109,3 +110,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/test-quota-v2-lifetime-dimensional-postgres.py
           python3 scripts/test-quota-v2-lifetime-dimensional-postgres.py -v
+      - name: Real global SQL allocator stress - 10, 100 and 500 users, two concurrent Nodes each
+        run: |
+          python3 -m py_compile scripts/benchmark-quota-v2-postgres-allocator.py
+          python3 scripts/benchmark-quota-v2-postgres-allocator.py
