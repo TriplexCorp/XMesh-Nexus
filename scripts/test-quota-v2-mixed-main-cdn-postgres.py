@@ -59,6 +59,28 @@ def real_backfill_guard_sql():
     return match.group(1)
 
 
+def real_mixed_signed_cdn_sql():
+    source = (Path(__file__).resolve().parents[1]
+              / "backend/src/quota_v2_cdn_lifetime.rs").read_text()
+    scope = source.split("pub async fn signed_cdn_ceiling(",1)[1].split(
+        "pub async fn renew_mixed_cdn(",1)[0]
+    match = re.search(
+        r'sqlx::query_scalar\(\s*"([^"]+)"',scope,re.DOTALL)
+    if match is None:
+        raise AssertionError("production mixed signed CDN ceiling query missing")
+    return match.group(1)
+
+
+def exact_signed_cdn(conn,node):
+    # This is the actual query Nexus executes before first cap delivery or
+    # renewal. A hardcoded Python approximation would miss regressions.
+    query = "mixed_signed_"+uuid.uuid4().hex
+    conn.execute("PREPARE "+query+"(uuid,bigint,bigint) AS "+real_mixed_signed_cdn_sql())
+    return conn.execute(
+        f"EXECUTE {query}('{identity(node,'reservation')}'::uuid,{USER},{node})"
+    ).fetchone()
+
+
 def real_topup_insert_sql():
     rust = (Path(__file__).resolve().parents[1]
             / "backend/src/quota_v2_cdn_lifetime.rs").read_text()
@@ -163,6 +185,9 @@ def main():
             "WHERE reservation_id=%s",(identity(87420,"reservation"),)
         ).fetchone()[0]
         assert held_before == MIXED_REQUEST
+        assert exact_signed_cdn(conn,87420)==(MIXED_REQUEST,)
+        # A mismatch of Node cannot read another Node's CDN authorization.
+        assert exact_signed_cdn(conn,87430) is None
         # Recharge MAIN through the SAME issued mixed reservation. The
         # original CDN hold must not grow or be treated as the full ceiling.
         assert shared_reserve(conn,87420,5_000_000)==5_000_000
@@ -214,6 +239,7 @@ def main():
         )
         conn.execute(topup_sql)
         assert sql_liability(conn) == old_liability+topup_bytes
+        assert exact_signed_cdn(conn,87420)==(MIXED_REQUEST+topup_bytes,)
         assert conn.execute(
             "SELECT held_bytes FROM quota_v2_mixed_cdn_holds "
             "WHERE reservation_id=%s",(identity(87420,"reservation"),)
