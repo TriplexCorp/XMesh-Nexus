@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import secrets
 import subprocess
+import time
 
 LEASE_PATH = "/api/v1/node/quota-v2/genesis-reservation"
 CAP_PATH = "/api/v1/node/quota-v2/genesis-cap-delivery"
@@ -240,11 +241,13 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert hashlib.sha256(raw).hexdigest()==profile
         return observed
 
-    def probe(item,ceiling,observed,tag,previous=0):
+    def probe(item,ceiling,observed,tag,previous=0,barrier=None,pause_after=0):
         guest,_,_=item
         raw=guest.exec("nsenter","--target",str(observed[2]),"--net","--",
                        "python3",MEASURED+"/live-vless.py",MEASURED+"/xray-client",
-                       user["xrayId"],f"xmesh-u{uid}--{tag}",str(ceiling),str(previous),timeout=48)
+                       user["xrayId"],f"xmesh-u{uid}--{tag}",str(ceiling),str(previous),
+                       *([barrier,str(pause_after)] if barrier else []),
+                       timeout=120 if barrier else 48)
         return json.loads(raw)
 
     measurements=parallel(measure,stages)
@@ -496,56 +499,77 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         renewal={"reservationId": installed["reservationId"],
                  "previousRevision": installed["reservationRevision"]}))[0] == 409
     previous_request = None
-    for step in range(2):
-        increment = 256 * 1024
-        expected_limit += increment
-        owner.request("PATCH", user_path, {"limit": expected_limit / 1_000_000_000})
-        request = dict(original_request, requestChallenge=secrets.token_hex(32), renewal={
-            "reservationId": installed["reservationId"],
-            "previousRevision": installed["reservationRevision"],
-        })
-        results = parallel(lambda _: guest_a.request(CAP_PATH, request), range(2))
-        status, reply = results[0]
-        assert status == 200 and results[1] == (status, reply), results
-        assert reply["status"] == "committed_renewal"
-        if previous_request is not None:
-            assert guest_a.request(CAP_PATH, previous_request)[0] == 409
-        assert guest_a.request(CAP_PATH, dict(request, requestChallenge=secrets.token_hex(32)))[0] == 409
-        raw = reply["signedEnvelope"].encode()
-        doc = json.loads(raw)
-        independent_signature(root, f"renewed-{step}", doc, CAP_DOMAIN)
-        new = doc["payload"]
-        assert new["reservationRevision"] == installed["reservationRevision"] + 1
-        assert new["sharedCeilingBytes"] == cumulative + increment
-        assert new["validUntilMs"] == installed["validUntilMs"]
-        assert new["witnessedWalBytes"] == cumulative
-        command = [*commands[0][:-1], request["requestChallenge"],
-                   "--previous-revision", str(installed["reservationRevision"])]
-        receipt = json.loads(guest_a.exec(*command, timeout=48))
-        saved = guest_a.exec("cat", STATE + f"/genesis-renewal-u{uid}-r{new['reservationRevision']}.json")
-        assert json.loads(saved)["signedEnvelope"].encode() == raw
-        assert receipt == {"runtimeId":measured[3], "grantSha256":hashlib.sha256(raw).hexdigest()}
-        live = probe(item, increment, measured, tags[0], cumulative)
-        cumulative += increment
-        assert sum(live.values()) == cumulative and measure(item) == measured
-        for path, prior in list(wal_snapshots[0].items()):
-            updated = guest_a.exec("cat", path)
-            assert updated.startswith(prior) and updated != prior
-            batch = charge_request(guest_a, raw, path, updated[len(prior):])
-            status, ack = guest_a.request(WAL_PATH, batch)
-            assert status == 200, ack
-            assert guest_a.request(WAL_PATH, batch) == (200, ack)
-            charges[0].append((batch, ack))
-            wal_snapshots[0][path] = updated
-        installed = new
-        previous_request = request
+    barrier = MEASURED + "/renewal-" + secrets.token_hex(12)
+    half = 256 * 1024
+    assert cumulative >= 2 * half
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as live_pool:
+        for step, increment in enumerate((2 * half, half)):
+            expected_limit += increment
+            owner.request("PATCH", user_path, {"limit": expected_limit / 1_000_000_000})
+            request = dict(original_request, requestChallenge=secrets.token_hex(32), renewal={
+                "reservationId": installed["reservationId"],
+                "previousRevision": installed["reservationRevision"],
+            })
+            results = parallel(lambda _: guest_a.request(CAP_PATH, request), range(2))
+            status, reply = results[0]
+            assert status == 200 and results[1] == (status, reply), results
+            assert reply["status"] == "committed_renewal"
+            if previous_request is not None:
+                assert guest_a.request(CAP_PATH, previous_request)[0] == 409
+            assert guest_a.request(CAP_PATH, dict(request, requestChallenge=secrets.token_hex(32)))[0] == 409
+            raw = reply["signedEnvelope"].encode()
+            doc = json.loads(raw)
+            independent_signature(root, f"renewed-{step}", doc, CAP_DOMAIN)
+            new = doc["payload"]
+            assert new["reservationRevision"] == installed["reservationRevision"] + 1
+            assert new["sharedCeilingBytes"] == installed["sharedCeilingBytes"] + increment
+            assert new["validUntilMs"] == installed["validUntilMs"]
+            assert new["witnessedWalBytes"] == cumulative
+            command = [*commands[0][:-1], request["requestChallenge"],
+                       "--previous-revision", str(installed["reservationRevision"])]
+            receipt = json.loads(guest_a.exec(*command, timeout=48))
+            saved = guest_a.exec("cat", STATE + f"/genesis-renewal-u{uid}-r{new['reservationRevision']}.json")
+            assert json.loads(saved)["signedEnvelope"].encode() == raw
+            assert receipt == {"runtimeId":measured[3], "grantSha256":hashlib.sha256(raw).hexdigest()}
+            if step == 0:
+                active = live_pool.submit(
+                    probe, item, 3 * half, measured, tags[0], cumulative, barrier, half)
+                deadline = time.monotonic() + 30
+                while True:
+                    if active.done():
+                        raise AssertionError(f"VLESS ended before the second renewal: {active.result()}")
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("VLESS failed to reach the renewal barrier")
+                    if guest_a.exec("sh", "-c", 'test -f "$1" && printf ready || true',
+                                    "sh", barrier + ".ready") == b"ready":
+                        break
+                    time.sleep(.15)
+                cumulative += half
+            else:
+                assert not active.done(), "VLESS ended before the new cap was applied"
+                guest_a.exec("touch", barrier + ".continue")
+                live = active.result(timeout=30)
+                cumulative += 2 * half
+                assert sum(live.values()) == cumulative
+            assert measure(item) == measured
+            for path, prior in list(wal_snapshots[0].items()):
+                updated = guest_a.exec("cat", path)
+                assert updated.startswith(prior) and updated != prior
+                batch = charge_request(guest_a, raw, path, updated[len(prior):])
+                status, ack = guest_a.request(WAL_PATH, batch)
+                assert status == 200, ack
+                assert guest_a.request(WAL_PATH, batch) == (200, ack)
+                charges[0].append((batch, ack))
+                wal_snapshots[0][path] = updated
+            installed = new
+            previous_request = request
     renewal_rows = db.execute(renewals_sql).fetchall()
     assert len(renewal_rows) == 2
     rows = db.execute(lease_sql, (uid,)).fetchall()
     charged_rows = db.execute(charge_sql).fetchall()
     charged_balance = db.execute(balance_sql, (uid,)).fetchone()
     assert charged_balance == (expected_limit, account[2])
-    print("PASS: Nexus renewed the same live Xray twice, rejecting stale and concurrent duplicate allocations.")
+    print("PASS: Nexus signed both renewals; one live VLESS stream crossed its earlier ceiling after the second install.")
 
     # A repeat cannot extend/reinstall the existing positive cap.
     repeated=subprocess.run(["docker","exec",guest_a.name,*commands[0]],

@@ -101,7 +101,7 @@ def parse_stats(raw, email):
     return result
 
 
-def run(xray,uuid,email,ceiling,previous=0):
+def run(xray,uuid,email,ceiling,previous=0,barrier=None,pause_after=0):
     with tempfile.TemporaryDirectory(prefix="xmesh-vless-ns-") as work, \
          EchoServer(("127.0.0.1",ECHO),EchoHandler) as echo:
         thread=threading.Thread(target=echo.serve_forever,daemon=True)
@@ -148,7 +148,17 @@ def run(xray,uuid,email,ceiling,previous=0):
                     assert stats(xray,email)=={"uplink":previous//2,"downlink":previous//2}
                 data=b"x"*16384
                 with socks_stream() as stream:
-                    for _ in range(ceiling//(2*len(data))):
+                    for sent in range(0, ceiling, 2*len(data)):
+                        if barrier and sent == pause_after:
+                            assert stats(xray,email)=={
+                                "uplink":(previous+sent)//2,"downlink":(previous+sent)//2,
+                            }
+                            Path(barrier+".ready").touch(exist_ok=False)
+                            deadline=time.monotonic()+90
+                            while not Path(barrier+".continue").exists():
+                                if time.monotonic() >= deadline:
+                                    raise TimeoutError("quota renewal barrier expired")
+                                time.sleep(.05)
                         stream.sendall(data)
                         assert exact(stream,len(data))==data
                     try:
@@ -177,6 +187,9 @@ def run(xray,uuid,email,ceiling,previous=0):
 
 
 if __name__=="__main__":
-    assert len(sys.argv) in (5,6)
-    print(json.dumps(run(*sys.argv[1:4],*map(int,sys.argv[4:])),
+    assert len(sys.argv) in (6,8)
+    kwargs = {} if len(sys.argv)==6 else {
+        "barrier":sys.argv[6], "pause_after":int(sys.argv[7]),
+    }
+    print(json.dumps(run(*sys.argv[1:4],*map(int,sys.argv[4:6]),**kwargs),
                      sort_keys=True,separators=(",",":")))
