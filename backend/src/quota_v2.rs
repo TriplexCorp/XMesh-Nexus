@@ -1441,6 +1441,9 @@ pub async fn issue_user(
     .bind(&reservation)
     .fetch_optional(&mut *conn)
     .await?;
+    crate::quota_v2_cdn_lifetime::require_fundable_mixed(
+        conn, user_id, node_id, user, &reservation, inbound_class,
+    ).await?;
     // Keep the old outstanding amount plus ONLY the independently
     // unallocated per-Node lifetime headroom. A shared account reservation
     // must never exceed a configured Node's own remaining lifetime budget.
