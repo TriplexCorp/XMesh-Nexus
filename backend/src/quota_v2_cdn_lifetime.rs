@@ -402,6 +402,27 @@ pub async fn signed_cdn_ceiling(
     }
 }
 
+/// Independently signed CDN headroom is a separate ledger dimension.
+/// A MAIN-only renewal with no CDN spend must never refill an already full
+/// CDN window; verified CDN WAL and owner-funded free capacity are required.
+fn next_mixed_cdn_refill(
+    free: i64,
+    first_window: i64,
+    previous_cdn: i64,
+    witnessed_cdn: i64,
+    next_shared: i64,
+) -> Option<i64> {
+    if free < 0 || first_window <= 0 || previous_cdn < 0
+        || witnessed_cdn < 0 || witnessed_cdn > previous_cdn
+        || next_shared < previous_cdn
+    {
+        return None;
+    }
+    let remaining = previous_cdn.checked_sub(witnessed_cdn)?;
+    Some(free.min(first_window.saturating_sub(remaining))
+        .min(next_shared.saturating_sub(previous_cdn)).max(0))
+}
+
 /// Fund another CDN class window only from the independently uncommitted
 /// pooled CDN balance. The caller holds the per-user advisory/account locks,
 /// has authenticated the EXACT signed prior cap and attested WAL charge, and
@@ -447,10 +468,9 @@ pub async fn renew_mixed_cdn(
     if stored != previous_cdn {
         return Err(deny());
     }
-    let leftover = previous_cdn.checked_sub(committed_cdn_wal).ok_or_else(deny)?;
-    let refill = free.min(first_window.saturating_sub(leftover))
-        .min(next_shared.saturating_sub(previous_cdn))
-        .max(0);
+    let refill = next_mixed_cdn_refill(
+        free, first_window, previous_cdn, committed_cdn_wal, next_shared,
+    ).ok_or_else(deny)?;
     if refill == 0 {
         return Ok(previous_cdn);
     }
@@ -525,6 +545,18 @@ pub async fn issued_within_limit(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn only_verified_cdn_spend_and_independent_pool_funds_a_topup() {
+        assert_eq!(next_mixed_cdn_refill(0, 700, 400, 300, 1_000), Some(0));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 700, 0, 1_200), Some(0));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 700, 300, 1_200), Some(200));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 700, 500, 750), Some(50));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 400, 0, 1_200), Some(200));
+        assert_eq!(next_mixed_cdn_refill(-1, 700, 400, 100, 1_200), None);
+        assert_eq!(next_mixed_cdn_refill(100, 700, 400, 401, 1_200), None);
+        assert_eq!(next_mixed_cdn_refill(100, 700, 400, 300, 399), None);
+    }
 
     #[test]
     fn lifetime_cdn_supported_only_in_classified_safe_scope() {
