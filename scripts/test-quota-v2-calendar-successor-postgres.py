@@ -191,6 +191,30 @@ def main():
                     "(reservation_id,revision,nonce,grant_bytes,signed_envelope) "
                     "VALUES (%s,1,%s,1,%s)",
                     (next_reservation, "0" * 64, b"0" * 200), {"23514"})
+        # Attempt to bypass the zero-spend candidate ID by inserting a new
+        # reservation with the SAME meter epoch but a substituted UUID.
+        # A positive first cap must still fail before nullable payload
+        # fields or unrelated admission preflight constraints are evaluated.
+        substituted = uuid.uuid4()
+        db.execute(
+            "INSERT INTO quota_v2_reservations "
+            "(user_id,epoch,node_id,meter_epoch,reservation_id,valid_until) "
+            "VALUES(%s,%s,%s,%s,%s,%s)",
+            (user, epoch, node, next_meter, substituted,
+             datetime.now(timezone.utc) + timedelta(minutes=2)))
+        must_refuse(db,
+                    "INSERT INTO quota_v2_signed_first_cap_outbox "
+                    "(reservation_id,meter_epoch) VALUES (%s,%s)",
+                    (substituted, next_meter), {"23514"})
+        must_refuse(db,
+                    "INSERT INTO quota_v2_signed_first_cap_outbox "
+                    "(reservation_id,runtime_id) VALUES (%s,%s)",
+                    (substituted, "e" * 64), {"23514"})
+        must_refuse(db,
+                    "INSERT INTO quota_v2_cap_renewals "
+                    "(reservation_id,revision,nonce,grant_bytes,signed_envelope) "
+                    "VALUES (%s,1,%s,1,%s)",
+                    (substituted, "1" * 64, b"0" * 200), {"23514"})
         # Two independent users may enter ONE newly isolated Xray process.
         # Per-user predecessor/reservation/WAL identities must stay distinct.
         user2 = user + 1
