@@ -144,7 +144,7 @@ pub(super) async fn prepare(
         return Err(deny());
     }
     let mut tx = state.pool.begin().await?;
-    let current_user = lock_signed_user(&mut tx, req.user_id)
+    lock_signed_user(&mut tx, req.user_id)
         .await?.ok_or_else(deny)?;
     let (_open_epoch, _limit, _floor) = lock_open_account(&mut tx, req.user_id).await?;
     let earlier_epoch: String = sqlx::query_scalar(
