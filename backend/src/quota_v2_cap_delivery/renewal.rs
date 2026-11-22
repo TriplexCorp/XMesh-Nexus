@@ -345,15 +345,17 @@ async fn extend(
     let (all, cdn) =
         quota_wal_transport::committed_charge_totals(conn, &fields.reservation_id).await?;
     let held = lease.ceiling.checked_sub(all).ok_or_else(deny)?;
-    let add = free.min(lease.first_ceiling.saturating_sub(held));
+    // A separate CDN class window may need refilling while the shared/MAIN
+    // reserve still has room. Never force MAIN consumption simply to unlock
+    // independently funded CDN bytes. Shared renewals remain half-window
+    // gated; a CDN-only revision keeps the shared ceiling EXACTLY unchanged.
+    let add = if held <= lease.first_ceiling / 2 {
+        free.min(lease.first_ceiling.saturating_sub(held)).max(0)
+    } else {
+        0
+    };
     let install = now.saturating_add(30_000).min(expires.saturating_sub(1));
-    // Keep at most one original-sized window, only replenish at half-full.
-    if all != lease.wal_floor
-        || all == 0
-        || held > lease.first_ceiling / 2
-        || add <= 0
-        || install <= now
-    {
+    if all != lease.wal_floor || all == 0 || install <= now {
         return Err(deny());
     }
     let digest: String = sqlx::query_scalar(
@@ -387,6 +389,12 @@ async fn extend(
     } else {
         next_cdn_ceiling(inbound_class, false, old_cdn, ceiling).ok_or_else(deny)?
     };
+    // Both grants may remain fixed only for a pure replay (handled before
+    // extend), never for a newly committed nonce/revision. CDN-only renewals
+    // are permitted ONLY through independently committed mixed-class SQL.
+    if add == 0 && (next_cdn == old_cdn || !fixed_mixed_cdn) {
+        return Err(deny());
+    }
     payload["cdnCeilingBytes"] = json!(next_cdn);
     payload["issuedAtMs"] = json!(now);
     payload["installBeforeMs"] = json!(install);
