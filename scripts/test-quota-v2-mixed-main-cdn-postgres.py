@@ -46,7 +46,10 @@ def real_liability_sql():
     return match.group(1)
 
 
-def sql_liability(conn, name="mixed_issued"):
+def sql_liability(conn):
+    # Repeated snapshots on one PostgreSQL connection must not collide
+    # with an earlier PREPARE of the same name.
+    name = "mixed_issued_" + uuid.uuid4().hex
     conn.execute("PREPARE "+name+"(bigint) AS "+real_liability_sql())
     return conn.execute(f"EXECUTE {name}({USER})").fetchone()[0]
 
