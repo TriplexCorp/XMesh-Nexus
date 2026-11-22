@@ -71,6 +71,19 @@ pub async fn headroom(
     .fetch_one(&mut *conn)
     .await?;
 
+    // The immutable first baseline cannot erase later V1 counters from
+    // another concurrently active meter. Take the larger of the anchored
+    // and current lifetime usage as a conservative floor; overlap with V2
+    // grants can only deny excess allocation, never create free capacity.
+    let observed: Option<i64> = sqlx::query_scalar(
+        "SELECT uplink_bytes+downlink_bytes FROM user_node_quota_lifetime
+         WHERE user_id=$1 AND node_id=$2",
+    )
+    .bind(user_id)
+    .bind(node_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let baseline = baseline.max(observed.unwrap_or(0));
     // Sum ALL issued ceilings, including historical accounting epochs.
     // Never infer that an unreported/offline byte is unspent, and do not
     // confuse ACKs or conservative burns with refundable capacity.
@@ -180,5 +193,7 @@ mod tests {
         assert_eq!(remaining(5_000,1_000,7_000),0);
         assert_eq!(remaining(5_000,0,5_000),0);
         assert_eq!(remaining(5_000,4_999,0),1);
+        // Any newly reported V1 usage only raises the baseline.
+        assert_eq!(remaining(5_000,1_000.max(3_000),2_000),0);
     }
 }
