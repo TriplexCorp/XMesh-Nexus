@@ -9,6 +9,7 @@ on:
       - 'backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql'
       - 'backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql'
       - 'backend/migrations/0144_quota_v2_genesis_lease_replies.sql'
+      - 'backend/migrations/0146_quota_v2_cap_renewals.sql'
       - 'backend/migrations/0147_quota_v2_node_lifetime_baselines.sql'
       - 'backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql'
       - 'backend/migrations/0149_quota_v2_mixed_class_cdn_holds.sql'
@@ -89,6 +90,7 @@ jobs:
                   "backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql",
                   "backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql",
                   "backend/migrations/0144_quota_v2_genesis_lease_replies.sql",
+                  "backend/migrations/0146_quota_v2_cap_renewals.sql",
                   "backend/migrations/0147_quota_v2_node_lifetime_baselines.sql",
                   "backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql",
                   "backend/migrations/0149_quota_v2_mixed_class_cdn_holds.sql",
