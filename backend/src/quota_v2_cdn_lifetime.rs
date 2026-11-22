@@ -41,8 +41,9 @@ pub fn limit(user: &Value) -> Result<Option<i64>, ApiError> {
 /// network request or a hard-coded VLESS inbound tag.
 pub fn supported(user: &Value, class: &str) -> bool {
     matches!(class, "main" | "cdn" | "mixed" | "unclassified")
-        && limit(user)
-            .is_ok_and(|_| true)
+        && limit(user).is_ok_and(|quota| {
+            quota.is_none() || matches!(class, "main" | "cdn" | "mixed")
+        })
 }
 
 /// Record every reservation's original signed classification even if the
@@ -413,7 +414,7 @@ mod tests {
         assert!(supported(&user, "main"));
         assert!(supported(&user, "cdn"));
         assert!(supported(&user, "mixed"));
-        assert!(supported(&user, "unclassified"));
+        assert!(!supported(&user, "unclassified"));
         assert!(supported(&json!({"cdnLimitGb":0}), "mixed"));
         for bad in [json!(null),json!(-1),json!("1"),json!(1_000_001)] {
             assert!(limit(&json!({"cdnLimitGb":bad})).is_err());
