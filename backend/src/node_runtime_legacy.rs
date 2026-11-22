@@ -2408,10 +2408,14 @@ fn first_genesis_cap_aliases(
     Ok(aliases)
 }
 
-// The rehearsal has only a shared global reservation ledger. Never
-// translate independent Node/CDN quotas into a global bootstrap allowance.
+// Lifetime per-Node reservations are independently bounded by the
+// immutable PostgreSQL baseline and ALL historical issued ceilings.
+// UTC-window Node quotas and CDN budgets still require separate period
+// reserve ledgers; never silently translate them into a global allowance.
 pub fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_cdn: bool) -> bool {
-    if !matches!(crate::node_user_quotas::rule_for(user, node_id), Ok(None)) {
+    if !crate::node_user_quotas::rule_for(user, node_id)
+        .is_ok_and(|rule| rule.is_none_or(|limit| limit.period == "lifetime"))
+    {
         return false;
     }
     if has_cdn {
@@ -2477,8 +2481,8 @@ mod first_genesis_rehearsal_limit_tests {
         for period in ["daily", "weekly", "monthly", "lifetime"] {
             let limited = json!({"limit":2,
                 "nodeTrafficLimits":{"47":{"limitGb":0.000_000_001,"period":period}}});
-            assert!(!supported(&limited, 47, false));
-            assert!(!supported(&limited, 47, true));
+            assert_eq!(supported(&limited, 47, false), period == "lifetime");
+            assert_eq!(supported(&limited, 47, true), period == "lifetime");
             assert!(supported(&limited, 48, false));
         }
         for malformed in [json!(null), json!([]), json!({"47":{"limitGb":0}})] {
