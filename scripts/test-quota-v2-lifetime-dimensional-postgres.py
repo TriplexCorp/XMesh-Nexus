@@ -117,7 +117,7 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1]
                   / "backend/src/quota_v2_node_lifetime.rs").read_text()
         match = re.search(
-            r'let committed: bool = sqlx::query_scalar\\(\\s*"([^"]+)"',
+            r'let committed: bool = sqlx::query_scalar\(\s*"([^"]+)"',
             source, re.DOTALL)
         self.assertIsNotNone(match, "production Node cap guard not found")
         production_sql = match.group(1)
@@ -152,12 +152,12 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
                 "UPDATE user_node_quota_lifetime SET uplink_bytes=%s "
                 "WHERE user_id=%s AND node_id=%s",(250_000,USER,node))
             self.assertFalse(db.execute(check,(USER,node,limit)).fetchone()[0])
-            # Decreasing a reported V1 counter is not a recognized refund.
-            # At minimum the immutable historical floor must remain charged.
+            # More verified cumulative V1 consumption cannot increase
+            # available V2 capacity or reactivate a signed stale grant.
             db.execute(
                 "UPDATE user_node_quota_lifetime SET uplink_bytes=%s "
-                "WHERE user_id=%s AND node_id=%s",(50_000,USER,node))
-            self.assertTrue(db.execute(check,(USER,node,limit)).fetchone()[0])
+                "WHERE user_id=%s AND node_id=%s",(300_000,USER,node))
+            self.assertFalse(db.execute(check,(USER,node,limit)).fetchone()[0])
 
     def test_immutable_class_scope_and_baseline(self):
         with psycopg.connect(DSN) as db:
