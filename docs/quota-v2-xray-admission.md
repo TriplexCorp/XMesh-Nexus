@@ -79,6 +79,9 @@ overlapping CDN commitments across all nodes. Mixed reservations account for
 their immutable CDN sub-cap and funded CDN top-ups. MAIN-only reservations
 are outside this pool. When a mixed reservation has both a Node window and
 a CDN window, its shared signed permit expires at the earlier deadline.
+Xray closes idle transports for that permit's user at its monotonic deadline.
+The pre-write and post-fsync checks also reject spending at the signed
+deadline while retaining any intent that already reached durable storage.
 
 A periodic V2 reservation needs an immutable accounting epoch and an expiry
 at or before the next applicable UTC boundary. A later period may open only
