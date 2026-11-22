@@ -44,6 +44,28 @@ fn challenge(predecessor: &str, runtime: &str) -> String {
     format!("{:x}", Sha256::digest(prefix.as_bytes()))
 }
 
+fn confirmed_old_heads_hash(heads: &[(String,i64,String,i64)]) -> Result<String,ApiError> {
+    // Cross-language canonical bytes MUST match Agent
+    // calendar_fence._verified_old_wal_charge_heads. PostgreSQL's
+    // DISTINCT ON filename result is sorted ASC by filename.
+    let mut last_name = "";
+    let mut json_heads = Vec::with_capacity(heads.len());
+    for (name,sequence,digest,bytes) in heads {
+        if name.as_str() <= last_name || *sequence<=0 || *bytes<=0
+            || !super::hex64(digest)
+            || !name.starts_with("meter-") || !name.ends_with(".jsonl") {
+            return Err(deny());
+        }
+        json_heads.push(json!({
+            "filename":name, "lastSequence":sequence,
+            "lastDigest":digest, "conservativeBytes":bytes
+        }));
+        last_name=name;
+    }
+    Ok(format!("{:x}",Sha256::digest(
+        serde_json::to_vec(&json_heads).map_err(|_|deny())?)))
+}
+
 fn request_valid(req: &Request, fields: &RequestFields) -> bool {
     canonical_id(&fields.predecessor_id)
         && req.challenge == challenge(&fields.predecessor_id,&fields.fresh_runtime_id)
@@ -163,20 +185,14 @@ async fn signed_predecessor(
     .fetch_all(&mut *conn).await?;
     let mut canonical_heads = Vec::with_capacity(old_heads.len());
     for row in &old_heads {
-        let filename: String=row.try_get("filename")?;
-        let last_sequence: i64=row.try_get("last_sequence")?;
-        let last_digest: String=row.try_get("last_digest")?;
-        let bytes: i64=row.try_get("stream_bytes")?;
-        if last_sequence<=0 || bytes<=0 || !super::hex64(&last_digest) {
-            return Err(deny());
-        }
-        canonical_heads.push(json!({
-            "filename":filename, "lastSequence":last_sequence,
-            "lastDigest":last_digest, "conservativeBytes":bytes
-        }));
+        canonical_heads.push((
+            row.try_get::<String,_>("filename")?,
+            row.try_get::<i64,_>("last_sequence")?,
+            row.try_get::<String,_>("last_digest")?,
+            row.try_get::<i64,_>("stream_bytes")?,
+        ));
     }
-    let expected_heads = format!("{:x}",Sha256::digest(
-        serde_json::to_vec(&canonical_heads).map_err(|_|deny())?));
+    let expected_heads = confirmed_old_heads_hash(&canonical_heads)?;
     if expected_heads != fields.old_wal_charge_heads_sha256 {
         return Err(deny());
     }
@@ -454,6 +470,21 @@ pub(super) async fn issue(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn old_wal_charge_head_sha256_exactly_matches_agent_canonical_json() {
+        let empty: Vec<(String,i64,String,i64)>=vec![];
+        assert_eq!(confirmed_old_heads_hash(&empty).unwrap(),
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945");
+        let rows = vec![
+            (format!("meter-{}.jsonl","a".repeat(64)),2,"b".repeat(64),123),
+            (format!("meter-{}.jsonl","c".repeat(64)),1,"d".repeat(64),456),
+        ];
+        assert_eq!(confirmed_old_heads_hash(&rows).unwrap(),
+            "d0f329fe6cd8f43ff9677ff16a4b276a3b20c6566ba7d0e6dbe267d24281f64c");
+        assert!(confirmed_old_heads_hash(&rows.iter().rev().cloned().collect::<Vec<_>>()).is_err());
+        assert!(confirmed_old_heads_hash(&[(
+            rows[0].0.clone(),0,rows[0].2.clone(),123)]).is_err());
+    }
     #[test]
     fn successor_challenge_is_process_and_predecessor_bound() {
         let p="33333333-3333-4333-8333-333333333333";
