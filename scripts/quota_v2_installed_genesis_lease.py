@@ -230,7 +230,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert len(rows)==2 and all(r[2]>0 and r[3] and r[4]==0 for r in rows),rows
     account=db.execute("SELECT limit_bytes,settled_bytes,observed_floor_bytes "
                        "FROM quota_v2_accounts WHERE user_id=%s AND NOT closed",(uid,)).fetchone()
-    assert rows[0][2] == node_a_lifetime, ("Node lifetime cap not enforced",rows)
+    assert {row[0]:row[2] for row in rows}[guest_a.node] == node_a_lifetime, ("Node lifetime cap not enforced",rows)
     baseline=db.execute("SELECT baseline_bytes FROM quota_v2_node_lifetime_baselines "
         "WHERE user_id=%s AND node_id=%s",(uid,guest_a.node)).fetchone()
     assert baseline == (0,), ("Node lifetime baseline missing",baseline)
