@@ -4,6 +4,7 @@
 //! The existing allocator ceiling is already held in PostgreSQL. This API
 //! retains the same reservation and runtime on renewal.
 mod renewal;
+mod successor;
 use crate::{
     ApiError, AppState, node_auth,
     node_runtime::FirstGenesisCapPolicyScope,
@@ -30,6 +31,7 @@ struct Request {
     challenge: String,
     measurement: Option<Measurement>,
     renewal: Option<renewal::RequestFields>,
+    calendar_successor: Option<successor::RequestFields>,
 }
 
 #[derive(Deserialize)]
@@ -62,6 +64,8 @@ fn valid(req: &Request) -> bool {
     req.node_id > 0
         && req.user_id > 0
         && hex64(&req.challenge)
+        && (req.calendar_successor.is_none()
+            || (req.renewal.is_none() && req.measurement.is_none()))
         && req.measurement.as_ref().is_none_or(|measurement| {
             measurement.host_pid > 0
                 && hex64(&measurement.runtime_id)
@@ -90,7 +94,12 @@ pub async fn handle(
     }
     let activation =
         node_auth::authenticate_product_activation(&state, &headers, req.node_id, PATH).await?;
-    let (status, exact) = if let Some(ref fields) = req.renewal {
+    let (status, exact) = if let Some(ref fields) = req.calendar_successor {
+        (
+            "prepared_calendar_successor",
+            successor::prepare(&state, &req, fields, activation).await?,
+        )
+    } else if let Some(ref fields) = req.renewal {
         (
             "committed_renewal",
             renewal::issue(&state, &req, fields, activation).await?,
