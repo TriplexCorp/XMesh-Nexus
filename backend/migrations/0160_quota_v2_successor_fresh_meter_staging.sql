@@ -75,8 +75,7 @@ BEGIN
       FROM quota_v2_reservations r
       JOIN quota_v2_calendar_closures c ON c.reservation_id=r.reservation_id
       WHERE r.reservation_id=NEW.predecessor_id;
-    IF
-       OR NEW.node_id IS DISTINCT FROM previous.node_id
+    IF NEW.node_id IS DISTINCT FROM previous.node_id
        OR NEW.user_id IS DISTINCT FROM previous.user_id
        OR NEW.account_epoch IS DISTINCT FROM previous.account_epoch
        OR NEW.candidate_meter_epoch IS DISTINCT FROM previous.candidate_meter_epoch
