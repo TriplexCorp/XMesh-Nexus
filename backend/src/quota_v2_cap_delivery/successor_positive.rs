@@ -207,8 +207,8 @@ async fn existing_signed(
         || payload["runtimeId"]!=fields.fresh_runtime_id
         || payload["reservationId"]!=reservation
         || payload["meterEpoch"]!=meter
-        || serde_json::to_vec(&parsed).map_err(|_|deny())? != signed[..signed.len()-1]
-            && serde_json::to_vec(&parsed).map_err(|_|deny())? != signed
+        || !matches!(serde_json::to_vec(&parsed),Ok(ref canonical)
+                if signed == *canonical || signed == [canonical.as_slice(), b"\n"].concat())
     {
         return Err(deny());
     }
@@ -234,9 +234,6 @@ pub(super) async fn issue(
         || !crate::quota_v2_cdn_lifetime::supported(&user,class)
     {return Err(deny());}
     let (epoch,limit,floor)=lock_open_account(&mut tx,req.user_id).await?;
-    if node_runtime::first_genesis_active_until(&user,1,1)==false
-        && crate::quota_v2::authoritative_shared_limit(&user).ok()!=Some(limit)
-    {return Err(deny());}
     let now=database_now_ms(&mut tx).await?;
     if !node_runtime::first_genesis_active_until(&user,now,now.saturating_add(120_000))
         || crate::quota_v2::authoritative_shared_limit(&user).ok()!=Some(limit)
