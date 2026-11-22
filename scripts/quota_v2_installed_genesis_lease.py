@@ -184,7 +184,10 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     # or its compiled config, so the current plan must be checked separately.
     user_path=f"/collections/users/{uid}"
     owner.request("PATCH",user_path,{
-        "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.000000001,"period":"daily"}},
+        "nodeTrafficLimits":{
+            str(guest_a.node):{"limitGb":0.000000001,"period":"daily"},
+            str(guest_b.node):{"limitGb":0.000000001,"period":"daily"},
+        },
         "cdnLimitGb":0.000000001,
     })
     try:
@@ -200,10 +203,11 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     # This lifetime Node rule is conservative and independently bounded:
     # A has 700 KiB, while the two-Node shared balance is 1.5 MiB.
     node_a_lifetime = 716800
+    cdn_pool_lifetime = 1_572_864 - node_a_lifetime
     owner.request("PATCH",user_path,{
         "nodeTrafficLimits":{str(guest_a.node):{
             "limitGb":node_a_lifetime/1_000_000_000,"period":"lifetime"}},
-        "cdnLimitGb":0,
+        "cdnLimitGb":cdn_pool_lifetime/1_000_000_000,
     })
 
     # Deliberately abandon both first authenticated replies (no Node disk
@@ -234,6 +238,15 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     baseline=db.execute("SELECT baseline_bytes FROM quota_v2_node_lifetime_baselines "
         "WHERE user_id=%s AND node_id=%s",(uid,guest_a.node)).fetchone()
     assert baseline == (0,), ("Node lifetime baseline missing",baseline)
+    assert {row[0]:row[2] for row in rows}[guest_b.node] == cdn_pool_lifetime, (
+        "Shared lifetime CDN pool not enforced",rows)
+    assert db.execute(
+        "SELECT baseline_bytes FROM quota_v2_cdn_lifetime_baselines WHERE user_id=%s",
+        (uid,)).fetchone() == (0,)
+    assert db.execute(
+        "SELECT node_id,class FROM quota_v2_reservation_classes "
+        "WHERE user_id=%s ORDER BY node_id",(uid,)).fetchall() == [
+            (guest_a.node,"main"),(guest_b.node,"cdn")]
     assert max(account[1],account[2])+sum(r[2] for r in rows)==account[0],(rows,account)
     retried=parallel(lambda item:helper(item,"confirm"),stages)
     assert retried==confirmed
@@ -344,7 +357,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     finally:
         owner.request("PATCH",user_path,{
             "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.003,"period":"lifetime"}},
-            "cdnLimitGb":0,
+            "cdnLimitGb":cdn_pool_lifetime/1_000_000_000,
         })
 
     # Lowering only A's lifetime quota below its already committed grant
@@ -363,7 +376,27 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         owner.request("PATCH",user_path,{
             "nodeTrafficLimits":{str(guest_a.node):{
                 "limitGb":0.003,"period":"lifetime"}},
-            "cdnLimitGb":0,
+            "cdnLimitGb":cdn_pool_lifetime/1_000_000_000,
+        })
+
+    # Lowering the GLOBAL CDN pool below already issued B ceiling must deny
+    # B's signed cap while MAIN on A remains available. No reclaim or
+    # untrusted remote report can release that outstanding CDN reservation.
+    owner.request("PATCH",user_path,{
+        "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.003,"period":"lifetime"}},
+        "cdnLimitGb":0.000000001,
+    })
+    try:
+        assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==200
+        assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==409
+        assert db.execute(
+            "SELECT node_id,request_challenge,signed_envelope "
+            "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id"
+        ).fetchall()==original_caps
+    finally:
+        owner.request("PATCH",user_path,{
+            "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.003,"period":"lifetime"}},
+            "cdnLimitGb":cdn_pool_lifetime/1_000_000_000,
         })
 
     # A signed spending-only cap cannot outlive a shortened subscription.
