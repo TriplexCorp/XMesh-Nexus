@@ -160,6 +160,11 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
         return Err(deny());
     }
     check_conservation(&mut tx, req.user_id, &epoch, limit, floor).await?;
+    if !crate::quota_v2_node_lifetime::issued_within_limit(
+        &mut tx, req.user_id, req.node_id, &current_user,
+    ).await? {
+        return Err(deny());
+    }
     let mut row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     if row.is_none() {
         let measurement = req.measurement.as_ref().ok_or_else(deny)?;
