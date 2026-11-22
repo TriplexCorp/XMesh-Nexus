@@ -12,6 +12,7 @@ on:
       - 'backend/Cargo.toml'
       - 'backend/migrations/014*.sql'
       - 'backend/migrations/015*.sql'
+      - 'backend/migrations/016*.sql'
       - 'deploy/xsp-v2-product-gateway/**'
       - 'scripts/run-quota-wal-transport-audit.sh'
       - 'scripts/test-quota-wal-installed.py'
@@ -53,12 +54,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: f20f01cee7d984c1a3e64bba7987045076dca342
+          ref: a2253d9a3b9d319186a072c514d40659c9f16a58
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 'f20f01cee7d984c1a3e64bba7987045076dca342'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 'a2253d9a3b9d319186a072c514d40659c9f16a58'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py
       - uses: dtolnay/rust-toolchain@stable
