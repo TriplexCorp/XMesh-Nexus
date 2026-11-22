@@ -87,7 +87,32 @@ def verify_calendar_closure(db, dsn):
                       (user,)).fetchone() == (17,)
     assert db.execute("SELECT acknowledged_bytes,ceiling_bytes FROM quota_v2_reservations "
                       "WHERE reservation_id=%s", (reservation,)).fetchone() == (17, 30)
-    print("PASS: calendar closure is immutable and idempotent; late debt and holds survive")
+    # Closing a calendar must not allow same-revision, same-expiry updates
+    # that fabricate capacity, lower a debt floor or move the reservation
+    # to another identity. 0158 narrows the original 0155 trigger.
+    for command, arguments in (
+        ("UPDATE quota_v2_reservations SET ceiling_bytes=31 "
+         "WHERE reservation_id=%s", (reservation,)),
+        ("UPDATE quota_v2_reservations SET acknowledged_bytes=16 "
+         "WHERE reservation_id=%s", (reservation,)),
+        ("UPDATE quota_v2_reservations SET reservation_id=%s "
+         "WHERE reservation_id=%s", (uuid4(), reservation)),
+    ):
+        try:
+            db.execute(command, arguments)
+        except psycopg.errors.CheckViolation as error:
+            assert error.diag.message_primary == "calendar reservation is permanently closed"
+        else:
+            raise AssertionError("closed calendar allowed a forbidden identity/debt/cap update")
+    # Genuine late, even above-ceiling consumption remains debt in the
+    # original epoch, never a fresh spend entitlement.
+    db.execute("SELECT quota_v2_ack(%s,%s,201,%s,%s,35)",
+               (user, epoch, meter, reservation))
+    assert db.execute("SELECT acknowledged_bytes,ceiling_bytes FROM quota_v2_reservations "
+                      "WHERE reservation_id=%s", (reservation,)).fetchone() == (35, 35)
+    assert db.execute("SELECT settled_bytes FROM quota_v2_accounts WHERE user_id=%s",
+                      (user,)).fetchone() == (35,)
+    print("PASS: calendar closure is immutable; only monotone late debt, not new capacity")
 
 
 def verify_stream_owner(db, dsn):
