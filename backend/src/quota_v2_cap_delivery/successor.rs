@@ -110,13 +110,14 @@ async fn original_predecessor(
                 f.meter_epoch::text AS meter_epoch,
                 f.runtime_id AS predecessor_runtime_id,
                 f.policy_sha256,f.valid_until_ms
-         FROM quota_v2_signed_first_cap_outbox f
+         FROM quota_v2_wal_admission_caps f
          JOIN quota_v2_reservations r ON r.reservation_id=f.reservation_id
               AND r.node_id=f.node_id AND r.user_id=f.user_id
               AND r.epoch=f.epoch AND r.meter_epoch=f.meter_epoch
          JOIN quota_v2_calendar_closures c ON c.reservation_id=r.reservation_id
          JOIN quota_v2_genesis_quarantine_policies q ON q.node_id=f.node_id
-              AND q.runtime_id=f.runtime_id AND q.policy_sha256=f.policy_sha256
+              AND (q.runtime_id=f.runtime_id OR f.successor)
+              AND q.policy_sha256=f.policy_sha256
          JOIN node_xsp_product_nodes p ON p.node_id=f.node_id
               AND p.state='active' AND encode(p.receipt_sha256,'hex')=$4
          JOIN node_xsp_public_keysets k ON k.node_id=p.node_id
@@ -126,13 +127,15 @@ async fn original_predecessor(
          JOIN panel_records n ON n.id=f.node_id AND n.collection='nodes'
          WHERE f.reservation_id=$1::uuid AND f.node_id=$2 AND f.user_id=$3
            AND f.signer_public_key=$5 AND q.first_activation_sha256=$4
+           AND convert_from(f.signed_envelope,'UTF8')::jsonb
+               ->'payload'->>'activationReceiptSha256'=$4
            AND r.node_confirmed
            AND (n.data->'disabled') IS DISTINCT FROM 'true'::jsonb
            AND f.valid_until_ms <= $6
            AND c.observed_at >= c.boundary_at
            AND NOT EXISTS (SELECT 1 FROM quota_v2_revocation_requests v
               WHERE v.reservation_id=r.reservation_id)
-         FOR SHARE OF f,r,c,q,p,k,n"
+         FOR SHARE OF r,c,q,p,k,n"
     )
     .bind(&req.calendar_successor.as_ref().ok_or_else(deny)?.predecessor_id)
     .bind(req.node_id)

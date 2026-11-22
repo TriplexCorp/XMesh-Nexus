@@ -34,6 +34,7 @@ struct Cap {
     runtime_id: String,
     grant_bytes: i64,
     signed_envelope: Vec<u8>,
+    successor: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -95,7 +96,8 @@ async fn lock_account(
     reservation: &str,
 ) -> Result<Cap, ApiError> {
     let initial = sqlx::query_as::<_, Cap>(
-        "SELECT user_id, epoch::text, meter_epoch::text, runtime_id, grant_bytes, signed_envelope
+        "SELECT user_id, epoch::text, meter_epoch::text, runtime_id, grant_bytes, signed_envelope,
+                false AS successor
            FROM quota_v2_signed_first_cap_outbox WHERE node_id=$1 AND reservation_id=$2::uuid",
     )
     .bind(node_id)
@@ -111,7 +113,7 @@ async fn lock_account(
         None => sqlx::query_as::<_, Cap>(
             "SELECT user_id, account_epoch::text AS epoch,
                     meter_epoch::text, fresh_runtime_id AS runtime_id,
-                    grant_bytes, signed_envelope
+                    grant_bytes, signed_envelope, true AS successor
              FROM quota_v2_calendar_successor_positive_caps
              WHERE node_id=$1 AND reservation_id=$2::uuid",
         )
@@ -133,18 +135,17 @@ async fn lock_account(
         .await?;
     // There is no successor renewal protocol yet. The legacy renewal
     // table is permanently forbidden from mixing with this new WAL epoch.
-    if from_first_genesis {
-        if let Some((ceiling, envelope)) = sqlx::query_as::<_, (i64, Vec<u8>)>(
+    if from_first_genesis
+        && let Some((ceiling, envelope)) = sqlx::query_as::<_, (i64, Vec<u8>)>(
             "SELECT grant_bytes,signed_envelope FROM quota_v2_cap_renewals
              WHERE reservation_id=$1::uuid ORDER BY revision DESC LIMIT 1",
         )
         .bind(reservation)
         .fetch_optional(conn)
         .await?
-        {
-            cap.grant_bytes = ceiling;
-            cap.signed_envelope = envelope;
-        }
+    {
+        cap.grant_bytes = ceiling;
+        cap.signed_envelope = envelope;
     }
     Ok(cap)
 }
@@ -206,6 +207,7 @@ async fn load_anchored_birth(
     node_id: i64,
     activation: &str,
     filename: &str,
+    runtime: Option<&str>,
 ) -> Result<Birth, ApiError> {
     let still_enrolled = sqlx::query_scalar::<_, i32>(
         "SELECT 1 FROM node_xsp_product_nodes p
@@ -225,13 +227,24 @@ async fn load_anchored_birth(
     if still_enrolled.is_none() {
         return Err(conflict());
     }
-    let index: Vec<u8> = sqlx::query_scalar(
-        "SELECT inventory_bytes FROM quota_v2_external_wal_birth_anchors
+    let index: Vec<u8> = if let Some(runtime) = runtime {
+        sqlx::query_scalar(
+            "SELECT inventory_bytes FROM quota_v2_runtime_wal_anchors
+             WHERE node_id=$1 AND runtime_id=$2 ORDER BY inventory_sequence DESC LIMIT 1",
+        )
+        .bind(node_id)
+        .bind(runtime)
+        .fetch_optional(conn)
+        .await?
+    } else {
+        sqlx::query_scalar(
+            "SELECT inventory_bytes FROM quota_v2_external_wal_birth_anchors
          WHERE node_id=$1 ORDER BY inventory_sequence DESC LIMIT 1",
-    )
-    .bind(node_id)
-    .fetch_optional(&mut *conn)
-    .await?
+        )
+        .bind(node_id)
+        .fetch_optional(&mut *conn)
+        .await?
+    }
     .ok_or_else(conflict)?;
     if index.len() > INDEX_LIMIT {
         return Err(conflict());
@@ -354,7 +367,14 @@ pub(super) async fn charge(
     .bind(node_id)
     .fetch_one(&mut *tx)
     .await?;
-    let birth = load_anchored_birth(&mut tx, node_id, activation, filename).await?;
+    let birth = load_anchored_birth(
+        &mut tx,
+        node_id,
+        activation,
+        filename,
+        cap.successor.then_some(cap.runtime_id.as_str()),
+    )
+    .await?;
     let (is_cdn, cdn_ceiling) =
         cap_cdn_ceiling(state, &cap, &birth, activation, node_id, reservation)?;
     // Charge transactions may arrive after Xray has stopped at the

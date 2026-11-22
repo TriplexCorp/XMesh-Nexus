@@ -39,6 +39,7 @@ const HEAD_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_REMOTE_WAL_HEAD_V1\0";
 enum Request {
     Store {
         node_id: i64,
+        runtime_id: Option<String>,
         witness: String,
         inventory: String,
         inventory_encoding: Option<InventoryEncoding>,
@@ -52,12 +53,18 @@ enum Request {
     Head {
         node_id: i64,
         challenge: String,
+        runtime_id: Option<String>,
     },
     PrepareGenesis {
         node_id: i64,
         candidate_runtime_id: String,
         challenge: String,
     },
+}
+
+struct RuntimeScope<'a> {
+    id: &'a str,
+    activation: &'a str,
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -247,6 +254,64 @@ fn check_first_cap_history(index: &[u8], user_id: i64, runtime: &str) -> Result<
     Ok(())
 }
 
+pub async fn require_closed_stream_charges(
+    conn: &mut PgConnection,
+    node_id: i64,
+    user_id: i64,
+    runtime: &str,
+    successor: bool,
+    heads: &[(String, i64, String, i64)],
+) -> Result<(), ApiError> {
+    let (index, hash): (Vec<u8>, String) = if successor {
+        sqlx::query_as(
+            "SELECT inventory_bytes,inventory_sha256 FROM quota_v2_runtime_wal_anchors
+             WHERE node_id=$1 AND runtime_id=$2 ORDER BY inventory_sequence DESC LIMIT 1",
+        )
+        .bind(node_id)
+        .bind(runtime)
+        .fetch_optional(conn)
+        .await?
+    } else {
+        sqlx::query_as(
+            "SELECT inventory_bytes,inventory_sha256 FROM quota_v2_external_wal_birth_anchors
+             WHERE node_id=$1 ORDER BY inventory_sequence DESC LIMIT 1",
+        )
+        .bind(node_id)
+        .fetch_optional(conn)
+        .await?
+    }
+    .ok_or_else(conflict)?;
+    if sha256(&index) != hash {
+        return Err(conflict());
+    }
+    check_closed_stream_charges(&index, user_id, runtime, heads)
+}
+
+fn check_closed_stream_charges(
+    index: &[u8],
+    user_id: i64,
+    runtime: &str,
+    heads: &[(String, i64, String, i64)],
+) -> Result<(), ApiError> {
+    let prefix = format!("xmesh-u{user_id}--");
+    let lines = index.strip_suffix(b"\n").ok_or_else(conflict)?;
+    let mut charged: std::collections::HashSet<&str> =
+        heads.iter().map(|(name, _, _, _)| name.as_str()).collect();
+    for line in lines.split(|byte| *byte == b'\n') {
+        let birth: Birth = serde_json::from_slice(line).map_err(|_| conflict())?;
+        if birth.runtime_id == runtime
+            && birth.email.starts_with(&prefix)
+            && !charged.remove(birth.filename.as_str())
+        {
+            return Err(conflict());
+        }
+    }
+    if !charged.is_empty() {
+        return Err(conflict());
+    }
+    Ok(())
+}
+
 fn verify_index(index: &[u8], witness: &Witness) -> Result<(), ApiError> {
     let raw_lines = index.strip_suffix(b"\n").ok_or_else(invalid)?;
     let mut previous = "0".repeat(64);
@@ -408,12 +473,42 @@ async fn store(
     witness: &str,
     inventory: &str,
     encoding: Option<InventoryEncoding>,
+    scope: Option<RuntimeScope<'_>>,
 ) -> Result<Value, ApiError> {
     let raw = decode(witness, WITNESS_LIMIT)?;
     let index = unpack_index(inventory, encoding)?;
     let mut tx = state.pool.begin().await?;
     let key = enrolled_key(&mut tx, node_id).await?;
     let w = verify_witness(&raw, &index, node_id, &key)?;
+    if let Some(ref scope) = scope {
+        let aliases: std::collections::HashSet<String> = sqlx::query_scalar(
+            "SELECT DISTINCT alias->>'email'
+               FROM quota_v2_calendar_successor_positive_caps c
+               JOIN quota_v2_calendar_successor_meter_preflights p USING(predecessor_id)
+               CROSS JOIN LATERAL jsonb_array_elements(
+                   convert_from(c.signed_envelope,'UTF8')::jsonb->'payload'->'aliasScopes'
+               ) alias
+              WHERE c.node_id=$1 AND c.fresh_runtime_id=$2 AND p.fresh_container_id=$3
+                AND p.fresh_started_at=$4::text::timestamptz
+                AND convert_from(c.signed_envelope,'UTF8')::jsonb
+                    ->'payload'->>'activationReceiptSha256'=$5",
+        )
+        .bind(node_id)
+        .bind(scope.id)
+        .bind(&w.old_container_id)
+        .bind(&w.old_started_at)
+        .bind(scope.activation)
+        .fetch_all(&mut *tx)
+        .await?
+        .into_iter()
+        .collect();
+        for line in index[..index.len() - 1].split(|byte| *byte == b'\n') {
+            let birth: Birth = serde_json::from_slice(line).map_err(|_| invalid())?;
+            if birth.runtime_id != scope.id || !aliases.contains(&birth.email) {
+                return Err(conflict());
+            }
+        }
+    }
     // Never commit a large head that Nexus cannot deliver in the fixed envelope.
     if index.len() > WIRE_INDEX_LIMIT {
         pack_index(&index)?;
@@ -422,6 +517,37 @@ async fn store(
     sqlx::query("SET LOCAL synchronous_commit TO on")
         .execute(&mut *tx)
         .await?;
+    if let Some(scope) = scope {
+        let bootstrap = sqlx::query_scalar(
+            "SELECT quota_v2_store_runtime_wal_anchor($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        )
+        .bind(node_id)
+        .bind(scope.id)
+        .bind(w.inventory_sequence)
+        .bind(&w.inventory_sha256)
+        .bind(&w.inventory_tail_digest)
+        .bind(&fingerprint)
+        .bind(&w.old_container_id)
+        .bind(&w.old_started_at)
+        .bind(&index)
+        .bind(&raw)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| {
+            if e.as_database_error()
+                .and_then(sqlx::error::DatabaseError::code)
+                .as_deref()
+                == Some("22023")
+            {
+                conflict()
+            } else {
+                ApiError::from(e)
+            }
+        })?;
+        tx.commit().await?;
+        let ack = receipt(&state.node_policy_signer, &w, &fingerprint, bootstrap)?;
+        return Ok(json!({"receipt": STANDARD.encode(ack)}));
+    }
     let bootstrap: bool = sqlx::query_scalar(
         "SELECT first_external_witness FROM quota_v2_store_external_wal_birth_anchor($1,$2,$3,$4,$5,$6,$7,$8)",
     ).bind(node_id).bind(w.inventory_sequence).bind(&w.inventory_sha256)
@@ -459,23 +585,42 @@ async fn store(
     Ok(json!({"receipt":STANDARD.encode(ack)}))
 }
 
-async fn head(state: &AppState, node_id: i64, challenge: &str) -> Result<Value, ApiError> {
+async fn head(
+    state: &AppState,
+    node_id: i64,
+    challenge: &str,
+    runtime: Option<&str>,
+) -> Result<Value, ApiError> {
     if !lower_hex(challenge, 64) {
         return Err(invalid());
     }
     let mut tx = state.pool.begin().await?;
     let key = enrolled_key(&mut tx, node_id).await?;
-    let row = sqlx::query_as::<_, Anchor>(
-        "SELECT a.inventory_sequence,a.inventory_sha256,a.inventory_tail_digest,
+    let row = if let Some(runtime) = runtime {
+        sqlx::query_as::<_, Anchor>(
+            "SELECT inventory_sequence,inventory_sha256,inventory_tail_digest,
+                    original_node_witness_sha256,old_container_id,old_started_at,
+                    inventory_bytes,first_external_witness,witness_bytes
+               FROM quota_v2_runtime_wal_anchors
+              WHERE node_id=$1 AND runtime_id=$2 ORDER BY inventory_sequence DESC LIMIT 1",
+        )
+        .bind(node_id)
+        .bind(runtime)
+        .fetch_optional(&mut *tx)
+        .await?
+    } else {
+        sqlx::query_as::<_, Anchor>(
+            "SELECT a.inventory_sequence,a.inventory_sha256,a.inventory_tail_digest,
                 a.original_node_witness_sha256,a.old_container_id,a.old_started_at,
                 a.inventory_bytes,a.first_external_witness,s.witness_bytes
            FROM quota_v2_external_wal_birth_anchors AS a
            LEFT JOIN quota_v2_external_wal_birth_sources AS s USING(node_id,inventory_sequence)
           WHERE a.node_id=$1 ORDER BY a.inventory_sequence DESC LIMIT 1",
-    )
-    .bind(node_id)
-    .fetch_optional(&mut *tx)
-    .await?
+        )
+        .bind(node_id)
+        .fetch_optional(&mut *tx)
+        .await?
+    }
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "No committed WAL checkpoint."))?;
     tx.commit().await?;
     let raw = row.witness_bytes.ok_or_else(conflict)?;
@@ -498,15 +643,15 @@ async fn head(state: &AppState, node_id: i64, challenge: &str) -> Result<Value, 
     )?;
     // This independent proof binds the PostgreSQL snapshot and receipt to
     // the caller's fresh challenge. A reusable stored receipt has no challenge.
-    let proof = signed(
-        &state.node_policy_signer,
-        HEAD_DOMAIN,
-        &json!({
-            "schemaVersion":1, "kind":"xmesh.quota-v2.external-wal-head",
-            "nodeId":node_id, "challenge":challenge, "sequence":row.inventory_sequence,
-            "registrySha256":row.inventory_sha256, "receiptSha256":sha256(&ack),
-        }),
-    )?;
+    let mut head_claim = json!({
+        "schemaVersion":1, "kind":"xmesh.quota-v2.external-wal-head",
+        "nodeId":node_id, "challenge":challenge, "sequence":row.inventory_sequence,
+        "registrySha256":row.inventory_sha256, "receiptSha256":sha256(&ack),
+    });
+    if let Some(runtime) = runtime {
+        head_claim["runtimeId"] = json!(runtime);
+    }
+    let proof = signed(&state.node_policy_signer, HEAD_DOMAIN, &head_claim)?;
     let (inventory, compressed) = pack_index(&row.inventory_bytes)?;
     let mut bundle = json!({
         "head":STANDARD.encode(proof), "receipt":STANDARD.encode(ack),
@@ -520,6 +665,24 @@ async fn head(state: &AppState, node_id: i64, challenge: &str) -> Result<Value, 
 
 pub fn route() -> MethodRouter<AppState> {
     post(handle).layer(tower_http::limit::RequestBodyLimitLayer::new(REQUEST_LIMIT))
+}
+
+async fn authenticate_runtime<'a>(
+    state: &AppState,
+    headers: &'a HeaderMap,
+    node_id: i64,
+    runtime: &str,
+) -> Result<&'a str, ApiError> {
+    if !lower_hex(runtime, 64) {
+        return Err(invalid());
+    }
+    if !crate::quota_v2::enabled() || !crate::quota_xray_genesis::quarantine_enabled() {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Runtime WAL transport disabled.",
+        ));
+    }
+    node_auth::authenticate_product_activation(state, headers, node_id, PATH).await
 }
 
 async fn handle(
@@ -545,13 +708,31 @@ async fn handle(
     }
     let result = match request {
         Request::Store {
+            runtime_id,
             witness,
             inventory,
             inventory_encoding,
             ..
         } => {
-            node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
-            store(&state, node_id, &witness, &inventory, inventory_encoding).await?
+            let activation = if let Some(ref runtime) = runtime_id {
+                Some(authenticate_runtime(&state, &headers, node_id, runtime).await?)
+            } else {
+                node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
+                None
+            };
+            let scope = runtime_id
+                .as_deref()
+                .zip(activation)
+                .map(|(id, activation)| RuntimeScope { id, activation });
+            store(
+                &state,
+                node_id,
+                &witness,
+                &inventory,
+                inventory_encoding,
+                scope,
+            )
+            .await?
         }
         Request::Charge {
             reservation_id,
@@ -577,9 +758,17 @@ async fn handle(
             )
             .await?
         }
-        Request::Head { challenge, .. } => {
-            node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
-            head(&state, node_id, &challenge).await?
+        Request::Head {
+            challenge,
+            runtime_id,
+            ..
+        } => {
+            if let Some(ref runtime) = runtime_id {
+                authenticate_runtime(&state, &headers, node_id, runtime).await?;
+            } else {
+                node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
+            }
+            head(&state, node_id, &challenge, runtime_id.as_deref()).await?
         }
         Request::PrepareGenesis {
             candidate_runtime_id,
@@ -627,6 +816,33 @@ mod first_admission_history_tests {
         peer.runtime_id = "d".repeat(64);
         assert!(check_first_cap_history(&encode(&peer), 10, &runtime).is_err());
         assert!(check_first_cap_history(b"{\n", 10, &runtime).is_err());
+    }
+
+    #[test]
+    fn closed_reservation_requires_every_indexed_user_stream() {
+        let runtime = "a".repeat(64);
+        let mut birth = Birth {
+            schema_version: 1,
+            sequence: 1,
+            filename: "meter-main.jsonl".into(),
+            runtime_id: runtime.clone(),
+            email: "xmesh-u42--vless-main".into(),
+            direction: "uplink".into(),
+            first_wal_digest: "b".repeat(64),
+            previous_digest: "0".repeat(64),
+            digest: "c".repeat(64),
+        };
+        let mut index = serde_json::to_vec(&birth).unwrap();
+        index.push(b'\n');
+        birth.filename = "meter-peer.jsonl".into();
+        birth.email = "xmesh-u99--vless-main".into();
+        serde_json::to_writer(&mut index, &birth).unwrap();
+        index.push(b'\n');
+        assert!(check_closed_stream_charges(&index, 42, &runtime, &[]).is_err());
+        let charged = [("meter-main.jsonl".into(), 5, "d".repeat(64), 256)];
+        assert!(check_closed_stream_charges(&index, 42, &runtime, &charged).is_ok());
+        assert!(check_closed_stream_charges(&index, 99, &runtime, &charged).is_err());
+        assert!(check_closed_stream_charges(&index, 42, &"e".repeat(64), &charged).is_err());
     }
 
     #[test]

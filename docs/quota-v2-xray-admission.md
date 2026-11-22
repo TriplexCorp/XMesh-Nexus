@@ -141,6 +141,14 @@ nor shadow carryforward satisfies these requirements.
 
 ## Immutable calendar successor preparation (draft, **zero authority**)
 
+Successor spending caps retain their own authenticated WAL birth history.
+Migration 0162 keys that history by Node and measured runtime. Each fresh
+head signature binds both the runtime and the request challenge. The
+original Genesis registry remains available for its existing reservations.
+Before funding another successor, Nexus compares the charged stream names
+with the predecessor's authenticated birth index. An omitted stream blocks
+funding even when the submitted digest matches the other charge receipts.
+
 When a signed first-genesis reservation crosses a proven calendar boundary,
 the installed Agent may request `calendarSuccessor.predecessorId` on the
 **existing enrolled XSP/2 cap delivery endpoint**. The challenge is the

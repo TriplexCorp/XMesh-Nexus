@@ -95,8 +95,7 @@ async fn signed_predecessor(
     req: &Request,
     fields: &RequestFields,
     activation: &str,
-    account_epoch: &str,
-    policy_sha256: &str,
+    (account_epoch, policy_sha256): (&str, &str),
     now: i64,
 ) -> Result<(String,String),ApiError> {
     let row=sqlx::query(
@@ -105,18 +104,18 @@ async fn signed_predecessor(
                 p.signed_envelope AS envelope,
                 p.predecessor_runtime_id AS old_runtime,
                 p.issued_at_ms,p.valid_until_ms,
-                f.valid_until_ms AS old_until,
+                f.valid_until_ms AS old_until,f.successor AS old_successor,
                 p.signer_public_key
          FROM quota_v2_calendar_successor_preparations p
          JOIN quota_v2_calendar_closures c ON c.reservation_id=p.predecessor_id
-         JOIN quota_v2_signed_first_cap_outbox f
+         JOIN quota_v2_wal_admission_caps f
            ON f.reservation_id=p.predecessor_id AND f.node_id=p.node_id
               AND f.user_id=p.user_id AND f.epoch=p.account_epoch
          WHERE p.predecessor_id=$1::uuid AND p.node_id=$2 AND p.user_id=$3
            AND p.account_epoch=$4::uuid AND p.policy_sha256=$5
            AND f.policy_sha256=$5 AND c.observed_at>=c.boundary_at
            AND f.valid_until_ms <= $6
-         FOR SHARE OF p,c,f"
+         FOR SHARE OF p,c"
     )
     .bind(&fields.predecessor_id)
     .bind(req.node_id)
@@ -196,6 +195,10 @@ async fn signed_predecessor(
     if expected_heads != fields.old_wal_charge_heads_sha256 {
         return Err(deny());
     }
+    crate::quota_wal_transport::require_closed_stream_charges(
+        conn, req.node_id, req.user_id, &runtime,
+        row.try_get("old_successor")?, &canonical_heads,
+    ).await?;
     Ok((meter,reservation))
 }
 
@@ -207,8 +210,7 @@ async fn existing_signed(
     req: &Request,
     fields: &RequestFields,
     account_epoch: &str,
-    meter: &str,
-    reservation: &str,
+    (meter, reservation): (&str, &str),
     policy: &str,
 ) -> Result<Option<(String,String)>,ApiError> {
     let row=sqlx::query(
@@ -239,7 +241,7 @@ async fn existing_signed(
         .map_err(|_|deny())?;
     let stored_started:String=row.try_get("started")?;
     let requested_started:Option<String>=sqlx::query_scalar(
-        "SELECT $1::timestamptz::text")
+        "SELECT $1::text::timestamptz::text")
         .bind(&fields.fresh_started_at)
         .fetch_optional(&mut *conn).await.map_err(|_|deny())?;
     if row.try_get::<i64,_>("node_id")?!=req.node_id
@@ -291,8 +293,11 @@ pub(super) async fn issue(
     activation: &str,
 ) -> Result<(String,String),ApiError> {
     if !request_valid(req,fields) {return Err(deny());}
-    let scope=node_runtime::original_first_genesis_cap_scope(
-        state,req.node_id,req.user_id).await?;
+    // The original Genesis installation deadline has expired in a calendar
+    // rollover. Recheck the signed policy and current scope, and use the
+    // independently measured new runtime's own short installation window.
+    let scope=node_runtime::signed_first_genesis_scope(
+        state,req.node_id,req.user_id,false).await?;
     let policy=&scope.policy_sha256;
     let class=scope.inbound_class();
     let has_cdn=scope.aliases.iter().any(|a|a.class=="cdn");
@@ -308,9 +313,9 @@ pub(super) async fn issue(
         || crate::quota_v2::authoritative_shared_limit(&user).ok()!=Some(limit)
     {return Err(deny());}
     let (meter,reservation)=signed_predecessor(
-        &mut tx,state,req,fields,activation,&epoch,policy,now).await?;
+        &mut tx,state,req,fields,activation,(&epoch, policy),now).await?;
     if let Some(saved)=existing_signed(
-        &mut tx,state,req,fields,&epoch,&meter,&reservation,policy).await?
+        &mut tx,state,req,fields,&epoch,(&meter, &reservation),policy).await?
     {
         tx.commit().await?;
         return Ok(saved);
@@ -332,7 +337,7 @@ pub(super) async fn issue(
           fresh_executable_sha256,fresh_config_sha256,fresh_wal_inventory_sha256,
           zero_initial_raw_counters,isolated_new_wal_root)
          VALUES($1::uuid,$2,$3,$4::uuid,$5::uuid,$6::uuid,
-                $7,$8,$9::timestamptz,$10,$11,$12,$13,$14,$15)"
+                $7,$8,$9::text::timestamptz,$10,$11,$12,$13,$14,$15)"
     )
     .bind(&fields.predecessor_id).bind(req.node_id).bind(req.user_id)
     .bind(&epoch).bind(&meter).bind(&reservation)

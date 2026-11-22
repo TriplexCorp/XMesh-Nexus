@@ -6,7 +6,9 @@ pretend SQL can verify the Nexus Ed25519 signature or a live Xray runtime.
 """
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 
 import psycopg
 
@@ -26,10 +28,43 @@ def must_refuse(connection, statement, params=(), states=None):
     raise AssertionError("immutable successor SQL accepted forbidden write")
 
 
+def verify_runtime_wal(db, node):
+    first, second = "a" * 64, "b" * 64
+    statement = "SELECT quota_v2_store_runtime_wal_anchor(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+
+    def args(runtime, index):
+        witness = runtime.encode() + index
+        return (node, runtime, index.count(b"\n"), sha256(index).hexdigest(), "e" * 64,
+                sha256(witness).hexdigest(), runtime, "2026-11-01T00:00:00Z", index, witness)
+
+    def store(runtime, index):
+        with psycopg.connect(os.environ["QUOTA_TEST_DSN"]) as connection:
+            return connection.execute(statement, args(runtime, index)).fetchone()[0]
+
+    first_index, second_index = b"first generation\n", b"second generation\n"
+    with ThreadPoolExecutor(3) as pool:
+        replies = list(pool.map(lambda job: store(*job), (
+            (first, first_index), (second, second_index), (first, first_index),
+        )))
+    assert replies == [True, True, True], replies
+    assert store(first, first_index + b"continued\n") is False
+    assert store(second, second_index) is True
+    must_refuse(db, statement, args(first, first_index), {"22023"})
+    must_refuse(db, statement, args(first, b"tampered\ncontinued\nnew\n"), {"22023"})
+    must_refuse(db, "DELETE FROM quota_v2_runtime_wal_anchors WHERE node_id=%s", (node,))
+    rows = db.execute(
+        "SELECT runtime_id,max(inventory_sequence),count(*) FROM quota_v2_runtime_wal_anchors "
+        "WHERE node_id=%s GROUP BY runtime_id ORDER BY runtime_id", (node,),
+    ).fetchall()
+    assert rows == [(first, 2, 2), (second, 1, 1)], rows
+    print("PASS: concurrent per-runtime WAL checkpoints, exact retry, fork and rollback refusal")
+
+
 def main():
     with psycopg.connect(os.environ["QUOTA_TEST_DSN"], autocommit=True) as db:
         user = 8700000000 + uuid.uuid4().int % 1000000000
         node = 8700000000 + uuid.uuid4().int % 1000000000
+        verify_runtime_wal(db, node)
         epoch, meter, predecessor = (uuid.uuid4() for _ in range(3))
         next_meter, next_reservation = (uuid.uuid4() for _ in range(2))
         issued = int(datetime.now(timezone.utc).timestamp() * 1000)
@@ -101,7 +136,7 @@ def main():
         must_refuse(db,
                     "DELETE FROM quota_v2_calendar_successor_preparations "
                     "WHERE predecessor_id=%s", (predecessor,))
-        must_refuse(db, "TRUNCATE quota_v2_calendar_successor_preparations")
+        must_refuse(db, "TRUNCATE quota_v2_calendar_successor_preparations CASCADE")
         assert db.execute(
             "SELECT count(*) FROM quota_v2_calendar_successor_preparations "
             "WHERE predecessor_id=%s", (predecessor,)).fetchone() == (1,)
@@ -176,7 +211,7 @@ def main():
         must_refuse(db,
                     "DELETE FROM quota_v2_calendar_successor_meter_preflights "
                     "WHERE predecessor_id=%s", (predecessor,), {"22023"})
-        must_refuse(db, "TRUNCATE quota_v2_calendar_successor_meter_preflights",
+        must_refuse(db, "TRUNCATE quota_v2_calendar_successor_meter_preflights CASCADE",
                     (), {"22023"})
         assert db.execute(
             "SELECT count(*) FROM quota_v2_reservations "

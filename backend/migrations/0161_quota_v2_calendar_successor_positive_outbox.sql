@@ -148,97 +148,62 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
         RAISE EXCEPTION 'invalid successor cap envelope JSON' USING ERRCODE='23514';
     END;
-    IF jsonb_typeof(doc)<>'object' OR
-       (SELECT count(*) FROM jsonb_object_keys(doc))<>3 OR
-       doc->>'algorithm'<>'Ed25519' OR
-       doc->>'signature' !~ '^[0-9a-f]{128}$' OR
-       jsonb_typeof(payload)<>'object' OR
-       payload->>'kind'<>'xmesh.quota-v2.xray-cap-admission' OR
-       payload->>'schemaVersion'<>'1' OR
-       payload->>'nodeId'<>NEW.node_id::TEXT OR
-       payload->>'userId'<>NEW.user_id::TEXT OR
-       payload->>'runtimeId'<>NEW.fresh_runtime_id OR
-       payload->>'policySha256'<>NEW.policy_sha256 OR
-       payload->>'accountEpoch'<>NEW.account_epoch::TEXT OR
-       payload->>'meterEpoch'<>NEW.meter_epoch::TEXT OR
-       payload->>'reservationId'<>NEW.reservation_id::TEXT OR
-       payload->>'reservationRevision'<>NEW.revision::TEXT OR
-       payload->>'nonce'<>NEW.nonce OR
-       payload->>'sharedCeilingBytes'<>NEW.grant_bytes::TEXT OR
-       payload->>'nodeCeilingBytes'<>NEW.grant_bytes::TEXT OR
-       payload->>'cdnCeilingBytes'<>NEW.cdn_ceiling_bytes::TEXT OR
-       payload->>'inventoryTailDigest'<>repeat('0',64) OR
-       payload->>'witnessedWalBytes'<>'0' OR
-       payload->>'witnessedCdnBytes'<>'0' OR
-       payload->>'canSpend'<>'true' OR payload->>'canStart'<>'false' OR
-       payload->>'canResume'<>'false' OR
-       payload->>'finalMeterVerified'<>'false' OR
-       payload->>'refundableBytes'<>'0' OR
-       payload->>'issuedAtMs'<>NEW.issued_at_ms::TEXT OR
-       payload->>'installBeforeMs'<>NEW.install_before_ms::TEXT OR
-       payload->>'validUntilMs'<>NEW.valid_until_ms::TEXT THEN
+    IF jsonb_typeof(doc) IS DISTINCT FROM 'object' OR
+       (SELECT count(*) FROM jsonb_object_keys(doc)) IS DISTINCT FROM 3 OR
+       doc->>'algorithm' IS DISTINCT FROM 'Ed25519' OR
+       COALESCE(doc->>'signature','') !~ '^[0-9a-f]{128}$' OR
+       jsonb_typeof(payload) IS DISTINCT FROM 'object' OR
+       payload->>'kind' IS DISTINCT FROM 'xmesh.quota-v2.xray-cap-admission' OR
+       payload->>'schemaVersion' IS DISTINCT FROM '1' OR
+       payload->>'nodeId' IS DISTINCT FROM NEW.node_id::TEXT OR
+       payload->>'userId' IS DISTINCT FROM NEW.user_id::TEXT OR
+       payload->>'runtimeId' IS DISTINCT FROM NEW.fresh_runtime_id OR
+       payload->>'policySha256' IS DISTINCT FROM NEW.policy_sha256 OR
+       payload->>'accountEpoch' IS DISTINCT FROM NEW.account_epoch::TEXT OR
+       payload->>'meterEpoch' IS DISTINCT FROM NEW.meter_epoch::TEXT OR
+       payload->>'reservationId' IS DISTINCT FROM NEW.reservation_id::TEXT OR
+       payload->>'reservationRevision' IS DISTINCT FROM NEW.revision::TEXT OR
+       payload->>'nonce' IS DISTINCT FROM NEW.nonce OR
+       payload->>'sharedCeilingBytes' IS DISTINCT FROM NEW.grant_bytes::TEXT OR
+       payload->>'nodeCeilingBytes' IS DISTINCT FROM NEW.grant_bytes::TEXT OR
+       payload->>'cdnCeilingBytes' IS DISTINCT FROM NEW.cdn_ceiling_bytes::TEXT OR
+       payload->>'inventoryTailDigest' IS DISTINCT FROM repeat('0',64) OR
+       payload->>'witnessedWalBytes' IS DISTINCT FROM '0' OR
+       payload->>'witnessedCdnBytes' IS DISTINCT FROM '0' OR
+       payload->>'canSpend' IS DISTINCT FROM 'true' OR payload->>'canStart' IS DISTINCT FROM 'false' OR
+       payload->>'canResume' IS DISTINCT FROM 'false' OR
+       payload->>'finalMeterVerified' IS DISTINCT FROM 'false' OR
+       payload->>'refundableBytes' IS DISTINCT FROM '0' OR
+       payload->>'issuedAtMs' IS DISTINCT FROM NEW.issued_at_ms::TEXT OR
+       payload->>'installBeforeMs' IS DISTINCT FROM NEW.install_before_ms::TEXT OR
+       payload->>'validUntilMs' IS DISTINCT FROM NEW.valid_until_ms::TEXT THEN
         RAISE EXCEPTION 'signed successor bytes differ from immutable PostgreSQL funded reservation'
             USING ERRCODE='23514';
     END IF;
-    IF jsonb_typeof(fresh_doc)<>'object' OR
-       (SELECT count(*) FROM jsonb_object_keys(fresh_doc))<>3 OR
-       fresh_doc->>'algorithm'<>'Ed25519' OR
-       fresh_doc->>'signature' !~ '^[0-9a-f]{128}
-BEFORE INSERT ON quota_v2_calendar_successor_positive_caps
-FOR EACH ROW EXECUTE FUNCTION quota_v2_guard_successor_positive_cap();
-
--- Zero-byte preparation remains non-authorizing. If an application ever
--- inserts a candidate reservation by itself, it MUST atomically commit the
--- corresponding exact signed positive outbox or the whole tx rolls back.
-CREATE FUNCTION quota_v2_require_successor_outbox_on_commit()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN
-    IF EXISTS (
-      SELECT 1 FROM quota_v2_calendar_successor_preparations p
-      WHERE p.candidate_reservation_id=NEW.reservation_id
-    ) AND NOT EXISTS (
-      SELECT 1 FROM quota_v2_calendar_successor_positive_caps o
-      WHERE o.reservation_id=NEW.reservation_id
-    ) THEN
-      RAISE EXCEPTION 'unfunded or unsigned successor reservation cannot commit'
-        USING ERRCODE='23514';
-    END IF;
-    RETURN NEW;
-END
-$$;
-
-CREATE CONSTRAINT TRIGGER quota_v2_successor_must_sign_reservation
-AFTER INSERT OR UPDATE ON quota_v2_reservations
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE FUNCTION quota_v2_require_successor_outbox_on_commit();
-
-REVOKE ALL ON quota_v2_calendar_successor_positive_caps FROM PUBLIC;
-REVOKE ALL ON FUNCTION quota_v2_guard_successor_positive_cap() FROM PUBLIC;
-REVOKE ALL ON FUNCTION quota_v2_require_successor_outbox_on_commit() FROM PUBLIC;
-
-COMMENT ON TABLE quota_v2_calendar_successor_positive_caps IS
-'Exact immutable signed successor cap, atomically paired with fresh-WAL reservation; never releases old WAL debt or refund. Separate authenticated issuer required.';
- OR
-       jsonb_typeof(fresh_payload)<>'object' OR
-       fresh_payload->>'kind'<>'xmesh.xray.genesis-prepared' OR
-       fresh_payload->>'schemaVersion'<>'1' OR
-       fresh_payload->>'nodeId'<>NEW.node_id::TEXT OR
-       fresh_payload->>'activationReceiptSha256'<>payload->>'activationReceiptSha256' OR
-       fresh_payload->>'candidateRuntimeId'<>NEW.fresh_runtime_id OR
-       fresh_payload->>'challenge'<>NEW.nonce OR
-       fresh_payload->>'preparedAtMs'<>NEW.issued_at_ms::TEXT OR
-       fresh_payload->>'validUntilMs'<>
+    IF jsonb_typeof(fresh_doc) IS DISTINCT FROM 'object' OR
+       (SELECT count(*) FROM jsonb_object_keys(fresh_doc)) IS DISTINCT FROM 3 OR
+       fresh_doc->>'algorithm' IS DISTINCT FROM 'Ed25519' OR
+       COALESCE(fresh_doc->>'signature','') !~ '^[0-9a-f]{128}$' OR
+       jsonb_typeof(fresh_payload) IS DISTINCT FROM 'object' OR
+       fresh_payload->>'kind' IS DISTINCT FROM 'xmesh.xray.genesis-prepared' OR
+       fresh_payload->>'schemaVersion' IS DISTINCT FROM '1' OR
+       fresh_payload->>'nodeId' IS DISTINCT FROM NEW.node_id::TEXT OR
+       fresh_payload->>'activationReceiptSha256' IS DISTINCT FROM payload->>'activationReceiptSha256' OR
+       fresh_payload->>'candidateRuntimeId' IS DISTINCT FROM NEW.fresh_runtime_id OR
+       fresh_payload->>'challenge' IS DISTINCT FROM NEW.nonce OR
+       fresh_payload->>'preparedAtMs' IS DISTINCT FROM NEW.issued_at_ms::TEXT OR
+       fresh_payload->>'validUntilMs' IS DISTINCT FROM
             (NEW.issued_at_ms+120000)::TEXT OR
-       fresh_payload->>'authorizedBytes'<>'0' OR
-       fresh_payload->>'canStart'<>'false' OR
-       fresh_payload->>'canResume'<>'false' OR
+       fresh_payload->>'authorizedBytes' IS DISTINCT FROM '0' OR
+       fresh_payload->>'canStart' IS DISTINCT FROM 'false' OR
+       fresh_payload->>'canResume' IS DISTINCT FROM 'false' OR
        NEW.install_before_ms > NEW.issued_at_ms + 120000 THEN
        RAISE EXCEPTION 'fresh Xray genesis zero-authority proof differs from signed permit'
            USING ERRCODE='23514';
     END IF;
     RETURN NEW;
 END
-$;
+$$;
 
 CREATE TRIGGER quota_v2_successor_positive_validate
 BEFORE INSERT ON quota_v2_calendar_successor_positive_caps
