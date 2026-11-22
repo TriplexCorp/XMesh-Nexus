@@ -253,6 +253,13 @@ def start_isolated_candidate(guest, archive, image, config_bytes=XRAY_CONFIG, *,
         with archive.open("rb") as bundle:
             docker("exec", "-i", guest.name, "docker", "load", stdin=bundle, timeout=90)
     guest.exec("install", "-d", "-m", "0700", "/var/lib/xmesh-measured-lab/wal")
+    # A previous flat journal is evidence. Refuse it before starting a process
+    # configured to use the nested ledger, including after an interrupted run.
+    parent = "/var/lib/xmesh-measured-lab/wal"
+    entries = set(guest.exec("ls", "-1A", parent).decode().splitlines())
+    if entries - {"drain.sock", "cap-binding.json", "ledger"} or (entries and "ledger" not in entries):
+        raise RuntimeError("refusing to start a new ledger over a prior Xray journal")
+    guest.exec("install", "-d", "-m", "0700", parent + "/ledger")
     config = "/var/lib/xmesh-measured-lab/config.json"
     docker("exec", "-i", guest.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", config,
            input=config_bytes)
@@ -260,18 +267,43 @@ def start_isolated_candidate(guest, archive, image, config_bytes=XRAY_CONFIG, *,
     if binding is not None:
         assert tag in ("vless-main", "vless-cdn")
         location = "/var/lib/xmesh-measured-lab/wal/cap-binding.json"
-        docker("exec", "-i", guest.name, "bash", "-ec", 'umask 077; cat > "$1"', "--", location,
+        # A retry checks the pinned startup identity byte-for-byte, including
+        # after a killed process. A partial write is never silently repaired.
+        guest_binding = """
+import os, stat, sys
+path, raw = sys.argv[1], sys.stdin.buffer.read()
+try:
+    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+except FileExistsError:
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as f:
+        st = os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or st.st_nlink != 1
+                or stat.S_IMODE(st.st_mode) != 0o600 or f.read(len(raw) + 1) != raw):
+            raise ValueError('existing Xray startup binding differs')
+else:
+    with os.fdopen(fd, 'wb') as f:
+        f.write(raw)
+        f.flush()
+        os.fsync(fd)
+    parent_fd = os.open(os.path.dirname(path), os.O_DIRECTORY)
+    try:
+        os.fsync(parent_fd)
+    finally:
+        os.close(parent_fd)
+"""
+        docker("exec", "-i", guest.name, "python3", "-c", guest_binding, location,
                input=json.dumps(binding, sort_keys=True, separators=(",", ":")).encode())
-        cap_env = ["-e", "XMESH_EXPERIMENTAL_SIGNED_CAP_BINDING=/run/xmesh-xray-audit/cap-binding.json",
+        cap_env = ["-e", "XMESH_EXPERIMENTAL_SIGNED_CAP_BINDING=/run/xmesh-quota-runtime/cap-binding.json",
                    "-e", "XMESH_EXPERIMENTAL_SCOPED_INBOUNDS=" + tag]
     guest.exec("docker", "run", "-d", "--name", XRAY, "--network", "none", "--restart=no",
                "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                "--user", "0:0", "-e", "GITHUB_ACTIONS=true", "-e", "XMESH_EXPERIMENTAL_DRAIN=1",
-               "-e", "XMESH_EXPERIMENTAL_OBSERVED_DIR=/run/xmesh-xray-audit",
-               "-e", "XMESH_EXPERIMENTAL_DRAIN_SOCKET=/run/xmesh-xray-audit/drain.sock",
+               "-e", "XMESH_EXPERIMENTAL_OBSERVED_DIR=/run/xmesh-quota-runtime/ledger",
+               "-e", "XMESH_EXPERIMENTAL_DRAIN_SOCKET=/run/xmesh-quota-runtime/drain.sock",
                *cap_env,
                "-v", config + ":/etc/xray/config.json:ro",
-               "-v", "/var/lib/xmesh-measured-lab/wal:/run/xmesh-xray-audit:rw",
+               "-v", "/var/lib/xmesh-measured-lab/wal:/run/xmesh-quota-runtime:rw",
                image, "run", "-config", "/etc/xray/config.json")
     def candidate_ready():
         status = guest.exec("docker", "inspect", "-f", "{{.State.Running}}", XRAY).strip()

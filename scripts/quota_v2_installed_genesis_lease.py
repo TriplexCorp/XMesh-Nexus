@@ -325,7 +325,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     # measured kernel process and private WAL directory, not a Node claim.
     # Verify both original isolated processes have no historic WAL or cap.
     for (guest,_,_),_ in zip(stages,measurements):
-        names=guest.exec("ls","-1A",MEASURED+"/wal").decode().splitlines()
+        names=guest.exec("ls","-1A",MEASURED+"/wal/ledger").decode().splitlines()
         assert not any(n.startswith(("meter-","positive-cap-")) for n in names),names
         assert db.execute("SELECT count(*) FROM quota_v2_external_wal_birth_anchors WHERE node_id=%s",
                           (guest.node,)).fetchone()==(0,)
@@ -488,7 +488,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
              "--executable-sha256",digest,"--request-challenge",request["requestChallenge"]]
         saved=json.loads(guest.exec("cat",STATE+f"/genesis-positive-cap-u{uid}.json"))
         assert saved["signedEnvelope"].encode()==grant
-        stored=guest.exec("cat",MEASURED+f"/wal/positive-cap-u{uid}.json")
+        stored=guest.exec("cat",MEASURED+f"/wal/ledger/positive-cap-u{uid}.json")
         assert stored==grant
         return cmd
 
@@ -526,7 +526,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         snapshot={}
         for direction in ("uplink","downlink"):
             key=f"{runtime}\0xmesh-u{uid}--{tag}\0{direction}".encode()
-            path=MEASURED+"/wal/meter-"+hashlib.sha256(key).hexdigest()+".jsonl"
+            path=MEASURED+"/wal/ledger/meter-"+hashlib.sha256(key).hexdigest()+".jsonl"
             raw=guest.exec("cat",path)
             assert json.loads(raw.splitlines()[-1])["nextBytes"]==result[direction]
             snapshot[path]=raw
@@ -558,7 +558,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         anchor = db.execute(anchor_sql, (guest.node,)).fetchone()
         assert anchor is not None, guest.node
         sequence, digest, inventory, witness = anchor
-        local = guest.exec("cat", MEASURED+"/wal/xmesh-meter-inventory-v1.jsonl")
+        local = guest.exec("cat", MEASURED+"/wal/ledger/xmesh-meter-inventory-v1.jsonl")
         assert sequence == len(local.splitlines()) == expected_streams
         assert bytes(inventory) == local and digest == hashlib.sha256(local).hexdigest()
         assert json.loads(bytes(witness))["payload"]["nodeId"] == guest.node
@@ -622,7 +622,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             assert len(saved) == len(batches), ("Agent did not settle every Xray WAL", saved)
             for filename, journal, signature in saved:
                 raw, receipt = bytes(journal), bytes(signature)
-                request = charge_request(guest, cap_jobs[0][3], MEASURED+"/wal/"+filename, raw)
+                request = charge_request(guest, cap_jobs[0][3], MEASURED+"/wal/ledger/"+filename, raw)
                 reply = {"receipt":base64.b64encode(receipt).decode()}
                 assert guest.request(WAL_PATH, request) == (200, reply)
                 independent_signature(root, f"agent-charge-{filename}", json.loads(receipt),
