@@ -231,6 +231,18 @@ pub(super) async fn issue(
     ).await? {
         return Err(deny());
     }
+    // Independently prove the exact CDN sub-ceiling already signed for
+    // this immutable reservation. For mixed capped Nodes this is the
+    // original prefunded hold, NOT the growing shared MAIN ceiling.
+    let issued_cdn = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
+        &mut tx, &fields.reservation_id, req.user_id, req.node_id,
+        &user, inbound_class, lease.ceiling,
+    ).await?;
+    if payload["cdnCeilingBytes"].as_i64() != Some(issued_cdn) {
+        return Err(deny());
+    }
+    let fixed_mixed_cdn = inbound_class == "mixed"
+        && crate::quota_v2_cdn_lifetime::limit(&user)?.is_some();
     let node_free = crate::quota_v2_node_lifetime::headroom(
         &mut tx, req.user_id, req.node_id, &user,
     ).await?;
@@ -257,7 +269,8 @@ pub(super) async fn issue(
         return Err(deny());
     }
     let signed = extend(
-        &mut tx, state, req, fields, &lease, payload, free, now, expires, limit,
+        &mut tx, state, req, fields, &lease, payload, free, now, expires,
+        limit, inbound_class, fixed_mixed_cdn,
     )
     .await?;
     tx.commit().await?;
@@ -279,6 +292,8 @@ async fn extend(
     now: i64,
     expires: i64,
     limit: i64,
+    inbound_class: &str,
+    fixed_mixed_cdn: bool,
 ) -> Result<String, ApiError> {
     let (all, cdn) =
         quota_wal_transport::committed_charge_totals(conn, &fields.reservation_id).await?;
@@ -312,7 +327,11 @@ async fn extend(
     payload["witnessedCdnBytes"] = json!(cdn);
     payload["sharedCeilingBytes"] = json!(ceiling);
     payload["nodeCeilingBytes"] = json!(ceiling);
-    if payload["cdnCeilingBytes"] != 0 {
+    // A MAIN top-up can never increase the independently prefunded CDN
+    // budget on a mixed Node. Homogeneous CDN Nodes already hold ALL their
+    // increased shared ceilings against the pooled CDN balance.
+    // Mixed Nodes without a CDN limit still receive only finite windows.
+    if inbound_class == "cdn" || (inbound_class == "mixed" && !fixed_mixed_cdn) {
         payload["cdnCeilingBytes"] = json!(ceiling);
     }
     payload["issuedAtMs"] = json!(now);
