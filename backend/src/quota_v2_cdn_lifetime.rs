@@ -197,7 +197,11 @@ pub async fn headroom(
     let issued: i64 = sqlx::query_scalar(
         "SELECT COALESCE(SUM((CASE
            WHEN s.class='mixed' AND m.held_bytes IS NOT NULL
-             THEN m.held_bytes::numeric
+             THEN m.held_bytes::numeric + COALESCE((
+                SELECT SUM(t.added_bytes::numeric)
+                  FROM quota_v2_mixed_cdn_topups t
+                 WHERE t.reservation_id=r.reservation_id
+               ),0)
            ELSE r.ceiling_bytes::numeric END)),0)::bigint
          FROM quota_v2_reservations r
          LEFT JOIN quota_v2_reservation_classes s ON s.reservation_id=r.reservation_id
@@ -379,8 +383,12 @@ pub async fn signed_cdn_ceiling(
         "mixed" if limit(user)?.is_none() => Ok(shared),
         "mixed" => {
             let held: Option<i64> = sqlx::query_scalar(
-                "SELECT held_bytes FROM quota_v2_mixed_cdn_holds
-                 WHERE reservation_id=$1::uuid AND user_id=$2 AND node_id=$3 FOR SHARE",
+                "SELECT m.held_bytes+COALESCE((
+                    SELECT SUM(t.added_bytes) FROM quota_v2_mixed_cdn_topups t
+                    WHERE t.reservation_id=m.reservation_id
+                ),0) FROM quota_v2_mixed_cdn_holds m
+                 WHERE m.reservation_id=$1::uuid AND m.user_id=$2 AND m.node_id=$3
+                 FOR SHARE",
             )
             .bind(reservation)
             .bind(user_id)
@@ -392,6 +400,77 @@ pub async fn signed_cdn_ceiling(
         }
         _ => Err(deny()),
     }
+}
+
+/// Fund another CDN class window only from the independently uncommitted
+/// pooled CDN balance. The caller holds the per-user advisory/account locks,
+/// has authenticated the EXACT signed prior cap and attested WAL charge, and
+/// writes the new immutable top-up in the SAME PostgreSQL transaction as the
+/// signed revision/outbox. All signed byte ceilings are CUMULATIVE.
+/// An offline, stale or duplicated revision never creates additional bytes.
+pub async fn renew_mixed_cdn(
+    conn: &mut PgConnection,
+    user_id: i64,
+    node_id: i64,
+    user: &Value,
+    reservation: &str,
+    revision: i64,
+    nonce: &str,
+    previous_cdn: i64,
+    committed_cdn_wal: i64,
+    next_shared: i64,
+    first_window: i64,
+) -> Result<i64, ApiError> {
+    if revision <= 1 || nonce.len() != 64
+        || !nonce.bytes().all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase())
+        || first_window <= 0 || first_window > 64 * 1024 * 1024
+        || previous_cdn < 0 || previous_cdn < committed_cdn_wal
+        || next_shared < previous_cdn || next_shared <= 0
+    {
+        return Err(deny());
+    }
+    let Some(free) = headroom(conn, user_id, user).await? else {
+        return Err(deny());
+    };
+    let stored: i64 = sqlx::query_scalar(
+        "SELECT m.held_bytes+COALESCE((
+            SELECT SUM(t.added_bytes) FROM quota_v2_mixed_cdn_topups t
+             WHERE t.reservation_id=m.reservation_id
+         ),0) FROM quota_v2_mixed_cdn_holds m
+         WHERE m.reservation_id=$1::uuid AND m.user_id=$2 AND m.node_id=$3 FOR SHARE",
+    )
+    .bind(reservation)
+    .bind(user_id)
+    .bind(node_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if stored != previous_cdn {
+        return Err(deny());
+    }
+    let leftover = previous_cdn.checked_sub(committed_cdn_wal).ok_or_else(deny)?;
+    let refill = free.min(first_window.saturating_sub(leftover))
+        .min(next_shared.saturating_sub(previous_cdn))
+        .max(0);
+    if refill == 0 {
+        return Ok(previous_cdn);
+    }
+    let cumulative = previous_cdn.checked_add(refill).ok_or_else(deny)?;
+    sqlx::query(
+        "INSERT INTO quota_v2_mixed_cdn_topups(
+           reservation_id,revision,user_id,node_id,added_bytes,
+           cumulative_cdn_ceiling_bytes,request_nonce
+         ) VALUES($1::uuid,$2,$3,$4,$5,$6,$7)",
+    )
+    .bind(reservation)
+    .bind(revision)
+    .bind(user_id)
+    .bind(node_id)
+    .bind(refill)
+    .bind(cumulative)
+    .bind(nonce)
+    .execute(&mut *conn)
+    .await?;
+    Ok(cumulative)
 }
 
 /// A saved first cap or renewal cannot escape a recently lowered CDN plan.
@@ -422,7 +501,11 @@ pub async fn issued_within_limit(
     let issued: i64 = sqlx::query_scalar(
         "SELECT COALESCE(SUM((CASE
            WHEN s.class='mixed' AND m.held_bytes IS NOT NULL
-             THEN m.held_bytes::numeric
+             THEN m.held_bytes::numeric + COALESCE((
+                SELECT SUM(t.added_bytes::numeric)
+                  FROM quota_v2_mixed_cdn_topups t
+                 WHERE t.reservation_id=r.reservation_id
+               ),0)
            ELSE r.ceiling_bytes::numeric END)),0)::bigint
          FROM quota_v2_reservations r
          LEFT JOIN quota_v2_reservation_classes s ON s.reservation_id=r.reservation_id
