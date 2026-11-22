@@ -153,6 +153,7 @@ systemctl stop docker.socket docker.service containerd.service
         command = ["docker", "exec", "-it", self.name, "env",
                    f"XMESH_NODE_RELEASE_REF={identity['sourceRevision']}",
                    f"XMESH_NEXUS_RELEASE_REF={nexus_revision}", "XMESH_QUOTA_V2_WAL_STAGE_AGENT=1",
+                   f"XMESH_QUOTA_V2_AUTO_RENEW_STAGING={int(os.environ.get('XMESH_INSTALLED_GENESIS_LEASE') == '1')}",
                    "bash", "/root/xmesh-bootstrap.sh", panel, str(self.node), "8443"]
         process = subprocess.Popen(command, stdin=secondary, stdout=secondary, stderr=secondary)
         os.close(secondary)
