@@ -100,33 +100,44 @@ pub async fn handle(
     }
     let activation =
         node_auth::authenticate_product_activation(&state, &headers, req.node_id, PATH).await?;
-    let (status, exact) = if let Some(ref fields) = req.calendar_successor {
-        (
-            "prepared_calendar_successor",
-            successor::prepare(&state, &req, fields, activation).await?,
-        )
-    } else if let Some(ref fields) = req.calendar_successor_positive {
-        (
-            "committed_calendar_successor",
-            successor_positive::issue(&state, &req, fields, activation).await?,
-        )
-    } else if let Some(ref fields) = req.renewal {
-        (
-            "committed_renewal",
-            renewal::issue(&state, &req, fields, activation).await?,
-        )
+    let (status, exact, fresh_genesis) =
+        if let Some(ref fields) = req.calendar_successor {
+            (
+                "prepared_calendar_successor",
+                successor::prepare(&state, &req, fields, activation).await?,
+                None,
+            )
+        } else if let Some(ref fields) = req.calendar_successor_positive {
+            let (grant, genesis) =
+                successor_positive::issue(&state, &req, fields, activation).await?;
+            ("committed_calendar_successor", grant, Some(genesis))
+        } else if let Some(ref fields) = req.renewal {
+            (
+                "committed_renewal",
+                renewal::issue(&state, &req, fields, activation).await?,
+                None,
+            )
+        } else {
+            (
+                "committed_first_cap",
+                first_cap(&state, &req, activation).await?,
+                None,
+            )
+        };
+    let reply = if let Some(genesis) = fresh_genesis {
+        json!({
+            "status":status, "nodeId":req.node_id, "userId":req.user_id,
+            "signedEnvelope":exact, "freshGenesisEnvelope":genesis
+        })
     } else {
-        (
-            "committed_first_cap",
-            first_cap(&state, &req, activation).await?,
-        )
+        json!({
+            "status":status, "nodeId":req.node_id, "userId":req.user_id,
+            "signedEnvelope":exact
+        })
     };
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
-        Json(json!({
-            "status":status, "nodeId":req.node_id, "userId":req.user_id,
-            "signedEnvelope":exact,
-        })),
+        Json(reply),
     ))
 }
 
