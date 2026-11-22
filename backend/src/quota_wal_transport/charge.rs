@@ -94,15 +94,33 @@ async fn lock_account(
     node_id: i64,
     reservation: &str,
 ) -> Result<Cap, ApiError> {
-    let mut cap = sqlx::query_as::<_, Cap>(
+    let initial = sqlx::query_as::<_, Cap>(
         "SELECT user_id, epoch::text, meter_epoch::text, runtime_id, grant_bytes, signed_envelope
            FROM quota_v2_signed_first_cap_outbox WHERE node_id=$1 AND reservation_id=$2::uuid",
     )
     .bind(node_id)
     .bind(reservation)
     .fetch_optional(&mut *conn)
-    .await?
-    .ok_or_else(conflict)?;
+    .await?;
+    let from_first_genesis = initial.is_some();
+    // The successor is an entirely NEW metered Xray process, not a
+    // relabeled old-cap lease. Late old WAL must still select its original
+    // signed outbox and cannot be charged under the new reservation ID.
+    let mut cap = match initial {
+        Some(cap) => cap,
+        None => sqlx::query_as::<_, Cap>(
+            "SELECT user_id, account_epoch::text AS epoch,
+                    meter_epoch::text, fresh_runtime_id AS runtime_id,
+                    grant_bytes, signed_envelope
+             FROM quota_v2_calendar_successor_positive_caps
+             WHERE node_id=$1 AND reservation_id=$2::uuid",
+        )
+        .bind(node_id)
+        .bind(reservation)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or_else(conflict)?,
+    };
 
     sqlx::query("SELECT pg_advisory_xact_lock($1)")
         .bind(cap.user_id ^ 0x51_4D_45_53_48_i64)
@@ -113,16 +131,20 @@ async fn lock_account(
         .bind(&cap.epoch)
         .fetch_one(&mut *conn)
         .await?;
-    if let Some((ceiling, envelope)) = sqlx::query_as::<_, (i64, Vec<u8>)>(
-        "SELECT grant_bytes,signed_envelope FROM quota_v2_cap_renewals
-         WHERE reservation_id=$1::uuid ORDER BY revision DESC LIMIT 1",
-    )
-    .bind(reservation)
-    .fetch_optional(conn)
-    .await?
-    {
-        cap.grant_bytes = ceiling;
-        cap.signed_envelope = envelope;
+    // There is no successor renewal protocol yet. The legacy renewal
+    // table is permanently forbidden from mixing with this new WAL epoch.
+    if from_first_genesis {
+        if let Some((ceiling, envelope)) = sqlx::query_as::<_, (i64, Vec<u8>)>(
+            "SELECT grant_bytes,signed_envelope FROM quota_v2_cap_renewals
+             WHERE reservation_id=$1::uuid ORDER BY revision DESC LIMIT 1",
+        )
+        .bind(reservation)
+        .fetch_optional(conn)
+        .await?
+        {
+            cap.grant_bytes = ceiling;
+            cap.signed_envelope = envelope;
+        }
     }
     Ok(cap)
 }
