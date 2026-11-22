@@ -12,6 +12,7 @@ on:
       - 'backend/migrations/0147_quota_v2_node_lifetime_baselines.sql'
       - 'backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql'
       - 'backend/migrations/0149_quota_v2_mixed_class_cdn_holds.sql'
+      - 'backend/migrations/0150_quota_v2_mixed_cdn_topups.sql'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
       - 'scripts/benchmark-quota-v2-postgres-allocator.py'
       - 'scripts/test-quota-v2-unlimited-main-postgres.py'
@@ -91,6 +92,7 @@ jobs:
                   "backend/migrations/0147_quota_v2_node_lifetime_baselines.sql",
                   "backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql",
                   "backend/migrations/0149_quota_v2_mixed_class_cdn_holds.sql",
+                  "backend/migrations/0150_quota_v2_mixed_cdn_topups.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
