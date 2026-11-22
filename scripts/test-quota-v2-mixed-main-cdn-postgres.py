@@ -49,7 +49,7 @@ def sql_only_signed_fixture(node, revision, nonce, shared, cdn):
             "reservationRevision":revision, "nonce":nonce,
             "sharedCeilingBytes":shared, "cdnCeilingBytes":cdn,
         }
-    },separators=(",",":"))+"\\n").encode()
+    },separators=(",",":"))).encode()
 
 
 def real_liability_sql():
