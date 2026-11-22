@@ -5,6 +5,7 @@
 //! retains the same reservation and runtime on renewal.
 mod renewal;
 mod successor;
+mod successor_positive;
 use crate::{
     ApiError, AppState, node_auth,
     node_runtime::FirstGenesisCapPolicyScope,
@@ -32,6 +33,7 @@ struct Request {
     measurement: Option<Measurement>,
     renewal: Option<renewal::RequestFields>,
     calendar_successor: Option<successor::RequestFields>,
+    calendar_successor_positive: Option<successor_positive::RequestFields>,
 }
 
 #[derive(Deserialize)]
@@ -65,7 +67,11 @@ fn valid(req: &Request) -> bool {
         && req.user_id > 0
         && hex64(&req.challenge)
         && (req.calendar_successor.is_none()
-            || (req.renewal.is_none() && req.measurement.is_none()))
+            || (req.renewal.is_none() && req.measurement.is_none()
+                && req.calendar_successor_positive.is_none()))
+        && (req.calendar_successor_positive.is_none()
+            || (req.renewal.is_none() && req.measurement.is_none()
+                && req.calendar_successor.is_none()))
         && req.measurement.as_ref().is_none_or(|measurement| {
             measurement.host_pid > 0
                 && hex64(&measurement.runtime_id)
@@ -98,6 +104,11 @@ pub async fn handle(
         (
             "prepared_calendar_successor",
             successor::prepare(&state, &req, fields, activation).await?,
+        )
+    } else if let Some(ref fields) = req.calendar_successor_positive {
+        (
+            "committed_calendar_successor",
+            successor_positive::issue(&state, &req, fields, activation).await?,
         )
     } else if let Some(ref fields) = req.renewal {
         (
