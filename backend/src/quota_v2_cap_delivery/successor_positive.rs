@@ -16,6 +16,7 @@ use sha2::{Digest, Sha256};
 use sqlx::{PgConnection, Row};
 
 const ZERO_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_CALENDAR_SUCCESSOR_V1\0";
+const FRESH_GENESIS_DOMAIN: &[u8] = b"XMESH_XRAY_GENESIS_PREPARED_V1\0";
 const EMPTY_SHA: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 #[derive(Deserialize)]
@@ -160,12 +161,13 @@ async fn existing_signed(
     meter: &str,
     reservation: &str,
     policy: &str,
-) -> Result<Option<String>,ApiError> {
+) -> Result<Option<(String,String)>,ApiError> {
     let row=sqlx::query(
         "SELECT o.node_id,o.user_id,o.account_epoch::text AS epoch,
                 o.meter_epoch::text AS meter,o.reservation_id::text AS reservation,
                 o.fresh_runtime_id,o.policy_sha256,o.signer_public_key,
                 o.nonce,o.grant_bytes,o.signed_envelope,
+                o.fresh_genesis_envelope,
                 p.fresh_container_id,p.fresh_host_pid,p.fresh_started_at::text AS started,
                 p.fresh_executable_sha256,p.fresh_config_sha256
          FROM quota_v2_calendar_successor_positive_caps o
@@ -177,9 +179,14 @@ async fn existing_signed(
     .fetch_optional(&mut *conn).await?;
     let Some(row)=row else {return Ok(None)};
     let signed:Vec<u8>=row.try_get("signed_envelope")?;
+    let fresh:Vec<u8>=row.try_get("fresh_genesis_envelope")?;
     let parsed:Value=serde_json::from_slice(&signed).map_err(|_|deny())?;
+    let fresh_doc:Value=serde_json::from_slice(&fresh).map_err(|_|deny())?;
     let payload=&parsed["payload"];
     let check=state.node_policy_signer.sign_domain(super::DOMAIN,payload)
+        .map_err(|_|deny())?;
+    let fresh_payload=&fresh_doc["payload"];
+    let fresh_check=state.node_policy_signer.sign_domain(FRESH_GENESIS_DOMAIN,fresh_payload)
         .map_err(|_|deny())?;
     let stored_started:String=row.try_get("started")?;
     let requested_started:Option<String>=sqlx::query_scalar(
@@ -203,6 +210,16 @@ async fn existing_signed(
         || row.try_get::<i64,_>("grant_bytes")?<=0
         || parsed["algorithm"]!="Ed25519"
         || parsed["signature"]!=check
+        || fresh_doc["algorithm"]!="Ed25519"
+        || fresh_doc["signature"]!=fresh_check
+        || fresh_payload["kind"]!="xmesh.xray.genesis-prepared"
+        || fresh_payload["nodeId"]!=req.node_id
+        || fresh_payload["challenge"]!=req.challenge
+        || fresh_payload["candidateRuntimeId"]!=fields.fresh_runtime_id
+        || fresh_payload["activationReceiptSha256"]!=payload["activationReceiptSha256"]
+        || fresh_payload["authorizedBytes"]!=0
+        || fresh_payload["canStart"]!=false || fresh_payload["canResume"]!=false
+        || serde_json::to_vec(&fresh_doc).map_err(|_|deny())? != fresh
         || payload["nonce"]!=req.challenge
         || payload["runtimeId"]!=fields.fresh_runtime_id
         || payload["reservationId"]!=reservation
@@ -212,7 +229,9 @@ async fn existing_signed(
     {
         return Err(deny());
     }
-    String::from_utf8(signed).map(Some).map_err(|_|deny())
+    let grant=String::from_utf8(signed).map_err(|_|deny())?;
+    let genesis=String::from_utf8(fresh).map_err(|_|deny())?;
+    Ok(Some((grant,genesis)))
 }
 
 pub(super) async fn issue(
@@ -220,7 +239,7 @@ pub(super) async fn issue(
     req: &Request,
     fields: &RequestFields,
     activation: &str,
-) -> Result<String,ApiError> {
+) -> Result<(String,String),ApiError> {
     if !request_valid(req,fields) {return Err(deny());}
     let scope=node_runtime::original_first_genesis_cap_scope(
         state,req.node_id,req.user_id).await?;
@@ -339,6 +358,24 @@ pub(super) async fn issue(
     let aliases=scope.aliases.into_iter().map(|a|Alias{
         email:a.email,class:a.class,
     }).collect::<Vec<_>>();
+    let fresh_genesis_payload=json!({
+        "schemaVersion":1,"kind":"xmesh.xray.genesis-prepared",
+        "nodeId":req.node_id,"activationReceiptSha256":activation,
+        "candidateRuntimeId":fields.fresh_runtime_id,
+        "challenge":req.challenge,
+        "preparedAtMs":signed_now,
+        "validUntilMs":signed_now.saturating_add(120_000),
+        "authorizedBytes":0,"canStart":false,"canResume":false
+    });
+    let fresh_signature=state.node_policy_signer
+        .sign_domain(FRESH_GENESIS_DOMAIN,&fresh_genesis_payload)
+        .map_err(|_|deny())?;
+    let fresh_genesis=serde_json::to_vec(&json!({
+        "algorithm":"Ed25519",
+        "payload":fresh_genesis_payload,
+        "signature":fresh_signature
+    })).map_err(|_|deny())?;
+    if fresh_genesis.len()>4096 {return Err(deny());}
     let signed=sign_snapshot(
         &state.node_policy_signer,
         &SqlSnapshot {
@@ -362,9 +399,9 @@ pub(super) async fn issue(
          (predecessor_id,node_id,user_id,account_epoch,meter_epoch,
           reservation_id,fresh_runtime_id,policy_sha256,signer_public_key,
           nonce,revision,grant_bytes,cdn_ceiling_bytes,issued_at_ms,
-          install_before_ms,valid_until_ms,signed_envelope)
+          install_before_ms,valid_until_ms,signed_envelope,fresh_genesis_envelope)
          VALUES($1::uuid,$2,$3,$4::uuid,$5::uuid,$6::uuid,
-                $7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)"
+                $7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)"
     )
     .bind(&fields.predecessor_id).bind(req.node_id).bind(req.user_id)
     .bind(&epoch).bind(&meter).bind(&reservation)
@@ -372,11 +409,13 @@ pub(super) async fn issue(
     .bind(state.node_policy_signer.public_key()).bind(&req.challenge)
     .bind(revision).bind(granted).bind(cdn_ceiling).bind(signed_now)
     .bind(install_before).bind(valid_until).bind(&signed)
+    .bind(&fresh_genesis)
     .execute(&mut *tx).await.map_err(|_|deny())?;
     // PostgreSQL 0161 deferred constraint verifies that NO committed
     // successor reservation exists without exactly these signed bytes.
     tx.commit().await.map_err(|_|deny())?;
-    String::from_utf8(signed).map_err(|_|deny())
+    Ok((String::from_utf8(signed).map_err(|_|deny())?,
+        String::from_utf8(fresh_genesis).map_err(|_|deny())?))
 }
 
 #[cfg(test)]
