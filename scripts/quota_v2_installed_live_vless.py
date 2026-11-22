@@ -6,7 +6,6 @@ target, no fixture-generated traffic counters.
 """
 import json
 from pathlib import Path
-import re
 import socket
 import socketserver
 import struct
@@ -91,14 +90,12 @@ def parse_stats(raw, email):
             continue
         if direction in result:
             raise ValueError(f"duplicate StatsService counter: {direction}")
-        # ProtoJSON omits a default scalar and encodes an int64 as a string.
-        value = item.get("value", "0")
-        if not isinstance(value, str) or not re.fullmatch(r"0|[1-9][0-9]{0,18}", value):
+        # The pinned Xray CLI reflects protobuf's omitempty fields and
+        # encodes an int64 as a JSON number when it is nonzero.
+        value = item.get("value", 0)
+        if type(value) is not int or not 0 <= value <= 2**63 - 1:
             raise ValueError(f"invalid StatsService counter: {direction}")
-        count = int(value)
-        if count > 2**63 - 1:
-            raise ValueError(f"StatsService counter overflow: {direction}")
-        result[direction] = count
+        result[direction] = value
     if len(result) != len(names):
         raise ValueError(f"missing StatsService counters: {sorted(set(names.values()) - result.keys())}")
     return result
