@@ -15,6 +15,7 @@ on:
       - 'deploy/xsp-v2-product-gateway/**'
       - 'scripts/run-quota-wal-transport-audit.sh'
       - 'scripts/test-quota-wal-installed.py'
+      - 'scripts/test-quota-wal-product-tunnel.py'
       - 'scripts/quota_v2_installed_genesis_lease.py'
       - 'scripts/quota_v2_installed_live_vless.py'
       - 'scripts/quota-wal-systemd.Dockerfile'
