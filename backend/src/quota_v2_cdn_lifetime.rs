@@ -94,6 +94,36 @@ pub async fn record_class(
     Ok(())
 }
 
+/// An immutable classification is required on EVERY positive signed
+/// delivery, including exact outbox retries and incremental renewals. A
+/// historic unclassified reservation is conservatively charged as CDN and
+/// cannot later claim to have been MAIN merely because a profile changed.
+pub async fn verify_class(
+    conn: &mut PgConnection,
+    user_id: i64,
+    node_id: i64,
+    reservation: &str,
+    class: &str,
+) -> Result<(), ApiError> {
+    if !matches!(class, "main" | "cdn" | "mixed") {
+        return Err(deny());
+    }
+    let stored: Option<String> = sqlx::query_scalar(
+        "SELECT class FROM quota_v2_reservation_classes
+         WHERE reservation_id=$1::uuid AND user_id=$2 AND node_id=$3
+         FOR SHARE",
+    )
+    .bind(reservation)
+    .bind(user_id)
+    .bind(node_id)
+    .fetch_optional(conn)
+    .await?;
+    if stored.as_deref() != Some(class) {
+        return Err(deny());
+    }
+    Ok(())
+}
+
 /// Runs inside the existing locked per-user account transaction. Legacy
 /// aggregate input is read only from the existing authoritative server
 /// telemetry ledger, NOT from the claimed node counters or client policy.
