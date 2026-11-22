@@ -86,6 +86,36 @@ pub async fn headroom(
     Ok(Some(remaining(limit, baseline, issued)))
 }
 
+/// A previously signed positive grant must not be delivered after the
+/// operator lowers a lifetime Node quota below the already held commitments.
+/// No new bytes are minted here, but stale outbox redelivery is also denied.
+pub async fn issued_within_limit(
+    conn: &mut PgConnection,
+    user_id: i64,
+    node_id: i64,
+    user: &Value,
+) -> Result<bool, ApiError> {
+    let Some(limit) = lifetime_rule(user, node_id)? else {
+        return Ok(true);
+    };
+    // Anchor any newly introduced lifetime quota conservatively, even if
+    // there were V2 grants before the owner configured it.
+    let _ = headroom(conn, user_id, node_id, user).await?;
+    let committed: bool = sqlx::query_scalar(
+        "SELECT baseline_bytes::numeric + COALESCE((
+           SELECT SUM(ceiling_bytes::numeric) FROM quota_v2_reservations
+            WHERE user_id=$1 AND node_id=$2
+         ),0) <= $3::numeric FROM quota_v2_node_lifetime_baselines
+          WHERE user_id=$1 AND node_id=$2",
+    )
+    .bind(user_id)
+    .bind(node_id)
+    .bind(limit)
+    .fetch_one(conn)
+    .await?;
+    Ok(committed)
+}
+
 fn remaining(limit: i64, baseline: i64, issued: i64) -> i64 {
     limit.saturating_sub(baseline).saturating_sub(issued).max(0)
 }
