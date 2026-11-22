@@ -17,6 +17,7 @@ FILES = tuple(
         ("0158", "calendar_closed_settlement_guard"),
         ("0159", "successor_predecessor_binding"),
         ("0160", "successor_fresh_meter_staging"),
+        ("0161", "calendar_successor_positive_outbox"),
     )
 )
 for path in FILES:
