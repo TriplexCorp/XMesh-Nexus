@@ -274,7 +274,8 @@ async fn existing_signed(
         || payload["reservationId"]!=reservation
         || payload["meterEpoch"]!=meter
         || !matches!(serde_json::to_vec(&parsed),Ok(ref canonical)
-                if signed == *canonical || signed == [canonical.as_slice(), b"\n"].concat())
+                if signed.as_slice()==canonical.as_slice()
+                    || signed.as_slice()==[canonical.as_slice(),b"\n"].concat().as_slice())
     {
         return Err(deny());
     }
