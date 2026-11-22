@@ -134,6 +134,7 @@ jobs:
                   "backend/migrations/0158_quota_v2_calendar_closed_settlement_guard.sql",
                   "backend/migrations/0159_quota_v2_successor_predecessor_binding.sql",
                   "backend/migrations/0160_quota_v2_successor_fresh_meter_staging.sql",
+                  "backend/migrations/0161_quota_v2_calendar_successor_positive_outbox.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
