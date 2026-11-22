@@ -237,7 +237,22 @@ def main():
             f"'{identity(87420,'reservation')}'::uuid,8,{USER},87420,"
             f"{topup_bytes},{MIXED_REQUEST+topup_bytes},'{'f'*64}')"
         )
+        # The SQL fixture is deliberately NOT a cryptographic signature.
+        # It proves the storage transaction; the Nexus Ed25519 signer and
+        # actual Xray verification have separate integration tests.
+        exact_sql_fixture = b"disposable-signed-envelope-placeholder-" + b"x"*160
         conn.execute(topup_sql)
+        conn.execute(
+            "INSERT INTO quota_v2_cap_renewals("
+            "reservation_id,revision,nonce,grant_bytes,signed_envelope) "
+            "VALUES(%s,8,%s,5000000,%s)",
+            (identity(87420,"reservation"),"f"*64,exact_sql_fixture)
+        )
+        assert conn.execute(
+            "SELECT signed_envelope FROM quota_v2_cap_renewals "
+            "WHERE reservation_id=%s AND revision=8",
+            (identity(87420,"reservation"),)
+        ).fetchone() == (exact_sql_fixture,)
         assert sql_liability(conn) == old_liability+topup_bytes
         assert exact_signed_cdn(conn,87420)==(MIXED_REQUEST+topup_bytes,)
         assert conn.execute(
@@ -265,6 +280,41 @@ def main():
             conn.rollback()
         else:
             raise AssertionError("duplicate signed CDN revision created new capacity")
+        assert sql_liability(conn) == old_liability+topup_bytes
+
+    # A failure to commit the exact signed cap MUST also roll back the
+    # independently proposed CDN bytes. Both records share a DB transaction.
+    # Zero grant_bytes violates the actual immutable signed-cap SQL schema.
+    with psycopg.connect(DSN) as conn:
+        try:
+            conn.execute(
+                "INSERT INTO quota_v2_mixed_cdn_topups("
+                "reservation_id,revision,user_id,node_id,added_bytes,"
+                "cumulative_cdn_ceiling_bytes,request_nonce) "
+                "VALUES(%s,9,%s,87420,1000,%s,%s)",
+                (identity(87420,"reservation"),USER,
+                 MIXED_REQUEST+topup_bytes+1000,"e"*64)
+            )
+            conn.execute(
+                "INSERT INTO quota_v2_cap_renewals("
+                "reservation_id,revision,nonce,grant_bytes,signed_envelope) "
+                "VALUES(%s,9,%s,0,%s)",
+                (identity(87420,"reservation"),"e"*64,b"x"*160)
+            )
+        except psycopg.Error:
+            conn.rollback()
+        else:
+            raise AssertionError("invalid signed-cap commit accepted new CDN hold")
+        assert conn.execute(
+            "SELECT revision FROM quota_v2_mixed_cdn_topups "
+            "WHERE reservation_id=%s ORDER BY revision",
+            (identity(87420,"reservation"),)
+        ).fetchall() == [(8,)]
+        assert conn.execute(
+            "SELECT revision FROM quota_v2_cap_renewals "
+            "WHERE reservation_id=%s ORDER BY revision",
+            (identity(87420,"reservation"),)
+        ).fetchall() == [(8,)]
         assert sql_liability(conn) == old_liability+topup_bytes
 
     for statement, params in [
