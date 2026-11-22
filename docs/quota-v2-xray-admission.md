@@ -138,3 +138,32 @@ never restore a consumed byte. A process crash between durable charge and
 delivery may conservatively overcharge a write. Reopening a stream and
 renewing a policy cannot reset that charge. Neither rollover preparation
 nor shadow carryforward satisfies these requirements.
+
+## Immutable calendar successor preparation (draft, **zero authority**)
+
+When a signed first-genesis reservation crosses a proven calendar boundary,
+the installed Agent may request `calendarSuccessor.predecessorId` on the
+**existing enrolled XSP/2 cap delivery endpoint**. The challenge is the
+SHA-256 of `XMESH_QUOTA_V2_CALENDAR_SUCCESSOR_REQUEST_V1\0` plus the
+canonical predecessor UUID. The Nexus handler requires the current enrolled
+Node keyset, an active product activation, unchanged PolicySigner, the
+original signed first-cap identity, a recorded immutable calendar closure,
+and an expired predecessor cap.
+
+Migration `0157_quota_v2_calendar_successor_zero_authority.sql` records one
+canonical Ed25519 response per predecessor in
+`quota_v2_calendar_successor_preparations`. The response is durable before
+delivery and exact byte-for-byte replies are idempotent while its time window
+remains valid. It identifies **unfunded** successor meter/reservation UUIDs
+and always carries `authorizedBytes=0`, `canSpend=false`,
+`canStart=false`, `canResume=false`, `finalMeterVerified=false`,
+`refundableBytes=0`.
+
+**This is not a new quota lease.** No row is created in
+`quota_v2_reservations`, no signed positive Xray cap is issued, and
+Agent cannot resume ingress using this receipt. Old WAL filename ownership
+remains immutable. Reusing the same Xray WAL stream for a new reservation
+would reattribute late bytes; a new independently verified meter identity
+and a funded PostgreSQL lease are prerequisites for any future positive
+transition. The staging nonce/response must never be treated as final
+Xray meter attestation. GitHub Actions hosted E2E remains required.
