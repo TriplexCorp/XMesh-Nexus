@@ -46,6 +46,19 @@ def real_liability_sql():
     return match.group(1)
 
 
+def real_backfill_guard_sql():
+    source = (Path(__file__).resolve().parents[1]
+              / "backend/src/quota_v2_cdn_lifetime.rs").read_text()
+    region = source.split("pub async fn require_fundable_mixed(",1)[1].split(
+        "pub async fn fund_mixed(",1)[0]
+    match = re.search(
+        r'let legacy_unfunded: bool = sqlx::query_scalar\(\s*"([^"]+)"',
+        region,re.DOTALL)
+    if match is None:
+        raise AssertionError("missing production historical mixed hold barrier")
+    return match.group(1)
+
+
 def sql_liability(conn):
     # Repeated snapshots on one PostgreSQL connection must not collide
     # with an earlier PREPARE of the same name.
@@ -150,6 +163,20 @@ def main():
         prepared(conn,87440,"cdn")
         assert shared_reserve(conn,87440,0)==0
         assert sql_liability(conn)==issued
+        # Execute the EXACT production Rust preflight SQL: a previously
+        # issued historic lease with no CDN hold must be refused, while
+        # the current mixed lease's held CDN reservation remains valid.
+        conn.execute(
+            "PREPARE mixed_backfill_guard(uuid,bigint,bigint) AS "
+            + real_backfill_guard_sql()
+        )
+        def must_deny_historic(node):
+            ident=identity(node,"reservation")
+            return conn.execute(
+                f"EXECUTE mixed_backfill_guard('{ident}'::uuid,{USER},{node})"
+            ).fetchone()[0]
+        assert must_deny_historic(87411) is True
+        assert must_deny_historic(87420) is False
         # Historic grants lacking classification continue to count fully.
         assert conn.execute(
             "SELECT class FROM quota_v2_reservation_classes "
