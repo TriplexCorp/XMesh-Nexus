@@ -90,6 +90,55 @@ def verify_calendar_closure(db, dsn):
     print("PASS: calendar closure is immutable and idempotent; late debt and holds survive")
 
 
+def verify_stream_owner(db, dsn):
+    user, old_epoch, new_epoch = 2_637_315_405, uuid4(), uuid4()
+    old_reservation, new_reservation = uuid4(), uuid4()
+    for epoch, reservation, closed in (
+        (old_epoch, old_reservation, True), (new_epoch, new_reservation, False),
+    ):
+        db.execute("INSERT INTO quota_v2_accounts (user_id,epoch,limit_bytes,closed) "
+                   "VALUES (%s,%s,100,%s)", (user, epoch, closed))
+        db.execute("INSERT INTO quota_v2_reservations "
+                   "(user_id,epoch,node_id,meter_epoch,reservation_id,valid_until) "
+                   "VALUES (%s,%s,201,%s,%s,clock_timestamp())",
+                   (user, epoch, uuid4(), reservation))
+    first = "meter-" + "1" * 64 + ".jsonl"
+    second = "meter-" + "2" * 64 + ".jsonl"
+
+    def store(tx, name, reservation, sequence):
+        tx.execute("INSERT INTO quota_v2_wal_charges "
+                   "(filename,reservation_id,first_sequence,last_sequence,last_digest,"
+                   "stream_bytes,is_cdn,journal,signed_receipt) "
+                   "VALUES (%s,%s,%s,%s,%s,17,false,%s,%s)",
+                   (name, reservation, sequence, sequence, "a" * 64, b"journal", b"r" * 128))
+
+    store(db, first, old_reservation, 1)
+    store(db, first, old_reservation, 2)
+
+    def attempt(reservation):
+        try:
+            with psycopg.connect(dsn) as tx:
+                store(tx, second, reservation, 1)
+        except psycopg.errors.ForeignKeyViolation as error:
+            assert error.diag.constraint_name == "quota_v2_wal_charge_stream_owner"
+            return None
+        return reservation
+
+    with ThreadPoolExecutor(2) as pool:
+        claimed = list(pool.map(attempt, (old_reservation, new_reservation)))
+    assert claimed.count(None) == 1, claimed
+    try:
+        store(db, first, new_reservation, 3)
+    except psycopg.errors.ForeignKeyViolation as error:
+        assert error.diag.constraint_name == "quota_v2_wal_charge_stream_owner"
+    else:
+        raise AssertionError("an old WAL suffix was charged to a new epoch")
+    store(db, first, old_reservation, 3)
+    assert db.execute("SELECT count(*) FROM quota_v2_wal_charges WHERE filename=%s",
+                      (first,)).fetchone() == (3,)
+    print("PASS: a WAL stream keeps its original reservation across calendar epochs")
+
+
 def verify_monthly_cdn(db, dsn):
     mib = 1024 * 1024
     user = 2_637_315_401
@@ -315,6 +364,7 @@ def main():
         verify_shared_budget(db, dsn)
         verify_cdn_submonth_history(db)
         verify_calendar_closure(db, dsn)
+        verify_stream_owner(db, dsn)
 
 
 if __name__ == "__main__":

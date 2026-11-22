@@ -403,7 +403,16 @@ pub(super) async fn charge(
     .bind(&raw)
     .bind(&receipt)
     .execute(&mut *tx)
-    .await?;
+    .await
+    .map_err(|error| {
+        if error.as_database_error().and_then(|err| err.constraint())
+            == Some("quota_v2_wal_charge_stream_owner")
+        {
+            conflict()
+        } else {
+            error.into()
+        }
+    })?;
     tx.commit().await?;
     Ok(json!({"receipt":STANDARD.encode(receipt)}))
 }

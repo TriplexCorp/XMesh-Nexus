@@ -59,6 +59,14 @@ digest, append-only prefix, and PostgreSQL record still cover the exact
 uncompressed bytes. A malformed or untransferable checkpoint leaves the
 previous committed checkpoint intact.
 
+The Agent retains the verified first-cap envelope by user and measured
+runtime before the Unix installation call. That copy can identify historical
+WAL even when the installation acknowledgment was lost. The separate
+installation marker still requires a response from Xray. Nexus binds the
+full filename of each anchored WAL stream to its original reservation on
+the first accepted charge. Later batches cannot move that stream to a new
+reservation or epoch.
+
 ## Quota periods
 
 The existing Node counters use UTC. Days start at midnight, weeks at Monday

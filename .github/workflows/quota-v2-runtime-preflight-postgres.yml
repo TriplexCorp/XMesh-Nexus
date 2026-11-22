@@ -19,6 +19,7 @@ on:
       - 'backend/migrations/0153_quota_v2_cdn_calendar.sql'
       - 'backend/migrations/0154_quota_v2_cdn_day_week.sql'
       - 'backend/migrations/0155_quota_v2_calendar_closures.sql'
+      - 'backend/migrations/0156_quota_v2_wal_stream_owners.sql'
       - 'scripts/test-quota-v2-node-calendar-postgres.py'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
       - 'scripts/benchmark-quota-v2-postgres-allocator.py'
@@ -108,6 +109,7 @@ jobs:
                   "backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql",
                   "backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql",
                   "backend/migrations/0144_quota_v2_genesis_lease_replies.sql",
+                  "backend/migrations/0145_quota_v2_wal_charges.sql",
                   "backend/migrations/0146_quota_v2_cap_renewals.sql",
                   "backend/migrations/0147_quota_v2_node_lifetime_baselines.sql",
                   "backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql",
@@ -118,6 +120,7 @@ jobs:
                   "backend/migrations/0153_quota_v2_cdn_calendar.sql",
                   "backend/migrations/0154_quota_v2_cdn_day_week.sql",
                   "backend/migrations/0155_quota_v2_calendar_closures.sql",
+                  "backend/migrations/0156_quota_v2_wal_stream_owners.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY

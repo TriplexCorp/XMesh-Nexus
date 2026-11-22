@@ -598,6 +598,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     try:
         assert guest_b.request(WAL_PATH, charge_jobs[1][1][0][0])[0] == 500
         assert db.execute(charge_sql).fetchall() == []
+        assert db.execute("SELECT count(*) FROM quota_v2_wal_stream_owners").fetchone() == (0,)
         assert db.execute(balance_sql, (uid,)).fetchone() == account[1:]
     finally:
         db.execute("ALTER TABLE quota_v2_wal_charges DROP CONSTRAINT ci_reject_wal")
@@ -611,6 +612,9 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             # inserts SQL, fabricates a receipt or invokes a signing fixture.
             guest.exec("systemctl","start","xmesh-quota-v2-renewal.service",timeout=180)
             grant = json.loads(cap_jobs[0][3])["payload"]
+            archived = json.loads(guest.exec(
+                "cat", STATE + f"/wal-cap-u{grant['userId']}-{grant['runtimeId']}.json"))
+            assert archived["signedEnvelope"].encode() == cap_jobs[0][3]
             saved = db.execute(
                 "SELECT filename,journal,signed_receipt FROM quota_v2_wal_charges "
                 "WHERE reservation_id=%s::uuid ORDER BY filename,first_sequence",
@@ -658,6 +662,9 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     print("PASS: installed Agent bootstrapped the first WAL birth index and charged it through strict XSP/2.")
     charged_rows = db.execute(charge_sql).fetchall()
     assert len(charged_rows) == 6
+    assert set(db.execute("SELECT reservation_id,filename FROM quota_v2_wal_stream_owners").fetchall()) == {
+        (row[0], row[1]) for row in charged_rows
+    }
     charged_balance = db.execute(balance_sql, (uid,)).fetchone()
     assert charged_balance == (account[0], account[2]), charged_balance
     floors = db.execute("SELECT node_id,conservative_burn_floor_bytes FROM quota_v2_reservations "
