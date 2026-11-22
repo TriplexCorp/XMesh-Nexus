@@ -1,4 +1,4 @@
-//! Signed Quota V2 lifetime CDN budget: conservative classified reservations.
+//! Signed Quota V2 CDN budgets backed by conservative classified reservations.
 //!
 //! MAIN permits stay outside the CDN pool. Homogeneous CDN Nodes reserve
 //! their full issued ceiling. Mixed MAIN+CDN Nodes pre-fund a *separate*
@@ -13,7 +13,7 @@ use sqlx::PgConnection;
 fn deny() -> ApiError {
     ApiError::new(
         StatusCode::CONFLICT,
-        "Independent lifetime CDN quota cannot safely fund this Xray reservation.",
+        "Independent CDN quota cannot safely fund this Xray reservation.",
     )
 }
 
@@ -120,18 +120,87 @@ pub async fn verify_class(
     Ok(())
 }
 
-/// Runs inside the existing locked per-user account transaction. Legacy
-/// aggregate input is read only from the existing authoritative server
-/// telemetry ledger, NOT from the claimed node counters or client policy.
-async fn legacy_cdn_usage(conn: &mut PgConnection, user_id: i64) -> Result<i64, ApiError> {
-    let settings: Value =
+async fn panel_settings(conn: &mut PgConnection) -> Result<Value, ApiError> {
+    Ok(
         sqlx::query_scalar("SELECT value FROM app_settings WHERE key='panel' FOR SHARE")
-            .fetch_optional(&mut *conn)
+            .fetch_optional(conn)
             .await?
-            .unwrap_or_else(|| json!({}));
-    if cdn_quota::reset_period(&settings)? != "lifetime" {
+            .unwrap_or_else(|| json!({})),
+    )
+}
+
+async fn monthly(conn: &mut PgConnection, user: &Value) -> Result<bool, ApiError> {
+    if limit(user)?.is_none() || cdn_quota::reset_period(&panel_settings(conn).await?)? != "monthly"
+    {
+        return Ok(false);
+    }
+    if std::env::var("XMESH_QUOTA_V2_CDN_CALENDAR_STAGING").as_deref() != Ok("1") {
         return Err(deny());
     }
+    Ok(true)
+}
+
+pub async fn bind_deadline(
+    conn: &mut PgConnection,
+    user: &Value,
+    reservation: &str,
+    class: &str,
+) -> Result<Option<i64>, ApiError> {
+    if matches!(class, "cdn" | "mixed") && monthly(conn, user).await? {
+        // Avoid invoking the insert guard on an already issued reservation.
+        sqlx::query(
+            "INSERT INTO quota_v2_cdn_calendar_bindings(reservation_id,period,calendar_window)
+             SELECT $1::uuid,'monthly',quota_v2_calendar_window('monthly',statement_timestamp())
+             WHERE NOT EXISTS (SELECT 1 FROM quota_v2_cdn_calendar_bindings WHERE reservation_id=$1::uuid)",
+        )
+        .bind(reservation)
+        .execute(&mut *conn)
+        .await?;
+    }
+    permit_deadline(conn, user, reservation, class).await
+}
+
+/// Existing bindings cannot be relabeled or extended after a policy change.
+pub async fn permit_deadline(
+    conn: &mut PgConnection,
+    user: &Value,
+    reservation: &str,
+    class: &str,
+) -> Result<Option<i64>, ApiError> {
+    let requires_window = matches!(class, "cdn" | "mixed") && monthly(conn, user).await?;
+    let existing: Option<(i64, bool)> = sqlx::query_as(
+        "SELECT (extract(epoch FROM upper(calendar_window))*1000)::bigint,
+                calendar_window @> statement_timestamp()
+         FROM quota_v2_cdn_calendar_bindings WHERE reservation_id=$1::uuid",
+    )
+    .bind(reservation)
+    .fetch_optional(conn)
+    .await?;
+    match (requires_window, existing) {
+        (false, None) => Ok(None),
+        (true, Some((end, true))) => Ok(Some(end)),
+        _ => Err(deny()),
+    }
+}
+
+async fn calendar_remaining(
+    conn: &mut PgConnection,
+    user_id: i64,
+    limit: i64,
+) -> Result<i64, ApiError> {
+    Ok(
+        sqlx::query_scalar("SELECT quota_v2_cdn_calendar_remaining($1,$2,statement_timestamp())")
+            .bind(user_id)
+            .bind(limit)
+            .fetch_one(conn)
+            .await?,
+    )
+}
+
+/// Runs inside the existing locked per-user account transaction. Legacy
+/// aggregate input comes from the authoritative server telemetry ledger.
+async fn legacy_cdn_usage(conn: &mut PgConnection, user_id: i64) -> Result<i64, ApiError> {
+    let settings = panel_settings(conn).await?;
     let tags = cdn_quota::tags(&settings)?.into_iter().collect::<Vec<_>>();
     let used: i64 = sqlx::query_scalar(
         "SELECT COALESCE(SUM(t.uplink_bytes+t.downlink_bytes),0)::bigint
@@ -170,6 +239,9 @@ pub async fn headroom(
     let Some(limit) = limit(user)? else {
         return Ok(None);
     };
+    if monthly(conn, user).await? {
+        return Ok(Some(calendar_remaining(conn, user_id, limit).await?.max(0)));
+    }
     let observed = legacy_cdn_usage(conn, user_id).await?;
     sqlx::query(
         "INSERT INTO quota_v2_cdn_lifetime_baselines(user_id,baseline_bytes)
@@ -544,11 +616,13 @@ pub async fn issued_within_limit(
     if class == "main" {
         return Ok(true);
     }
-    let Some(_limit) = limit(user)? else {
+    let Some(limit) = limit(user)? else {
         return Ok(true);
     };
+    if monthly(conn, user).await? {
+        return Ok(calendar_remaining(conn, user_id, limit).await? >= 0);
+    }
     let _ = headroom(conn, user_id, user).await?;
-    let limit = limit(user)?.ok_or_else(deny)?;
     let anchor: i64 = sqlx::query_scalar(
         "SELECT baseline_bytes FROM quota_v2_cdn_lifetime_baselines
          WHERE user_id=$1 FOR SHARE",

@@ -26,6 +26,112 @@ def verify_boundaries(db):
         assert row == (True, True, True), (period, row)
 
 
+def verify_monthly_cdn(db, dsn):
+    mib = 1024 * 1024
+    user = 2_637_315_401
+    epoch = uuid4()
+    total = 150 * mib
+    db.execute("INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes) VALUES (%s,%s,%s)",
+               (user, epoch, (1 << 63) - 1))
+    db.execute("INSERT INTO user_inbound_traffic_monthly VALUES "
+               "(date_trunc('month',statement_timestamp() AT TIME ZONE 'UTC')::date,%s,%s,0)",
+               (user, 20 * mib))
+
+    def remaining(tx, at=None):
+        return tx.execute(
+            "SELECT quota_v2_cdn_calendar_remaining(%s,%s,COALESCE(%s,statement_timestamp()))",
+            (user, total, at),
+        ).fetchone()[0]
+
+    def reserve(node, scope, target, *, monthly=False, mixed_hold=0):
+        reservation, meter = uuid4(), uuid4()
+        with psycopg.connect(dsn) as tx:
+            tx.execute("SELECT pg_advisory_xact_lock(%s)", (user ^ 0x51_4D_45_53_48,))
+            until, = tx.execute(
+                "SELECT LEAST(statement_timestamp()+interval '1 hour',"
+                "upper(quota_v2_calendar_window('monthly',statement_timestamp())))"
+            ).fetchone()
+            if monthly:
+                tx.execute(
+                    "INSERT INTO quota_v2_cdn_calendar_bindings VALUES "
+                    "(%s,'monthly',quota_v2_calendar_window('monthly',statement_timestamp()))",
+                    (reservation,),
+                )
+            ids = (user, epoch, node, meter, reservation)
+            tx.execute("SELECT quota_v2_reserve(%s,%s,%s,%s,%s,0,0,%s)", (*ids, until))
+            if scope is not None:
+                tx.execute("INSERT INTO quota_v2_reservation_classes VALUES (%s,%s,%s,%s)",
+                           (reservation, user, node, scope))
+            tx.execute("UPDATE quota_v2_reservations SET node_confirmed=true WHERE reservation_id=%s",
+                       (reservation,))
+            if scope == "cdn" and monthly:
+                target = min(target, max(0, remaining(tx)))
+            issued, = tx.execute(
+                "SELECT ceiling_bytes FROM quota_v2_reserve(%s,%s,%s,%s,%s,%s,0,%s)",
+                (*ids, target, until),
+            ).fetchone()
+            if mixed_hold:
+                tx.execute("INSERT INTO quota_v2_mixed_cdn_holds VALUES (%s,%s,%s,%s)",
+                           (reservation, user, node, mixed_hold))
+            return issued
+
+    assert reserve(10_381, None, 15 * mib) == 15 * mib
+    assert reserve(10_382, "main", 64 * mib) == 64 * mib
+    assert reserve(10_383, "mixed", 48 * mib, monthly=True, mixed_hold=15 * mib) == 48 * mib
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        granted = list(workers.map(lambda node: reserve(node, "cdn", 64 * mib, monthly=True),
+                                   (10_384, 10_385)))
+    assert sorted(granted) == [36 * mib, 64 * mib], granted
+    assert remaining(db) == 0
+    assert reserve(10_386, "main", 64 * mib) == 64 * mib
+    boundary, = db.execute(
+        "SELECT upper(quota_v2_calendar_window('monthly',statement_timestamp()))"
+    ).fetchone()
+    assert remaining(db, boundary - timedelta(milliseconds=1)) == 0
+    assert remaining(db, boundary) == 135 * mib  # Unbound reserve remains held.
+    assert db.execute("SELECT SUM(ceiling_bytes) FROM quota_v2_reservations WHERE user_id=%s",
+                      (user,)).fetchone() == (291 * mib,)
+    print("PASS: 150 MiB monthly CDN pool conserves competing leases and mixed holds; MAIN stays independent")
+
+
+def verify_shared_budget(db, dsn):
+    mib = 1024 * 1024
+    user = 2_637_315_402
+    epoch = uuid4()
+    budget = 1000 * mib
+    db.execute("INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes) VALUES (%s,%s,%s)",
+               (user, epoch, budget))
+
+    def spend_windows(node):
+        ids = (user, epoch, node, uuid4(), uuid4())
+        acknowledged = 0
+        with psycopg.connect(dsn) as tx:
+            with tx.transaction():
+                tx.execute(
+                    "SELECT quota_v2_reserve(%s,%s,%s,%s,%s,0,0,now()+interval '1 hour')", ids,
+                )
+                tx.execute("UPDATE quota_v2_reservations SET node_confirmed=true WHERE reservation_id=%s",
+                           (ids[-1],))
+            for _ in range(8):
+                with tx.transaction():
+                    request = (*ids, 64 * mib, acknowledged)
+                    sql = ("SELECT ceiling_bytes FROM quota_v2_reserve"
+                           "(%s,%s,%s,%s,%s,%s,%s,now()+interval '1 hour')")
+                    ceiling, = tx.execute(sql, request).fetchone()
+                    assert 0 <= ceiling - acknowledged <= 64 * mib
+                    assert tx.execute(sql, request).fetchone() == (ceiling,)
+                    for _ in range(2):
+                        tx.execute("SELECT quota_v2_ack(%s,%s,%s,%s,%s,%s)", (*ids, ceiling))
+                    acknowledged = ceiling
+        return acknowledged
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        assert sum(workers.map(spend_windows, (10_387, 10_388))) == budget
+    assert db.execute("SELECT settled_bytes FROM quota_v2_accounts WHERE user_id=%s",
+                      (user,)).fetchone() == (budget,)
+    print("PASS: two competing Nodes settle an exact shared 1000 MiB SQL budget through retries")
+
+
 def main():
     dsn = os.environ["QUOTA_TEST_DSN"]
     assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
@@ -113,6 +219,8 @@ def main():
         assert db.execute("SELECT count(*) FROM quota_v2_node_calendar_bindings WHERE reservation_id=ANY(%s)",
                           ([row[1] for row in grants],)).fetchone() == (2,)
         print("PASS: UTC boundaries, concurrent Node funding, immutable deadlines and historical debt")
+        verify_monthly_cdn(db, dsn)
+        verify_shared_budget(db, dsn)
 
 
 if __name__ == "__main__":

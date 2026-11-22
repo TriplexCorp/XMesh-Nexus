@@ -1476,6 +1476,26 @@ async fn reservation_revocation(
     .map_err(ApiError::from)
 }
 
+async fn bind_reservation_deadline(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    user: &Value,
+    reservation: &str,
+    inbound_class: &str,
+) -> Result<i64, ApiError> {
+    let node = crate::quota_v2_node_lifetime::bind_deadline(
+        conn,
+        node_id,
+        user,
+        reservation,
+        inbound_class != "unclassified",
+    )
+    .await?;
+    let cdn =
+        crate::quota_v2_cdn_lifetime::bind_deadline(conn, user, reservation, inbound_class).await?;
+    Ok(node.into_iter().chain(cdn).min().unwrap_or(i64::MAX))
+}
+
 pub async fn issue_user(
     conn: &mut sqlx::PgConnection,
     user: &mut Value,
@@ -1499,14 +1519,8 @@ pub async fn issue_user(
     let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
     let (meter, reservation, confirmed) =
         lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
-    let calendar_end = crate::quota_v2_node_lifetime::bind_deadline(
-        conn,
-        node_id,
-        user,
-        &reservation,
-        inbound_class != "unclassified",
-    )
-    .await?;
+    let calendar_end =
+        bind_reservation_deadline(conn, node_id, user, &reservation, inbound_class).await?;
     let revoke_id =
         reservation_revocation(conn, user_id, node_id, &epoch, &meter, &reservation).await?;
     let bounded_target = bounded_policy_target(
@@ -1520,7 +1534,7 @@ pub async fn issue_user(
     )
     .await?;
     // A mixed MAIN/CDN Node draws a finite CDN sub-ceiling from its own
-    // lifetime pool, independently of its MAIN/shared grant. Snapshot this
+    // pool, independently of its MAIN/shared grant. Snapshot this
     // headroom BEFORE quota_v2_reserve increases the shared SQL ceiling.
     // The same user-account lock serializes all competing CDN Nodes.
     let mixed_cdn_free_before = if inbound_class == "mixed" && confirmed && revoke_id.is_none() {
@@ -1528,9 +1542,7 @@ pub async fn issue_user(
     } else {
         None
     };
-    let until = now_ms
-        .saturating_add(24 * 60 * 60 * 1000)
-        .min(calendar_end.unwrap_or(i64::MAX));
+    let until = now_ms.saturating_add(24 * 60 * 60 * 1000).min(calendar_end);
     let lease = sqlx::query(
         "SELECT acknowledged_bytes,ceiling_bytes,revision,
                     (EXTRACT(EPOCH FROM valid_until)*1000)::BIGINT AS valid_until_ms

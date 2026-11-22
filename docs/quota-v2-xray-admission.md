@@ -72,13 +72,22 @@ The allocator counts legacy usage, unbound V2 reservations and all earlier
 reservations with overlapping windows. Changing the rule does not move a
 bound reservation. This staging switch defaults to off.
 
+`XMESH_QUOTA_V2_CDN_CALENDAR_STAGING=1` uses the panel's existing
+`cdnResetPeriod=monthly` rule for classified CDN or mixed reservations. The
+monthly pool includes legacy CDN telemetry, unbound reservations and
+overlapping CDN commitments across all nodes. Mixed reservations account for
+their immutable CDN sub-cap and funded CDN top-ups. MAIN-only reservations
+are outside this pool. When a mixed reservation has both a Node window and
+a CDN window, its shared signed permit expires at the earlier deadline.
+
 A periodic V2 reservation needs an immutable accounting epoch and an expiry
 at or before the next applicable UTC boundary. A later period may open only
 after the old spending authority has expired or been fenced. Outstanding
 old grants and late WAL remain booked to the original epoch. Policy edits
 must preserve the historical ledger and cannot free an unverified balance.
-Seamless rollover of an active session, global and CDN calendar funding,
-and replacement of the runtime still require separate lifecycle support.
+The shared limit remains cumulative. Opening a spending permit in a new
+window, continuing an active session across that boundary and replacing the
+runtime still require separate lifecycle support.
 
 ## Required positive admission contract
 

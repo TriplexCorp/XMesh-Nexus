@@ -197,7 +197,15 @@ pub(super) async fn issue(
     let payload = verified_payload(state, &permit, &lease, activation, scope)?;
     let now = super::database_now_ms(&mut tx).await?;
     let expires = payload["validUntilMs"].as_i64().ok_or_else(deny)?;
-    super::check_node_calendar(&mut tx, req, &user, &fields.reservation_id, expires).await?;
+    super::check_reservation_calendars(
+        &mut tx,
+        req,
+        &user,
+        &fields.reservation_id,
+        inbound_class,
+        expires,
+    )
+    .await?;
     let limit = crate::quota_v2::authoritative_shared_limit(&user).map_err(|_| deny())?;
     if !node_runtime::first_genesis_active_until(&user, now, expires) || limit < original_limit {
         return Err(deny());
@@ -214,15 +222,7 @@ pub(super) async fn issue(
         &payload,
     )
     .await?;
-    let node_free =
-        crate::quota_v2_node_lifetime::headroom(&mut tx, req.user_id, req.node_id, &user).await?;
-    let cdn_free = if inbound_class == "cdn" {
-        crate::quota_v2_cdn_lifetime::headroom(&mut tx, req.user_id, &user).await?
-    } else {
-        None
-    };
-    let free = node_free.map_or(free, |remaining| free.min(remaining));
-    let free = cdn_free.map_or(free, |remaining| free.min(remaining));
+    let free = constrain_free(&mut tx, req, &user, inbound_class, free).await?;
     if is_renewal
         && permit.nonce == req.challenge
         && next_revision == lease.revision
@@ -256,6 +256,24 @@ pub(super) async fn issue(
     .await?;
     tx.commit().await?;
     Ok(signed)
+}
+
+async fn constrain_free(
+    conn: &mut PgConnection,
+    req: &Request,
+    user: &Value,
+    inbound_class: &str,
+    free: i64,
+) -> Result<i64, ApiError> {
+    let node_free =
+        crate::quota_v2_node_lifetime::headroom(&mut *conn, req.user_id, req.node_id, user).await?;
+    let cdn_free = if inbound_class == "cdn" {
+        crate::quota_v2_cdn_lifetime::headroom(&mut *conn, req.user_id, user).await?
+    } else {
+        None
+    };
+    let free = node_free.map_or(free, |remaining| free.min(remaining));
+    Ok(cdn_free.map_or(free, |remaining| free.min(remaining)))
 }
 
 async fn verify_prior_cdn(

@@ -93,10 +93,17 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         # At a simultaneous near-midnight day/week/month boundary, let the
         # concurrency rehearsal continue with lifetime limits.
         periods += ["lifetime"] * (2 - len(periods))
+    monthly_cdn = os.environ.get("XMESH_QUOTA_V2_CDN_CALENDAR_STAGING") == "1" and db.execute(
+        "SELECT upper(quota_v2_calendar_window('monthly',statement_timestamp())) "
+        "> statement_timestamp()+interval '15 minutes'"
+    ).fetchone()[0]
+    if monthly_cdn:
+        owner.request("PATCH", "/settings", {"cdnResetPeriod": "monthly"})
     peer_limit = 4 * 64 * 1024
     _,peer=owner.request("POST","/collections/users",{
         "username":"ci_genesis_lease_peer","squads":[squad["id"]],
-        "hold":False,"used":0,"limit":2 * peer_limit / 1_000_000_000,"expireAt":0,
+        "hold":False,"used":0,"limit":0,"expireAt":0,
+        "cdnLimitGb":peer_limit / 1_000_000_000,
         "nodeTrafficLimits":{
             str(guest.node):{"limitGb":peer_limit / 1_000_000_000,"period":period}
             for guest,period in zip(pair,periods)
@@ -408,7 +415,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     owner.request("PATCH",user_path,{
         "nodeTrafficLimits":{str(guest_a.node):{
             "limitGb":0.000000001,"period":"lifetime"}},
-        "cdnLimitGb":0,
+        "cdnLimitGb":cdn_pool_lifetime/1_000_000_000,
     })
     try:
         assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==409
@@ -488,6 +495,14 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert sorted(bindings) == sorted((guest.node,period,True)
             for guest,period in zip(pair,periods) if period != "lifetime"), bindings
 
+    if monthly_cdn:
+        cdn_binding = db.execute(
+            "SELECT o.node_id, b.period, o.valid_until_ms "
+            "<= (EXTRACT(epoch FROM upper(b.calendar_window))*1000)::bigint "
+            "FROM quota_v2_signed_first_cap_outbox o JOIN quota_v2_cdn_calendar_bindings b "
+            "USING(reservation_id) WHERE o.user_id=%s", (peer_id,),
+        ).fetchall()
+        assert cdn_binding == [(guest_b.node,"monthly",True)], cdn_binding
     results=parallel(lambda value:probe(value[0][0],value[0][4],
                                        value[0][1],value[1]),zip(cap_jobs,tags))
     assert sum(sum(result.values()) for result in results)==account[0]
