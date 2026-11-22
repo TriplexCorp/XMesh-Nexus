@@ -23,6 +23,8 @@ BEGIN
        OR predecessor.meter_epoch IS NOT DISTINCT FROM NEW.candidate_reservation_id
        OR NEW.issued_at_ms <
           (EXTRACT(EPOCH FROM predecessor.boundary_at)*1000)::bigint
+       OR NEW.issued_at_ms >
+          (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint
     THEN
         RAISE EXCEPTION 'successor does not belong to closed predecessor meter'
           USING ERRCODE='23514';
