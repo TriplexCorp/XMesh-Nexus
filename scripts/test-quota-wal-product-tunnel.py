@@ -28,6 +28,7 @@ import witness_inventory as producer
 from quota_wal_real_xray import MeteredXray
 
 STATE_ROOT = "/var/lib/xmesh-agent"
+ROOT_COMMAND = [] if os.geteuid() == 0 else ["sudo"]
 DESIRED_PATH = "/api/v1/node/desired-config"
 
 
@@ -55,7 +56,7 @@ class Agent:
         token_path = self.root / "token"
         token_path.write_text(token, encoding="ascii")
         token_path.chmod(0o600)
-        subprocess.run(["sudo", "chown", "root:root", token_path], check=True)
+        subprocess.run([*ROOT_COMMAND, "chown", "root:root", token_path], check=True)
         try:
             self.run("bootstrap", "--panel", self.panel, "--node-id", str(self.node), "--token-file", token_path)
         finally:
@@ -70,7 +71,7 @@ class Agent:
 
     def run(self, *args):
         response = subprocess.run([
-            "sudo", "unshare", "--mount", "--propagation", "private", "bash", "-ec",
+            *ROOT_COMMAND, "unshare", "--mount", "--propagation", "private", "bash", "-ec",
             'mount --bind "$1" /var/lib/xmesh-agent; shift; exec "$@"',
             "wal-test", self.state, "env", f"SSL_CERT_FILE={self.ca}",
             os.environ["XMESH_WAL_PRODUCT_AGENT"], *args,
@@ -95,7 +96,7 @@ class Agent:
         request.write_text(json.dumps(body), encoding="utf-8")
         status = self.root / "status"
         raw = self.run("request", "--path", path, "--body-file", request, "--status-file", status)
-        assert subprocess.check_output(["sudo", "cat", status], timeout=5).strip() == b"200", raw
+        assert subprocess.check_output([*ROOT_COMMAND, "cat", status], timeout=5).strip() == b"200", raw
         return raw
 
     def sign(self, _, message):
@@ -103,7 +104,7 @@ class Agent:
         path = self.root / "witness-payload"
         path.write_bytes(message[len(producer.DOMAIN):])
         path.chmod(0o600)
-        subprocess.run(["sudo", "chown", "root:root", path], check=True)
+        subprocess.run([*ROOT_COMMAND, "chown", "root:root", path], check=True)
         try:
             signed = json.loads(self.run(
                 "wal-evidence", "--panel", self.panel, "--node-id", str(self.node), "--payload-file", path,
@@ -278,7 +279,13 @@ def check_large_signed_checkpoint(agent, database):
 
 
 def main():
-    assert os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+    if os.environ.get("XMESH_WAL_XRAY_BINARY"):
+        assert (os.environ.get("GITHUB_ACTIONS") == "true"
+                and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
+    else:
+        # The signed-wire fixture uses only loopback and a disposable DB.
+        # A user/mount namespace also lets it run without host-root changes.
+        assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
     binary = os.environ["XMESH_WAL_PRODUCT_AGENT"]
     identity = json.loads(subprocess.check_output([binary, "--identity"], timeout=10))
     assert identity["version"] == "control-v6.0.27"
@@ -286,10 +293,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix="xmesh-xsp-wal-") as directory:
         root = Path(directory)
         with ExitStack() as stack:
-            stack.callback(subprocess.run, ["sudo", "chown", "-R", f"{os.getuid()}:{os.getgid()}", root], check=True)
+            stack.callback(subprocess.run, [*ROOT_COMMAND, "chown", "-R", f"{os.getuid()}:{os.getgid()}", root], check=True)
             assert not Path(STATE_ROOT).exists()
-            subprocess.run(["sudo", "mkdir", "-m", "0700", STATE_ROOT], check=True)
-            stack.callback(subprocess.run, ["sudo", "rmdir", STATE_ROOT], check=True)
+            subprocess.run([*ROOT_COMMAND, "mkdir", "-m", "0700", STATE_ROOT], check=True)
+            stack.callback(subprocess.run, [*ROOT_COMMAND, "rmdir", STATE_ROOT], check=True)
             gateway = subprocess.Popen([
                 os.environ["XMESH_WAL_TUNNEL_FIXTURE"], "-test.run=^TestServeWALTunnelFixture$", "-test.v",
             ], env={**os.environ,
