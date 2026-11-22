@@ -109,7 +109,89 @@ def main():
         assert db.execute(
             "SELECT count(*) FROM quota_v2_signed_first_cap_outbox "
             "WHERE reservation_id=%s", (next_reservation,)).fetchone() == (0,)
-    print("PASS: successor planning is immutable, owner-bound and zero-spend")
+        # A signed zero-spend preparation cannot confer an isolated runtime.
+        empty_sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        cols = (
+            "predecessor_id,node_id,user_id,account_epoch,"
+            "candidate_meter_epoch,candidate_reservation_id,"
+            "fresh_runtime_id,fresh_container_id,fresh_started_at,fresh_host_pid,"
+            "fresh_executable_sha256,fresh_config_sha256,fresh_wal_inventory_sha256,"
+            "zero_initial_raw_counters,isolated_new_wal_root,"
+            "authorized_bytes,can_spend,can_start,can_resume,"
+            "final_meter_verified,refundable_bytes"
+        )
+        statement = (
+            "INSERT INTO quota_v2_calendar_successor_meter_preflights "
+            f"({cols}) VALUES({','.join(['%s'] * 21)})"
+        )
+        fresh = (
+            predecessor, node, user, epoch,
+            next_meter, next_reservation, "e" * 64, "f" * 64,
+            datetime.now(timezone.utc), 912345, "1" * 64, "2" * 64,
+            empty_sha, True, True, 0, False, False, False, False, 0,
+        )
+        def altered_fresh(index, value):
+            args = list(fresh)
+            args[index] = value
+            return tuple(args)
+        for bad in (
+            altered_fresh(0, uuid.uuid4()),
+            altered_fresh(1, node + 1),
+            altered_fresh(2, user + 1),
+            altered_fresh(3, uuid.uuid4()),
+            altered_fresh(4, meter),
+            altered_fresh(4, uuid.uuid4()),
+            altered_fresh(5, uuid.uuid4()),
+            altered_fresh(6, "c" * 64),
+            altered_fresh(7, "0" * 64),
+            altered_fresh(8, boundary - timedelta(seconds=1)),
+            altered_fresh(8, datetime.now(timezone.utc) + timedelta(hours=1)),
+            altered_fresh(9, 0),
+            altered_fresh(10, "0" * 64),
+            altered_fresh(11, "0" * 64),
+            altered_fresh(12, "3" * 64),
+            altered_fresh(13, False),
+            altered_fresh(14, False),
+            altered_fresh(15, 1),
+            altered_fresh(16, True),
+            altered_fresh(17, True),
+            altered_fresh(18, True),
+            altered_fresh(19, True),
+            altered_fresh(20, 1),
+        ):
+            must_refuse(db, statement, bad, {"23514", "23503"})
+        db.execute(statement, fresh)
+        saved = db.execute(
+            "SELECT candidate_meter_epoch,candidate_reservation_id,"
+            "fresh_runtime_id,authorized_bytes,can_spend,can_start,can_resume "
+            "FROM quota_v2_calendar_successor_meter_preflights "
+            "WHERE predecessor_id=%s", (predecessor,)).fetchone()
+        assert saved == (next_meter, next_reservation, "e" * 64, 0,
+                         False, False, False)
+        must_refuse(db, statement, fresh, {"23505"})
+        must_refuse(db,
+                    "UPDATE quota_v2_calendar_successor_meter_preflights "
+                    "SET fresh_host_pid=fresh_host_pid WHERE predecessor_id=%s",
+                    (predecessor,), {"22023"})
+        must_refuse(db,
+                    "DELETE FROM quota_v2_calendar_successor_meter_preflights "
+                    "WHERE predecessor_id=%s", (predecessor,), {"22023"})
+        must_refuse(db, "TRUNCATE quota_v2_calendar_successor_meter_preflights",
+                    (), {"22023"})
+        assert db.execute(
+            "SELECT count(*) FROM quota_v2_reservations "
+            "WHERE reservation_id=%s OR meter_epoch=%s",
+            (next_reservation, next_meter)).fetchone() == (0,)
+        must_refuse(db,
+                    "INSERT INTO quota_v2_signed_first_cap_outbox "
+                    "(reservation_id) VALUES (%s)", (next_reservation,),
+                    {"23514"})
+        must_refuse(db,
+                    "INSERT INTO quota_v2_cap_renewals "
+                    "(reservation_id,revision,nonce,grant_bytes,signed_envelope) "
+                    "VALUES (%s,1,%s,1,%s)",
+                    (next_reservation, "0" * 64, b"0" * 200), {"23514"})
+    print("PASS: zero-spend calendar successor and immutable fresh-meter candidate only")
 
 
 if __name__ == "__main__":
