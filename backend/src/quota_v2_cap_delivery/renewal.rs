@@ -215,9 +215,15 @@ pub(super) async fn issue(
     }
     let usage = usage_floor(&mut tx, req.user_id, &user).await?;
     let free = available(&mut tx, req.user_id, &epoch, limit, floor.max(usage)).await?;
-    if free < 0 {
+    if free < 0 || !crate::quota_v2_node_lifetime::issued_within_limit(
+        &mut tx, req.user_id, req.node_id, &user,
+    ).await? {
         return Err(deny());
     }
+    let node_free = crate::quota_v2_node_lifetime::headroom(
+        &mut tx, req.user_id, req.node_id, &user,
+    ).await?;
+    let free = node_free.map_or(free, |remaining| free.min(remaining));
     if is_renewal
         && permit.nonce == req.challenge
         && next_revision == lease.revision
