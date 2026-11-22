@@ -248,6 +248,42 @@ pub async fn bounded_target(
     Ok(target.min(outstanding.saturating_add(free)))
 }
 
+/// A historic mixed reservation which already issued positive bytes
+/// without an immutable CDN sub-hold must NOT be backfilled later. Doing so
+/// would reclassify the old potentially-CDN bytes as independent MAIN and
+/// refund previously committed CDN liability. Run BEFORE any shared grant.
+pub async fn require_fundable_mixed(
+    conn: &mut PgConnection,
+    user_id: i64,
+    node_id: i64,
+    user: &Value,
+    reservation: &str,
+    class: &str,
+) -> Result<(), ApiError> {
+    if class != "mixed" || limit(user)?.is_none() {
+        return Ok(());
+    }
+    let legacy_unfunded: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM quota_v2_reservations r
+            LEFT JOIN quota_v2_mixed_cdn_holds h
+                   ON h.reservation_id=r.reservation_id
+            WHERE r.reservation_id=$1::uuid AND r.user_id=$2 AND r.node_id=$3
+              AND (r.ceiling_bytes>0 OR r.acknowledged_bytes>0)
+              AND h.reservation_id IS NULL
+         )",
+    )
+    .bind(reservation)
+    .bind(user_id)
+    .bind(node_id)
+    .fetch_one(conn)
+    .await?;
+    if legacy_unfunded {
+        return Err(deny());
+    }
+    Ok(())
+}
+
 /// Freeze an independent CDN sub-ceiling for a *newly funded* mixed
 /// reservation. The caller must hold the account's per-user advisory lock,
 /// must have calculated free CDN capacity BEFORE issuing the positive shared
