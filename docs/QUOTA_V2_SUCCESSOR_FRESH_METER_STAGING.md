@@ -35,8 +35,15 @@ head; it never authorizes a refund.
   start, positive authorization fields and duplicate submissions.
 - Multiple users may share **one** new isolated Xray process. Their
   predecessor reservations, meter epochs and user-scoped WAL ownership
-  remain distinct. Reusing the same new process for a different
-  calendar transition of the **same** user is refused by SQL.
+  remain distinct. SQL serializes concurrent staging under a per-container
+  advisory lock and requires identical Node, runtime ID, container start
+  time, host PID, executable/config hashes and initial WAL fingerprint for
+  all users reporting that container. Reusing the same new process for
+  a second calendar transition of the **same** user is refused.
+  A successor may boot before a later user's independent calendar
+  boundary, but an already active process with a nonempty WAL cannot
+  truthfully claim an entirely pristine first-cohort registry. Per-user
+  live zero-counter proofs are still mandatory for dynamic joins.
 - A database trigger explicitly rejects use of candidate reservation
   IDs or meter epochs through the existing positive first-cap and
   renewal outbox paths. It also refuses reuse of any staged new runtime
