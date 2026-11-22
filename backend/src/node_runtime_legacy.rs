@@ -2322,6 +2322,18 @@ pub struct FirstGenesisCapPolicyScope {
     pub aliases: Vec<FirstGenesisCapAlias>,
 }
 
+impl FirstGenesisCapPolicyScope {
+    pub fn inbound_class(&self) -> &'static str {
+        if self.aliases.iter().all(|alias| alias.class == "cdn") {
+            "cdn"
+        } else if self.aliases.iter().all(|alias| alias.class == "main") {
+            "main"
+        } else {
+            "mixed"
+        }
+    }
+}
+
 fn cap_policy_denied() -> ApiError {
     ApiError::new(
         StatusCode::CONFLICT,
@@ -2492,10 +2504,14 @@ mod first_genesis_rehearsal_limit_tests {
         for cap in [json!(0.000_000_001), json!(1)] {
             let limited = json!({"limit":2,"cdnLimitGb":cap});
             assert!(supported(&limited, 47, true));
-            // A positive CDN cap is admitted only after the real signed
-            // inbound compiler establishes a homogeneous CDN-only scope.
+            // A positive CDN cap requires a verified inbound classification.
+            // Mixed grants have their own pre-funded CDN sub-ceiling.
             assert!(crate::quota_v2_cdn_lifetime::supported(&limited, "cdn"));
-            assert!(!crate::quota_v2_cdn_lifetime::supported(&limited, "mixed"));
+            assert!(crate::quota_v2_cdn_lifetime::supported(&limited, "mixed"));
+            assert!(!crate::quota_v2_cdn_lifetime::supported(
+                &limited,
+                "unclassified"
+            ));
             assert!(supported(&limited, 47, false));
         }
         for cap in [json!("1"), json!(null), json!(-1)] {

@@ -1083,7 +1083,7 @@ fn validate_local(
     Ok(reported)
 }
 
-/// Quota V2 always issues finite Xray windows; i64::MAX means that
+/// Quota V2 always issues finite Xray windows; `i64::MAX` means that
 /// PostgreSQL must not impose a global traffic budget on an otherwise
 /// unlimited subscriber. Independent Node and CDN budgets remain binding.
 /// This sentinel must NEVER be copied into an Xray signed byte ceiling.
@@ -1396,6 +1396,63 @@ async fn lease_identity(
     Ok((meter, uuid::Uuid::new_v4().to_string(), false))
 }
 
+async fn bounded_policy_target(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    user: &Value,
+    reservation: &str,
+    target: i64,
+    inbound_class: &str,
+) -> Result<i64, ApiError> {
+    crate::quota_v2_cdn_lifetime::require_fundable_mixed(
+        conn,
+        user_id,
+        node_id,
+        user,
+        reservation,
+        inbound_class,
+    )
+    .await?;
+    // Keep the old outstanding amount plus ONLY the independently
+    // unallocated per-Node lifetime headroom. A shared account reservation
+    // must never exceed a configured Node's own remaining lifetime budget.
+    // A missing node-specific rule leaves the existing global limit intact.
+    let node_target = crate::quota_v2_node_lifetime::bounded_target(
+        conn,
+        user_id,
+        node_id,
+        user,
+        reservation,
+        target,
+    )
+    .await?;
+    crate::quota_v2_cdn_lifetime::bounded_target(
+        conn,
+        user_id,
+        node_id,
+        user,
+        reservation,
+        node_target,
+        inbound_class,
+    )
+    .await
+}
+
+fn offline_reservation_target(user: &Value) -> i64 {
+    if user.get("onHold").and_then(Value::as_bool) == Some(true) {
+        // Waiting subscriptions must be able to make the first verified
+        // online connection. Allocate a small shared bootstrap allowance,
+        // never an unreserved offline grant across multiple nodes.
+        1024 * 1024
+    } else {
+        user.get("offlineBudgetBytes")
+            .and_then(Value::as_i64)
+            .unwrap_or(0)
+            .clamp(0, 64 * 1024 * 1024)
+    }
+}
+
 pub async fn issue_user(
     conn: &mut sqlx::PgConnection,
     user: &mut Value,
@@ -1414,17 +1471,7 @@ pub async fn issue_user(
         .get("panelUsedBytes")
         .and_then(Value::as_i64)
         .ok_or_else(conflict)?;
-    let target = if user.get("onHold").and_then(Value::as_bool) == Some(true) {
-        // Waiting subscriptions must be able to make the first verified
-        // online connection. Allocate a small shared bootstrap allowance,
-        // never an unreserved offline grant across multiple nodes.
-        1024 * 1024
-    } else {
-        user.get("offlineBudgetBytes")
-            .and_then(Value::as_i64)
-            .unwrap_or(0)
-            .clamp(0, 64 * 1024 * 1024)
-    };
+    let target = offline_reservation_target(user);
     let local_total = local_record.map_or(0, |item| item.used_bytes);
     let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
     let (meter, reservation, confirmed) =
@@ -1441,35 +1488,13 @@ pub async fn issue_user(
     .bind(&reservation)
     .fetch_optional(&mut *conn)
     .await?;
-    crate::quota_v2_cdn_lifetime::require_fundable_mixed(
-        conn,
-        user_id,
-        node_id,
-        user,
-        &reservation,
-        inbound_class,
-    )
-    .await?;
-    // Keep the old outstanding amount plus ONLY the independently
-    // unallocated per-Node lifetime headroom. A shared account reservation
-    // must never exceed a configured Node's own remaining lifetime budget.
-    // A missing node-specific rule leaves the existing global limit intact.
-    let node_target = crate::quota_v2_node_lifetime::bounded_target(
+    let bounded_target = bounded_policy_target(
         conn,
         user_id,
         node_id,
         user,
         &reservation,
         target,
-    )
-    .await?;
-    let bounded_target = crate::quota_v2_cdn_lifetime::bounded_target(
-        conn,
-        user_id,
-        node_id,
-        user,
-        &reservation,
-        node_target,
         inbound_class,
     )
     .await?;

@@ -315,7 +315,7 @@ pub async fn fund_mixed(
     .fetch_one(&mut *conn)
     .await?;
     let (ceiling, charged) = row;
-    if ceiling < 0 || ceiling > 64 * 1024 * 1024 || charged > ceiling {
+    if !(0..=64 * 1024 * 1024).contains(&ceiling) || charged > ceiling {
         return Err(deny());
     }
     // An existing nonzero historic reservation without a held row is not
@@ -363,7 +363,7 @@ pub async fn fund_mixed(
 }
 
 /// A first mixed signed cap must use the SAME immutable sub-ceiling recorded
-/// by fund_mixed. A CDN-only cap uses its full independently funded lease.
+/// by `fund_mixed`. A CDN-only cap uses its full independently funded lease.
 pub async fn signed_cdn_ceiling(
     conn: &mut PgConnection,
     reservation: &str,
@@ -435,6 +435,18 @@ fn next_mixed_cdn_refill(
     )
 }
 
+pub struct MixedCdnRenewal<'a> {
+    pub user_id: i64,
+    pub node_id: i64,
+    pub reservation: &'a str,
+    pub revision: i64,
+    pub nonce: &'a str,
+    pub previous_cdn: i64,
+    pub committed_cdn_wal: i64,
+    pub next_shared: i64,
+    pub first_window: i64,
+}
+
 /// Fund another CDN class window only from the independently uncommitted
 /// pooled CDN balance. The caller holds the per-user advisory/account locks,
 /// has authenticated the EXACT signed prior cap and attested WAL charge, and
@@ -443,17 +455,20 @@ fn next_mixed_cdn_refill(
 /// An offline, stale or duplicated revision never creates additional bytes.
 pub async fn renew_mixed_cdn(
     conn: &mut PgConnection,
-    user_id: i64,
-    node_id: i64,
     user: &Value,
-    reservation: &str,
-    revision: i64,
-    nonce: &str,
-    previous_cdn: i64,
-    committed_cdn_wal: i64,
-    next_shared: i64,
-    first_window: i64,
+    renewal: MixedCdnRenewal<'_>,
 ) -> Result<i64, ApiError> {
+    let MixedCdnRenewal {
+        user_id,
+        node_id,
+        reservation,
+        revision,
+        nonce,
+        previous_cdn,
+        committed_cdn_wal,
+        next_shared,
+        first_window,
+    } = renewal;
     if revision <= 1
         || nonce.len() != 64
         || !nonce

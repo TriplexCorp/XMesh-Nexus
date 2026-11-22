@@ -329,20 +329,9 @@ pub async fn handle(
     // Sharing the ordinary allocator's per-user advisory lock prevents two
     // simultaneous prepare/confirm requests from renewing a lease revision.
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SET LOCAL synchronous_commit TO on")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(req.user_id ^ 0x51_4D_45_53_48_i64)
-        .execute(&mut *tx)
-        .await?;
-    let current_user: Value = sqlx::query_scalar(
-        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
-    )
-    .bind(req.user_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(deny)?;
+    let current_user = crate::quota_v2_cap_delivery::lock_signed_user(&mut tx, req.user_id)
+        .await?
+        .ok_or_else(deny)?;
     // The request may have waited for the account or subscriber lock.
     // Derive issue time and expiry from the locked transaction.
     let now_ms: i64 =
@@ -373,13 +362,7 @@ pub async fn handle(
             map.remove(field);
         }
     }
-    let inbound_class = if verified.aliases.iter().all(|alias| alias.class == "cdn") {
-        "cdn"
-    } else if verified.aliases.iter().all(|alias| alias.class == "main") {
-        "main"
-    } else {
-        "mixed"
-    };
+    let inbound_class = verified.inbound_class();
     if !crate::quota_v2_cdn_lifetime::supported(&current_user, inbound_class) {
         return Err(deny());
     }

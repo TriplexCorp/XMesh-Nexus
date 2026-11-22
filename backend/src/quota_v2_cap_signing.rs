@@ -278,7 +278,7 @@ mod tests {
         // Xray block, NOT i64::MAX from the unlimited SQL account.
         assert_eq!(snapshot.ceiling, 700);
         assert_eq!(snapshot.node_ceiling, 700);
-        let mut malicious = snapshot.clone();
+        let mut malicious = snapshot;
         malicious.ceiling = i64::MAX;
         malicious.node_ceiling = i64::MAX;
         malicious.cdn_ceiling = i64::MAX;

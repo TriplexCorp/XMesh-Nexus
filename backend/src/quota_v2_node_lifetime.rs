@@ -203,6 +203,6 @@ mod tests {
         assert_eq!(remaining(5_000, 0, 5_000), 0);
         assert_eq!(remaining(5_000, 4_999, 0), 1);
         // Any newly reported V1 usage only raises the baseline.
-        assert_eq!(remaining(5_000, 1_000.max(3_000), 2_000), 0);
+        assert_eq!(remaining(5_000, 3_000, 2_000), 0);
     }
 }

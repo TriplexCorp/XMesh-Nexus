@@ -1,5 +1,5 @@
 //! Increase an existing process-bound cap using committed WAL charge floors.
-use super::{Alias, DOMAIN, Request, available, deny};
+use super::{Alias, DOMAIN, FirstGenesisCapPolicyScope, Request, available, deny};
 use crate::{ApiError, AppState, node_runtime, quota_wal_transport};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -90,6 +90,7 @@ fn verified_payload(
     permit: &Permit,
     lease: &Lease,
     activation: &str,
+    scope: FirstGenesisCapPolicyScope,
 ) -> Result<Value, ApiError> {
     let doc: Value = serde_json::from_slice(&permit.signed_envelope).map_err(|_| deny())?;
     let payload = &doc["payload"];
@@ -104,6 +105,17 @@ fn verified_payload(
         || payload["sharedCeilingBytes"] != lease.ceiling
         || payload["nonce"] != permit.nonce
     {
+        return Err(deny());
+    }
+    let aliases: Vec<Alias> = scope
+        .aliases
+        .into_iter()
+        .map(|a| Alias {
+            email: a.email,
+            class: a.class,
+        })
+        .collect();
+    if payload["aliasScopes"] != json!(aliases) || permit.revision != lease.revision {
         return Err(deny());
     }
     Ok(payload.clone())
@@ -158,41 +170,17 @@ pub(super) async fn issue(
     let scope =
         node_runtime::signed_first_genesis_scope(state, req.node_id, req.user_id, false).await?;
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SET LOCAL synchronous_commit TO on")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(req.user_id ^ 0x51_4D_45_53_48_i64)
-        .execute(&mut *tx)
-        .await?;
-    let user: Value = sqlx::query_scalar(
-        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
-    )
-    .bind(req.user_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(deny)?;
+    let user = super::lock_signed_user(&mut tx, req.user_id)
+        .await?
+        .ok_or_else(deny)?;
     let has_cdn = scope.aliases.iter().any(|a| a.class == "cdn");
-    let inbound_class = if scope.aliases.iter().all(|a| a.class == "cdn") {
-        "cdn"
-    } else if scope.aliases.iter().all(|a| a.class == "main") {
-        "main"
-    } else {
-        "mixed"
-    };
+    let inbound_class = scope.inbound_class();
     if !node_runtime::first_genesis_rehearsal_limits_supported(&user, req.node_id, has_cdn)
         || !crate::quota_v2_cdn_lifetime::supported(&user, inbound_class)
     {
         return Err(deny());
     }
-    let (epoch, original_limit, floor): (String, i64, i64) = sqlx::query_as(
-        "SELECT epoch::text,limit_bytes,GREATEST(settled_bytes,observed_floor_bytes)
-         FROM quota_v2_accounts WHERE user_id=$1 AND NOT closed FOR UPDATE",
-    )
-    .bind(req.user_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(deny)?;
+    let (epoch, original_limit, floor) = super::lock_open_account(&mut tx, req.user_id).await?;
     let lease = lock_lease(&mut tx, req, fields, activation, &scope.policy_sha256).await?;
     if lease.epoch != epoch {
         return Err(deny());
@@ -206,65 +194,25 @@ pub(super) async fn issue(
     )
     .await?;
     let (permit, is_renewal) = latest_permit(&mut tx, fields, &lease).await?;
-    let payload = verified_payload(state, &permit, &lease, activation)?;
-    let aliases: Vec<Alias> = scope
-        .aliases
-        .into_iter()
-        .map(|a| Alias {
-            email: a.email,
-            class: a.class,
-        })
-        .collect();
-    if payload["aliasScopes"] != json!(aliases) || permit.revision != lease.revision {
-        return Err(deny());
-    }
-    let now: i64 =
-        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
-            .fetch_one(&mut *tx)
-            .await?;
+    let payload = verified_payload(state, &permit, &lease, activation, scope)?;
+    let now = super::database_now_ms(&mut tx).await?;
     let expires = payload["validUntilMs"].as_i64().ok_or_else(deny)?;
     let limit = crate::quota_v2::authoritative_shared_limit(&user).map_err(|_| deny())?;
     if !node_runtime::first_genesis_active_until(&user, now, expires) || limit < original_limit {
         return Err(deny());
     }
-    let usage = usage_floor(&mut tx, req.user_id, &user).await?;
-    let free = available(&mut tx, req.user_id, &epoch, limit, floor.max(usage)).await?;
-    if free < 0
-        || !crate::quota_v2_node_lifetime::issued_within_limit(
-            &mut tx,
-            req.user_id,
-            req.node_id,
-            &user,
-        )
-        .await?
-        || !crate::quota_v2_cdn_lifetime::issued_within_limit(
-            &mut tx,
-            req.user_id,
-            &user,
-            inbound_class,
-        )
-        .await?
-    {
-        return Err(deny());
-    }
-    // Independently prove the exact CDN sub-ceiling already signed for
-    // this immutable reservation. For mixed capped Nodes this is the
-    // original prefunded hold, NOT the growing shared MAIN ceiling.
-    let issued_cdn = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
+    let free =
+        verify_issued_limits(&mut tx, req, &epoch, &user, inbound_class, limit, floor).await?;
+    let fixed_mixed_cdn = verify_prior_cdn(
         &mut tx,
+        req,
         &fields.reservation_id,
-        req.user_id,
-        req.node_id,
         &user,
         inbound_class,
         lease.ceiling,
+        &payload,
     )
     .await?;
-    if payload["cdnCeilingBytes"].as_i64() != Some(issued_cdn) {
-        return Err(deny());
-    }
-    let fixed_mixed_cdn =
-        inbound_class == "mixed" && crate::quota_v2_cdn_lifetime::limit(&user)?.is_some();
     let node_free =
         crate::quota_v2_node_lifetime::headroom(&mut tx, req.user_id, req.node_id, &user).await?;
     let cdn_free = if inbound_class == "cdn" {
@@ -309,6 +257,66 @@ pub(super) async fn issue(
     Ok(signed)
 }
 
+async fn verify_prior_cdn(
+    conn: &mut PgConnection,
+    req: &Request,
+    reservation: &str,
+    user: &Value,
+    inbound_class: &str,
+    ceiling: i64,
+    payload: &Value,
+) -> Result<bool, ApiError> {
+    // Independently prove the exact CDN sub-ceiling already signed for
+    // this immutable reservation. For mixed capped Nodes this is the
+    // original prefunded hold, NOT the growing shared MAIN ceiling.
+    let issued_cdn = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
+        conn,
+        reservation,
+        req.user_id,
+        req.node_id,
+        user,
+        inbound_class,
+        ceiling,
+    )
+    .await?;
+    if payload["cdnCeilingBytes"].as_i64() != Some(issued_cdn) {
+        return Err(deny());
+    }
+    Ok(inbound_class == "mixed" && crate::quota_v2_cdn_lifetime::limit(user)?.is_some())
+}
+
+async fn verify_issued_limits(
+    conn: &mut PgConnection,
+    req: &Request,
+    epoch: &str,
+    user: &Value,
+    inbound_class: &str,
+    limit: i64,
+    floor: i64,
+) -> Result<i64, ApiError> {
+    let usage = usage_floor(&mut *conn, req.user_id, user).await?;
+    let free = available(&mut *conn, req.user_id, epoch, limit, floor.max(usage)).await?;
+    if free < 0
+        || !crate::quota_v2_node_lifetime::issued_within_limit(
+            &mut *conn,
+            req.user_id,
+            req.node_id,
+            user,
+        )
+        .await?
+        || !crate::quota_v2_cdn_lifetime::issued_within_limit(
+            &mut *conn,
+            req.user_id,
+            user,
+            inbound_class,
+        )
+        .await?
+    {
+        return Err(deny());
+    }
+    Ok(free)
+}
+
 /// Both signed ceilings are cumulative. Only independently funded
 /// CDN-only reservations may grow their CDN cap with shared top-ups.
 /// A mixed reservation whose CDN pool is limited keeps its immutable hold
@@ -324,9 +332,8 @@ fn next_cdn_ceiling(
     }
     match inbound_class {
         "main" if previous == 0 => Some(0),
-        "cdn" => Some(next_shared),
         "mixed" if fixed_mixed_cdn => Some(previous),
-        "mixed" => Some(next_shared),
+        "cdn" | "mixed" => Some(next_shared),
         _ => None,
     }
 }
@@ -334,7 +341,7 @@ fn next_cdn_ceiling(
 /// A revision is a genuine new entitlement only if it increases the
 /// cumulative shared/MAIN ceiling, OR independently increases a strictly
 /// funded mixed CDN class allowance. No-op revisions cannot consume nonces.
-fn has_authorized_revision_delta(
+const fn has_authorized_revision_delta(
     shared_add: i64,
     previous_cdn: i64,
     next_cdn: i64,
@@ -343,41 +350,6 @@ fn has_authorized_revision_delta(
     shared_add >= 0
         && next_cdn >= previous_cdn
         && (shared_add > 0 || (funded_mixed && next_cdn > previous_cdn))
-}
-
-#[cfg(test)]
-mod mixed_cdn_renewal_tests {
-    use super::{has_authorized_revision_delta, next_cdn_ceiling};
-
-    #[test]
-    fn cdn_only_revision_does_not_require_artificial_main_consumption() {
-        assert!(has_authorized_revision_delta(0, 512, 768, true));
-        assert!(has_authorized_revision_delta(100, 512, 512, true));
-        assert!(has_authorized_revision_delta(100, 512, 512, false));
-        assert!(!has_authorized_revision_delta(0, 512, 512, true));
-        assert!(!has_authorized_revision_delta(0, 512, 768, false));
-        assert!(!has_authorized_revision_delta(0, 768, 512, true));
-        assert!(!has_authorized_revision_delta(-1, 512, 768, true));
-    }
-
-    #[test]
-    fn main_topup_never_mints_cdn_bytes_in_fixed_mixed_pool() {
-        assert_eq!(next_cdn_ceiling("mixed", true, 250, 1_000), Some(250));
-        assert_eq!(next_cdn_ceiling("mixed", true, 250, 4_000), Some(250));
-        assert_eq!(next_cdn_ceiling("mixed", true, 0, 4_000), Some(0));
-        assert_eq!(next_cdn_ceiling("cdn", false, 250, 1_000), Some(1_000));
-        assert_eq!(next_cdn_ceiling("mixed", false, 250, 1_000), Some(1_000));
-        assert_eq!(next_cdn_ceiling("main", false, 0, 4_000), Some(0));
-    }
-
-    #[test]
-    fn invalid_or_downgraded_class_never_signs_replenishment() {
-        assert_eq!(next_cdn_ceiling("other", false, 0, 1_000), None);
-        assert_eq!(next_cdn_ceiling("main", false, 1, 1_000), None);
-        assert_eq!(next_cdn_ceiling("mixed", true, 1_001, 1_000), None);
-        assert_eq!(next_cdn_ceiling("mixed", true, -1, 1_000), None);
-        assert_eq!(next_cdn_ceiling("cdn", false, 0, 0), None);
-    }
 }
 
 #[expect(
@@ -440,16 +412,18 @@ async fn extend(
         // commit together with this exact Ed25519-signed revision response.
         crate::quota_v2_cdn_lifetime::renew_mixed_cdn(
             conn,
-            req.user_id,
-            req.node_id,
             user,
-            &fields.reservation_id,
-            revision,
-            &req.challenge,
-            old_cdn,
-            cdn,
-            ceiling,
-            lease.first_ceiling,
+            crate::quota_v2_cdn_lifetime::MixedCdnRenewal {
+                user_id: req.user_id,
+                node_id: req.node_id,
+                reservation: &fields.reservation_id,
+                revision,
+                nonce: &req.challenge,
+                previous_cdn: old_cdn,
+                committed_cdn_wal: cdn,
+                next_shared: ceiling,
+                first_window: lease.first_ceiling,
+            },
         )
         .await?
     } else {
@@ -486,4 +460,39 @@ async fn extend(
         .bind(&fields.reservation_id).bind(revision).bind(&req.challenge).bind(ceiling)
         .bind(signed.as_bytes()).execute(conn).await?;
     Ok(signed)
+}
+
+#[cfg(test)]
+mod mixed_cdn_renewal_tests {
+    use super::{has_authorized_revision_delta, next_cdn_ceiling};
+
+    #[test]
+    fn cdn_only_revision_does_not_require_artificial_main_consumption() {
+        assert!(has_authorized_revision_delta(0, 512, 768, true));
+        assert!(has_authorized_revision_delta(100, 512, 512, true));
+        assert!(has_authorized_revision_delta(100, 512, 512, false));
+        assert!(!has_authorized_revision_delta(0, 512, 512, true));
+        assert!(!has_authorized_revision_delta(0, 512, 768, false));
+        assert!(!has_authorized_revision_delta(0, 768, 512, true));
+        assert!(!has_authorized_revision_delta(-1, 512, 768, true));
+    }
+
+    #[test]
+    fn main_topup_never_mints_cdn_bytes_in_fixed_mixed_pool() {
+        assert_eq!(next_cdn_ceiling("mixed", true, 250, 1_000), Some(250));
+        assert_eq!(next_cdn_ceiling("mixed", true, 250, 4_000), Some(250));
+        assert_eq!(next_cdn_ceiling("mixed", true, 0, 4_000), Some(0));
+        assert_eq!(next_cdn_ceiling("cdn", false, 250, 1_000), Some(1_000));
+        assert_eq!(next_cdn_ceiling("mixed", false, 250, 1_000), Some(1_000));
+        assert_eq!(next_cdn_ceiling("main", false, 0, 4_000), Some(0));
+    }
+
+    #[test]
+    fn invalid_or_downgraded_class_never_signs_replenishment() {
+        assert_eq!(next_cdn_ceiling("other", false, 0, 1_000), None);
+        assert_eq!(next_cdn_ceiling("main", false, 1, 1_000), None);
+        assert_eq!(next_cdn_ceiling("mixed", true, 1_001, 1_000), None);
+        assert_eq!(next_cdn_ceiling("mixed", true, -1, 1_000), None);
+        assert_eq!(next_cdn_ceiling("cdn", false, 0, 0), None);
+    }
 }

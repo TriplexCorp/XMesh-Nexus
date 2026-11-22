@@ -110,37 +110,57 @@ pub async fn handle(
     ))
 }
 
+/// Acquire the allocator's per-user lock before reading the current plan.
+pub async fn lock_signed_user(
+    conn: &mut PgConnection,
+    user_id: i64,
+) -> Result<Option<Value>, sqlx::Error> {
+    sqlx::query("SET LOCAL synchronous_commit TO on")
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(user_id ^ 0x51_4D_45_53_48_i64)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
+    )
+    .bind(user_id)
+    .fetch_optional(conn)
+    .await
+}
+
+async fn lock_open_account(
+    conn: &mut PgConnection,
+    user_id: i64,
+) -> Result<(String, i64, i64), ApiError> {
+    sqlx::query_as(
+        "SELECT epoch::text,limit_bytes,GREATEST(settled_bytes,observed_floor_bytes)
+         FROM quota_v2_accounts WHERE user_id=$1 AND NOT closed FOR UPDATE",
+    )
+    .bind(user_id)
+    .fetch_optional(conn)
+    .await?
+    .ok_or_else(deny)
+}
+
+async fn database_now_ms(conn: &mut PgConnection) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+        .fetch_one(conn)
+        .await
+}
+
 async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<String, ApiError> {
     let scope =
         crate::node_runtime::original_first_genesis_cap_scope(state, req.node_id, req.user_id)
             .await?;
     let key = state.node_policy_signer.public_key();
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SET LOCAL synchronous_commit TO on")
-        .execute(&mut *tx)
-        .await?;
-    // Match ensure_account: the per-user advisory lock precedes the
-    // user record and accounting rows. A changed plan cannot be serviced
-    // from a stale outbox just because the Xray config hash is unchanged.
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(req.user_id ^ 0x51_4D_45_53_48_i64)
-        .execute(&mut *tx)
-        .await?;
-    let current_user: Value = sqlx::query_scalar(
-        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
-    )
-    .bind(req.user_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(deny)?;
+    let current_user = lock_signed_user(&mut tx, req.user_id)
+        .await?
+        .ok_or_else(deny)?;
     let has_cdn = scope.aliases.iter().any(|alias| alias.class == "cdn");
-    let inbound_class = if scope.aliases.iter().all(|a| a.class == "cdn") {
-        "cdn"
-    } else if scope.aliases.iter().all(|a| a.class == "main") {
-        "main"
-    } else {
-        "mixed"
-    };
+    let inbound_class = scope.inbound_class();
     if !crate::node_runtime::first_genesis_rehearsal_limits_supported(
         &current_user,
         req.node_id,
@@ -150,18 +170,8 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
         return Err(deny());
     }
     // Account first, as in every reserve/settle/revoke writer.
-    let account: Option<(String, i64, i64)> = sqlx::query_as(
-        "SELECT epoch::text,limit_bytes,GREATEST(settled_bytes,observed_floor_bytes)
-         FROM quota_v2_accounts WHERE user_id=$1 AND NOT closed FOR UPDATE",
-    )
-    .bind(req.user_id)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let (epoch, limit, floor) = account.ok_or_else(deny)?;
-    let now: i64 =
-        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
-            .fetch_one(&mut *tx)
-            .await?;
+    let (epoch, limit, floor) = lock_open_account(&mut tx, req.user_id).await?;
+    let now = database_now_ms(&mut tx).await?;
     if !crate::node_runtime::first_genesis_active_until(&current_user, now, now.saturating_add(1))
         || crate::quota_v2::authoritative_shared_limit(&current_user).ok() != Some(limit)
     {
@@ -187,7 +197,6 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     }
     let mut row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     if row.is_none() {
-        let measurement = req.measurement.as_ref().ok_or_else(deny)?;
         issue_original(
             &mut tx,
             state,
@@ -195,7 +204,6 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
             &scope,
             &epoch,
             activation,
-            measurement,
             &current_user,
         )
         .await?;
@@ -215,10 +223,7 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     let expires: i64 = row.try_get("valid_until_ms")?;
     // The outbox/lease reads can wait behind a writer. The signed
     // installation window must still be open after those locks are taken.
-    let delivery_now: i64 =
-        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
-            .fetch_one(&mut *tx)
-            .await?;
+    let delivery_now = database_now_ms(&mut tx).await?;
     if delivery_now < now
         || delivery_now >= install
         || !crate::node_runtime::first_genesis_active_until(&current_user, delivery_now, expires)
@@ -487,17 +492,11 @@ async fn issue_original(
     scope: &FirstGenesisCapPolicyScope,
     epoch: &str,
     activation: &str,
-    measurement: &Measurement,
     current_user: &Value,
 ) -> Result<(), ApiError> {
+    let measurement = req.measurement.as_ref().ok_or_else(deny)?;
     let lease = lock_first_lease(conn, req, epoch, activation, measurement).await?;
-    let inbound_class = if scope.aliases.iter().all(|a| a.class == "cdn") {
-        "cdn"
-    } else if scope.aliases.iter().all(|a| a.class == "main") {
-        "main"
-    } else {
-        "mixed"
-    };
+    let inbound_class = scope.inbound_class();
     crate::quota_v2_cdn_lifetime::verify_class(
         conn,
         req.user_id,
@@ -527,10 +526,7 @@ async fn issue_original(
     .fetch_one(&mut *conn)
     .await
     .map_err(reject_conflict)?;
-    let now: i64 =
-        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
-            .fetch_one(&mut *conn)
-            .await?;
+    let now = database_now_ms(conn).await?;
     let aliases = scope
         .aliases
         .iter()
@@ -585,13 +581,22 @@ async fn issue_original(
         now,
     )
     .map_err(|_| deny())?;
+    store_signed_first_cap(conn, state, req, &signed).await
+}
+
+async fn store_signed_first_cap(
+    conn: &mut PgConnection,
+    state: &AppState,
+    req: &Request,
+    signed: &[u8],
+) -> Result<(), ApiError> {
     let exact: Vec<u8> = sqlx::query_scalar(
         "SELECT signed_envelope FROM quota_v2_store_signed_first_cap($1,$2,$3,$4)",
     )
     .bind(req.node_id)
     .bind(&req.challenge)
     .bind(state.node_policy_signer.public_key())
-    .bind(&signed)
+    .bind(signed)
     .fetch_one(conn)
     .await
     .map_err(reject_conflict)?;
