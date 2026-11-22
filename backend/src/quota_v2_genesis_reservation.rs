@@ -362,6 +362,15 @@ pub async fn handle(
     {
         return Err(deny());
     }
+    // The original quarantine policy is immutable and may not include the
+    // owner's newly configured per-Node quota. The CURRENT locked user
+    // record is authoritative for any positive reservation budget.
+    let mut selected = selected;
+    if let Some(rule) = current_user.get("nodeTrafficLimits") {
+        selected["nodeTrafficLimits"] = rule.clone();
+    } else if let Some(map) = selected.as_object_mut() {
+        map.remove("nodeTrafficLimits");
+    }
     let public = state.node_policy_signer.public_key();
     let prepared = saved_reply(&mut tx, &state, &req, "prepare").await?;
     if req.operation == "confirm" {
