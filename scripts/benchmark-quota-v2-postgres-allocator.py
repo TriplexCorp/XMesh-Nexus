@@ -3,7 +3,9 @@
 
 10/100/500 distinct subscriber accounts with two concurrent reservation
 writers per user. Uses the REAL quota_v2_reserve SQL and asserts complete
-conservation, replay idempotency and lease-identity rejection. NOT a claim
+conservation, no duplicate capacity on retry and lease-identity rejection.
+This does NOT assert identical SQL revision bytes on raw allocator retries; the
+signed-cap outbox separately owns exact HTTP response idempotency. NOT a claim
 of 500 live VLESS users, full signed-Agent admission or Xray throughput.
 """
 import concurrent.futures
@@ -71,6 +73,8 @@ def run_case(size, first):
     if wall > MAX_WALL_SECONDS:
         raise AssertionError("PostgreSQL quota allocator stress wall-time exceeded")
     timings=[latency for _,latency in results]
+    original_ceiling={(job[0],job[1]):value[0]
+                      for job,(value,_) in zip(jobs,results)}
     if any(row is None or not 0<=row[0]<=WINDOW for row,_ in results):
         raise AssertionError("unexpected PostgreSQL quota grant outside requested window")
 
@@ -95,8 +99,8 @@ def run_case(size, first):
     # Then attempt an altered reservation UUID on the same meter: deny.
     for user,node,meter,grant in jobs[:min(8,len(jobs))]:
         replay,_=reserve(user,node,meter,grant)
-        if not 0<replay[0]<=WINDOW:
-            raise AssertionError("idempotent retry minted invalid capacity")
+        if replay[0]!=original_ceiling[(user,node)]:
+            raise AssertionError("same lease replay changed already-issued capacity")
         with psycopg.connect(DSN) as connection:
             try:
                 connection.execute(
@@ -109,6 +113,15 @@ def run_case(size, first):
                 connection.rollback()
             else:
                 raise AssertionError("competing lease identity was accepted")
+    with psycopg.connect(DSN) as connection:
+        outstanding=connection.execute(
+            "SELECT COALESCE(SUM(r.ceiling_bytes-r.acknowledged_bytes),0)::bigint "
+            "FROM quota_v2_reservations r WHERE r.user_id >= %s AND r.user_id < %s",
+            (first,first+size),
+        ).fetchone()[0]
+    if outstanding!=size*TOTAL:
+        raise AssertionError("idempotent retry or competing lease changed aggregate capacity")
+
     result={
         "users":size,
         "nodes_per_user":2,
