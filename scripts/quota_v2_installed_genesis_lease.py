@@ -240,11 +240,11 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert hashlib.sha256(raw).hexdigest()==profile
         return observed
 
-    def probe(item,ceiling,observed,tag):
+    def probe(item,ceiling,observed,tag,previous=0):
         guest,_,_=item
         raw=guest.exec("nsenter","--target",str(observed[2]),"--net","--",
                        "python3",MEASURED+"/live-vless.py",MEASURED+"/xray-client",
-                       user["xrayId"],f"xmesh-u{uid}--{tag}",str(ceiling),timeout=48)
+                       user["xrayId"],f"xmesh-u{uid}--{tag}",str(ceiling),str(previous),timeout=48)
         return json.loads(raw)
 
     measurements=parallel(measure,stages)
@@ -484,6 +484,77 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert db.execute(lease_sql, (uid,)).fetchall() == rows
     print("PASS: signed WAL charges on two Nodes conserved the balance after rollback and retries.")
 
+    # Raise the same user's limit through the panel, then allocate only the
+    # added capacity. Both renewals must use the real Nexus signer.
+    item, measured, original_request, first_grant, _ = cap_jobs[0]
+    installed = json.loads(first_grant)["payload"]
+    cumulative = installed["sharedCeilingBytes"]
+    expected_limit = account[0]
+    renewals_sql = ("SELECT reservation_id,revision,nonce,grant_bytes,signed_envelope "
+                    "FROM quota_v2_cap_renewals ORDER BY reservation_id,revision")
+    assert guest_a.request(CAP_PATH, dict(original_request, requestChallenge=secrets.token_hex(32),
+        renewal={"reservationId": installed["reservationId"],
+                 "previousRevision": installed["reservationRevision"]}))[0] == 409
+    previous_request = None
+    for step in range(2):
+        increment = 256 * 1024
+        expected_limit += increment
+        owner.request("PATCH", user_path, {"limit": expected_limit / 1_000_000_000})
+        request = dict(original_request, requestChallenge=secrets.token_hex(32), renewal={
+            "reservationId": installed["reservationId"],
+            "previousRevision": installed["reservationRevision"],
+        })
+        results = parallel(lambda _: guest_a.request(CAP_PATH, request), range(2))
+        status, reply = results[0]
+        assert status == 200 and results[1] == (status, reply), results
+        assert reply["status"] == "committed_renewal"
+        if previous_request is not None:
+            assert guest_a.request(CAP_PATH, previous_request)[0] == 409
+        assert guest_a.request(CAP_PATH, dict(request, requestChallenge=secrets.token_hex(32)))[0] == 409
+        raw = reply["signedEnvelope"].encode()
+        doc = json.loads(raw)
+        independent_signature(root, f"renewed-{step}", doc, CAP_DOMAIN)
+        new = doc["payload"]
+        assert new["reservationRevision"] == installed["reservationRevision"] + 1
+        assert new["sharedCeilingBytes"] == cumulative + increment
+        assert new["validUntilMs"] == installed["validUntilMs"]
+        assert new["witnessedWalBytes"] == cumulative
+        scope = {"userId":uid, "policySha256":new["policySha256"],
+                 "accountEpoch":new["accountEpoch"], "meterEpoch":new["meterEpoch"],
+                 "reservationId":new["reservationId"], "revision":new["reservationRevision"],
+                 "nonce":request["requestChallenge"], "aliases":new["aliasScopes"]}
+        code = (
+            "import base64,json,sys; "
+            "sys.path.insert(0,'/usr/local/libexec/xmesh-quota-wal/quota-v2-physical-stop'); "
+            "from cap_install import install_in_xray; "
+            "print(json.dumps(install_in_xray(sys.argv[1],int(sys.argv[2]),sys.argv[3],"
+            "b'',base64.b64decode(sys.argv[4]),json.loads(sys.argv[5]))))"
+        )
+        receipt = json.loads(guest_a.exec("python3", "-c", code, MEASURED+"/wal/drain.sock",
+            str(measured[2]), measured[3], base64.b64encode(raw).decode(), json.dumps(scope)))
+        assert receipt == {"runtimeId":measured[3], "grantSha256":hashlib.sha256(raw).hexdigest()}
+        live = probe(item, increment, measured, tags[0], cumulative)
+        cumulative += increment
+        assert sum(live.values()) == cumulative and measure(item) == measured
+        for path, prior in list(wal_snapshots[0].items()):
+            updated = guest_a.exec("cat", path)
+            assert updated.startswith(prior) and updated != prior
+            batch = charge_request(guest_a, raw, path, updated[len(prior):])
+            status, ack = guest_a.request(WAL_PATH, batch)
+            assert status == 200, ack
+            assert guest_a.request(WAL_PATH, batch) == (200, ack)
+            charges[0].append((batch, ack))
+            wal_snapshots[0][path] = updated
+        installed = new
+        previous_request = request
+    renewal_rows = db.execute(renewals_sql).fetchall()
+    assert len(renewal_rows) == 2
+    rows = db.execute(lease_sql, (uid,)).fetchall()
+    charged_rows = db.execute(charge_sql).fetchall()
+    charged_balance = db.execute(balance_sql, (uid,)).fetchone()
+    assert charged_balance == (expected_limit, account[2])
+    print("PASS: Nexus renewed the same live Xray twice, rejecting stale and concurrent duplicate allocations.")
+
     # A repeat cannot extend/reinstall the existing positive cap.
     repeated=subprocess.run(["docker","exec",guest_a.name,*commands[0]],
                              capture_output=True,timeout=35)
@@ -524,6 +595,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     db=lab.restart_postgres(stack,dsn,db)
     assert db.execute(ledger_sql).fetchall()==ledger
     assert db.execute(outbox_sql).fetchall()==committed_caps
+    assert db.execute(renewals_sql).fetchall()==renewal_rows
     assert db.execute(lease_sql,(uid,)).fetchall()==rows
     assert db.execute(charge_sql).fetchall() == charged_rows
     assert db.execute(balance_sql, (uid,)).fetchone() == charged_balance

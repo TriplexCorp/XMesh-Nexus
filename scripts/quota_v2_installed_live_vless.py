@@ -101,7 +101,7 @@ def parse_stats(raw, email):
     return result
 
 
-def run(xray,uuid,email,ceiling):
+def run(xray,uuid,email,ceiling,previous=0):
     with tempfile.TemporaryDirectory(prefix="xmesh-vless-ns-") as work, \
          EchoServer(("127.0.0.1",ECHO),EchoHandler) as echo:
         thread=threading.Thread(target=echo.serve_forever,daemon=True)
@@ -144,6 +144,8 @@ def run(xray,uuid,email,ceiling):
                     assert actual == {"uplink":0,"downlink":0}, actual
                     return actual
                 assert ceiling>0 and ceiling%(2*16384)==0
+                if previous:
+                    assert stats(xray,email)=={"uplink":previous//2,"downlink":previous//2}
                 data=b"x"*16384
                 with socks_stream() as stream:
                     for _ in range(ceiling//(2*len(data))):
@@ -156,7 +158,7 @@ def run(xray,uuid,email,ceiling):
                         pass
                 denied()
                 actual=stats(xray,email)
-                assert actual=={"uplink":ceiling//2,"downlink":ceiling//2},actual
+                assert actual=={"uplink":(ceiling+previous)//2,"downlink":(ceiling+previous)//2},actual
                 return actual
             except BaseException:
                 log.flush()
@@ -175,6 +177,6 @@ def run(xray,uuid,email,ceiling):
 
 
 if __name__=="__main__":
-    assert len(sys.argv)==5
-    print(json.dumps(run(sys.argv[1],sys.argv[2],sys.argv[3],int(sys.argv[4])),
+    assert len(sys.argv) in (5,6)
+    print(json.dumps(run(*sys.argv[1:4],*map(int,sys.argv[4:])),
                      sort_keys=True,separators=(",",":")))

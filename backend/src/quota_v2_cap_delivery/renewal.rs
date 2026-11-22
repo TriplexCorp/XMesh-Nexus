@@ -1,0 +1,319 @@
+//! Increase an existing process-bound cap using committed WAL charge floors.
+use super::{Alias, DOMAIN, Request, available, deny};
+use crate::{ApiError, AppState, node_runtime, quota_wal_transport};
+use serde::Deserialize;
+use serde_json::{Value, json};
+use sqlx::PgConnection;
+
+const KIND: &str = "xmesh.quota-v2.xray-cap-renewal";
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct RequestFields {
+    reservation_id: String,
+    previous_revision: i64,
+}
+
+#[derive(sqlx::FromRow)]
+struct Lease {
+    epoch: String,
+    revision: i64,
+    ceiling: i64,
+    wal_floor: i64,
+    first_nonce: String,
+    first_ceiling: i64,
+    first_envelope: Vec<u8>,
+}
+
+#[derive(sqlx::FromRow)]
+struct Permit {
+    revision: i64,
+    nonce: String,
+    signed_envelope: Vec<u8>,
+}
+
+async fn lock_lease(
+    conn: &mut PgConnection,
+    req: &Request,
+    fields: &RequestFields,
+    activation: &str,
+    policy: &str,
+) -> Result<Lease, ApiError> {
+    let Some(ref measurement) = req.measurement else {
+        return Err(deny());
+    };
+    sqlx::query_as(
+        "SELECT r.epoch::text, r.revision, r.ceiling_bytes AS ceiling,
+                r.conservative_burn_floor_bytes AS wal_floor,
+                f.request_challenge AS first_nonce, f.grant_bytes AS first_ceiling,
+                f.signed_envelope AS first_envelope
+         FROM quota_v2_reservations r
+         JOIN quota_v2_signed_first_cap_outbox f
+            ON f.reservation_id=r.reservation_id AND f.epoch=r.epoch AND f.meter_epoch=r.meter_epoch
+            AND f.node_id=r.node_id AND f.user_id=r.user_id
+         JOIN quota_v2_runtime_admission_preflights pf
+            ON pf.node_id=f.node_id AND pf.request_challenge=f.request_challenge
+         JOIN node_xsp_product_nodes p ON p.node_id=r.node_id
+         JOIN node_xsp_public_keysets k ON k.node_id=p.node_id
+              AND k.purpose='node_request' AND k.key_epoch=p.key_epoch
+              AND k.ed25519_key_id=p.ed25519_key_id AND k.mldsa65_key_id=p.mldsa65_key_id
+              AND k.revoked_at IS NULL
+         JOIN panel_records n ON n.id=r.node_id AND n.collection='nodes'
+         WHERE r.reservation_id=$1::uuid AND r.node_id=$2 AND r.user_id=$3
+           AND f.runtime_id=$4 AND f.policy_sha256=$5
+           AND pf.reported_container_id=$6 AND pf.reported_pid=$7
+           AND p.state='active' AND encode(p.receipt_sha256,'hex')=$8
+           AND (n.data->'disabled') IS DISTINCT FROM 'true'::jsonb
+           AND r.node_confirmed AND r.acknowledged_bytes=0 AND r.conservative_burned_at IS NULL
+           AND r.valid_until>clock_timestamp()
+           AND NOT EXISTS (SELECT 1 FROM quota_v2_revocation_requests v
+                 WHERE v.reservation_id=r.reservation_id)
+           AND NOT EXISTS (SELECT 1 FROM quota_v2_terminal_settlements t
+                 WHERE t.reservation_id=r.reservation_id)
+         FOR UPDATE OF r FOR SHARE OF p,k,n",
+    )
+    .bind(&fields.reservation_id)
+    .bind(req.node_id)
+    .bind(req.user_id)
+    .bind(&measurement.runtime_id)
+    .bind(policy)
+    .bind(&measurement.container_id)
+    .bind(measurement.host_pid)
+    .bind(activation)
+    .fetch_optional(conn)
+    .await?
+    .ok_or_else(deny)
+}
+
+fn verified_payload(
+    state: &AppState,
+    permit: &Permit,
+    lease: &Lease,
+    activation: &str,
+) -> Result<Value, ApiError> {
+    let doc: Value = serde_json::from_slice(&permit.signed_envelope).map_err(|_| deny())?;
+    let payload = &doc["payload"];
+    let signature = state
+        .node_policy_signer
+        .sign_domain(DOMAIN, payload)
+        .map_err(|_| deny())?;
+    if doc["algorithm"] != "Ed25519"
+        || doc["signature"] != signature
+        || payload["activationReceiptSha256"] != activation
+        || payload["reservationRevision"] != lease.revision
+        || payload["sharedCeilingBytes"] != lease.ceiling
+        || payload["nonce"] != permit.nonce
+    {
+        return Err(deny());
+    }
+    Ok(payload.clone())
+}
+
+async fn usage_floor(conn: &mut PgConnection, user_id: i64, user: &Value) -> Result<i64, ApiError> {
+    let measured: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(uplink_bytes+downlink_bytes),0)::bigint
+         FROM user_node_traffic_totals WHERE user_id=$1",
+    )
+    .bind(user_id)
+    .fetch_one(conn)
+    .await?;
+    let baseline = crate::gb_to_bytes_i64(user["used"].as_f64().unwrap_or_default());
+    Ok(baseline.saturating_add(measured.max(0)))
+}
+
+async fn latest_permit(
+    conn: &mut PgConnection,
+    fields: &RequestFields,
+    lease: &Lease,
+) -> Result<(Permit, bool), ApiError> {
+    let latest = sqlx::query_as::<_, Permit>(
+        "SELECT revision,nonce,signed_envelope FROM quota_v2_cap_renewals
+         WHERE reservation_id=$1::uuid ORDER BY revision DESC LIMIT 1",
+    )
+    .bind(&fields.reservation_id)
+    .fetch_optional(conn)
+    .await?;
+    let is_renewal = latest.is_some();
+    let permit = latest.unwrap_or_else(|| Permit {
+        revision: lease.revision,
+        nonce: lease.first_nonce.clone(),
+        signed_envelope: lease.first_envelope.clone(),
+    });
+    Ok((permit, is_renewal))
+}
+
+pub(super) async fn issue(
+    state: &AppState,
+    req: &Request,
+    fields: &RequestFields,
+    activation: &str,
+) -> Result<String, ApiError> {
+    let next_revision = fields.previous_revision.checked_add(1).ok_or_else(deny)?;
+    if fields.previous_revision <= 0
+        || !uuid::Uuid::parse_str(&fields.reservation_id)
+            .is_ok_and(|parsed| parsed.to_string() == fields.reservation_id)
+    {
+        return Err(deny());
+    }
+    let scope =
+        node_runtime::signed_first_genesis_scope(state, req.node_id, req.user_id, false).await?;
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("SET LOCAL synchronous_commit TO on")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(req.user_id ^ 0x51_4D_45_53_48_i64)
+        .execute(&mut *tx)
+        .await?;
+    let user: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR SHARE",
+    )
+    .bind(req.user_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(deny)?;
+    let has_cdn = scope.aliases.iter().any(|a| a.class == "cdn");
+    if !node_runtime::first_genesis_rehearsal_limits_supported(&user, req.node_id, has_cdn) {
+        return Err(deny());
+    }
+    let (epoch, original_limit, floor): (String, i64, i64) = sqlx::query_as(
+        "SELECT epoch::text,limit_bytes,GREATEST(settled_bytes,observed_floor_bytes)
+         FROM quota_v2_accounts WHERE user_id=$1 AND NOT closed FOR UPDATE",
+    )
+    .bind(req.user_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(deny)?;
+    let lease = lock_lease(&mut tx, req, fields, activation, &scope.policy_sha256).await?;
+    if lease.epoch != epoch {
+        return Err(deny());
+    }
+    let (permit, is_renewal) = latest_permit(&mut tx, fields, &lease).await?;
+    let payload = verified_payload(state, &permit, &lease, activation)?;
+    let aliases: Vec<Alias> = scope
+        .aliases
+        .into_iter()
+        .map(|a| Alias {
+            email: a.email,
+            class: a.class,
+        })
+        .collect();
+    if payload["aliasScopes"] != json!(aliases) || permit.revision != lease.revision {
+        return Err(deny());
+    }
+    let now: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&mut *tx)
+            .await?;
+    let expires = payload["validUntilMs"].as_i64().ok_or_else(deny)?;
+    let limit = user["limit"]
+        .as_f64()
+        .map(crate::gb_to_bytes_i64)
+        .ok_or_else(deny)?;
+    if !node_runtime::first_genesis_active_until(&user, now, expires) || limit < original_limit {
+        return Err(deny());
+    }
+    let usage = usage_floor(&mut tx, req.user_id, &user).await?;
+    let free = available(&mut tx, req.user_id, &epoch, limit, floor.max(usage)).await?;
+    if free < 0 {
+        return Err(deny());
+    }
+    if is_renewal
+        && permit.nonce == req.challenge
+        && next_revision == lease.revision
+        && payload["installBeforeMs"]
+            .as_i64()
+            .is_some_and(|deadline| now < deadline)
+    {
+        return String::from_utf8(permit.signed_envelope).map_err(|_| deny());
+    }
+    if lease.revision != fields.previous_revision
+        || req.challenge == lease.first_nonce
+        || now < payload["issuedAtMs"].as_i64().ok_or_else(deny)?
+    {
+        return Err(deny());
+    }
+    let signed = extend(
+        &mut tx, state, req, fields, &lease, payload, free, now, expires, limit,
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(signed)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "transaction inputs and locked snapshot"
+)]
+async fn extend(
+    conn: &mut PgConnection,
+    state: &AppState,
+    req: &Request,
+    fields: &RequestFields,
+    lease: &Lease,
+    mut payload: Value,
+    free: i64,
+    now: i64,
+    expires: i64,
+    limit: i64,
+) -> Result<String, ApiError> {
+    let (all, cdn) =
+        quota_wal_transport::committed_charge_totals(conn, &fields.reservation_id).await?;
+    let held = lease.ceiling.checked_sub(all).ok_or_else(deny)?;
+    let add = free.min(lease.first_ceiling.saturating_sub(held));
+    let install = now.saturating_add(30_000).min(expires.saturating_sub(1));
+    // Keep at most one original-sized window, only replenish at half-full.
+    if all != lease.wal_floor
+        || all == 0
+        || held > lease.first_ceiling / 2
+        || add <= 0
+        || install <= now
+    {
+        return Err(deny());
+    }
+    let digest: String = sqlx::query_scalar(
+        "SELECT inventory_tail_digest FROM quota_v2_external_wal_birth_anchors
+         WHERE node_id=$1 ORDER BY inventory_sequence DESC LIMIT 1",
+    )
+    .bind(req.node_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(deny)?;
+    let ceiling = lease.ceiling.checked_add(add).ok_or_else(deny)?;
+    let revision = fields.previous_revision.checked_add(1).ok_or_else(deny)?;
+    payload["kind"] = json!(KIND);
+    payload["nonce"] = json!(req.challenge);
+    payload["reservationRevision"] = json!(revision);
+    payload["inventoryTailDigest"] = json!(digest);
+    payload["witnessedWalBytes"] = json!(all);
+    payload["witnessedCdnBytes"] = json!(cdn);
+    payload["sharedCeilingBytes"] = json!(ceiling);
+    payload["nodeCeilingBytes"] = json!(ceiling);
+    if payload["cdnCeilingBytes"] != 0 {
+        payload["cdnCeilingBytes"] = json!(ceiling);
+    }
+    payload["issuedAtMs"] = json!(now);
+    payload["installBeforeMs"] = json!(install);
+    let signature = state
+        .node_policy_signer
+        .sign_domain(DOMAIN, &payload)
+        .map_err(|_| deny())?;
+    let signed = serde_json::to_string(
+        &json!({"algorithm":"Ed25519","payload":payload,"signature":signature}),
+    )
+    .map_err(|_| deny())?
+        + "\n";
+    sqlx::query("UPDATE quota_v2_accounts SET limit_bytes=$3 WHERE user_id=$1 AND epoch=$2::uuid")
+        .bind(req.user_id)
+        .bind(&lease.epoch)
+        .bind(limit)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("UPDATE quota_v2_reservations SET revision=$2,ceiling_bytes=$3 WHERE reservation_id=$1::uuid")
+        .bind(&fields.reservation_id).bind(revision).bind(ceiling).execute(&mut *conn).await?;
+    sqlx::query("INSERT INTO quota_v2_cap_renewals(reservation_id,revision,nonce,grant_bytes,signed_envelope)
+                 VALUES($1::uuid,$2,$3,$4,$5)")
+        .bind(&fields.reservation_id).bind(revision).bind(&req.challenge).bind(ceiling)
+        .bind(signed.as_bytes()).execute(conn).await?;
+    Ok(signed)
+}

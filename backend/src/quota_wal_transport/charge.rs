@@ -94,7 +94,7 @@ async fn lock_account(
     node_id: i64,
     reservation: &str,
 ) -> Result<Cap, ApiError> {
-    let cap = sqlx::query_as::<_, Cap>(
+    let mut cap = sqlx::query_as::<_, Cap>(
         "SELECT user_id, epoch::text, meter_epoch::text, runtime_id, grant_bytes, signed_envelope
            FROM quota_v2_signed_first_cap_outbox WHERE node_id=$1 AND reservation_id=$2::uuid",
     )
@@ -111,8 +111,19 @@ async fn lock_account(
     sqlx::query("SELECT 1 FROM quota_v2_accounts WHERE user_id=$1 AND epoch=$2::uuid FOR UPDATE")
         .bind(cap.user_id)
         .bind(&cap.epoch)
-        .fetch_one(conn)
+        .fetch_one(&mut *conn)
         .await?;
+    if let Some((ceiling, envelope)) = sqlx::query_as::<_, (i64, Vec<u8>)>(
+        "SELECT grant_bytes,signed_envelope FROM quota_v2_cap_renewals
+         WHERE reservation_id=$1::uuid ORDER BY revision DESC LIMIT 1",
+    )
+    .bind(reservation)
+    .fetch_optional(conn)
+    .await?
+    {
+        cap.grant_bytes = ceiling;
+        cap.signed_envelope = envelope;
+    }
     Ok(cap)
 }
 
@@ -132,7 +143,10 @@ fn cap_cdn_ceiling(
         .map_err(|_| conflict())?;
     if doc["algorithm"] != "Ed25519"
         || doc["signature"] != signature
-        || payload["kind"] != "xmesh.quota-v2.xray-cap-admission"
+        || !matches!(
+            payload["kind"].as_str(),
+            Some("xmesh.quota-v2.xray-cap-admission" | "xmesh.quota-v2.xray-cap-renewal")
+        )
         || payload["activationReceiptSha256"] != activation
         || payload["runtimeId"] != cap.runtime_id
         || payload["nodeId"] != node_id
@@ -245,14 +259,11 @@ async fn apply_conservative_floor(
     Ok(())
 }
 
-async fn reservation_totals(
+pub async fn committed_charge_totals(
     conn: &mut PgConnection,
     reservation: &str,
-    previous: Option<&Cursor>,
-    head: &Cursor,
-    is_cdn: bool,
 ) -> Result<(i64, i64), ApiError> {
-    let (prior_total, prior_cdn): (i64, i64) = sqlx::query_as(
+    sqlx::query_as(
         "SELECT COALESCE(SUM(stream_bytes),0)::bigint,
                 COALESCE(SUM(stream_bytes) FILTER (WHERE is_cdn),0)::bigint
          FROM (SELECT DISTINCT ON (filename) stream_bytes, is_cdn
@@ -261,7 +272,18 @@ async fn reservation_totals(
     )
     .bind(reservation)
     .fetch_one(conn)
-    .await?;
+    .await
+    .map_err(ApiError::from)
+}
+
+async fn reservation_totals(
+    conn: &mut PgConnection,
+    reservation: &str,
+    previous: Option<&Cursor>,
+    head: &Cursor,
+    is_cdn: bool,
+) -> Result<(i64, i64), ApiError> {
+    let (prior_total, prior_cdn) = committed_charge_totals(conn, reservation).await?;
     let delta = head.stream_bytes - previous.map_or(0, |p| p.stream_bytes);
     let total = prior_total.checked_add(delta).ok_or_else(conflict)?;
     let cdn = prior_cdn

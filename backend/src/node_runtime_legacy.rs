@@ -2513,6 +2513,15 @@ pub async fn original_first_genesis_cap_scope(
     node_id: i64,
     user_id: i64,
 ) -> Result<FirstGenesisCapPolicyScope, ApiError> {
+    signed_first_genesis_scope(state, node_id, user_id, true).await
+}
+
+pub async fn signed_first_genesis_scope(
+    state: &AppState,
+    node_id: i64,
+    user_id: i64,
+    first_issuance: bool,
+) -> Result<FirstGenesisCapPolicyScope, ApiError> {
     if node_id <= 0 || user_id <= 0 {
         return Err(cap_policy_denied());
     }
@@ -2538,7 +2547,7 @@ pub async fn original_first_genesis_cap_scope(
             .fetch_one(&state.pool)
             .await?;
     if now_ms < prepared_ms
-        || now_ms >= prepared_ms.saturating_add(120_000)
+        || (first_issuance && now_ms >= prepared_ms.saturating_add(120_000))
         || hex::encode(sha2::Sha256::digest(&signed)) != sha
         || pubkey != state.node_policy_signer.public_key()
     {
@@ -2595,8 +2604,11 @@ pub async fn original_first_genesis_cap_scope(
         current_user,
         node_id,
         aliases.iter().any(|a| a.class == "cdn"),
-    ) || !first_genesis_active_until(current_user, now_ms, now_ms.saturating_add(3_600_000))
-    {
+    ) || !first_genesis_active_until(
+        current_user,
+        now_ms,
+        now_ms.saturating_add(if first_issuance { 3_600_000 } else { 1 }),
+    ) {
         return Err(cap_policy_denied());
     }
     Ok(FirstGenesisCapPolicyScope {

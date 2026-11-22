@@ -2,7 +2,8 @@
 //!
 //! A Node measurement is an authenticated assertion, not remote attestation.
 //! The existing allocator ceiling is already held in PostgreSQL. This API
-//! grants no renewal, automatic restart, refund or release of held bytes.
+//! retains the same reservation and runtime on renewal.
+mod renewal;
 use crate::{
     ApiError, AppState, node_auth,
     node_runtime::FirstGenesisCapPolicyScope,
@@ -28,6 +29,7 @@ struct Request {
     #[serde(rename = "requestChallenge")]
     challenge: String,
     measurement: Option<Measurement>,
+    renewal: Option<renewal::RequestFields>,
 }
 
 #[derive(Deserialize)]
@@ -88,8 +90,29 @@ pub async fn handle(
     }
     let activation =
         node_auth::authenticate_product_activation(&state, &headers, req.node_id, PATH).await?;
+    let (status, exact) = if let Some(ref fields) = req.renewal {
+        (
+            "committed_renewal",
+            renewal::issue(&state, &req, fields, activation).await?,
+        )
+    } else {
+        (
+            "committed_first_cap",
+            first_cap(&state, &req, activation).await?,
+        )
+    };
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(json!({
+            "status":status, "nodeId":req.node_id, "userId":req.user_id,
+            "signedEnvelope":exact,
+        })),
+    ))
+}
+
+async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<String, ApiError> {
     let scope =
-        crate::node_runtime::original_first_genesis_cap_scope(&state, req.node_id, req.user_id)
+        crate::node_runtime::original_first_genesis_cap_scope(state, req.node_id, req.user_id)
             .await?;
     let key = state.node_policy_signer.public_key();
     let mut tx = state.pool.begin().await?;
@@ -137,20 +160,11 @@ pub async fn handle(
         return Err(deny());
     }
     check_conservation(&mut tx, req.user_id, &epoch, limit, floor).await?;
-    let mut row = load_outbox(&mut tx, &req, &scope, &epoch, &key, activation).await?;
+    let mut row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     if row.is_none() {
         let measurement = req.measurement.as_ref().ok_or_else(deny)?;
-        issue_original(
-            &mut tx,
-            &state,
-            &req,
-            &scope,
-            &epoch,
-            activation,
-            measurement,
-        )
-        .await?;
-        row = load_outbox(&mut tx, &req, &scope, &epoch, &key, activation).await?;
+        issue_original(&mut tx, state, req, &scope, &epoch, activation, measurement).await?;
+        row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     }
     let row = row.ok_or_else(deny)?;
     let install: i64 = row.try_get("install_before_ms")?;
@@ -167,15 +181,9 @@ pub async fn handle(
     {
         return Err(deny());
     }
-    let exact = verified_outbox(&state, &req, &scope, &epoch, activation, &row)?;
+    let exact = verified_outbox(state, req, &scope, &epoch, activation, &row)?;
     tx.commit().await?;
-    Ok((
-        [(header::CACHE_CONTROL, "no-store")],
-        Json(json!({
-            "status":"committed_first_cap", "nodeId":req.node_id, "userId":req.user_id,
-            "signedEnvelope":exact,
-        })),
-    ))
+    Ok(exact)
 }
 
 async fn check_conservation(
@@ -185,6 +193,19 @@ async fn check_conservation(
     limit: i64,
     floor: i64,
 ) -> Result<(), ApiError> {
+    if available(conn, user_id, epoch, limit, floor).await? < 0 {
+        return Err(deny());
+    }
+    Ok(())
+}
+
+async fn available(
+    conn: &mut PgConnection,
+    user_id: i64,
+    epoch: &str,
+    limit: i64,
+    floor: i64,
+) -> Result<i64, ApiError> {
     let held: i64 = sqlx::query_scalar(
         "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::numeric-
                  GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::bigint
@@ -194,10 +215,7 @@ async fn check_conservation(
     .bind(epoch)
     .fetch_one(conn)
     .await?;
-    if i128::from(held) + i128::from(floor) > i128::from(limit) {
-        return Err(deny());
-    }
-    Ok(())
+    Ok(limit.saturating_sub(floor).saturating_sub(held))
 }
 
 async fn load_outbox(

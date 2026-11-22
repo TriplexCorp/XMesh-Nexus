@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use sqlx::PgConnection;
 
 mod charge;
+pub use charge::committed_charge_totals;
 
 pub const PATH: &str = "/api/v1/node/quota-v2/wal";
 const REQUEST_LIMIT: usize = 544 * 1024;
