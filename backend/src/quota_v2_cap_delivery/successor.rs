@@ -181,7 +181,7 @@ pub(super) async fn prepare(
     let mut tx = state.pool.begin().await?;
     let current_user = lock_signed_user(&mut tx, req.user_id)
         .await?.ok_or_else(deny)?;
-    let (_open_epoch, _limit, _floor) =
+    let (open_epoch, _limit, _floor) =
         lock_open_account(&mut tx, req.user_id).await?;
     let now = database_now_ms(&mut tx).await?;
     if !crate::node_runtime::first_genesis_active_until(
@@ -191,6 +191,14 @@ pub(super) async fn prepare(
     }
     let signer = state.node_policy_signer.public_key();
     let old = original_predecessor(&mut tx, req, activation, &signer, now).await?;
+    // The V1 preparation contract signs the PREDECESSOR account epoch.
+    // Do not prepare an unusable/misleading successor when the GLOBAL
+    // account epoch has also rotated. A future cross-account transition
+    // needs a separately signed successor account epoch and conservation
+    // proof; pretending it is the old epoch is not a valid shortcut.
+    if old.account_epoch != open_epoch {
+        return Err(deny());
+    }
     let prior = sqlx::query(
         "SELECT node_id,user_id,request_challenge,signer_public_key,
                 account_epoch::text AS account_epoch,
