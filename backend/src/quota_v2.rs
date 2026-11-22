@@ -1405,6 +1405,13 @@ pub async fn issue_user(
     .bind(&reservation)
     .fetch_optional(&mut *conn)
     .await?;
+    // Keep the old outstanding amount plus ONLY the independently
+    // unallocated per-Node lifetime headroom. A shared account reservation
+    // must never exceed a configured Node's own remaining lifetime budget.
+    // A missing node-specific rule leaves the existing global limit intact.
+    let bounded_target = crate::quota_v2_node_lifetime::bounded_target(
+        conn, user_id, node_id, user, &reservation, target,
+    ).await?;
     let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
     let lease = sqlx::query(
         "SELECT acknowledged_bytes,ceiling_bytes,revision,
@@ -1421,7 +1428,7 @@ pub async fn issue_user(
     // HTTP response gets exactly this existing unfunded lease back. Only an
     // authenticated echo of its durable identity unlocks the real budget.
     .bind(if confirmed && revoke_id.is_none() {
-        target
+        bounded_target
     } else {
         0
     })
