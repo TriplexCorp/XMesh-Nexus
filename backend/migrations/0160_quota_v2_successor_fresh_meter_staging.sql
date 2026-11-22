@@ -60,7 +60,7 @@ DECLARE
     predecessor_meter UUID;
     closed_at TIMESTAMPTZ;
 BEGIN
-    SELECT p INTO previous
+    SELECT p.* INTO previous
       FROM quota_v2_calendar_successor_preparations p
       JOIN quota_v2_reservations r ON r.reservation_id=p.predecessor_id
       JOIN quota_v2_calendar_closures c ON c.reservation_id=p.predecessor_id
