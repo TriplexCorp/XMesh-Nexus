@@ -191,6 +191,45 @@ def main():
                     "(reservation_id,revision,nonce,grant_bytes,signed_envelope) "
                     "VALUES (%s,1,%s,1,%s)",
                     (next_reservation, "0" * 64, b"0" * 200), {"23514"})
+        # Two independent users may enter ONE newly isolated Xray process.
+        # Per-user predecessor/reservation/WAL identities must stay distinct.
+        user2 = user + 1
+        epoch2, meter2, predecessor2 = (uuid.uuid4() for _ in range(3))
+        candidate_meter2, candidate_reservation2 = (uuid.uuid4() for _ in range(2))
+        db.execute(
+            "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes) "
+            "VALUES(%s,%s,1000)", (user2, epoch2))
+        db.execute(
+            "INSERT INTO quota_v2_reservations "
+            "(user_id,epoch,node_id,meter_epoch,reservation_id,valid_until) "
+            "VALUES (%s,%s,%s,%s,%s,%s)",
+            (user2, epoch2, node, meter2, predecessor2, boundary))
+        db.execute(
+            "INSERT INTO quota_v2_calendar_closures "
+            "(reservation_id,boundary_at,observed_at) VALUES(%s,%s,%s)",
+            (predecessor2, boundary, datetime.now(timezone.utc)))
+        second_prepared = (
+            predecessor2, node, user2, "9" * 64, "b" * 64, epoch2,
+            "c" * 64, "d" * 64, candidate_meter2, candidate_reservation2,
+            issued, issued + 60000, sample,
+        )
+        db.execute(insert, second_prepared)
+        second_fresh = list(fresh)
+        for index, val in (
+            (0, predecessor2), (2, user2), (3, epoch2),
+            (4, candidate_meter2), (5, candidate_reservation2),
+            (8, datetime.now(timezone.utc)),
+        ):
+            second_fresh[index] = val
+        db.execute(statement, tuple(second_fresh))
+        assert db.execute(
+            "SELECT count(*) FROM quota_v2_calendar_successor_meter_preflights "
+            "WHERE node_id=%s AND fresh_runtime_id=%s AND fresh_container_id=%s",
+            (node, "e" * 64, "f" * 64)).fetchone() == (2,)
+        assert db.execute(
+            "SELECT count(*) FROM quota_v2_reservations WHERE "
+            "reservation_id IN (%s,%s)",
+            (next_reservation, candidate_reservation2)).fetchone() == (0,)
     print("PASS: zero-spend calendar successor and immutable fresh-meter candidate only")
 
 
