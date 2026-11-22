@@ -1,11 +1,10 @@
 //! Signed Quota V2 lifetime CDN budget: conservative classified reservations.
 //!
-//! Only CDN-only Node permits with a separately enforced, globally bounded
-//! account are eligible. MAIN permits stay outside the CDN pool. A mixed
-//! MAIN/CDN Node cannot be safely admitted into a smaller CDN pool until
-//! the issuer supports separate independently held class ceilings.
-//! Unknown or mixed historical reservations count against CDN in FULL,
-//! never as a guess about how many bytes actually reached a remote peer.
+//! MAIN permits stay outside the CDN pool. Homogeneous CDN Nodes reserve
+//! their full issued ceiling. Mixed MAIN+CDN Nodes pre-fund a *separate*
+//! immutable CDN sub-ceiling; MAIN can renew without expanding that CDN
+//! ceiling. Unknown historic/mixed-without-a-hold reservations count FULL
+//! shared ceilings, never an optimistic guess at delivered bytes.
 use crate::{ApiError, cdn_quota};
 use axum::http::StatusCode;
 use serde_json::{Value, json};
@@ -43,7 +42,7 @@ pub fn limit(user: &Value) -> Result<Option<i64>, ApiError> {
 pub fn supported(user: &Value, class: &str) -> bool {
     matches!(class, "main" | "cdn" | "mixed" | "unclassified")
         && limit(user)
-            .is_ok_and(|quota| quota.is_none() || matches!(class, "main" | "cdn"))
+            .is_ok_and(|_| true)
 }
 
 /// Record every reservation's original signed classification even if the
@@ -195,9 +194,13 @@ pub async fn headroom(
     // Unknown historic reservations are treated as CDN, so upgrading
     // metadata cannot retroactively release bytes previously issued.
     let issued: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(r.ceiling_bytes::numeric),0)::bigint
+        "SELECT COALESCE(SUM((CASE
+           WHEN s.class='mixed' AND m.held_bytes IS NOT NULL
+             THEN m.held_bytes::numeric
+           ELSE r.ceiling_bytes::numeric END)),0)::bigint
          FROM quota_v2_reservations r
          LEFT JOIN quota_v2_reservation_classes s ON s.reservation_id=r.reservation_id
+         LEFT JOIN quota_v2_mixed_cdn_holds m ON m.reservation_id=r.reservation_id
          WHERE r.user_id=$1 AND (s.class IS NULL OR s.class<>'main')",
     )
     .bind(user_id)
@@ -244,6 +247,116 @@ pub async fn bounded_target(
     Ok(target.min(outstanding.saturating_add(free)))
 }
 
+/// Freeze an independent CDN sub-ceiling for a *newly funded* mixed
+/// reservation. The caller must hold the account's per-user advisory lock,
+/// must have calculated free CDN capacity BEFORE issuing the positive shared
+/// ceiling, and must operate in the SAME transaction as the SQL grant.
+/// Exact retries cannot increase the original CDN hold.
+pub async fn fund_mixed(
+    conn: &mut PgConnection,
+    user_id: i64,
+    node_id: i64,
+    user: &Value,
+    reservation: &str,
+    class: &str,
+    free_before: Option<i64>,
+) -> Result<(), ApiError> {
+    if class != "mixed" || limit(user)?.is_none() {
+        return Ok(());
+    }
+    let available = free_before.ok_or_else(deny)?.max(0);
+    let row: (i64, i64) = sqlx::query_as(
+        "SELECT r.ceiling_bytes,r.acknowledged_bytes
+         FROM quota_v2_reservations r
+         JOIN quota_v2_reservation_classes s ON s.reservation_id=r.reservation_id
+         WHERE r.reservation_id=$1::uuid AND r.user_id=$2 AND r.node_id=$3
+           AND s.class='mixed' FOR UPDATE OF r",
+    )
+    .bind(reservation)
+    .bind(user_id)
+    .bind(node_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let (ceiling, charged) = row;
+    if ceiling < 0 || ceiling > 64 * 1024 * 1024 || charged > ceiling {
+        return Err(deny());
+    }
+    // An existing nonzero historic reservation without a held row is not
+    // an eligible newly-funded mixed lease. Its FULL shared ceiling remains
+    // conservatively charged under headroom(), preventing backfill.
+    let previously: Option<i64> = sqlx::query_scalar(
+        "SELECT held_bytes FROM quota_v2_mixed_cdn_holds
+         WHERE reservation_id=$1::uuid AND user_id=$2 AND node_id=$3",
+    )
+    .bind(reservation)
+    .bind(user_id)
+    .bind(node_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if previously.is_some() {
+        return Ok(());
+    }
+    if charged != 0 {
+        return Err(deny());
+    }
+    let held = ceiling.min(available);
+    sqlx::query(
+        "INSERT INTO quota_v2_mixed_cdn_holds(reservation_id,user_id,node_id,held_bytes)
+         VALUES($1::uuid,$2,$3,$4) ON CONFLICT DO NOTHING",
+    )
+    .bind(reservation)
+    .bind(user_id)
+    .bind(node_id)
+    .bind(held)
+    .execute(&mut *conn)
+    .await?;
+    let saved: i64 = sqlx::query_scalar(
+        "SELECT held_bytes FROM quota_v2_mixed_cdn_holds
+         WHERE reservation_id=$1::uuid AND user_id=$2 AND node_id=$3 FOR SHARE",
+    )
+    .bind(reservation)
+    .bind(user_id)
+    .bind(node_id)
+    .fetch_one(conn)
+    .await?;
+    if saved != held {
+        return Err(deny());
+    }
+    Ok(())
+}
+
+/// A first mixed signed cap must use the SAME immutable sub-ceiling recorded
+/// by fund_mixed. A CDN-only cap uses its full independently funded lease.
+pub async fn signed_cdn_ceiling(
+    conn: &mut PgConnection,
+    reservation: &str,
+    user_id: i64,
+    node_id: i64,
+    user: &Value,
+    class: &str,
+    shared: i64,
+) -> Result<i64, ApiError> {
+    match class {
+        "main" => Ok(0),
+        "cdn" => Ok(shared),
+        "mixed" if limit(user)?.is_none() => Ok(shared),
+        "mixed" => {
+            let held: Option<i64> = sqlx::query_scalar(
+                "SELECT held_bytes FROM quota_v2_mixed_cdn_holds
+                 WHERE reservation_id=$1::uuid AND user_id=$2 AND node_id=$3 FOR SHARE",
+            )
+            .bind(reservation)
+            .bind(user_id)
+            .bind(node_id)
+            .fetch_optional(conn)
+            .await?;
+            held.filter(|value| *value >= 0 && *value <= shared)
+                .ok_or_else(deny)
+        }
+        _ => Err(deny()),
+    }
+}
+
 /// A saved first cap or renewal cannot escape a recently lowered CDN plan.
 pub async fn issued_within_limit(
     conn: &mut PgConnection,
@@ -254,7 +367,7 @@ pub async fn issued_within_limit(
     if !supported(user, class) {
         return Ok(false);
     }
-    if class != "cdn" {
+    if class == "main" {
         return Ok(true);
     }
     let Some(_limit) = limit(user)? else {
@@ -270,9 +383,13 @@ pub async fn issued_within_limit(
     .fetch_one(&mut *conn)
     .await?;
     let issued: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(r.ceiling_bytes::numeric),0)::bigint
+        "SELECT COALESCE(SUM((CASE
+           WHEN s.class='mixed' AND m.held_bytes IS NOT NULL
+             THEN m.held_bytes::numeric
+           ELSE r.ceiling_bytes::numeric END)),0)::bigint
          FROM quota_v2_reservations r
          LEFT JOIN quota_v2_reservation_classes s ON s.reservation_id=r.reservation_id
+         LEFT JOIN quota_v2_mixed_cdn_holds m ON m.reservation_id=r.reservation_id
          WHERE r.user_id=$1 AND (s.class IS NULL OR s.class<>'main')",
     )
     .bind(user_id)
@@ -295,8 +412,8 @@ mod tests {
         assert_eq!(limit(&user).unwrap(),Some(716_800));
         assert!(supported(&user, "main"));
         assert!(supported(&user, "cdn"));
-        assert!(!supported(&user, "mixed"));
-        assert!(!supported(&user, "unclassified"));
+        assert!(supported(&user, "mixed"));
+        assert!(supported(&user, "unclassified"));
         assert!(supported(&json!({"cdnLimitGb":0}), "mixed"));
         for bad in [json!(null),json!(-1),json!("1"),json!(1_000_001)] {
             assert!(limit(&json!({"cdnLimitGb":bad})).is_err());
