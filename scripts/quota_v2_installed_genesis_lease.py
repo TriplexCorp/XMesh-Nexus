@@ -196,7 +196,15 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                           (uid,)).fetchone()==(0,)
     finally:
         owner.request("PATCH",user_path,{"nodeTrafficLimits":{},"cdnLimitGb":0})
-    print("Independent Node and CDN limits cannot silently become shared bootstrap grants.")
+    print("UTC-window Node and CDN limits cannot become global bootstrap grants.")
+    # This lifetime Node rule is conservative and independently bounded:
+    # A has 700 KiB, while the two-Node shared balance is 1.5 MiB.
+    node_a_lifetime = 716800
+    owner.request("PATCH",user_path,{
+        "nodeTrafficLimits":{str(guest_a.node):{
+            "limitGb":node_a_lifetime/1_000_000_000,"period":"lifetime"}},
+        "cdnLimitGb":0,
+    })
 
     # Deliberately abandon both first authenticated replies (no Node disk
     # commit). The installed helper must recover precisely the saved bytes.
@@ -222,6 +230,10 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert len(rows)==2 and all(r[2]>0 and r[3] and r[4]==0 for r in rows),rows
     account=db.execute("SELECT limit_bytes,settled_bytes,observed_floor_bytes "
                        "FROM quota_v2_accounts WHERE user_id=%s AND NOT closed",(uid,)).fetchone()
+    assert rows[0][2] == node_a_lifetime, ("Node lifetime cap not enforced",rows)
+    baseline=db.execute("SELECT baseline_bytes FROM quota_v2_node_lifetime_baselines "
+        "WHERE user_id=%s AND node_id=%s",(uid,guest_a.node)).fetchone()
+    assert baseline == (0,), ("Node lifetime baseline missing",baseline)
     assert max(account[1],account[2])+sum(r[2] for r in rows)==account[0],(rows,account)
     retried=parallel(lambda item:helper(item,"confirm"),stages)
     assert retried==confirmed
@@ -330,7 +342,10 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert db.execute("SELECT node_id,request_challenge,signed_envelope "
                           "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id").fetchall()==original_caps
     finally:
-        owner.request("PATCH",user_path,{"nodeTrafficLimits":{},"cdnLimitGb":0})
+        owner.request("PATCH",user_path,{
+            "nodeTrafficLimits":{str(guest_a.node):{"limitGb":0.003,"period":"lifetime"}},
+            "cdnLimitGb":0,
+        })
 
     # A signed spending-only cap cannot outlive a shortened subscription.
     # Restore the original expiry only after both fresh deliveries are denied.
