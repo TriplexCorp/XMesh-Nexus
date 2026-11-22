@@ -175,7 +175,9 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     let mut row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     if row.is_none() {
         let measurement = req.measurement.as_ref().ok_or_else(deny)?;
-        issue_original(&mut tx, state, req, &scope, &epoch, activation, measurement).await?;
+        issue_original(
+            &mut tx, state, req, &scope, &epoch, activation, measurement, &current_user,
+        ).await?;
         row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     }
     let row = row.ok_or_else(deny)?;
@@ -424,6 +426,7 @@ async fn issue_original(
     epoch: &str,
     activation: &str,
     measurement: &Measurement,
+    current_user: &Value,
 ) -> Result<(), ApiError> {
     let lease = lock_first_lease(conn, req, epoch, activation, measurement).await?;
     let inbound_class = if scope.aliases.iter().all(|a| a.class == "cdn") {
@@ -469,11 +472,10 @@ async fn issue_original(
             class: a.class.clone(),
         })
         .collect::<Vec<_>>();
-    let cdn_ceiling = if aliases.iter().any(|alias| alias.class == "cdn") {
-        lease.ceiling
-    } else {
-        0
-    };
+    let cdn_ceiling = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
+        conn, &lease.reservation, req.user_id, req.node_id,
+        current_user, inbound_class, lease.ceiling,
+    ).await?;
     let signed = sign_snapshot(
         &state.node_policy_signer,
         &SqlSnapshot {
