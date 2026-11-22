@@ -299,9 +299,33 @@ fn next_cdn_ceiling(
     }
 }
 
+/// A revision is a genuine new entitlement only if it increases the
+/// cumulative shared/MAIN ceiling, OR independently increases a strictly
+/// funded mixed CDN class allowance. No-op revisions cannot consume nonces.
+fn has_authorized_revision_delta(
+    shared_add: i64,
+    previous_cdn: i64,
+    next_cdn: i64,
+    funded_mixed: bool,
+) -> bool {
+    shared_add >= 0 && next_cdn >= previous_cdn
+        && (shared_add > 0 || (funded_mixed && next_cdn > previous_cdn))
+}
+
 #[cfg(test)]
 mod mixed_cdn_renewal_tests {
-    use super::next_cdn_ceiling;
+    use super::{has_authorized_revision_delta, next_cdn_ceiling};
+
+    #[test]
+    fn cdn_only_revision_does_not_require_artificial_main_consumption() {
+        assert!(has_authorized_revision_delta(0, 512, 768, true));
+        assert!(has_authorized_revision_delta(100, 512, 512, true));
+        assert!(has_authorized_revision_delta(100, 512, 512, false));
+        assert!(!has_authorized_revision_delta(0, 512, 512, true));
+        assert!(!has_authorized_revision_delta(0, 512, 768, false));
+        assert!(!has_authorized_revision_delta(0, 768, 512, true));
+        assert!(!has_authorized_revision_delta(-1, 512, 768, true));
+    }
 
     #[test]
     fn main_topup_never_mints_cdn_bytes_in_fixed_mixed_pool() {
@@ -392,7 +416,7 @@ async fn extend(
     // Both grants may remain fixed only for a pure replay (handled before
     // extend), never for a newly committed nonce/revision. CDN-only renewals
     // are permitted ONLY through independently committed mixed-class SQL.
-    if add == 0 && (next_cdn == old_cdn || !fixed_mixed_cdn) {
+    if !has_authorized_revision_delta(add, old_cdn, next_cdn, fixed_mixed_cdn) {
         return Err(deny());
     }
     payload["cdnCeilingBytes"] = json!(next_cdn);
