@@ -482,7 +482,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                         "WHERE user_id=%s ORDER BY node_id", (uid,)).fetchall()
     assert floors == [(row[0], row[2]) for row in rows], floors
     assert db.execute(lease_sql, (uid,)).fetchall() == rows
-    print("PASS: signed WAL charges on two Nodes conserved the balance after failed COMMIT and retries.")
+    print("PASS: signed WAL charges on two Nodes conserved the balance after rollback and retries.")
 
     # A repeat cannot extend/reinstall the existing positive cap.
     repeated=subprocess.run(["docker","exec",guest_a.name,*commands[0]],

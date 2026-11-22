@@ -482,6 +482,38 @@ async fn inactive_revocation_preflight(
 /// Read-only operator preflight for coordinated revocation/reset.
 /// Expiration never refunds an offline grant: the outstanding amount remains
 /// held until authenticated node-side spending or a future revocation proof.
+async fn revocation_status_leases(
+    pool: &sqlx::PgPool,
+    user_id: i64,
+    epoch: &str,
+) -> Result<Vec<sqlx::postgres::PgRow>, ApiError> {
+    sqlx::query(
+        "SELECT lease.node_id,lease.acknowledged_bytes,lease.ceiling_bytes,
+                lease.revision,lease.node_confirmed,lease.valid_until<NOW() AS expired,
+                revoke.request_id::text AS revocation_request_id,
+                revoke.applied_at IS NOT NULL AS revocation_applied,
+                revoke.observed_used_bytes,
+                lease.conservative_burn_floor_bytes,lease.conservative_burned_bytes,
+                COALESCE((SELECT SUM(head.stream_bytes) FROM (
+                    SELECT DISTINCT ON (c.filename) c.stream_bytes
+                    FROM quota_v2_wal_charges c WHERE c.reservation_id=lease.reservation_id
+                    ORDER BY c.filename,c.first_sequence DESC
+                ) head),0)::bigint AS conservative_wal_bytes,
+                lease.conservative_burned_at IS NOT NULL AS conservatively_burned
+         FROM quota_v2_reservations AS lease
+         LEFT JOIN quota_v2_revocation_requests AS revoke
+           ON revoke.user_id=lease.user_id AND revoke.epoch=lease.epoch
+          AND revoke.node_id=lease.node_id AND revoke.meter_epoch=lease.meter_epoch
+         WHERE lease.user_id=$1 AND lease.epoch=$2::uuid
+         ORDER BY lease.node_id",
+    )
+    .bind(user_id)
+    .bind(epoch)
+    .fetch_all(pool)
+    .await
+    .map_err(ApiError::from)
+}
+
 pub async fn revocation_status(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
@@ -514,30 +546,7 @@ pub async fn revocation_status(
     let limit: i64 = active.try_get("limit_bytes")?;
     let settled: i64 = active.try_get("settled_bytes")?;
     let observed_floor: i64 = active.try_get("observed_floor_bytes")?;
-    let leases = sqlx::query(
-        "SELECT lease.node_id,lease.acknowledged_bytes,lease.ceiling_bytes,
-                lease.revision,lease.node_confirmed,lease.valid_until<NOW() AS expired,
-                revoke.request_id::text AS revocation_request_id,
-                revoke.applied_at IS NOT NULL AS revocation_applied,
-                revoke.observed_used_bytes,
-                lease.conservative_burn_floor_bytes,lease.conservative_burned_bytes,
-                COALESCE((SELECT SUM(head.stream_bytes) FROM (
-                    SELECT DISTINCT ON (c.filename) c.stream_bytes
-                    FROM quota_v2_wal_charges c WHERE c.reservation_id=lease.reservation_id
-                    ORDER BY c.filename,c.first_sequence DESC
-                ) head),0)::bigint AS conservative_wal_bytes,
-                lease.conservative_burned_at IS NOT NULL AS conservatively_burned
-         FROM quota_v2_reservations AS lease
-         LEFT JOIN quota_v2_revocation_requests AS revoke
-           ON revoke.user_id=lease.user_id AND revoke.epoch=lease.epoch
-          AND revoke.node_id=lease.node_id AND revoke.meter_epoch=lease.meter_epoch
-         WHERE lease.user_id=$1 AND lease.epoch=$2::uuid
-         ORDER BY lease.node_id",
-    )
-    .bind(user_id)
-    .bind(&epoch)
-    .fetch_all(&state.pool)
-    .await?;
+    let leases = revocation_status_leases(&state.pool, user_id, &epoch).await?;
     let mut held: i64 = 0;
     let mut nodes = Vec::with_capacity(leases.len());
     for lease in leases {
