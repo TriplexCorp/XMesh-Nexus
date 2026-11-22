@@ -160,7 +160,7 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
             .fetch_one(&mut *tx)
             .await?;
     if !crate::node_runtime::first_genesis_active_until(&current_user, now, now.saturating_add(1))
-        || current_user["limit"].as_f64().map(crate::gb_to_bytes_i64) != Some(limit)
+        || crate::quota_v2::authoritative_shared_limit(&current_user).ok() != Some(limit)
     {
         return Err(deny());
     }
