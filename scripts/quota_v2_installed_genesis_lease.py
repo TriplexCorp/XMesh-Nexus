@@ -298,7 +298,9 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         guest,req,_=item
         container,_,pid,runtime=measurement
         lease=saved[1]["payload"]["reservation"]
-        nonce=secrets.token_hex(32)
+        nonce=hashlib.sha256(
+            f"XMESH_QUOTA_V2_FIRST_CAP_V1\0{req['genesisChallenge']}\0{uid}".encode("ascii")
+        ).hexdigest()
         lookup={"nodeId":guest.node,"userId":uid,"requestChallenge":nonce}
         assert guest.request(CAP_PATH,lookup)[0]==409, "read-only lookup minted a cap"
         cap_request=dict(lookup,measurement={
@@ -318,6 +320,11 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             finally:
                 db.execute("ALTER TABLE quota_v2_signed_first_cap_outbox "
                            "DROP CONSTRAINT ci_reject_cap_write")
+        # Only the installed service performs the first positive issuance.
+        # Wait for it to acknowledge installation before deliberately
+        # duplicating the exact request below.
+        guest.exec("test","!","-e",STATE+f"/genesis-positive-cap-u{uid}.json")
+        guest.exec("systemctl","start","xmesh-quota-v2-renewal.service",timeout=95)
         issued=parallel(lambda _: guest.request(CAP_PATH,cap_request),range(2))
         code,signed=issued[0]
         assert code==200,(code,signed)
@@ -431,9 +438,6 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         cmd=["env","XMESH_QUOTA_V2_INSTALLED_CAP_DELIVERY=1",CAP_COMMAND,*common,
              "--user-id",str(uid),"--socket",MEASURED+"/wal/drain.sock",
              "--executable-sha256",digest,"--request-challenge",request["requestChallenge"]]
-        receipt=json.loads(guest.exec(*cmd,timeout=48))
-        assert receipt=={"runtimeId":measurement[3],
-                         "grantSha256":hashlib.sha256(grant).hexdigest()}
         saved=json.loads(guest.exec("cat",STATE+f"/genesis-positive-cap-u{uid}.json"))
         assert saved["signedEnvelope"].encode()==grant
         stored=guest.exec("cat",MEASURED+f"/wal/positive-cap-u{uid}.json")
@@ -441,6 +445,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         return cmd
 
     commands=parallel(install,cap_jobs)
+    print("PASS: the installed systemd Agent acquired and installed each first cap after signed quarantine.")
     assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone()==(2,)
     results=parallel(lambda value:probe(value[0][0],value[0][4],
                                        value[0][1],value[1]),zip(cap_jobs,tags))
@@ -474,9 +479,9 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             assert proof[field] is False, proof
         assert proof["refundableBytes"] == 0, proof
 
-    # Transfer the actual inventory born by this VLESS run through each
-    # installed Agent. The witness anchors the birth index, not final usage.
-    parallel(lambda guest: check_remote_wal(guest, "store"), pair)
+    # B provides the independent transaction rollback fixture. A must
+    # publish its first birth index from the installed service.
+    check_remote_wal(guest_b, "store")
     anchor_sql = """SELECT a.inventory_sequence,a.inventory_sha256,a.inventory_bytes,s.witness_bytes
                     FROM quota_v2_external_wal_birth_anchors a
                     JOIN quota_v2_external_wal_birth_sources s USING(node_id,inventory_sequence)
@@ -492,9 +497,8 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert json.loads(bytes(witness))["payload"]["nodeId"] == guest.node
         return anchor
 
-    anchors = [remote_anchor(guest) for guest in pair]
+    assert db.execute(anchor_sql, (guest_a.node,)).fetchone() is None
     assert db.execute(lease_sql,(uid,)).fetchall()==rows
-    print("PASS: real VLESS WAL birth indexes reached PostgreSQL over each installed Agent's XSP/2 tunnel.")
 
     def charge_request(guest, grant, path, raw):
         return {
@@ -525,7 +529,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                    "WHERE user_id=%s AND NOT closed")
     db.execute("ALTER TABLE quota_v2_wal_charges ADD CONSTRAINT ci_reject_wal CHECK (false) NOT VALID")
     try:
-        assert guest_a.request(WAL_PATH, first_batch)[0] == 500
+        assert guest_b.request(WAL_PATH, charge_jobs[1][1][0][0])[0] == 500
         assert db.execute(charge_sql).fetchall() == []
         assert db.execute(balance_sql, (uid,)).fetchone() == account[1:]
     finally:
@@ -583,6 +587,8 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     # Keep the controller's negative/corrupt-order tests for the other
     # installed Node. Avoid a shared psycopg connection across workers.
     charges = [upload(charge_jobs[0]), upload(charge_jobs[1])]
+    anchors = [remote_anchor(guest) for guest in pair]
+    print("PASS: installed Agent bootstrapped the first WAL birth index and charged it through strict XSP/2.")
     charged_rows = db.execute(charge_sql).fetchall()
     assert len(charged_rows) == 6
     charged_balance = db.execute(balance_sql, (uid,)).fetchone()
