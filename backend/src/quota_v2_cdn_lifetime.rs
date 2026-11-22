@@ -227,7 +227,10 @@ pub async fn issued_within_limit(
     .bind(user_id)
     .fetch_one(&mut *conn)
     .await?;
-    Ok(anchor.saturating_add(issued) <= limit)
+    // A later legacy CDN meter can only raise the consumption floor; it
+    // cannot be counted as proof that any V2 unspent allocation was freed.
+    let observed = legacy_cdn_usage(conn, user_id).await?;
+    Ok(anchor.max(observed).saturating_add(issued) <= limit)
 }
 
 #[cfg(test)]
