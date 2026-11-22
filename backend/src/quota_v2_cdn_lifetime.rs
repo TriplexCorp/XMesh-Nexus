@@ -105,6 +105,7 @@ async fn legacy_cdn_usage(conn: &mut PgConnection, user_id: i64) -> Result<i64, 
          LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
          WHERE t.user_id=$1
            AND (t.inbound_tag=ANY($2::text[])
+                OR n.id IS NULL
                 OR n.data->>'cdnMode'='all'
                 OR (n.data->>'cdnMode'='selected'
                     AND n.data->'cdnInboundTags' ? t.inbound_tag))",
@@ -113,7 +114,18 @@ async fn legacy_cdn_usage(conn: &mut PgConnection, user_id: i64) -> Result<i64, 
     .bind(&tags)
     .fetch_one(&mut *conn)
     .await?;
-    Ok(used.max(0))
+    // Monthly quota deltas are recorded at the time of signed telemetry
+    // acceptance. Counting *all* historical months protects the lifetime
+    // budget when an old CDN Node was deleted or subsequently reclassified
+    // as MAIN. This is a floor, never a refund or proof of delivered bytes.
+    let durable_history: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(quota_uplink_bytes+quota_downlink_bytes),0)::bigint
+         FROM user_inbound_traffic_monthly WHERE user_id=$1",
+    )
+    .bind(user_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(used.max(durable_history).max(0))
 }
 
 pub async fn headroom(
