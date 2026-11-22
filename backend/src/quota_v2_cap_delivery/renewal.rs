@@ -197,6 +197,9 @@ pub(super) async fn issue(
     if lease.epoch != epoch {
         return Err(deny());
     }
+    crate::quota_v2_cdn_lifetime::verify_class(
+        &mut tx, req.user_id, req.node_id, &fields.reservation_id, inbound_class,
+    ).await?;
     let (permit, is_renewal) = latest_permit(&mut tx, fields, &lease).await?;
     let payload = verified_payload(state, &permit, &lease, activation)?;
     let aliases: Vec<Alias> = scope
