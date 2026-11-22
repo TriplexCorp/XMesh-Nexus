@@ -192,7 +192,7 @@ pub async fn bounded_target(
     let Some(free) = headroom(conn, user_id, user).await? else {
         return Ok(target);
     };
-    let existing: Option<(i64,i64)> = sqlx::query_as(
+    let existing: Option<(i64, i64)> = sqlx::query_as(
         "SELECT ceiling_bytes,acknowledged_bytes FROM quota_v2_reservations
          WHERE reservation_id=$1::uuid AND user_id=$2 AND node_id=$3",
     )
