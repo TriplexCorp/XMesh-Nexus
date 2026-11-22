@@ -2421,9 +2421,7 @@ pub fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_
     if has_cdn && crate::quota_v2_cdn_lifetime::limit(user).is_err() {
         return false;
     }
-    user.get("limit")
-        .and_then(Value::as_f64)
-        .is_some_and(|limit| limit.is_finite() && crate::gb_to_bytes_i64(limit) > 0)
+    crate::quota_v2::authoritative_shared_limit(user).is_ok()
 }
 
 /// A spending-only first cap must never start a waiting subscription or
@@ -2473,7 +2471,10 @@ mod first_genesis_rehearsal_limit_tests {
     #[test]
     fn independent_quotas_are_not_global_bootstrap_bytes() {
         assert!(supported(&json!({"limit":0.001_572_864}), 47, true));
-        assert!(!supported(&json!({"limit":0}), 47, false));
+        assert!(supported(&json!({"limit":0}), 47, false));
+        assert!(supported(&json!({"limit":0,"cdnLimitGb":1}), 47, true));
+        assert!(supported(&json!({"limit":0,"cdnLimitGb":0.05}), 47, false));
+        assert!(!supported(&json!({"limit":-1}), 47, false));
         for period in ["daily", "weekly", "monthly", "lifetime"] {
             let limited = json!({"limit":2,
                 "nodeTrafficLimits":{"47":{"limitGb":0.000_000_001,"period":period}}});
