@@ -282,6 +282,65 @@ def main():
             raise AssertionError("duplicate signed CDN revision created new capacity")
         assert sql_liability(conn) == old_liability+topup_bytes
 
+    # The COMMIT-time FK binds a CDN grant to the exact signed cap revision
+    # and nonce. A standalone new CDN top-up cannot become durable even if
+    # application code forgot to insert a signed response entirely.
+    for revision, topup_nonce, signed_nonce in (
+        (10, "a" * 64, None),       # missing signed renewal
+        (11, "b" * 64, "c" * 64),   # wrong signed renewal nonce
+    ):
+        try:
+            with psycopg.connect(DSN) as conn:
+                conn.execute(
+                    "INSERT INTO quota_v2_mixed_cdn_topups("
+                    "reservation_id,revision,user_id,node_id,added_bytes,"
+                    "cumulative_cdn_ceiling_bytes,request_nonce) "
+                    "VALUES(%s,%s,%s,87420,1000,%s,%s)",
+                    (identity(87420,"reservation"),revision,USER,
+                     MIXED_REQUEST+topup_bytes+1000,topup_nonce),
+                )
+                if signed_nonce is not None:
+                    conn.execute(
+                        "INSERT INTO quota_v2_cap_renewals("
+                        "reservation_id,revision,nonce,grant_bytes,signed_envelope) "
+                        "VALUES(%s,%s,%s,5000000,%s)",
+                        (identity(87420,"reservation"),revision,
+                         signed_nonce,b"x"*160),
+                    )
+        except psycopg.ForeignKeyViolation:
+            pass
+        else:
+            raise AssertionError("orphan or wrong-nonce CDN hold committed")
+        with psycopg.connect(DSN) as conn:
+            assert conn.execute(
+                "SELECT count(*) FROM quota_v2_mixed_cdn_topups "
+                "WHERE reservation_id=%s AND revision=%s",
+                (identity(87420,"reservation"),revision),
+            ).fetchone() == (0,)
+            assert conn.execute(
+                "SELECT count(*) FROM quota_v2_cap_renewals "
+                "WHERE reservation_id=%s AND revision=%s",
+                (identity(87420,"reservation"),revision),
+            ).fetchone() == (0,)
+            assert sql_liability(conn) == old_liability+topup_bytes
+
+    # The composite FK also prevents shifting a previously signed CDN
+    # reserve onto a different Node or user under the same reservation ID.
+    try:
+        with psycopg.connect(DSN) as conn:
+            conn.execute(
+                "INSERT INTO quota_v2_mixed_cdn_topups("
+                "reservation_id,revision,user_id,node_id,added_bytes,"
+                "cumulative_cdn_ceiling_bytes,request_nonce) "
+                "VALUES(%s,12,%s,87430,1000,%s,%s)",
+                (identity(87420,"reservation"),USER,
+                 MIXED_REQUEST+topup_bytes+1000,"d"*64),
+            )
+    except psycopg.ForeignKeyViolation:
+        pass
+    else:
+        raise AssertionError("CDN class hold was transferred to another Node")
+
     # A failure to commit the exact signed cap MUST also roll back the
     # independently proposed CDN bytes. Both records share a DB transaction.
     # Zero grant_bytes violates the actual immutable signed-cap SQL schema.
