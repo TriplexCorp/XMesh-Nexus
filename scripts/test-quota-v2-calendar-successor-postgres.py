@@ -75,9 +75,14 @@ def main():
             altered(5, uuid.uuid4()),  # wrong account epoch
             altered(8, meter),  # reuse old WAL meter epoch
             altered(9, meter),  # reuse meter epoch as candidate reservation
-            altered(10, int(boundary.timestamp() * 1000) - 1),
         ):
             must_refuse(db, insert, invalid, {"23514"})
+        # Keep a perfectly valid 60-second lifetime: rejection must be
+        # caused by the CLOSED window, not an unrelated lifetime CHECK.
+        too_early = list(row)
+        too_early[10] = int(boundary.timestamp() * 1000) - 1
+        too_early[11] = too_early[10] + 60_000
+        must_refuse(db, insert, tuple(too_early), {"23514"})
         db.execute(insert, row)
         saved = db.execute(
             "SELECT signed_envelope FROM quota_v2_calendar_successor_preparations "
