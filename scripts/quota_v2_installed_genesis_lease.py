@@ -243,10 +243,10 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert db.execute(
         "SELECT baseline_bytes FROM quota_v2_cdn_lifetime_baselines WHERE user_id=%s",
         (uid,)).fetchone() == (0,)
-    assert db.execute(
+    assert dict(db.execute(
         "SELECT node_id,class FROM quota_v2_reservation_classes "
-        "WHERE user_id=%s ORDER BY node_id",(uid,)).fetchall() == [
-            (guest_a.node,"main"),(guest_b.node,"cdn")]
+        "WHERE user_id=%s",(uid,)).fetchall()) == {
+            guest_a.node:"main",guest_b.node:"cdn"}
     assert max(account[1],account[2])+sum(r[2] for r in rows)==account[0],(rows,account)
     retried=parallel(lambda item:helper(item,"confirm"),stages)
     assert retried==confirmed
