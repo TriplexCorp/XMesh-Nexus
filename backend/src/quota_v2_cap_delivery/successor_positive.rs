@@ -147,6 +147,39 @@ async fn signed_predecessor(
     {
         return Err(deny());
     }
+    // The Node's original nonfinal fence marker carries the SHA256 of
+    // EACH last signed WAL-charge head from the predecessor. Reconstruct
+    // those same exact bytes from PostgreSQL's immutable charge receipts
+    // BEFORE funding any new cap. A made-up local "all tails ACK" marker
+    // can no longer hide a missing or altered remote old-reservation debt.
+    // Birth history before the first off-host checkpoint is separately
+    // guarded and remains a release gate, not a refund authority.
+    let old_heads = sqlx::query(
+        "SELECT DISTINCT ON (filename) filename,last_sequence,last_digest,stream_bytes
+         FROM quota_v2_wal_charges WHERE reservation_id=$1::uuid
+         ORDER BY filename,first_sequence DESC"
+    )
+    .bind(&fields.predecessor_id)
+    .fetch_all(&mut *conn).await?;
+    let mut canonical_heads = Vec::with_capacity(old_heads.len());
+    for row in &old_heads {
+        let filename: String=row.try_get("filename")?;
+        let last_sequence: i64=row.try_get("last_sequence")?;
+        let last_digest: String=row.try_get("last_digest")?;
+        let bytes: i64=row.try_get("stream_bytes")?;
+        if last_sequence<=0 || bytes<=0 || !super::hex64(&last_digest) {
+            return Err(deny());
+        }
+        canonical_heads.push(json!({
+            "filename":filename, "lastSequence":last_sequence,
+            "lastDigest":last_digest, "conservativeBytes":bytes
+        }));
+    }
+    let expected_heads = format!("{:x}",Sha256::digest(
+        serde_json::to_vec(&canonical_heads).map_err(|_|deny())?));
+    if expected_heads != fields.old_wal_charge_heads_sha256 {
+        return Err(deny());
+    }
     Ok((meter,reservation))
 }
 
