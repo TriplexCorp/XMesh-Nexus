@@ -312,18 +312,31 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert hashlib.sha256(raw).hexdigest()==profile
         return observed
 
+    def start_external_endpoint(guest, observed):
+        # Lab ingress is reachable only from this guest. Pin the kernel
+        # namespace so a reused PID cannot redirect the fixture to another process.
+        guest.exec("ip", "netns", "attach", "quota-vless", str(observed[2]))
+        guest.exec("systemd-run", "--unit=xmesh-lab-ingress", "--collect",
+                   "/usr/bin/systemd-socket-activate", "--listen=127.0.0.1:28401",
+                   "/usr/bin/nsenter", "--no-fork", "--net=/run/netns/quota-vless",
+                   "/usr/lib/systemd/systemd-socket-proxyd", "127.0.0.1:28401")
+        lab.wait_for(lambda: b"127.0.0.1:28401" in guest.exec("ss", "-lnt"),
+                     label="external guest-loopback VLESS listener")
+
     def probe(item,ceiling,observed,tag,previous=0,barrier=None,pause_after=0,subscriber=user,
               reuse_echo=False):
         guest,_,_=item
-        raw=guest.exec("nsenter","--target",str(observed[2]),"--net","--",
-                       "python3",MEASURED+"/live-vless.py",MEASURED+"/xray-client",
+        raw=guest.exec("python3",MEASURED+"/live-vless.py",MEASURED+"/xray-client",
                        subscriber["xrayId"],f"xmesh-u{subscriber['id']}--{tag}",str(ceiling),str(previous),
                        *([barrier,str(pause_after)] if barrier else []),
+                       "--server-pid",str(observed[2]),
                        *(["--reuse-echo","--socks-port","28412"] if reuse_echo else []),
                        timeout=120 if barrier else 48)
         return json.loads(raw)
 
     measurements=parallel(measure,stages)
+    for guest, measured in zip(pair, measurements):
+        start_external_endpoint(guest, measured)
     before=parallel(lambda job:probe(job[0],0,job[1],job[2]),
                     zip(stages,measurements,tags))
     assert before==[{"uplink":0,"downlink":0}]*2
@@ -855,7 +868,10 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     guest_a.exec("docker","rm",lab.XRAY)
     lab.start_isolated_candidate(guest_a,archive,image,config,preloaded=True,
                                  tag=tags[0],binding=binding)
+    guest_a.exec("systemctl", "stop", "xmesh-lab-ingress.service")
+    guest_a.exec("ip", "netns", "delete", "quota-vless")
     replacement=measure(stages[0],replacement=True)
+    start_external_endpoint(guest_a, replacement)
     assert replacement[0]!=measurements[0][0]
     failed=subprocess.run(["docker","exec",guest_a.name,*commands[0]],
                           capture_output=True,timeout=35)

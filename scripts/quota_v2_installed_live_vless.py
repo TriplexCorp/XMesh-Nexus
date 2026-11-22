@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Run a real SOCKS->VLESS->loopback echo path inside isolated Xray's netns.
+"""Run a real SOCKS->VLESS client outside the measured Xray network namespace.
 
 Only the disposable runner invokes this probe; no public ingress, no external
 target, no fixture-generated traffic counters.
 """
 import argparse
 from contextlib import ExitStack
+import os
 import json
 from pathlib import Path
 import socket
@@ -74,7 +75,7 @@ def denied(socks_port=SOCKS):
 
 def stats(xray,email):
     raw=subprocess.check_output(
-        [xray,"api","statsquery","--server=127.0.0.1:10085","-pattern",f"user>>>{email}"],
+        ["nsenter","--net=/run/netns/quota-vless","--",xray,"api","statsquery","--server=127.0.0.1:10085","-pattern",f"user>>>{email}"],
         timeout=8)
     return parse_stats(raw, email)
 
@@ -104,10 +105,18 @@ def parse_stats(raw, email):
 
 
 def run(xray, uuid, email, ceiling, previous=0, barrier=None, pause_after=0,
-        *, socks_port=SOCKS, reuse_echo=False):
+        *, server_pid, socks_port=SOCKS, reuse_echo=False):
     with tempfile.TemporaryDirectory(prefix="xmesh-vless-ns-") as work, ExitStack() as services:
+        with open("/proc/self/ns/net","rb", buffering=0) as client_ns, open("/run/netns/quota-vless","rb", buffering=0) as server_ns:
+            assert os.fstat(server_ns.fileno()).st_ino == os.stat(f"/proc/{server_pid}/ns/net").st_ino
+            assert os.fstat(server_ns.fileno()).st_ino != os.fstat(client_ns.fileno()).st_ino
+            if not reuse_echo:
+                os.setns(server_ns.fileno(), os.CLONE_NEWNET)
+                try:
+                    echo = services.enter_context(EchoServer(("127.0.0.1", ECHO), EchoHandler))
+                finally:
+                    os.setns(client_ns.fileno(), os.CLONE_NEWNET)
         if not reuse_echo:
-            echo = services.enter_context(EchoServer(("127.0.0.1", ECHO), EchoHandler))
             thread = threading.Thread(target=echo.serve_forever, daemon=True)
             thread.start()
             services.callback(echo.shutdown)
@@ -149,7 +158,7 @@ def run(xray, uuid, email, ceiling, previous=0, barrier=None, pause_after=0,
                     actual = stats(xray, email)
                     assert actual == {"uplink":0,"downlink":0}, actual
                     return actual
-                assert ceiling>0 and ceiling%(2*16384)==0
+                assert ceiling>0 and ceiling%2==0
                 if previous:
                     assert stats(xray,email)=={"uplink":previous//2,"downlink":previous//2}
                 data=b"x"*16384
@@ -165,8 +174,9 @@ def run(xray, uuid, email, ceiling, previous=0, barrier=None, pause_after=0,
                                 if time.monotonic() >= deadline:
                                     raise TimeoutError("quota renewal barrier expired")
                                 time.sleep(.05)
-                        stream.sendall(data)
-                        assert exact(stream,len(data))==data
+                        chunk = data[:(ceiling - sent) // 2]
+                        stream.sendall(chunk)
+                        assert exact(stream,len(chunk))==chunk
                     try:
                         stream.sendall(b"x")
                         assert not stream.recv(1),"existing stream exceeded signed cap"
@@ -201,6 +211,7 @@ if __name__ == "__main__":
     parser.add_argument("previous", type=int)
     parser.add_argument("barrier", nargs="?")
     parser.add_argument("pause_after", type=int, nargs="?", default=0)
+    parser.add_argument("--server-pid", type=int, required=True)
     parser.add_argument("--socks-port", type=int, default=SOCKS)
     parser.add_argument("--reuse-echo", action="store_true")
     print(json.dumps(run(**vars(parser.parse_args())), sort_keys=True, separators=(",", ":")))
