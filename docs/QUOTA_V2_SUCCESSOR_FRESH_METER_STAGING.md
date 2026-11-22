@@ -121,3 +121,76 @@ attestation, particularly after root compromise. Migration 0160 remains
 a closed, non-spending SQL staging table, not an active API endpoint.
 Newly added regression coverage is staged; GitHub Actions runners must
 actually execute all checks before claiming successful acceptance.
+
+
+## Draft positive successor issuer and unresolved cross-runtime WAL birth chain
+
+Migration \`0161_quota_v2_calendar_successor_positive_outbox.sql\` and
+\`quota_v2_cap_delivery/successor_positive.rs\` now add a separate
+authenticated strict-XSP/2 branch
+\`calendarSuccessorPositive\`. After verified old calendar closure,
+the signed zero-authority preparation, new Xray kernel/container/pinned
+zero-WAL evidence and exact last signed predecessor WAL-charge heads,
+Nexus holds the existing per-user account lock and allocates a fresh
+reservation through the **existing** conservative SQL reserve function.
+It binds immutable Node/CDN calendar windows, an independent CDN class
+hold, and new meter/runtime identifiers, and conserves shared held
+capacity with **all existing historical commitments**.
+
+The same transaction saves TWO distinct Ed25519 signed envelopes:
+the positive \`XMESH_QUOTA_V2_XRAY_CAP_ADMISSION_V1\0\` spending cap and
+the fresh \`XMESH_XRAY_GENESIS_PREPARED_V1\0\` zero-byte Xray process
+companion. The trigger validates exact owner/Node/epoch/runtime,
+reservation amount/class and the JSON payload pair. A deferred constraint
+prevents the new reservation from committing without its exact signed
+positive outbox. A repeated deterministic request returns both exact
+original signatures; it does not reserve again. A wrong runtime or
+different old WAL charge-head digest fails closed.
+
+Node #170 contains the opt-in Agent path \`successor_positive.py\`:
+verify both pinned Nexus signatures, the exact original old reservation
+and ALREADY acked old WAL, check a different kernel-measured fresh Xray
+and private WAL, then use the existing SO_PEERCRED+pidfd checked Unix
+\`/v1/quota-cap\` installer with the two envelopes. It fsyncs the
+installation receipt. A real patched-Xray regression exercises the
+fresh Genesis/positive pair against loopback MAIN/CDN VLESS and new
+runtime-keyed WAL files.
+
+The stage defaults OFF: \`XMESH_QUOTA_V2_FRESH_METER_STAGING=1\`
+AND \`XMESH_QUOTA_V2_AUTO_SUCCESSOR_POSITIVE=1\`, separately configured
+new socket and executable/config pins, are required even in staging.
+It never launches Xray or alters public ingress, and NEVER enables
+\`XMESH_QUOTA_V2_ENABLED\`. No production toggles have been changed.
+
+### Current explicit release blockers
+
+1. **Independent multi-runtime WAL birth-index extension.** Existing
+   off-host signed birth anchors are a single append-only ledger per
+   Node. A fresh Xray private journal starts at birth sequence one and
+   cannot replace the previous process's signed remote prefix. The
+   staged second-runtime charge worker refuses an unverified fork;
+   new positive caps must not be enabled in production until a genuine
+   conservative merge/append protocol proves the previous full prefix
+   and every fresh new WAL birth. The old reservation always keeps
+   its original stream owner.
+2. **Real installed two-process switchover.** The fresh quarantined
+   Xray starts with \`--network none\`; successful Unix installation
+   alone does NOT redirect public VLESS ingress or restore an
+   already terminated user connection. A separately verified
+   fail-closed public ingress handoff remains to be built and tested.
+3. **Repeated calendar epochs and multiuser handoff.** The current
+   renewal scanner has a first calendar successor but does not promote
+   its positive reservation into the next historical predecessor for
+   a second rollover. Additionally the initial empty-WAL proof cannot
+   be reused indiscriminately after other users on the new process
+   have already transmitted bytes; an independently verified
+   per-user join/zero-counter protocol remains necessary.
+4. **Build/integration evidence.** No hosted Actions have completed
+   on the new commits; real PostgreSQL 17, Rust, pinned-Go Xray,
+   2-node live VLESS, SIGKILL, lost XSP reply and 100/500 connection
+   stress must PASS before merging. Unit/static source checks are
+   not a substitute.
+
+These draft changes must not be promoted to production until the
+complete above chain is proven. Existing MAIN/CDN and historical WAL
+conservation take priority over short-term availability.
