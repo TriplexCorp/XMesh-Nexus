@@ -180,7 +180,10 @@ pub(super) async fn prepare(
     let prior = sqlx::query(
         "SELECT node_id,user_id,request_challenge,signer_public_key,
                 account_epoch::text AS account_epoch,
-                predecessor_runtime_id,policy_sha256,signed_envelope
+                predecessor_runtime_id,policy_sha256,signed_envelope,
+                candidate_meter_epoch::text AS candidate_meter_epoch,
+                candidate_reservation_id::text AS candidate_reservation_id,
+                issued_at_ms,valid_until_ms
          FROM quota_v2_calendar_successor_preparations
          WHERE predecessor_id=$1::uuid FOR SHARE"
     )
@@ -204,6 +207,22 @@ pub(super) async fn prepare(
         }
         let raw: Vec<u8> = row.try_get("signed_envelope")?;
         let exact = verified_saved(state, &raw, req, &old, activation, now)?;
+        // The SQL row and signed immutable bytes must carry the SAME
+        // successor identifiers and validity. This guards against any
+        // partial/restored outbox state being mistaken for exact replay.
+        let signed: Value = serde_json::from_slice(&raw).map_err(|_| deny())?;
+        let payload = &signed["payload"];
+        let meter: String = row.try_get("candidate_meter_epoch")?;
+        let reservation: String = row.try_get("candidate_reservation_id")?;
+        let issued: i64 = row.try_get("issued_at_ms")?;
+        let until: i64 = row.try_get("valid_until_ms")?;
+        if payload["meterEpoch"] != meter
+            || payload["reservationId"] != reservation
+            || payload["issuedAtMs"] != issued
+            || payload["validUntilMs"] != until
+        {
+            return Err(deny());
+        }
         tx.commit().await?;
         return Ok(exact);
     }
