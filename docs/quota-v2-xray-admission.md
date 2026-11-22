@@ -159,6 +159,16 @@ and always carries `authorizedBytes=0`, `canSpend=false`,
 `canStart=false`, `canResume=false`, `finalMeterVerified=false`,
 `refundableBytes=0`.
 
+An expired **zero-authority preparation** may still be replayed
+byte-for-byte as historical identity after a lost XSP/2 response. Expiry
+does not become a fresh installation permission: any future positive
+spending cap needs its own unexpired signed issuance and independent
+Xray/WAL/runtime proof. Migration `0159` also rejects preparation unless
+the old calendar closure was observed and the candidate belongs to the
+same predecessor user, Node and account epoch with a different meter
+identity. The current V1 contract deliberately refuses cross-account
+epoch transitions; those require an explicit new-account conservation proof.
+
 **This is not a new quota lease.** No row is created in
 `quota_v2_reservations`, no signed positive Xray cap is issued, and
 Agent cannot resume ingress using this receipt. Old WAL filename ownership
