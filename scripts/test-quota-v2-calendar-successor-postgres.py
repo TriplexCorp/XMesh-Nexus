@@ -144,7 +144,7 @@ def main():
             altered_fresh(5, uuid.uuid4()),
             altered_fresh(6, "c" * 64),
             altered_fresh(7, "0" * 64),
-            altered_fresh(8, boundary - timedelta(seconds=1)),
+            altered_fresh(8, datetime(1960, 1, 1, tzinfo=timezone.utc)),
             altered_fresh(8, datetime.now(timezone.utc) + timedelta(hours=1)),
             altered_fresh(9, 0),
             altered_fresh(10, "0" * 64),
@@ -218,9 +218,15 @@ def main():
         for index, val in (
             (0, predecessor2), (2, user2), (3, epoch2),
             (4, candidate_meter2), (5, candidate_reservation2),
-            (8, datetime.now(timezone.utc)),
+            (8, fresh[8]),
         ):
             second_fresh[index] = val
+        inconsistent = list(second_fresh)
+        inconsistent[8] = datetime.now(timezone.utc)
+        must_refuse(db, statement, tuple(inconsistent), {"23514"})
+        inconsistent = list(second_fresh)
+        inconsistent[11] = "3" * 64
+        must_refuse(db, statement, tuple(inconsistent), {"23514"})
         db.execute(statement, tuple(second_fresh))
         assert db.execute(
             "SELECT count(*) FROM quota_v2_calendar_successor_meter_preflights "
