@@ -89,6 +89,11 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         "-in",os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"],"-outform","DER"],timeout=5)[-32:].hex()
 
     def load(guest):
+        # Installed staging timer must be enabled, but explicit lab sequencing
+        # keeps it quiescent until the live-VLESS automatic-charge test.
+        guest.exec("systemctl","is-enabled","--quiet","xmesh-quota-v2-renewal.timer")
+        guest.exec("systemctl","stop","xmesh-quota-v2-renewal.timer",
+                   "xmesh-quota-v2-renewal.service")
         guest.exec("systemctl","stop",f"{lab.SYNC}.timer",f"{lab.SYNC}.service",
                    f"{lab.METRICS}.timer",f"{lab.METRICS}.service",
                    "xmesh-node-user-meter.timer","xmesh-node-user-meter.service")
