@@ -310,6 +310,34 @@ async fn load_outbox(
     .fetch_optional(conn).await.map_err(ApiError::from)
 }
 
+/// Re-delivery must compare the immutable SQL-backed CDN sub-cap, NOT
+/// infer that every CDN alias may spend the entire shared MAIN ceiling.
+fn signed_cdn_matches_sql(signed: &Value, expected_cdn: i64, shared: i64) -> bool {
+    expected_cdn >= 0
+        && expected_cdn <= shared
+        && signed.as_i64() == Some(expected_cdn)
+}
+
+#[cfg(test)]
+mod immutable_first_cdn_outbox_tests {
+    use super::signed_cdn_matches_sql;
+    use serde_json::json;
+
+    #[test]
+    fn signed_mixed_cap_replays_exactly_its_small_sql_funded_cdn_hold() {
+        assert!(signed_cdn_matches_sql(&json!(512), 512, 4_096));
+        assert!(signed_cdn_matches_sql(&json!(0), 0, 4_096));
+        assert!(signed_cdn_matches_sql(&json!(4_096), 4_096, 4_096));
+        assert!(!signed_cdn_matches_sql(&json!(4_096), 512, 4_096));
+        assert!(!signed_cdn_matches_sql(&json!(512), 513, 4_096));
+        assert!(!signed_cdn_matches_sql(&json!(513), 512, 4_096));
+        assert!(!signed_cdn_matches_sql(&json!(512), -1, 4_096));
+        assert!(!signed_cdn_matches_sql(&json!(512), 4_097, 4_096));
+        assert!(!signed_cdn_matches_sql(&json!(-1), -1, 4_096));
+        assert!(!signed_cdn_matches_sql(&json!(null), 512, 4_096));
+    }
+}
+
 fn verified_outbox(
     state: &AppState,
     req: &Request,
@@ -376,8 +404,7 @@ fn verified_outbox(
         || p["reservationRevision"] != revision
         || p["sharedCeilingBytes"] != ceiling
         || p["nodeCeilingBytes"] != ceiling
-        || p["cdnCeilingBytes"] != expected_cdn
-        || expected_cdn < 0 || expected_cdn > ceiling
+        || !signed_cdn_matches_sql(&p["cdnCeilingBytes"], expected_cdn, ceiling)
         || p["installBeforeMs"] != install
         || p["validUntilMs"] != expires
         || p["aliasScopes"] != json!(aliases)
