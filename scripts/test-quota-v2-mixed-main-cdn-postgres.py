@@ -246,6 +246,12 @@ def main():
          "WHERE reservation_id=%s",(identity(87420,"reservation"),)),
         ("DELETE FROM quota_v2_mixed_cdn_holds WHERE reservation_id=%s",
          (identity(87420,"reservation"),)),
+        ("UPDATE quota_v2_mixed_cdn_topups SET added_bytes=0 "
+         "WHERE reservation_id=%s AND revision=8",
+         (identity(87420,"reservation"),)),
+        ("DELETE FROM quota_v2_mixed_cdn_topups "
+         "WHERE reservation_id=%s AND revision=8",
+         (identity(87420,"reservation"),)),
     ]:
         with psycopg.connect(DSN) as conn:
             try:
@@ -253,7 +259,7 @@ def main():
             except psycopg.Error:
                 conn.rollback()
             else:
-                raise AssertionError("immutable mixed CDN hold was modified")
+                raise AssertionError("immutable mixed CDN hold or revision top-up was modified")
 
     print({
         "main_bytes":10_000_000,
