@@ -63,7 +63,6 @@ RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
     previous quota_v2_calendar_successor_preparations%ROWTYPE;
     predecessor_meter UUID;
-    closed_at TIMESTAMPTZ;
 BEGIN
     SELECT p.* INTO previous
       FROM quota_v2_calendar_successor_preparations p
@@ -75,11 +74,9 @@ BEGIN
         RAISE EXCEPTION 'successor lacks a committed predecessor close'
             USING ERRCODE='23514';
     END IF;
-    SELECT r.meter_epoch, c.observed_at
-      INTO STRICT predecessor_meter, closed_at
-      FROM quota_v2_reservations r
-      JOIN quota_v2_calendar_closures c ON c.reservation_id=r.reservation_id
-      WHERE r.reservation_id=NEW.predecessor_id;
+    SELECT meter_epoch INTO STRICT predecessor_meter
+      FROM quota_v2_reservations
+      WHERE reservation_id=NEW.predecessor_id;
     IF NEW.node_id IS DISTINCT FROM previous.node_id
        OR NEW.user_id IS DISTINCT FROM previous.user_id
        OR NEW.account_epoch IS DISTINCT FROM previous.account_epoch
@@ -88,8 +85,10 @@ BEGIN
        OR NEW.candidate_meter_epoch IS NOT DISTINCT FROM predecessor_meter
        OR NEW.candidate_reservation_id IS NOT DISTINCT FROM predecessor_meter
        OR NEW.fresh_runtime_id IS NOT DISTINCT FROM previous.predecessor_runtime_id
-       OR NEW.fresh_started_at < to_timestamp(previous.issued_at_ms::double precision/1000.0)
-       OR NEW.fresh_started_at < closed_at
+       -- A clean successor may have booted BEFORE this particular user's
+       -- independent calendar window ended. No user can spend from this
+       -- staging table: fresh signed per-user counters are still mandatory.
+       OR NEW.fresh_started_at <= TIMESTAMPTZ '1970-01-01 00:00:00+00'
        OR NEW.fresh_started_at > clock_timestamp()
        OR EXISTS (
            SELECT 1 FROM quota_v2_signed_first_cap_outbox f
@@ -104,9 +103,28 @@ BEGIN
         RAISE EXCEPTION 'fresh successor meter is not isolated from predecessor'
             USING ERRCODE='23514';
     END IF;
+    -- Serialize absent-row as well as existing-row cohort checks. A
+    -- second user on the SAME Docker container must report the SAME
+    -- immutable kernel runtime, start time, PID, executable/config and
+    -- pristine WAL fingerprint, not a fabricated per-user variant.
+    PERFORM pg_advisory_xact_lock(1786042, hashtext(NEW.fresh_container_id));
+    IF EXISTS (
+        SELECT 1 FROM quota_v2_calendar_successor_meter_preflights e
+        WHERE e.fresh_container_id=NEW.fresh_container_id
+          AND (e.node_id IS DISTINCT FROM NEW.node_id
+            OR e.fresh_runtime_id IS DISTINCT FROM NEW.fresh_runtime_id
+            OR e.fresh_started_at IS DISTINCT FROM NEW.fresh_started_at
+            OR e.fresh_host_pid IS DISTINCT FROM NEW.fresh_host_pid
+            OR e.fresh_executable_sha256 IS DISTINCT FROM NEW.fresh_executable_sha256
+            OR e.fresh_config_sha256 IS DISTINCT FROM NEW.fresh_config_sha256
+            OR e.fresh_wal_inventory_sha256 IS DISTINCT FROM NEW.fresh_wal_inventory_sha256)
+    ) THEN
+        RAISE EXCEPTION 'shared successor container has conflicting runtime evidence'
+            USING ERRCODE='23514';
+    END IF;
     RETURN NEW;
 END
-$$;
+$;
 
 CREATE TRIGGER quota_v2_successor_fresh_meter_bound
 BEFORE INSERT ON quota_v2_calendar_successor_meter_preflights
