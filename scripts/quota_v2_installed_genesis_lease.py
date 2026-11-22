@@ -331,6 +331,12 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         cap=json.loads(grant)
         independent_signature(root,f"cap-{guest.node}",cap,CAP_DOMAIN)
         assert cap["payload"]["sharedCeilingBytes"]==lease["ceilingBytes"]
+        # The real signed outbox fetch must preserve the independently
+        # classified CDN authority: MAIN has zero, CDN-only has exactly
+        # its own fully reserved ceiling, never an unbounded cap.
+        expected_cdn = lease["ceilingBytes"] if tags[len(cap_jobs)]=="vless-cdn" else 0
+        assert cap["payload"]["cdnCeilingBytes"]==expected_cdn
+        assert cap["payload"]["nodeCeilingBytes"]==lease["ceilingBytes"]
         assert cap["payload"]["runtimeId"]==runtime
         assert db.execute("SELECT signed_envelope FROM quota_v2_signed_first_cap_outbox "
                           "WHERE node_id=%s AND request_challenge=%s",
