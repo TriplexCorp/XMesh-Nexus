@@ -21,6 +21,7 @@ on:
       - 'backend/migrations/0155_quota_v2_calendar_closures.sql'
       - 'backend/migrations/0156_quota_v2_wal_stream_owners.sql'
       - 'backend/migrations/0157_quota_v2_calendar_successor_zero_authority.sql'
+      - 'backend/migrations/0158_quota_v2_calendar_closed_settlement_guard.sql'
       - 'scripts/test-quota-v2-calendar-successor-postgres.py'
       - 'scripts/test-quota-v2-node-calendar-postgres.py'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
@@ -124,6 +125,7 @@ jobs:
                   "backend/migrations/0155_quota_v2_calendar_closures.sql",
                   "backend/migrations/0156_quota_v2_wal_stream_owners.sql",
                   "backend/migrations/0157_quota_v2_calendar_successor_zero_authority.sql",
+                  "backend/migrations/0158_quota_v2_calendar_closed_settlement_guard.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
