@@ -179,6 +179,10 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
         row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     }
     let row = row.ok_or_else(deny)?;
+    let reservation: String = row.try_get("reservation")?;
+    crate::quota_v2_cdn_lifetime::verify_class(
+        &mut tx, req.user_id, req.node_id, &reservation, inbound_class,
+    ).await?;
     let install: i64 = row.try_get("install_before_ms")?;
     let expires: i64 = row.try_get("valid_until_ms")?;
     // The outbox/lease reads can wait behind a writer. The signed
@@ -422,6 +426,16 @@ async fn issue_original(
     measurement: &Measurement,
 ) -> Result<(), ApiError> {
     let lease = lock_first_lease(conn, req, epoch, activation, measurement).await?;
+    let inbound_class = if scope.aliases.iter().all(|a| a.class == "cdn") {
+        "cdn"
+    } else if scope.aliases.iter().all(|a| a.class == "main") {
+        "main"
+    } else {
+        "mixed"
+    };
+    crate::quota_v2_cdn_lifetime::verify_class(
+        conn, req.user_id, req.node_id, &lease.reservation, inbound_class,
+    ).await?;
     let preflight = sqlx::query_as::<_, Preflight>(
         "SELECT account_limit_bytes,account_floor_bytes,all_node_held_bytes,
                 (EXTRACT(EPOCH FROM expires_at)*1000)::bigint AS expires_ms
