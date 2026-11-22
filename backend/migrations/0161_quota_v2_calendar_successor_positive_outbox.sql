@@ -86,6 +86,20 @@ BEGIN
        lease.acknowledged_bytes<>0 OR
        lease.conservative_burn_floor_bytes<>0 OR
        NOT lease.node_confirmed OR
+       -- A calendar successor must be bounded by an actually installed
+       -- NEW Node/CDN period; a forged unbound lifetime lease cannot
+       -- circumvent the old observed calendar closure.
+       NOT EXISTS (
+           SELECT 1 FROM quota_v2_calendar_bindings b
+           WHERE b.reservation_id=NEW.reservation_id
+             AND b.calendar_window @> clock_timestamp()
+       ) OR
+       EXISTS (
+           SELECT 1 FROM quota_v2_calendar_bindings b
+           WHERE b.reservation_id=NEW.reservation_id
+             AND NEW.valid_until_ms >
+                 (EXTRACT(EPOCH FROM upper(b.calendar_window))*1000)::BIGINT
+       ) OR
        (EXTRACT(EPOCH FROM lease.valid_until)*1000)::BIGINT < NEW.valid_until_ms OR
        NEW.valid_until_ms > (EXTRACT(EPOCH FROM lease.valid_until)*1000)::BIGINT OR
        NEW.install_before_ms<= (EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT OR
