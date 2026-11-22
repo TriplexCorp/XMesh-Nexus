@@ -92,3 +92,32 @@ relabeling charges. A future separate protocol must:
 
 Keep PRs draft, `main` and production untouched, and
 `XMESH_QUOTA_V2_ENABLED=0`. No staging record is permission to enable.
+
+## Source-pinned fresh process zero-meter probe (Node #170)
+
+The Node draft now has a read-only `/v1/zero-meter` action on the
+existing source-pinned, same-UID Unix control socket. The Agent checks
+the Nexus-signed zero-spend predecessor preparation, fully acknowledged
+old WAL close, a DIFFERENT Docker/kernel runtime and a separate private
+WAL root. The new Xray independently checks its exact runtime ID,
+empty birth inventory, absence of any prior sessions, signed caps,
+meter intents or nonzero StatsService user counters; it echoes the
+complete MAIN/CDN alias roster and returns only explicit zero-spend
+flags. A raw counter registered at zero by Xray configuration is
+permitted; any nonzero user counter is refused.
+
+The Agent rechecks the process and WAL root after IPC and stores a
+root-private `calendar-meter-*.json` proof. With
+`XMESH_QUOTA_V2_FRESH_METER_STAGING=1` and explicit measured successor
+socket/executable/config pins, the existing renewal worker may
+automatically perform this additional **non-authorizing** stage after
+the old signed WAL close. The default installed service does not
+enable that staging flag or launch a second Xray. The marker cannot
+create `quota_v2_reservations` or an Ed25519 positive-cap outbox.
+
+The Node/Agent same-host proof is **not authenticated by PostgreSQL**
+and cannot be trusted as a cryptographic independent runtime
+attestation, particularly after root compromise. Migration 0160 remains
+a closed, non-spending SQL staging table, not an active API endpoint.
+Newly added regression coverage is staged; GitHub Actions runners must
+actually execute all checks before claiming successful acceptance.
