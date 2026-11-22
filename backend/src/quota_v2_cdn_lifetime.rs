@@ -41,9 +41,8 @@ pub fn limit(user: &Value) -> Result<Option<i64>, ApiError> {
 /// network request or a hard-coded VLESS inbound tag.
 pub fn supported(user: &Value, class: &str) -> bool {
     matches!(class, "main" | "cdn" | "mixed" | "unclassified")
-        && limit(user).is_ok_and(|quota| {
-            quota.is_none() || matches!(class, "main" | "cdn" | "mixed")
-        })
+        && limit(user)
+            .is_ok_and(|quota| quota.is_none() || matches!(class, "main" | "cdn" | "mixed"))
 }
 
 /// Record every reservation's original signed classification even if the
@@ -56,10 +55,7 @@ pub async fn record_class(
     reservation: &str,
     class: &str,
 ) -> Result<(), ApiError> {
-    if user_id <= 0
-        || node_id <= 0
-        || !matches!(class, "main" | "cdn" | "mixed" | "unclassified")
-    {
+    if user_id <= 0 || node_id <= 0 || !matches!(class, "main" | "cdn" | "mixed" | "unclassified") {
         return Err(deny());
     }
     // An old reservation without a class could already have spent or held
@@ -128,12 +124,11 @@ pub async fn verify_class(
 /// aggregate input is read only from the existing authoritative server
 /// telemetry ledger, NOT from the claimed node counters or client policy.
 async fn legacy_cdn_usage(conn: &mut PgConnection, user_id: i64) -> Result<i64, ApiError> {
-    let settings: Value = sqlx::query_scalar(
-        "SELECT value FROM app_settings WHERE key='panel' FOR SHARE",
-    )
-    .fetch_optional(&mut *conn)
-    .await?
-    .unwrap_or_else(|| json!({}));
+    let settings: Value =
+        sqlx::query_scalar("SELECT value FROM app_settings WHERE key='panel' FOR SHARE")
+            .fetch_optional(&mut *conn)
+            .await?
+            .unwrap_or_else(|| json!({}));
     if cdn_quota::reset_period(&settings)? != "lifetime" {
         return Err(deny());
     }
@@ -212,7 +207,8 @@ pub async fn headroom(
     .fetch_one(&mut *conn)
     .await?;
     Ok(Some(
-        limit.saturating_sub(anchor.max(observed))
+        limit
+            .saturating_sub(anchor.max(observed))
             .saturating_sub(issued)
             .max(0),
     ))
@@ -412,8 +408,11 @@ fn next_mixed_cdn_refill(
     witnessed_cdn: i64,
     next_shared: i64,
 ) -> Option<i64> {
-    if free < 0 || first_window <= 0 || previous_cdn < 0
-        || witnessed_cdn < 0 || witnessed_cdn > previous_cdn
+    if free < 0
+        || first_window <= 0
+        || previous_cdn < 0
+        || witnessed_cdn < 0
+        || witnessed_cdn > previous_cdn
         || next_shared < previous_cdn
     {
         return None;
@@ -429,8 +428,11 @@ fn next_mixed_cdn_refill(
     if previous_cdn == 0 || remaining > active_window / 2 {
         return Some(0);
     }
-    Some(free.min(first_window.saturating_sub(remaining))
-        .min(next_shared.saturating_sub(previous_cdn)).max(0))
+    Some(
+        free.min(first_window.saturating_sub(remaining))
+            .min(next_shared.saturating_sub(previous_cdn))
+            .max(0),
+    )
 }
 
 /// Fund another CDN class window only from the independently uncommitted
@@ -452,11 +454,17 @@ pub async fn renew_mixed_cdn(
     next_shared: i64,
     first_window: i64,
 ) -> Result<i64, ApiError> {
-    if revision <= 1 || nonce.len() != 64
-        || !nonce.bytes().all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase())
-        || first_window <= 0 || first_window > 64 * 1024 * 1024
-        || previous_cdn < 0 || previous_cdn < committed_cdn_wal
-        || next_shared < previous_cdn || next_shared <= 0
+    if revision <= 1
+        || nonce.len() != 64
+        || !nonce
+            .bytes()
+            .all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase())
+        || first_window <= 0
+        || first_window > 64 * 1024 * 1024
+        || previous_cdn < 0
+        || previous_cdn < committed_cdn_wal
+        || next_shared < previous_cdn
+        || next_shared <= 0
     {
         return Err(deny());
     }
@@ -479,8 +487,13 @@ pub async fn renew_mixed_cdn(
         return Err(deny());
     }
     let refill = next_mixed_cdn_refill(
-        free, first_window, previous_cdn, committed_cdn_wal, next_shared,
-    ).ok_or_else(deny)?;
+        free,
+        first_window,
+        previous_cdn,
+        committed_cdn_wal,
+        next_shared,
+    )
+    .ok_or_else(deny)?;
     if refill == 0 {
         return Ok(previous_cdn);
     }
@@ -570,7 +583,10 @@ mod tests {
         // Two historic 700-byte CDN windows do not let a full third
         // window grow merely because 700 bytes were spent long ago.
         assert_eq!(next_mixed_cdn_refill(400, 700, 1_400, 700, 2_000), Some(0));
-        assert_eq!(next_mixed_cdn_refill(400, 700, 1_400, 1_050, 2_000), Some(350));
+        assert_eq!(
+            next_mixed_cdn_refill(400, 700, 1_400, 1_050, 2_000),
+            Some(350)
+        );
 
         assert_eq!(next_mixed_cdn_refill(-1, 700, 400, 100, 1_200), None);
         assert_eq!(next_mixed_cdn_refill(100, 700, 400, 401, 1_200), None);
@@ -580,13 +596,13 @@ mod tests {
     #[test]
     fn lifetime_cdn_supported_only_in_classified_safe_scope() {
         let user = json!({"cdnLimitGb":0.000_716_8});
-        assert_eq!(limit(&user).unwrap(),Some(716_800));
+        assert_eq!(limit(&user).unwrap(), Some(716_800));
         assert!(supported(&user, "main"));
         assert!(supported(&user, "cdn"));
         assert!(supported(&user, "mixed"));
         assert!(!supported(&user, "unclassified"));
         assert!(supported(&json!({"cdnLimitGb":0}), "mixed"));
-        for bad in [json!(null),json!(-1),json!("1"),json!(1_000_001)] {
+        for bad in [json!(null), json!(-1), json!("1"), json!(1_000_001)] {
             assert!(limit(&json!({"cdnLimitGb":bad})).is_err());
         }
     }

@@ -2489,7 +2489,7 @@ mod first_genesis_rehearsal_limit_tests {
                 false
             ));
         }
-        for cap in [json!(0.000_000_001),json!(1)] {
+        for cap in [json!(0.000_000_001), json!(1)] {
             let limited = json!({"limit":2,"cdnLimitGb":cap});
             assert!(supported(&limited, 47, true));
             // A positive CDN cap is admitted only after the real signed
@@ -2498,7 +2498,7 @@ mod first_genesis_rehearsal_limit_tests {
             assert!(!crate::quota_v2_cdn_lifetime::supported(&limited, "mixed"));
             assert!(supported(&limited, 47, false));
         }
-        for cap in [json!("1"),json!(null),json!(-1)] {
+        for cap in [json!("1"), json!(null), json!(-1)] {
             let limited = json!({"limit":2,"cdnLimitGb":cap});
             assert!(!supported(&limited, 47, true));
         }

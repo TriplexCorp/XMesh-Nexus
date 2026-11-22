@@ -182,27 +182,27 @@ mod tests {
             "47":{"limitGb":5,"period":"lifetime"},
             "48":{"limitGb":1,"period":"daily"}
         }});
-        assert_eq!(lifetime_rule(&user,47).unwrap(),Some(5_000_000_000));
-        assert_eq!(lifetime_rule(&user,49).unwrap(),None);
-        assert!(lifetime_rule(&user,48).is_err());
+        assert_eq!(lifetime_rule(&user, 47).unwrap(), Some(5_000_000_000));
+        assert_eq!(lifetime_rule(&user, 49).unwrap(), None);
+        assert!(lifetime_rule(&user, 48).is_err());
         for bad in [
             json!({"nodeTrafficLimits":{"47":{"period":"lifetime","limitGb":0}}}),
             json!({"nodeTrafficLimits":{"47":{"period":"weekly","limitGb":1}}}),
             json!({"nodeTrafficLimits":[]}),
         ] {
-            assert!(lifetime_rule(&bad,47).is_err());
+            assert!(lifetime_rule(&bad, 47).is_err());
         }
     }
 
     #[test]
     fn historic_issuance_never_refills_on_remote_loss_or_period_boundary() {
-        assert_eq!(remaining(5_000,0,0),5_000);
-        assert_eq!(remaining(5_000,1_000,3_000),1_000);
-        assert_eq!(remaining(5_000,1_000,4_000),0);
-        assert_eq!(remaining(5_000,1_000,7_000),0);
-        assert_eq!(remaining(5_000,0,5_000),0);
-        assert_eq!(remaining(5_000,4_999,0),1);
+        assert_eq!(remaining(5_000, 0, 0), 5_000);
+        assert_eq!(remaining(5_000, 1_000, 3_000), 1_000);
+        assert_eq!(remaining(5_000, 1_000, 4_000), 0);
+        assert_eq!(remaining(5_000, 1_000, 7_000), 0);
+        assert_eq!(remaining(5_000, 0, 5_000), 0);
+        assert_eq!(remaining(5_000, 4_999, 0), 1);
         // Any newly reported V1 usage only raises the baseline.
-        assert_eq!(remaining(5_000,1_000.max(3_000),2_000),0);
+        assert_eq!(remaining(5_000, 1_000.max(3_000), 2_000), 0);
     }
 }

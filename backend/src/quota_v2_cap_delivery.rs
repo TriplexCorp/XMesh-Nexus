@@ -142,8 +142,11 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
         "mixed"
     };
     if !crate::node_runtime::first_genesis_rehearsal_limits_supported(
-        &current_user, req.node_id, has_cdn,
-    ) || !crate::quota_v2_cdn_lifetime::supported(&current_user, inbound_class) {
+        &current_user,
+        req.node_id,
+        has_cdn,
+    ) || !crate::quota_v2_cdn_lifetime::supported(&current_user, inbound_class)
+    {
         return Err(deny());
     }
     // Account first, as in every reserve/settle/revoke writer.
@@ -166,25 +169,48 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     }
     check_conservation(&mut tx, req.user_id, &epoch, limit, floor).await?;
     if !crate::quota_v2_node_lifetime::issued_within_limit(
-        &mut tx, req.user_id, req.node_id, &current_user,
-    ).await? || !crate::quota_v2_cdn_lifetime::issued_within_limit(
-        &mut tx, req.user_id, &current_user, inbound_class,
-    ).await? {
+        &mut tx,
+        req.user_id,
+        req.node_id,
+        &current_user,
+    )
+    .await?
+        || !crate::quota_v2_cdn_lifetime::issued_within_limit(
+            &mut tx,
+            req.user_id,
+            &current_user,
+            inbound_class,
+        )
+        .await?
+    {
         return Err(deny());
     }
     let mut row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     if row.is_none() {
         let measurement = req.measurement.as_ref().ok_or_else(deny)?;
         issue_original(
-            &mut tx, state, req, &scope, &epoch, activation, measurement, &current_user,
-        ).await?;
+            &mut tx,
+            state,
+            req,
+            &scope,
+            &epoch,
+            activation,
+            measurement,
+            &current_user,
+        )
+        .await?;
         row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     }
     let row = row.ok_or_else(deny)?;
     let reservation: String = row.try_get("reservation")?;
     crate::quota_v2_cdn_lifetime::verify_class(
-        &mut tx, req.user_id, req.node_id, &reservation, inbound_class,
-    ).await?;
+        &mut tx,
+        req.user_id,
+        req.node_id,
+        &reservation,
+        inbound_class,
+    )
+    .await?;
     let install: i64 = row.try_get("install_before_ms")?;
     let expires: i64 = row.try_get("valid_until_ms")?;
     // The outbox/lease reads can wait behind a writer. The signed
@@ -200,12 +226,16 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
         return Err(deny());
     }
     let expected_cdn = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
-        &mut tx, &reservation, req.user_id, req.node_id,
-        &current_user, inbound_class, row.try_get("grant_bytes")?,
-    ).await?;
-    let exact = verified_outbox(
-        state, req, &scope, &epoch, activation, &row, expected_cdn,
-    )?;
+        &mut tx,
+        &reservation,
+        req.user_id,
+        req.node_id,
+        &current_user,
+        inbound_class,
+        row.try_get("grant_bytes")?,
+    )
+    .await?;
+    let exact = verified_outbox(state, req, &scope, &epoch, activation, &row, expected_cdn)?;
     tx.commit().await?;
     Ok(exact)
 }
@@ -313,9 +343,7 @@ async fn load_outbox(
 /// Re-delivery must compare the immutable SQL-backed CDN sub-cap, NOT
 /// infer that every CDN alias may spend the entire shared MAIN ceiling.
 fn signed_cdn_matches_sql(signed: &Value, expected_cdn: i64, shared: i64) -> bool {
-    expected_cdn >= 0
-        && expected_cdn <= shared
-        && signed.as_i64() == Some(expected_cdn)
+    expected_cdn >= 0 && expected_cdn <= shared && signed.as_i64() == Some(expected_cdn)
 }
 
 #[cfg(test)]
@@ -471,8 +499,13 @@ async fn issue_original(
         "mixed"
     };
     crate::quota_v2_cdn_lifetime::verify_class(
-        conn, req.user_id, req.node_id, &lease.reservation, inbound_class,
-    ).await?;
+        conn,
+        req.user_id,
+        req.node_id,
+        &lease.reservation,
+        inbound_class,
+    )
+    .await?;
     let preflight = sqlx::query_as::<_, Preflight>(
         "SELECT account_limit_bytes,account_floor_bytes,all_node_held_bytes,
                 (EXTRACT(EPOCH FROM expires_at)*1000)::bigint AS expires_ms
@@ -507,9 +540,15 @@ async fn issue_original(
         })
         .collect::<Vec<_>>();
     let cdn_ceiling = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
-        conn, &lease.reservation, req.user_id, req.node_id,
-        current_user, inbound_class, lease.ceiling,
-    ).await?;
+        conn,
+        &lease.reservation,
+        req.user_id,
+        req.node_id,
+        current_user,
+        inbound_class,
+        lease.ceiling,
+    )
+    .await?;
     let signed = sign_snapshot(
         &state.node_policy_signer,
         &SqlSnapshot {

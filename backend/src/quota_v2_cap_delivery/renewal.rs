@@ -198,8 +198,13 @@ pub(super) async fn issue(
         return Err(deny());
     }
     crate::quota_v2_cdn_lifetime::verify_class(
-        &mut tx, req.user_id, req.node_id, &fields.reservation_id, inbound_class,
-    ).await?;
+        &mut tx,
+        req.user_id,
+        req.node_id,
+        &fields.reservation_id,
+        inbound_class,
+    )
+    .await?;
     let (permit, is_renewal) = latest_permit(&mut tx, fields, &lease).await?;
     let payload = verified_payload(state, &permit, &lease, activation)?;
     let aliases: Vec<Alias> = scope
@@ -224,28 +229,44 @@ pub(super) async fn issue(
     }
     let usage = usage_floor(&mut tx, req.user_id, &user).await?;
     let free = available(&mut tx, req.user_id, &epoch, limit, floor.max(usage)).await?;
-    if free < 0 || !crate::quota_v2_node_lifetime::issued_within_limit(
-        &mut tx, req.user_id, req.node_id, &user,
-    ).await? || !crate::quota_v2_cdn_lifetime::issued_within_limit(
-        &mut tx, req.user_id, &user, inbound_class,
-    ).await? {
+    if free < 0
+        || !crate::quota_v2_node_lifetime::issued_within_limit(
+            &mut tx,
+            req.user_id,
+            req.node_id,
+            &user,
+        )
+        .await?
+        || !crate::quota_v2_cdn_lifetime::issued_within_limit(
+            &mut tx,
+            req.user_id,
+            &user,
+            inbound_class,
+        )
+        .await?
+    {
         return Err(deny());
     }
     // Independently prove the exact CDN sub-ceiling already signed for
     // this immutable reservation. For mixed capped Nodes this is the
     // original prefunded hold, NOT the growing shared MAIN ceiling.
     let issued_cdn = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
-        &mut tx, &fields.reservation_id, req.user_id, req.node_id,
-        &user, inbound_class, lease.ceiling,
-    ).await?;
+        &mut tx,
+        &fields.reservation_id,
+        req.user_id,
+        req.node_id,
+        &user,
+        inbound_class,
+        lease.ceiling,
+    )
+    .await?;
     if payload["cdnCeilingBytes"].as_i64() != Some(issued_cdn) {
         return Err(deny());
     }
-    let fixed_mixed_cdn = inbound_class == "mixed"
-        && crate::quota_v2_cdn_lifetime::limit(&user)?.is_some();
-    let node_free = crate::quota_v2_node_lifetime::headroom(
-        &mut tx, req.user_id, req.node_id, &user,
-    ).await?;
+    let fixed_mixed_cdn =
+        inbound_class == "mixed" && crate::quota_v2_cdn_lifetime::limit(&user)?.is_some();
+    let node_free =
+        crate::quota_v2_node_lifetime::headroom(&mut tx, req.user_id, req.node_id, &user).await?;
     let cdn_free = if inbound_class == "cdn" {
         crate::quota_v2_cdn_lifetime::headroom(&mut tx, req.user_id, &user).await?
     } else {
@@ -269,8 +290,19 @@ pub(super) async fn issue(
         return Err(deny());
     }
     let signed = extend(
-        &mut tx, state, req, fields, &lease, payload, free, now, expires,
-        limit, &user, inbound_class, fixed_mixed_cdn,
+        &mut tx,
+        state,
+        req,
+        fields,
+        &lease,
+        payload,
+        free,
+        now,
+        expires,
+        limit,
+        &user,
+        inbound_class,
+        fixed_mixed_cdn,
     )
     .await?;
     tx.commit().await?;
@@ -308,7 +340,8 @@ fn has_authorized_revision_delta(
     next_cdn: i64,
     funded_mixed: bool,
 ) -> bool {
-    shared_add >= 0 && next_cdn >= previous_cdn
+    shared_add >= 0
+        && next_cdn >= previous_cdn
         && (shared_add > 0 || (funded_mixed && next_cdn > previous_cdn))
 }
 
@@ -406,10 +439,19 @@ async fn extend(
         // one per-user/account transaction. This append-only top-up must
         // commit together with this exact Ed25519-signed revision response.
         crate::quota_v2_cdn_lifetime::renew_mixed_cdn(
-            conn, req.user_id, req.node_id, user, &fields.reservation_id,
-            revision, &req.challenge, old_cdn, cdn, ceiling,
+            conn,
+            req.user_id,
+            req.node_id,
+            user,
+            &fields.reservation_id,
+            revision,
+            &req.challenge,
+            old_cdn,
+            cdn,
+            ceiling,
             lease.first_ceiling,
-        ).await?
+        )
+        .await?
     } else {
         next_cdn_ceiling(inbound_class, false, old_cdn, ceiling).ok_or_else(deny)?
     };

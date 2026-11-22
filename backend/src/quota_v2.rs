@@ -1442,26 +1442,42 @@ pub async fn issue_user(
     .fetch_optional(&mut *conn)
     .await?;
     crate::quota_v2_cdn_lifetime::require_fundable_mixed(
-        conn, user_id, node_id, user, &reservation, inbound_class,
-    ).await?;
+        conn,
+        user_id,
+        node_id,
+        user,
+        &reservation,
+        inbound_class,
+    )
+    .await?;
     // Keep the old outstanding amount plus ONLY the independently
     // unallocated per-Node lifetime headroom. A shared account reservation
     // must never exceed a configured Node's own remaining lifetime budget.
     // A missing node-specific rule leaves the existing global limit intact.
     let node_target = crate::quota_v2_node_lifetime::bounded_target(
-        conn, user_id, node_id, user, &reservation, target,
-    ).await?;
+        conn,
+        user_id,
+        node_id,
+        user,
+        &reservation,
+        target,
+    )
+    .await?;
     let bounded_target = crate::quota_v2_cdn_lifetime::bounded_target(
-        conn, user_id, node_id, user, &reservation, node_target, inbound_class,
-    ).await?;
+        conn,
+        user_id,
+        node_id,
+        user,
+        &reservation,
+        node_target,
+        inbound_class,
+    )
+    .await?;
     // A mixed MAIN/CDN Node draws a finite CDN sub-ceiling from its own
     // lifetime pool, independently of its MAIN/shared grant. Snapshot this
     // headroom BEFORE quota_v2_reserve increases the shared SQL ceiling.
     // The same user-account lock serializes all competing CDN Nodes.
-    let mixed_cdn_free_before = if inbound_class == "mixed"
-        && confirmed
-        && revoke_id.is_none()
-    {
+    let mixed_cdn_free_before = if inbound_class == "mixed" && confirmed && revoke_id.is_none() {
         crate::quota_v2_cdn_lifetime::headroom(conn, user_id, user).await?
     } else {
         None
@@ -1493,14 +1509,19 @@ pub async fn issue_user(
     .map_err(|_| conflict())?;
     // A fresh zero-grant prepare also freezes authoritative class identity.
     // No later quota edit may silently relabel committed CDN as MAIN.
-    crate::quota_v2_cdn_lifetime::record_class(
-        conn, user_id, node_id, &reservation, inbound_class,
-    ).await?;
+    crate::quota_v2_cdn_lifetime::record_class(conn, user_id, node_id, &reservation, inbound_class)
+        .await?;
     if confirmed && revoke_id.is_none() {
         crate::quota_v2_cdn_lifetime::fund_mixed(
-            conn, user_id, node_id, user, &reservation,
-            inbound_class, mixed_cdn_free_before,
-        ).await?;
+            conn,
+            user_id,
+            node_id,
+            user,
+            &reservation,
+            inbound_class,
+            mixed_cdn_free_before,
+        )
+        .await?;
     }
 
     user["quotaReservation"] = json!({
@@ -1592,14 +1613,8 @@ mod unlimited_shared_account_tests {
             policy_shared_limit(&signed, "main").unwrap(),
             Some(i64::MAX),
         );
-        assert_eq!(
-            policy_shared_limit(&signed, "cdn").unwrap(),
-            Some(i64::MAX),
-        );
-        assert_eq!(
-            policy_shared_limit(&signed, "unclassified").unwrap(),
-            None,
-        );
+        assert_eq!(policy_shared_limit(&signed, "cdn").unwrap(), Some(i64::MAX),);
+        assert_eq!(policy_shared_limit(&signed, "unclassified").unwrap(), None,);
         // A signed mixed scope is permitted only with an independently
         // prefunded immutable CDN hold (checked in the SQL issuer).
         assert_eq!(
