@@ -16,10 +16,10 @@ CREATE TABLE quota_v2_calendar_successor_meter_preflights (
     candidate_reservation_id UUID NOT NULL UNIQUE,
     -- Separate FROM the old running process and every previously signed
     -- first-genesis Xray runtime. A mere new account epoch is insufficient.
-    fresh_runtime_id TEXT NOT NULL UNIQUE
+    fresh_runtime_id TEXT NOT NULL
         CHECK (fresh_runtime_id ~ '^[0-9a-f]{64}$'
                AND fresh_runtime_id <> repeat('0',64)),
-    fresh_container_id TEXT NOT NULL UNIQUE
+    fresh_container_id TEXT NOT NULL
         CHECK (fresh_container_id ~ '^[0-9a-f]{64}$'
                AND fresh_container_id <> repeat('0',64)),
     fresh_started_at TIMESTAMPTZ NOT NULL,
@@ -50,6 +50,11 @@ CREATE TABLE quota_v2_calendar_successor_meter_preflights (
     refundable_bytes BIGINT NOT NULL DEFAULT 0
         CHECK (refundable_bytes = 0),
     recorded_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    -- A single clean Xray can host many users in the SAME successor cohort.
+    -- Prohibit *one account* silently recycling its runtime across multiple
+    -- old reservations without making multiuser startup impossible.
+    UNIQUE(node_id,user_id,fresh_runtime_id),
+    UNIQUE(node_id,user_id,fresh_container_id),
     CHECK (candidate_meter_epoch <> candidate_reservation_id)
 );
 
