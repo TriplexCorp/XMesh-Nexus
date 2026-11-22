@@ -124,7 +124,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END
-$;
+$$;
 
 CREATE TRIGGER quota_v2_successor_fresh_meter_bound
 BEFORE INSERT ON quota_v2_calendar_successor_meter_preflights
