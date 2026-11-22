@@ -1364,6 +1364,7 @@ pub async fn issue_user(
     node_id: i64,
     local_record: Option<&LocalQuotaCounter>,
     now_ms: i64,
+    inbound_class: &str,
 ) -> Result<(), ApiError> {
     let limit = user
         .get("limitBytes")
@@ -1409,8 +1410,11 @@ pub async fn issue_user(
     // unallocated per-Node lifetime headroom. A shared account reservation
     // must never exceed a configured Node's own remaining lifetime budget.
     // A missing node-specific rule leaves the existing global limit intact.
-    let bounded_target = crate::quota_v2_node_lifetime::bounded_target(
+    let node_target = crate::quota_v2_node_lifetime::bounded_target(
         conn, user_id, node_id, user, &reservation, target,
+    ).await?;
+    let bounded_target = crate::quota_v2_cdn_lifetime::bounded_target(
+        conn, user_id, node_id, user, &reservation, node_target, inbound_class,
     ).await?;
     let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
     let lease = sqlx::query(
@@ -1437,6 +1441,11 @@ pub async fn issue_user(
     .fetch_one(&mut *conn)
     .await
     .map_err(|_| conflict())?;
+    // A fresh zero-grant prepare also freezes authoritative class identity.
+    // No later quota edit may silently relabel committed CDN as MAIN.
+    crate::quota_v2_cdn_lifetime::record_class(
+        conn, user_id, node_id, &reservation, inbound_class,
+    ).await?;
 
     user["quotaReservation"] = json!({
         "epoch": epoch,
@@ -1485,6 +1494,7 @@ pub async fn issue(
             node_id,
             reported.get(&id).copied(),
             now_ms,
+            "unclassified",
         )
         .await?;
     }
