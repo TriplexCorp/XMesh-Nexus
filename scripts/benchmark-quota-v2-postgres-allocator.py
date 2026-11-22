@@ -53,11 +53,12 @@ def run_case(size, first):
     # test is silently reused. SQL serializes the two competing writers.
     users = list(range(first, first+size))
     with psycopg.connect(DSN) as connection:
-        connection.executemany(
-            "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes) "
-            "VALUES(%s,%s,%s)",
-            [(u,identity(u,0,"epoch"),TOTAL) for u in users],
-        )
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes) "
+                "VALUES(%s,%s,%s)",
+                [(u,identity(u,0,"epoch"),TOTAL) for u in users],
+            )
     jobs=[]
     for user in users:
         for node in (71,72):
