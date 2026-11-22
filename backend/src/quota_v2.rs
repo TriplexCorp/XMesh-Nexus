@@ -1083,6 +1083,48 @@ fn validate_local(
     Ok(reported)
 }
 
+/// Quota V2 always issues finite Xray windows; i64::MAX means that
+/// PostgreSQL must not impose a global traffic budget on an otherwise
+/// unlimited subscriber. Independent Node and CDN budgets remain binding.
+/// This sentinel must NEVER be copied into an Xray signed byte ceiling.
+pub fn authoritative_shared_limit(user: &Value) -> Result<i64, ApiError> {
+    let gb = user
+        .get("limit")
+        .and_then(Value::as_f64)
+        .ok_or_else(conflict)?;
+    if !gb.is_finite() || gb < 0.0 || gb > 1_000_000.0 {
+        return Err(conflict());
+    }
+    if gb == 0.0 {
+        return Ok(i64::MAX);
+    }
+    let bytes = crate::gb_to_bytes_i64(gb);
+    if bytes <= 0 || bytes == i64::MAX {
+        return Err(conflict());
+    }
+    Ok(bytes)
+}
+
+/// The signed preview's zero global limit is an explicit unlimited
+/// subscriber, NOT an authorization to install an unbounded Xray cap.
+/// Unknown/unclassified Node policy paths retain their V1 behavior.
+fn policy_shared_limit(user: &Value, inbound_class: &str) -> Result<Option<i64>, ApiError> {
+    let raw = user
+        .get("limitBytes")
+        .and_then(Value::as_i64)
+        .ok_or_else(conflict)?;
+    if raw > 0 {
+        return Ok(Some(raw));
+    }
+    if raw == 0 && matches!(inbound_class, "main" | "cdn") {
+        return Ok(Some(i64::MAX));
+    }
+    if raw == 0 && inbound_class == "unclassified" {
+        return Ok(None);
+    }
+    Err(conflict())
+}
+
 async fn ensure_account(
     conn: &mut sqlx::PgConnection,
     user_id: i64,
@@ -1103,10 +1145,7 @@ async fn ensure_account(
     .fetch_optional(&mut *conn)
     .await?
     .ok_or_else(conflict)?;
-    let current_limit = current_user
-        .get("limit")
-        .and_then(Value::as_f64)
-        .unwrap_or(0.0);
+    let authoritative_limit = authoritative_shared_limit(&current_user)?;
     let base_used_gb = current_user
         .get("used")
         .and_then(Value::as_f64)
@@ -1123,7 +1162,7 @@ async fn ensure_account(
     .fetch_one(&mut *conn)
     .await?;
     let expected_used = crate::gb_to_bytes_i64(base_used_gb).saturating_add(measured_bytes.max(0));
-    if crate::gb_to_bytes_i64(current_limit) != limit || panel_used.abs_diff(expected_used) > 1 {
+    if authoritative_limit != limit || panel_used.abs_diff(expected_used) > 1 {
         return Err(conflict());
     }
 
@@ -1366,15 +1405,11 @@ pub async fn issue_user(
     now_ms: i64,
     inbound_class: &str,
 ) -> Result<(), ApiError> {
-    let limit = user
-        .get("limitBytes")
-        .and_then(Value::as_i64)
-        .ok_or_else(conflict)?;
-    if limit <= 0 {
-        // Node-only and CDN quotas stay on their independent rule path.
-        // A global shared reservation is meaningful only for global limits.
+    let Some(limit) = policy_shared_limit(user, inbound_class)? else {
+        // The generic V1/unknown-inbound policy path cannot manufacture
+        // a positive unsigned V2 lease for an unlimited subscriber.
         return Ok(());
-    }
+    };
     let panel_used = user
         .get("panelUsedBytes")
         .and_then(Value::as_i64)
