@@ -39,6 +39,22 @@ fn expected_challenge(predecessor: &str) -> String {
     format!("{:x}", Sha256::digest(message.as_bytes()))
 }
 
+fn valid_archived_preparation_lifetime(payload: &Value, predecessor_end: i64, now: i64) -> bool {
+    let (Some(issued), Some(expires)) = (
+        payload["issuedAtMs"].as_i64(),
+        payload["validUntilMs"].as_i64(),
+    ) else {
+        return false;
+    };
+    // The prepared stage has ZERO spending authority. Its exact historical
+    // identity survives a lost reply even if the clock passes its deadline.
+    // A future positive grant still requires fresh, separate proof.
+    issued >= predecessor_end
+        && issued <= now
+        && expires > issued
+        && expires <= issued.saturating_add(120_000)
+}
+
 fn verified_saved(
     state: &AppState,
     raw: &[u8],
@@ -74,16 +90,7 @@ fn verified_saved(
         || p["meterEpoch"] == previous.meter_epoch
         || p["reservationId"] == previous.predecessor_id
         || p["reservationId"] == p["meterEpoch"]
-        || p["issuedAtMs"].as_i64().is_none_or(|t| t < previous.valid_until_ms || t > now)
-        // A ZERO-SPEND preparation is an immutable historical receipt.
-        // A lost XSP reply may be retried after the 120-second planning
-        // window. Verify exact issued/expiry bounds but do not turn its
-        // historical expiry into a permanent idempotency dead-end.
-        // Future positive Xray admission MUST require a separate fresh
-        // signed grant and independent WAL/runtime proof.
-        || p["validUntilMs"].as_i64().is_none_or(|t|
-            t <= p["issuedAtMs"].as_i64().unwrap_or_default()
-                || t > p["issuedAtMs"].as_i64().unwrap_or_default().saturating_add(120_000))
+        || !valid_archived_preparation_lifetime(p, previous.valid_until_ms, now)
     {
         return Err(deny());
     }
@@ -303,5 +310,25 @@ mod tests {
         assert!(!canonical_predecessor("11111111-1111-4111-8111-111111111111 "));
         assert_ne!(expected_challenge(original), expected_challenge(
             "22222222-2222-4222-8222-222222222222"));
+    }
+
+    #[test]
+    fn archived_zero_spend_receipt_replays_after_expiry_but_not_with_bad_window() {
+        // Its expiry is NOT a new Xray permission or an install window.
+        // Historical bytes replay after a lost COMMIT response, but no
+        // future-dated, pre-boundary or overlong preparation is accepted.
+        let valid = json!({"issuedAtMs":120_000,"validUntilMs":240_000});
+        assert!(valid_archived_preparation_lifetime(&valid, 119_999, 300_000));
+        assert!(!valid_archived_preparation_lifetime(&valid, 120_001, 300_000));
+        assert!(!valid_archived_preparation_lifetime(&valid, 119_999, 119_999));
+        for invalid in [
+            json!({"issuedAtMs":120_000,"validUntilMs":120_000}),
+            json!({"issuedAtMs":120_000,"validUntilMs":119_999}),
+            json!({"issuedAtMs":120_000,"validUntilMs":240_001}),
+            json!({"issuedAtMs":120_000.5,"validUntilMs":240_000}),
+            json!({"issuedAtMs":120_000,"validUntilMs":"240000"}),
+        ] {
+            assert!(!valid_archived_preparation_lifetime(&invalid, 119_999, 300_000));
+        }
     }
 }
