@@ -270,7 +270,7 @@ pub(super) async fn issue(
     }
     let signed = extend(
         &mut tx, state, req, fields, &lease, payload, free, now, expires,
-        limit, inbound_class, fixed_mixed_cdn,
+        limit, &user, inbound_class, fixed_mixed_cdn,
     )
     .await?;
     tx.commit().await?;
@@ -338,6 +338,7 @@ async fn extend(
     now: i64,
     expires: i64,
     limit: i64,
+    user: &Value,
     inbound_class: &str,
     fixed_mixed_cdn: bool,
 ) -> Result<String, ApiError> {
@@ -374,8 +375,18 @@ async fn extend(
     payload["sharedCeilingBytes"] = json!(ceiling);
     payload["nodeCeilingBytes"] = json!(ceiling);
     let old_cdn = payload["cdnCeilingBytes"].as_i64().ok_or_else(deny)?;
-    let next_cdn = next_cdn_ceiling(inbound_class, fixed_mixed_cdn, old_cdn, ceiling)
-        .ok_or_else(deny)?;
+    let next_cdn = if fixed_mixed_cdn {
+        // Exact signed cap, WAL and current pooled balance are checked under
+        // one per-user/account transaction. This append-only top-up must
+        // commit together with this exact Ed25519-signed revision response.
+        crate::quota_v2_cdn_lifetime::renew_mixed_cdn(
+            conn, req.user_id, req.node_id, user, &fields.reservation_id,
+            revision, &req.challenge, old_cdn, cdn, ceiling,
+            lease.first_ceiling,
+        ).await?
+    } else {
+        next_cdn_ceiling(inbound_class, false, old_cdn, ceiling).ok_or_else(deny)?
+    };
     payload["cdnCeilingBytes"] = json!(next_cdn);
     payload["issuedAtMs"] = json!(now);
     payload["installBeforeMs"] = json!(install);
