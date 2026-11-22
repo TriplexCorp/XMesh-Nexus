@@ -260,6 +260,10 @@ mod tests {
     fn canonical_predecessor_is_required_for_idempotent_challenge() {
         let original = "11111111-1111-4111-8111-111111111111";
         assert!(canonical_predecessor(original));
+        assert_eq!(
+            expected_challenge(original),
+            "f349433b9bd3422baecb87c6b2ef6003a9e9f16650428b8783e5e3a7a79c64da"
+        );
         assert!(!canonical_predecessor("11111111-1111-4111-8111-11111111111Z"));
         assert!(!canonical_predecessor("11111111-1111-4111-8111-111111111111 "));
         assert_ne!(expected_challenge(original), expected_challenge(
