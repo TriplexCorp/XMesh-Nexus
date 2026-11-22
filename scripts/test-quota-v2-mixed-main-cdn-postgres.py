@@ -367,7 +367,7 @@ def main():
                      87420,13,"e"*64,5_000_000,
                      MIXED_REQUEST+topup_bytes+999))
             )
-    except psycopg.CheckViolation:
+    except psycopg.errors.CheckViolation:
         pass
     else:
         raise AssertionError("signed CDN ceiling mismatch committed")
@@ -391,7 +391,7 @@ def main():
                 (identity(87420,"reservation"),USER,
                  MIXED_REQUEST+topup_bytes+1000,"d"*64),
             )
-    except psycopg.ForeignKeyViolation:
+    except psycopg.errors.ForeignKeyViolation:
         pass
     else:
         raise AssertionError("CDN class hold was transferred to another Node")
