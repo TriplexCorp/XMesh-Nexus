@@ -419,6 +419,15 @@ fn next_mixed_cdn_refill(
         return None;
     }
     let remaining = previous_cdn.checked_sub(witnessed_cdn)?;
+    // A MAIN-only refill, with no attested CDN consumption, must never
+    // silently pre-allocate additional CDN capacity. A new class window
+    // is justified only after at least half of the ORIGINAL signed CDN
+    // allotment has been independently accounted by fsynced WAL.
+    if previous_cdn == 0 || witnessed_cdn == 0
+        || witnessed_cdn < previous_cdn.saturating_sub(witnessed_cdn)
+    {
+        return Some(0);
+    }
     Some(free.min(first_window.saturating_sub(remaining))
         .min(next_shared.saturating_sub(previous_cdn)).max(0))
 }
@@ -552,7 +561,9 @@ mod tests {
         assert_eq!(next_mixed_cdn_refill(200, 700, 700, 0, 1_200), Some(0));
         assert_eq!(next_mixed_cdn_refill(200, 700, 700, 300, 1_200), Some(200));
         assert_eq!(next_mixed_cdn_refill(200, 700, 700, 500, 750), Some(50));
-        assert_eq!(next_mixed_cdn_refill(200, 700, 400, 0, 1_200), Some(200));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 400, 0, 1_200), Some(0));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 400, 100, 1_200), Some(0));
+        assert_eq!(next_mixed_cdn_refill(200, 700, 400, 200, 1_200), Some(200));
         assert_eq!(next_mixed_cdn_refill(-1, 700, 400, 100, 1_200), None);
         assert_eq!(next_mixed_cdn_refill(100, 700, 400, 401, 1_200), None);
         assert_eq!(next_mixed_cdn_refill(100, 700, 400, 300, 399), None);
