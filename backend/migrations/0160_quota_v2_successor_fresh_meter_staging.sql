@@ -60,14 +60,22 @@ DECLARE
     predecessor_meter UUID;
     closed_at TIMESTAMPTZ;
 BEGIN
-    SELECT p.*, r.meter_epoch, c.observed_at
-      INTO previous, predecessor_meter, closed_at
+    SELECT p INTO previous
       FROM quota_v2_calendar_successor_preparations p
       JOIN quota_v2_reservations r ON r.reservation_id=p.predecessor_id
       JOIN quota_v2_calendar_closures c ON c.reservation_id=p.predecessor_id
       WHERE p.predecessor_id=NEW.predecessor_id
       FOR SHARE OF p,r,c;
-    IF NOT FOUND
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'successor lacks a committed predecessor close'
+            USING ERRCODE='23514';
+    END IF;
+    SELECT r.meter_epoch, c.observed_at
+      INTO STRICT predecessor_meter, closed_at
+      FROM quota_v2_reservations r
+      JOIN quota_v2_calendar_closures c ON c.reservation_id=r.reservation_id
+      WHERE r.reservation_id=NEW.predecessor_id;
+    IF
        OR NEW.node_id IS DISTINCT FROM previous.node_id
        OR NEW.user_id IS DISTINCT FROM previous.user_id
        OR NEW.account_epoch IS DISTINCT FROM previous.account_epoch
