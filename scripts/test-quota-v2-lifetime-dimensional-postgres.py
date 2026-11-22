@@ -7,6 +7,8 @@ not replace) the installed Agent/Xray/VLESS end-to-end acceptance.
 """
 import concurrent.futures
 import os
+from pathlib import Path
+import re
 import unittest
 import uuid
 
@@ -107,6 +109,55 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
                 WHERE r.user_id=%s AND (s.class IS NULL OR s.class<>'main')
             """,(USER,)).fetchone()[0]
         self.assertEqual(total,1_100_000)
+
+    def test_later_v1_node_usage_blocks_signed_cap_redelivery(self):
+        # Execute the EXACT SQL embedded in production Rust rather than a
+        # hand-written approximation. The immutable baseline by itself is
+        # insufficient if verified V1 usage rises after first Genesis.
+        source = (Path(__file__).resolve().parents[1]
+                  / "backend/src/quota_v2_node_lifetime.rs").read_text()
+        match = re.search(
+            r'let committed: bool = sqlx::query_scalar\\(\\s*"([^"]+)"',
+            source, re.DOTALL)
+        self.assertIsNotNone(match, "production Node cap guard not found")
+        production_sql = match.group(1)
+        node = 84001
+        with psycopg.connect(DSN) as db:
+            # The older migration test's historical shadow contains only
+            # node_id, so add the signed lifetime telemetry columns here.
+            for name in ("user_id", "uplink_bytes", "downlink_bytes"):
+                db.execute(
+                    "ALTER TABLE user_node_quota_lifetime ADD COLUMN IF NOT EXISTS "
+                    + name + " bigint DEFAULT 0")
+            held = db.execute(
+                "SELECT ceiling_bytes FROM quota_v2_reservations "
+                "WHERE user_id=%s AND node_id=%s", (USER,node)
+            ).fetchone()[0]
+            db.execute(
+                "INSERT INTO quota_v2_node_lifetime_baselines "
+                "(user_id,node_id,baseline_bytes) VALUES (%s,%s,%s)",
+                (USER,node,100_000))
+            db.execute(
+                "INSERT INTO user_node_quota_lifetime "
+                "(user_id,node_id,uplink_bytes,downlink_bytes) VALUES (%s,%s,%s,%s)",
+                (USER,node,50_000,0))
+            db.execute(
+                "PREPARE xmesh_node_cap_guard(bigint,bigint,bigint) AS " + production_sql)
+            limit = held + 120_000
+            check = "EXECUTE xmesh_node_cap_guard(%s,%s,%s)"
+            self.assertTrue(db.execute(check,(USER,node,limit)).fetchone()[0])
+            # This valid newer V1 receipt makes baseline + held look safe,
+            # but effective V1 high-water + held exceeds the lifetime plan.
+            db.execute(
+                "UPDATE user_node_quota_lifetime SET uplink_bytes=%s "
+                "WHERE user_id=%s AND node_id=%s",(250_000,USER,node))
+            self.assertFalse(db.execute(check,(USER,node,limit)).fetchone()[0])
+            # Decreasing a reported V1 counter is not a recognized refund.
+            # At minimum the immutable historical floor must remain charged.
+            db.execute(
+                "UPDATE user_node_quota_lifetime SET uplink_bytes=%s "
+                "WHERE user_id=%s AND node_id=%s",(50_000,USER,node))
+            self.assertTrue(db.execute(check,(USER,node,limit)).fetchone()[0])
 
     def test_immutable_class_scope_and_baseline(self):
         with psycopg.connect(DSN) as db:
