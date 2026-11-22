@@ -7,6 +7,7 @@ real quota_v2_reserve SQL and the exact CDN liability SQL extracted from
 the Rust code. It does NOT replace an installed mixed-Xray/VLESS E2E test.
 """
 import concurrent.futures
+import json
 import os
 from pathlib import Path
 import re
@@ -31,6 +32,24 @@ CDN_REQUEST = 350_000
 
 def identity(node, field):
     return uuid.uuid5(uuid.NAMESPACE_URL, f"xmesh-mixed-sql-{USER}-{node}-{field}")
+
+
+def sql_only_signed_fixture(node, revision, nonce, shared, cdn):
+    """Structurally valid cap JSON for SQL consistency tests ONLY.
+
+    NOT Ed25519-signed and MUST NEVER be used as a Node entitlement.
+    Cryptographic sign/verify is separately checked in Nexus and Xray.
+    """
+    return (json.dumps({
+        "algorithm":"Ed25519", "signature":"disposable-sql-only-invalid-signature",
+        "payload":{
+            "kind":"xmesh.quota-v2.xray-cap-renewal",
+            "userId":USER, "nodeId":node,
+            "reservationId":str(identity(node,"reservation")),
+            "reservationRevision":revision, "nonce":nonce,
+            "sharedCeilingBytes":shared, "cdnCeilingBytes":cdn,
+        }
+    },separators=(",",":"))+"\\n").encode()
 
 
 def real_liability_sql():
@@ -240,7 +259,8 @@ def main():
         # The SQL fixture is deliberately NOT a cryptographic signature.
         # It proves the storage transaction; the Nexus Ed25519 signer and
         # actual Xray verification have separate integration tests.
-        exact_sql_fixture = b"disposable-signed-envelope-placeholder-" + b"x"*160
+        exact_sql_fixture = sql_only_signed_fixture(
+            87420,8,"f"*64,5_000_000,MIXED_REQUEST+topup_bytes)
         conn.execute(topup_sql)
         conn.execute(
             "INSERT INTO quota_v2_cap_renewals("
@@ -305,9 +325,11 @@ def main():
                         "reservation_id,revision,nonce,grant_bytes,signed_envelope) "
                         "VALUES(%s,%s,%s,5000000,%s)",
                         (identity(87420,"reservation"),revision,
-                         signed_nonce,b"x"*160),
+                         signed_nonce,sql_only_signed_fixture(
+                             87420,revision,signed_nonce,5_000_000,
+                             MIXED_REQUEST+topup_bytes+1000)),
                     )
-        except psycopg.ForeignKeyViolation:
+        except psycopg.IntegrityError:
             pass
         else:
             raise AssertionError("orphan or wrong-nonce CDN hold committed")
@@ -323,6 +345,39 @@ def main():
                 (identity(87420,"reservation"),revision),
             ).fetchone() == (0,)
             assert sql_liability(conn) == old_liability+topup_bytes
+
+    # A matching FK is NOT sufficient: even with the correct nonce, an
+    # internally contradictory signed CDN ceiling must fail at COMMIT.
+    try:
+        with psycopg.connect(DSN) as conn:
+            conn.execute(
+                "INSERT INTO quota_v2_mixed_cdn_topups("
+                "reservation_id,revision,user_id,node_id,added_bytes,"
+                "cumulative_cdn_ceiling_bytes,request_nonce) "
+                "VALUES(%s,13,%s,87420,1000,%s,%s)",
+                (identity(87420,"reservation"),USER,
+                 MIXED_REQUEST+topup_bytes+1000,"e"*64)
+            )
+            conn.execute(
+                "INSERT INTO quota_v2_cap_renewals("
+                "reservation_id,revision,nonce,grant_bytes,signed_envelope) "
+                "VALUES(%s,13,%s,5000000,%s)",
+                (identity(87420,"reservation"),"e"*64,
+                 sql_only_signed_fixture(
+                     87420,13,"e"*64,5_000_000,
+                     MIXED_REQUEST+topup_bytes+999))
+            )
+    except psycopg.CheckViolation:
+        pass
+    else:
+        raise AssertionError("signed CDN ceiling mismatch committed")
+    with psycopg.connect(DSN) as conn:
+        assert sql_liability(conn) == old_liability+topup_bytes
+        assert conn.execute(
+            "SELECT count(*) FROM quota_v2_mixed_cdn_topups "
+            "WHERE reservation_id=%s AND revision=13",
+            (identity(87420,"reservation"),)
+        ).fetchone() == (0,)
 
     # The composite FK also prevents shifting a previously signed CDN
     # reserve onto a different Node or user under the same reservation ID.
