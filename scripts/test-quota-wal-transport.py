@@ -3,6 +3,7 @@
 import base64
 import concurrent.futures
 import copy
+import gzip
 import hashlib
 import http.client
 import json
@@ -141,6 +142,9 @@ def read_head(response, node, challenge, panel_pub):
     data = expect(response, 200)
     blob = {name: base64.b64decode(data[name], validate=True)
             for name in ("head", "receipt", "witness", "inventory")}
+    if "inventoryEncoding" in data:
+        assert data["inventoryEncoding"] == "gzip"
+        blob["inventory"] = gzip.decompress(blob["inventory"])
     envelope = signed._decode(blob["head"])
     signed._envelope(envelope, "Nexus WAL head")
     head = envelope["payload"]
@@ -205,6 +209,31 @@ def check_index_capacity(db, panel_pub):
             "SELECT count(*) FROM quota_v2_external_wal_birth_anchors WHERE node_id=%s", (node,),
         ).fetchone() == (1,)
         print("PASS: valid 384 KiB inventory commits in full; signed extension over cap leaves the full prior head intact")
+        cp["inboundMeters"] = [
+            {"email": f"xmesh-u{400000+user}--vless-main", "uplinkBytes": 1, "downlinkBytes": 1}
+            for user in range(500)
+        ]
+        fixture.write_test_meter_intents(cp, fx.xray)
+        witness, large = checkpoint(fx, node)
+        assert large.startswith(oversized)
+        wire = gzip.compress(large, compresslevel=6, mtime=0)
+        assert len(wire) < cap < len(large)
+        request = dict(store(node, witness, wire), inventoryEncoding="gzip")
+        altered = dict(request, inventory=b64(wire[:-1]))
+        expect(signed_exchange(node, fx.key, altered), 400)
+        exact_hash = hashlib.sha256(large).hexdigest()
+        answer = expect(signed_exchange(node, fx.key, request), 200)
+        assert expect(signed_exchange(node, fx.key, request), 200) == answer
+        challenge = secrets.token_hex(32)
+        head, bundle = read_head(signed_exchange(node, fx.key, latest(node, challenge)),
+                                 node, challenge, panel_pub)
+        assert bundle["inventory"] == large and bundle["receipt"] == base64.b64decode(answer["receipt"])
+        assert db.execute(
+            "SELECT inventory_sha256,inventory_bytes FROM quota_v2_external_wal_birth_anchors "
+            "WHERE node_id=%s AND inventory_sequence=%s", (node, head["sequence"]),
+        ).fetchone() == (exact_hash, large)
+        print(f"PASS: 500 additional users' two-direction WAL births commit and replay intact "
+              f"({len(large)} raw bytes, {len(wire)} compressed)")
     finally:
         fx.doCleanups()
 

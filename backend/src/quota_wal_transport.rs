@@ -9,10 +9,12 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signature, VerifyingKey};
+use flate2::{Compression, bufread::GzDecoder, write::GzEncoder};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::PgConnection;
+use std::io::{Read, Write};
 
 mod charge;
 pub use charge::committed_charge_totals;
@@ -20,7 +22,8 @@ pub use charge::committed_charge_totals;
 pub const PATH: &str = "/api/v1/node/quota-v2/wal";
 const REQUEST_LIMIT: usize = 544 * 1024;
 // Leave room for the two Base64 layers and the XSP/2 envelope signatures.
-const INDEX_LIMIT: usize = 384 * 1024;
+const WIRE_INDEX_LIMIT: usize = 384 * 1024;
+const INDEX_LIMIT: usize = 4 * 1024 * 1024;
 const WITNESS_LIMIT: usize = 4096;
 const WITNESS_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_OFFHOST_WAL_BIRTH_WITNESS_V1\0";
 const RECEIPT_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_REMOTE_WAL_BIRTH_STORED_V1\0";
@@ -38,6 +41,7 @@ enum Request {
         node_id: i64,
         witness: String,
         inventory: String,
+        inventory_encoding: Option<InventoryEncoding>,
     },
     Charge {
         node_id: i64,
@@ -54,6 +58,12 @@ enum Request {
         candidate_runtime_id: String,
         challenge: String,
     },
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum InventoryEncoding {
+    Gzip,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -144,6 +154,40 @@ fn decode(value: &str, max: usize) -> Result<Vec<u8>, ApiError> {
         return Err(invalid());
     }
     Ok(data)
+}
+
+fn unpack_index(value: &str, encoding: Option<InventoryEncoding>) -> Result<Vec<u8>, ApiError> {
+    let raw = decode(value, WIRE_INDEX_LIMIT)?;
+    if encoding.is_none() {
+        return Ok(raw);
+    }
+    let mut archive = GzDecoder::new(raw.as_slice());
+    let mut index = Vec::new();
+    (&mut archive)
+        .take((INDEX_LIMIT + 1) as u64)
+        .read_to_end(&mut index)
+        .map_err(|_| invalid())?;
+    if !(WIRE_INDEX_LIMIT + 1..=INDEX_LIMIT).contains(&index.len()) || !archive.get_ref().is_empty()
+    {
+        return Err(invalid());
+    }
+    Ok(index)
+}
+
+fn pack_index(index: &[u8]) -> Result<(Vec<u8>, bool), ApiError> {
+    if index.is_empty() || index.len() > INDEX_LIMIT {
+        return Err(conflict());
+    }
+    if index.len() <= WIRE_INDEX_LIMIT {
+        return Ok((index.to_vec(), false));
+    }
+    let mut archive = GzEncoder::new(Vec::new(), Compression::default());
+    archive.write_all(index).map_err(|_| conflict())?;
+    let compressed = archive.finish().map_err(|_| conflict())?;
+    if compressed.len() > WIRE_INDEX_LIMIT {
+        return Err(conflict());
+    }
+    Ok((compressed, true))
 }
 
 fn valid_email(value: &str) -> bool {
@@ -363,12 +407,17 @@ async fn store(
     node_id: i64,
     witness: &str,
     inventory: &str,
+    encoding: Option<InventoryEncoding>,
 ) -> Result<Value, ApiError> {
     let raw = decode(witness, WITNESS_LIMIT)?;
-    let index = decode(inventory, INDEX_LIMIT)?;
+    let index = unpack_index(inventory, encoding)?;
     let mut tx = state.pool.begin().await?;
     let key = enrolled_key(&mut tx, node_id).await?;
     let w = verify_witness(&raw, &index, node_id, &key)?;
+    // Never commit a large head that Nexus cannot deliver in the fixed envelope.
+    if index.len() > WIRE_INDEX_LIMIT {
+        pack_index(&index)?;
+    }
     let fingerprint = sha256(&raw);
     sqlx::query("SET LOCAL synchronous_commit TO on")
         .execute(&mut *tx)
@@ -458,10 +507,15 @@ async fn head(state: &AppState, node_id: i64, challenge: &str) -> Result<Value, 
             "registrySha256":row.inventory_sha256, "receiptSha256":sha256(&ack),
         }),
     )?;
-    Ok(json!({
+    let (inventory, compressed) = pack_index(&row.inventory_bytes)?;
+    let mut bundle = json!({
         "head":STANDARD.encode(proof), "receipt":STANDARD.encode(ack),
-        "witness":STANDARD.encode(raw), "inventory":STANDARD.encode(row.inventory_bytes),
-    }))
+        "witness":STANDARD.encode(raw), "inventory":STANDARD.encode(inventory),
+    });
+    if compressed {
+        bundle["inventoryEncoding"] = json!("gzip");
+    }
+    Ok(bundle)
 }
 
 pub fn route() -> MethodRouter<AppState> {
@@ -491,10 +545,13 @@ async fn handle(
     }
     let result = match request {
         Request::Store {
-            witness, inventory, ..
+            witness,
+            inventory,
+            inventory_encoding,
+            ..
         } => {
             node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
-            store(&state, node_id, &witness, &inventory).await?
+            store(&state, node_id, &witness, &inventory, inventory_encoding).await?
         }
         Request::Charge {
             reservation_id,
@@ -570,5 +627,55 @@ mod first_admission_history_tests {
         peer.runtime_id = "d".repeat(64);
         assert!(check_first_cap_history(&encode(&peer), 10, &runtime).is_err());
         assert!(check_first_cap_history(b"{\n", 10, &runtime).is_err());
+    }
+
+    #[test]
+    fn large_inventory_keeps_exact_bytes_inside_the_wire_limit() {
+        let mut index = Vec::new();
+        let mut previous_digest = "0".repeat(64);
+        let runtime = "a".repeat(64);
+        for sequence in 1..=1_000 {
+            let email = format!("xmesh-u{}--vless-main", (sequence + 1) / 2);
+            let direction = if sequence % 2 == 1 {
+                "uplink"
+            } else {
+                "downlink"
+            };
+            let source = format!("{runtime}\0{email}\0{direction}");
+            let mut birth = Birth {
+                schema_version: 1,
+                sequence,
+                filename: format!("meter-{}.jsonl", sha256(source.as_bytes())),
+                runtime_id: runtime.clone(),
+                email,
+                direction: direction.into(),
+                first_wal_digest: sha256(&sequence.to_be_bytes()),
+                previous_digest,
+                digest: String::new(),
+            };
+            let mut line = serde_json::to_vec(&birth).unwrap();
+            line.push(b'\n');
+            birth.digest = sha256(&line);
+            previous_digest = birth.digest.clone();
+            index.extend(serde_json::to_vec(&birth).unwrap());
+            index.push(b'\n');
+        }
+        assert!(index.len() > WIRE_INDEX_LIMIT);
+        let (wire, compressed) = pack_index(&index).unwrap();
+        assert!(compressed);
+        assert!(wire.len() <= WIRE_INDEX_LIMIT);
+        let encoding = Some(InventoryEncoding::Gzip);
+        assert_eq!(
+            unpack_index(&STANDARD.encode(&wire), encoding).unwrap(),
+            index
+        );
+        let mut duplicate = wire.clone();
+        duplicate.extend(&wire);
+        assert!(unpack_index(&STANDARD.encode(duplicate), encoding).is_err());
+        assert!(unpack_index(&STANDARD.encode(&wire[..wire.len() - 1]), encoding).is_err());
+        let mut archive = GzEncoder::new(Vec::new(), Compression::fast());
+        archive.write_all(&vec![0; INDEX_LIMIT + 1]).unwrap();
+        let oversize = archive.finish().unwrap();
+        assert!(unpack_index(&STANDARD.encode(oversize), encoding).is_err());
     }
 }

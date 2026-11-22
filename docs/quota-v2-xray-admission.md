@@ -34,6 +34,45 @@ again before returning. The only supported authority fields are
 `authorizedBytes=0`, `canStart=false` and `canResume=false`. No Xray service
 consumes this receipt as an admission decision.
 
+## Staged per-user permits and byte accounting
+
+After quarantine, the installed Agent processes the original signed user
+list in bounded batches with a persisted cursor. Each user has their own
+reservation, signed permit and WAL accounting. While the original Genesis
+proof is current, the same Xray can install a first permit for a registered
+peer even if a different user has already sent traffic. Xray checks its live
+runtime, the peer WAL inventory and the new user's zero-spend state. Nexus
+checks the user against the signed scope and the PostgreSQL outbox and WAL
+head. A changed process or earlier WAL for that user blocks first admission.
+The immutable profile still defines membership for this path.
+
+An issued reservation holds quota. A WAL entry records a byte intent before
+Xray delivers that write. Nexus settles verified WAL against the same
+reservation, across both directions and the signed inbound classes. A crash
+between fsync and delivery can leave a conservative charge above the bytes
+observed by the receiver. Signed receipts and expired permits do not release
+held capacity. XSP/2 authenticates the Node and Ed25519 binds what was signed.
+Neither establishes truthful metering on a host with compromised root.
+
+The WAL transport compresses a large checkpoint for the wire. The signed
+digest, append-only prefix, and PostgreSQL record still cover the exact
+uncompressed bytes. A malformed or untransferable checkpoint leaves the
+previous committed checkpoint intact.
+
+## Quota periods
+
+The existing Node counters use UTC. Days start at midnight, weeks at Monday
+00:00, and months at 00:00 on the first calendar day. The existing CDN panel
+setting supports lifetime and UTC-monthly counting. The staged independent
+Quota V2 allocator currently funds lifetime Node and CDN quotas.
+
+A periodic V2 reservation needs an immutable accounting epoch and an expiry
+at or before the next applicable UTC boundary. A later period may open only
+after the old spending authority has expired or been fenced. Outstanding
+old grants and late WAL remain booked to the original epoch. Policy edits
+must preserve the historical ledger and cannot free an unverified balance.
+The staged admission path has yet to support this lifecycle.
+
 ## Required positive admission contract
 
 | Scenario | Additional proof before opening the data plane |
