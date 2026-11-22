@@ -277,6 +277,52 @@ pub(super) async fn issue(
     Ok(signed)
 }
 
+/// Both signed ceilings are cumulative. Only independently funded
+/// CDN-only reservations may grow their CDN cap with shared top-ups.
+/// A mixed reservation whose CDN pool is limited keeps its immutable hold
+/// even as the MAIN component grows across multiple revisions.
+fn next_cdn_ceiling(
+    inbound_class: &str,
+    fixed_mixed_cdn: bool,
+    previous: i64,
+    next_shared: i64,
+) -> Option<i64> {
+    if previous < 0 || next_shared <= 0 || previous > next_shared {
+        return None;
+    }
+    match inbound_class {
+        "main" if previous == 0 => Some(0),
+        "cdn" => Some(next_shared),
+        "mixed" if fixed_mixed_cdn => Some(previous),
+        "mixed" => Some(next_shared),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod mixed_cdn_renewal_tests {
+    use super::next_cdn_ceiling;
+
+    #[test]
+    fn main_topup_never_mints_cdn_bytes_in_fixed_mixed_pool() {
+        assert_eq!(next_cdn_ceiling("mixed", true, 250, 1_000), Some(250));
+        assert_eq!(next_cdn_ceiling("mixed", true, 250, 4_000), Some(250));
+        assert_eq!(next_cdn_ceiling("mixed", true, 0, 4_000), Some(0));
+        assert_eq!(next_cdn_ceiling("cdn", false, 250, 1_000), Some(1_000));
+        assert_eq!(next_cdn_ceiling("mixed", false, 250, 1_000), Some(1_000));
+        assert_eq!(next_cdn_ceiling("main", false, 0, 4_000), Some(0));
+    }
+
+    #[test]
+    fn invalid_or_downgraded_class_never_signs_replenishment() {
+        assert_eq!(next_cdn_ceiling("other", false, 0, 1_000), None);
+        assert_eq!(next_cdn_ceiling("main", false, 1, 1_000), None);
+        assert_eq!(next_cdn_ceiling("mixed", true, 1_001, 1_000), None);
+        assert_eq!(next_cdn_ceiling("mixed", true, -1, 1_000), None);
+        assert_eq!(next_cdn_ceiling("cdn", false, 0, 0), None);
+    }
+}
+
 #[expect(
     clippy::too_many_arguments,
     reason = "transaction inputs and locked snapshot"
@@ -327,13 +373,10 @@ async fn extend(
     payload["witnessedCdnBytes"] = json!(cdn);
     payload["sharedCeilingBytes"] = json!(ceiling);
     payload["nodeCeilingBytes"] = json!(ceiling);
-    // A MAIN top-up can never increase the independently prefunded CDN
-    // budget on a mixed Node. Homogeneous CDN Nodes already hold ALL their
-    // increased shared ceilings against the pooled CDN balance.
-    // Mixed Nodes without a CDN limit still receive only finite windows.
-    if inbound_class == "cdn" || (inbound_class == "mixed" && !fixed_mixed_cdn) {
-        payload["cdnCeilingBytes"] = json!(ceiling);
-    }
+    let old_cdn = payload["cdnCeilingBytes"].as_i64().ok_or_else(deny)?;
+    let next_cdn = next_cdn_ceiling(inbound_class, fixed_mixed_cdn, old_cdn, ceiling)
+        .ok_or_else(deny)?;
+    payload["cdnCeilingBytes"] = json!(next_cdn);
     payload["issuedAtMs"] = json!(now);
     payload["installBeforeMs"] = json!(install);
     let signature = state
