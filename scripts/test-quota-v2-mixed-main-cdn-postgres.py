@@ -59,6 +59,18 @@ def real_backfill_guard_sql():
     return match.group(1)
 
 
+def real_topup_insert_sql():
+    rust = (Path(__file__).resolve().parents[1]
+            / "backend/src/quota_v2_cdn_lifetime.rs").read_text()
+    source = rust.split("pub async fn renew_mixed_cdn(",1)[1].split(
+        "pub async fn issued_within_limit(",1)[0]
+    match = re.search(
+        r'INSERT INTO quota_v2_mixed_cdn_topups\([^"]+"',source,re.DOTALL)
+    if match is None:
+        raise AssertionError("production mixed CDN top-up SQL missing")
+    return match.group(0)[:-1]
+
+
 def sql_liability(conn):
     # Repeated snapshots on one PostgreSQL connection must not collide
     # with an earlier PREPARE of the same name.
@@ -183,6 +195,52 @@ def main():
             "WHERE reservation_id=%s",(identity(87411,"reservation"),)
         ).fetchone() is None
 
+    # Operator explicitly increases the lifetime CDN plan by 120 KiB.
+    # The original mixed hold remains unchanged; a NEW immutable revision
+    # charges exactly those additional bytes against the enlarged pool.
+    topup_bytes = 120_000
+    revised_limit = CDN_LIMIT + topup_bytes
+    with psycopg.connect(DSN) as conn:
+        old_liability = sql_liability(conn)
+        assert revised_limit-PREEXISTING_CDN-old_liability == topup_bytes
+        conn.execute(
+            "PREPARE mixed_topup(uuid,bigint,bigint,bigint,bigint,bigint,text) AS "
+            + real_topup_insert_sql()
+        )
+        topup_sql = (
+            "EXECUTE mixed_topup("
+            f"'{identity(87420,'reservation')}'::uuid,8,{USER},87420,"
+            f"{topup_bytes},{MIXED_REQUEST+topup_bytes},'{'f'*64}')"
+        )
+        conn.execute(topup_sql)
+        assert sql_liability(conn) == old_liability+topup_bytes
+        assert conn.execute(
+            "SELECT held_bytes FROM quota_v2_mixed_cdn_holds "
+            "WHERE reservation_id=%s",(identity(87420,"reservation"),)
+        ).fetchone() == (MIXED_REQUEST,)
+        assert conn.execute(
+            "SELECT revision,added_bytes,cumulative_cdn_ceiling_bytes "
+            "FROM quota_v2_mixed_cdn_topups WHERE reservation_id=%s",
+            (identity(87420,"reservation"),)
+        ).fetchone() == (8,topup_bytes,MIXED_REQUEST+topup_bytes)
+
+    # A duplicate or conflicting top-up with the same revision cannot mint
+    # another 120k. PostgreSQL uniqueness and immutable triggers reject it.
+    with psycopg.connect(DSN) as conn:
+        try:
+            conn.execute(
+                "INSERT INTO quota_v2_mixed_cdn_topups("
+                "reservation_id,revision,user_id,node_id,added_bytes,"
+                "cumulative_cdn_ceiling_bytes,request_nonce) "
+                "VALUES(%s,8,%s,87420,10,620010,%s)",
+                (identity(87420,"reservation"),USER,"e"*64)
+            )
+        except psycopg.Error:
+            conn.rollback()
+        else:
+            raise AssertionError("duplicate signed CDN revision created new capacity")
+        assert sql_liability(conn) == old_liability+topup_bytes
+
     for statement, params in [
         ("UPDATE quota_v2_mixed_cdn_holds SET held_bytes=0 "
          "WHERE reservation_id=%s",(identity(87420,"reservation"),)),
@@ -203,10 +261,11 @@ def main():
         "mixed_cdn_signed_hold":MIXED_REQUEST,
         "cdn_only_hold":CDN_REQUEST,
         "historic_unknown_cdn_liability":HISTORIC_UNKNOWN,
-        "cdn_limit_bytes":CDN_LIMIT,
+        "cdn_limit_bytes_after_owner_increase":revised_limit,
+        "mixed_cdn_immutable_topup":topup_bytes,
         "two_node_allocate_ms":round((time.perf_counter()-t0)*1000,2),
     },flush=True)
-    print("PASS: mixed MAIN topup did not mint CDN bytes or refund any historic CDN hold")
+    print("PASS: mixed MAIN topup conserved CDN, independently signed CDN revision added exactly budgeted bytes, replay denied")
 
 
 if __name__ == "__main__":
