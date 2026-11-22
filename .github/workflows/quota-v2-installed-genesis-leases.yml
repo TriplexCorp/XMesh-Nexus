@@ -49,12 +49,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: a7e8b9bcf12311212e9ed84b331223df1b559016
+          ref: 235c28755b2d59989ec070a613c82f3e43bbb663
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 'a7e8b9bcf12311212e9ed84b331223df1b559016'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '235c28755b2d59989ec070a613c82f3e43bbb663'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py
       - uses: dtolnay/rust-toolchain@stable

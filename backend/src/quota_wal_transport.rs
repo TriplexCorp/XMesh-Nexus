@@ -14,6 +14,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::PgConnection;
 
+mod charge;
+
 pub const PATH: &str = "/api/v1/node/quota-v2/wal";
 const REQUEST_LIMIT: usize = 544 * 1024;
 // Leave room for the two Base64 layers and the XSP/2 envelope signatures.
@@ -35,6 +37,12 @@ enum Request {
         node_id: i64,
         witness: String,
         inventory: String,
+    },
+    Charge {
+        node_id: i64,
+        reservation_id: String,
+        filename: String,
+        journal: String,
     },
     Head {
         node_id: i64,
@@ -433,6 +441,7 @@ async fn handle(
     let request: Request = serde_json::from_slice(&raw).map_err(|_| invalid())?;
     let node_id = match &request {
         Request::Store { node_id, .. }
+        | Request::Charge { node_id, .. }
         | Request::Head { node_id, .. }
         | Request::PrepareGenesis { node_id, .. } => *node_id,
     };
@@ -445,6 +454,30 @@ async fn handle(
         } => {
             node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
             store(&state, node_id, &witness, &inventory).await?
+        }
+        Request::Charge {
+            reservation_id,
+            filename,
+            journal,
+            ..
+        } => {
+            if !crate::quota_v2::enabled() || !crate::quota_xray_genesis::quarantine_enabled() {
+                return Err(ApiError::new(
+                    StatusCode::NOT_FOUND,
+                    "WAL charging disabled.",
+                ));
+            }
+            let activation =
+                node_auth::authenticate_product_activation(&state, &headers, node_id, PATH).await?;
+            charge::charge(
+                &state,
+                node_id,
+                activation,
+                &reservation_id,
+                &filename,
+                &journal,
+            )
+            .await?
         }
         Request::Head { challenge, .. } => {
             node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;

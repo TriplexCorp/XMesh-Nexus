@@ -5,6 +5,7 @@ or production ingress. Nexus signs and commits caps from its own confirmed
 leases. The runner independently checks both guests and their PostgreSQL rows.
 """
 import concurrent.futures
+import base64
 import hashlib
 import json
 import os
@@ -16,6 +17,8 @@ import subprocess
 LEASE_PATH = "/api/v1/node/quota-v2/genesis-reservation"
 CAP_PATH = "/api/v1/node/quota-v2/genesis-cap-delivery"
 CAP_DOMAIN = b"XMESH_QUOTA_V2_XRAY_CAP_ADMISSION_V1\0"
+WAL_PATH = "/api/v1/node/quota-v2/wal"
+WAL_CHARGE_DOMAIN = b"XMESH_QUOTA_V2_WAL_CHARGE_V1\0"
 MEASURED = "/var/lib/xmesh-measured-lab"
 CAP_COMMAND = "/usr/local/sbin/xmesh-quota-genesis-cap-rehearsal"
 STATE = "/var/lib/xmesh-xray-sync"
@@ -410,7 +413,76 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
 
     anchors = [remote_anchor(guest) for guest in pair]
     assert db.execute(lease_sql,(uid,)).fetchall()==rows
-    print("PASS: real VLESS WAL birth indexes reached PostgreSQL over each installed Agent's XSP/2 tunnel; no settlement or refund.")
+    print("PASS: real VLESS WAL birth indexes reached PostgreSQL over each installed Agent's XSP/2 tunnel.")
+
+    def charge_request(guest, grant, path, raw):
+        return {
+            "operation": "charge", "nodeId": guest.node,
+            "reservationId": json.loads(grant)["payload"]["reservationId"],
+            "filename": Path(path).name, "journal": base64.b64encode(raw).decode(),
+        }
+
+    charge_jobs = []
+    for job, snapshot in zip(cap_jobs, wal_snapshots):
+        item, _, _, grant, _ = job
+        guest = item[0]
+        batches = []
+        for path, raw in snapshot.items():
+            lines = raw.splitlines(keepends=True)
+            middle = len(lines) // 2
+            assert middle
+            batches.append([charge_request(guest, grant, path, b"".join(chunk))
+                            for chunk in (lines[:middle], lines[middle:])])
+        charge_jobs.append((guest, batches))
+
+    first_batch, later_batch = charge_jobs[0][1][0]
+    assert guest_a.request(WAL_PATH, later_batch)[0] == 409
+    assert guest_b.request(WAL_PATH, dict(first_batch, nodeId=guest_b.node))[0] == 409
+    charge_sql = ("SELECT reservation_id,filename,first_sequence,last_sequence,journal,signed_receipt "
+                  "FROM quota_v2_wal_charges ORDER BY reservation_id,filename,first_sequence")
+    balance_sql = ("SELECT settled_bytes,observed_floor_bytes FROM quota_v2_accounts "
+                   "WHERE user_id=%s AND NOT closed")
+    db.execute("ALTER TABLE quota_v2_wal_charges ADD CONSTRAINT ci_reject_wal CHECK (false) NOT VALID")
+    try:
+        assert guest_a.request(WAL_PATH, first_batch)[0] == 500
+        assert db.execute(charge_sql).fetchall() == []
+        assert db.execute(balance_sql, (uid,)).fetchone() == account[1:]
+    finally:
+        db.execute("ALTER TABLE quota_v2_wal_charges DROP CONSTRAINT ci_reject_wal")
+
+    def upload(job):
+        guest, batches = job
+        committed = []
+        for split in batches:
+            for request in split:
+                first = guest.request(WAL_PATH, request)
+                status, reply = guest.request(WAL_PATH, request)
+                assert status == 200 and first == (status, reply), (status, reply)
+                raw = base64.b64decode(request["journal"], validate=True)
+                receipt = json.loads(base64.b64decode(reply["receipt"], validate=True))
+                payload = receipt["payload"]
+                independent_signature(root, f"wal-charge-{guest.node}", receipt, WAL_CHARGE_DOMAIN)
+                assert payload["nodeId"] == guest.node and payload["userId"] == uid
+                assert payload["reservationId"] == request["reservationId"]
+                assert payload["filename"] == request["filename"]
+                assert payload["journalSha256"] == hashlib.sha256(raw).hexdigest()
+                assert payload["firstSequence"] == json.loads(raw.splitlines()[0])["sequence"]
+                tail = json.loads(raw.splitlines()[-1])
+                assert payload["lastDigest"] == tail["digest"] and payload["streamBytes"] == tail["nextBytes"]
+                assert payload["finalMeterVerified"] is False and payload["refundableBytes"] == 0
+                committed.append((request, reply))
+        return committed
+
+    charges = parallel(upload, charge_jobs)
+    charged_rows = db.execute(charge_sql).fetchall()
+    assert len(charged_rows) == 8
+    charged_balance = db.execute(balance_sql, (uid,)).fetchone()
+    assert charged_balance == (account[0], account[2]), charged_balance
+    floors = db.execute("SELECT node_id,conservative_burn_floor_bytes FROM quota_v2_reservations "
+                        "WHERE user_id=%s ORDER BY node_id", (uid,)).fetchall()
+    assert floors == [(row[0], row[2]) for row in rows], floors
+    assert db.execute(lease_sql, (uid,)).fetchall() == rows
+    print("PASS: signed WAL charges on two Nodes conserved the balance after failed COMMIT and retries.")
 
     # A repeat cannot extend/reinstall the existing positive cap.
     repeated=subprocess.run(["docker","exec",guest_a.name,*commands[0]],
@@ -453,6 +525,11 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert db.execute(ledger_sql).fetchall()==ledger
     assert db.execute(outbox_sql).fetchall()==committed_caps
     assert db.execute(lease_sql,(uid,)).fetchall()==rows
+    assert db.execute(charge_sql).fetchall() == charged_rows
+    assert db.execute(balance_sql, (uid,)).fetchone() == charged_balance
+    for guest, receipts in zip(pair, charges):
+        for request, reply in receipts:
+            assert guest.request(WAL_PATH, request) == (200, reply)
     assert [remote_anchor(guest) for guest in pair] == anchors
     parallel(lambda guest: check_remote_wal(guest, "head"), pair)
     for guest,snapshot in zip(pair,wal_snapshots):
