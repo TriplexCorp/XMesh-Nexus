@@ -173,7 +173,16 @@ pub(super) async fn issue(
     .await?
     .ok_or_else(deny)?;
     let has_cdn = scope.aliases.iter().any(|a| a.class == "cdn");
-    if !node_runtime::first_genesis_rehearsal_limits_supported(&user, req.node_id, has_cdn) {
+    let inbound_class = if scope.aliases.iter().all(|a| a.class == "cdn") {
+        "cdn"
+    } else if scope.aliases.iter().all(|a| a.class == "main") {
+        "main"
+    } else {
+        "mixed"
+    };
+    if !node_runtime::first_genesis_rehearsal_limits_supported(&user, req.node_id, has_cdn)
+        || !crate::quota_v2_cdn_lifetime::supported(&user, inbound_class)
+    {
         return Err(deny());
     }
     let (epoch, original_limit, floor): (String, i64, i64) = sqlx::query_as(
@@ -217,13 +226,21 @@ pub(super) async fn issue(
     let free = available(&mut tx, req.user_id, &epoch, limit, floor.max(usage)).await?;
     if free < 0 || !crate::quota_v2_node_lifetime::issued_within_limit(
         &mut tx, req.user_id, req.node_id, &user,
+    ).await? || !crate::quota_v2_cdn_lifetime::issued_within_limit(
+        &mut tx, req.user_id, &user, inbound_class,
     ).await? {
         return Err(deny());
     }
     let node_free = crate::quota_v2_node_lifetime::headroom(
         &mut tx, req.user_id, req.node_id, &user,
     ).await?;
+    let cdn_free = if inbound_class == "cdn" {
+        crate::quota_v2_cdn_lifetime::headroom(&mut tx, req.user_id, &user).await?
+    } else {
+        None
+    };
     let free = node_free.map_or(free, |remaining| free.min(remaining));
+    let free = cdn_free.map_or(free, |remaining| free.min(remaining));
     if is_renewal
         && permit.nonce == req.challenge
         && next_revision == lease.revision
