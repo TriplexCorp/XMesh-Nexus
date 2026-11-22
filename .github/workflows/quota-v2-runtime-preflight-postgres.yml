@@ -23,6 +23,7 @@ on:
       - 'backend/migrations/0157_quota_v2_calendar_successor_zero_authority.sql'
       - 'backend/migrations/0158_quota_v2_calendar_closed_settlement_guard.sql'
       - 'backend/migrations/0159_quota_v2_successor_predecessor_binding.sql'
+      - 'backend/migrations/0160_quota_v2_successor_fresh_meter_staging.sql'
       - 'scripts/test-quota-v2-calendar-successor-postgres.py'
       - 'scripts/test-quota-v2-node-calendar-postgres.py'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
@@ -128,10 +129,11 @@ jobs:
                   "backend/migrations/0157_quota_v2_calendar_successor_zero_authority.sql",
                   "backend/migrations/0158_quota_v2_calendar_closed_settlement_guard.sql",
                   "backend/migrations/0159_quota_v2_successor_predecessor_binding.sql",
+                  "backend/migrations/0160_quota_v2_successor_fresh_meter_staging.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
-      - name: Immutable zero-spend calendar successor preparation cannot create traffic authority
+      - name: Immutable successor and independent empty WAL meter candidate cannot create traffic authority
         run: |
           python3 -m py_compile scripts/test-quota-v2-calendar-successor-postgres.py
           python3 scripts/test-quota-v2-calendar-successor-postgres.py
