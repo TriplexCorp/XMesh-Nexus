@@ -62,9 +62,17 @@ pub async fn record_class(
     {
         return Err(deny());
     }
+    // An old reservation without a class could already have spent or held
+    // CDN bytes. Never retroactively relabel it MAIN and release that
+    // historical liability. New Genesis always first records its class
+    // while the prepared reservation still has a zero issued ceiling.
     sqlx::query(
         "INSERT INTO quota_v2_reservation_classes(reservation_id,user_id,node_id,class)
-         VALUES($1::uuid,$2,$3,$4) ON CONFLICT(reservation_id) DO NOTHING",
+         SELECT r.reservation_id,r.user_id,r.node_id,$4
+         FROM quota_v2_reservations r
+         WHERE r.reservation_id=$1::uuid AND r.user_id=$2 AND r.node_id=$3
+           AND r.ceiling_bytes=0 AND r.acknowledged_bytes=0
+         ON CONFLICT(reservation_id) DO NOTHING",
     )
     .bind(reservation)
     .bind(user_id)
@@ -77,8 +85,9 @@ pub async fn record_class(
          WHERE reservation_id=$1::uuid FOR SHARE",
     )
     .bind(reservation)
-    .fetch_one(conn)
-    .await?;
+    .fetch_optional(conn)
+    .await?
+    .ok_or_else(deny)?;
     if (saved.0, saved.1, saved.2.as_str()) != (user_id, node_id, class) {
         return Err(deny());
     }
