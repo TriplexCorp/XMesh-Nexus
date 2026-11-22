@@ -134,11 +134,16 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     .await?
     .ok_or_else(deny)?;
     let has_cdn = scope.aliases.iter().any(|alias| alias.class == "cdn");
+    let inbound_class = if scope.aliases.iter().all(|a| a.class == "cdn") {
+        "cdn"
+    } else if scope.aliases.iter().all(|a| a.class == "main") {
+        "main"
+    } else {
+        "mixed"
+    };
     if !crate::node_runtime::first_genesis_rehearsal_limits_supported(
-        &current_user,
-        req.node_id,
-        has_cdn,
-    ) {
+        &current_user, req.node_id, has_cdn,
+    ) || !crate::quota_v2_cdn_lifetime::supported(&current_user, inbound_class) {
         return Err(deny());
     }
     // Account first, as in every reserve/settle/revoke writer.
@@ -162,6 +167,8 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     check_conservation(&mut tx, req.user_id, &epoch, limit, floor).await?;
     if !crate::quota_v2_node_lifetime::issued_within_limit(
         &mut tx, req.user_id, req.node_id, &current_user,
+    ).await? || !crate::quota_v2_cdn_lifetime::issued_within_limit(
+        &mut tx, req.user_id, &current_user, inbound_class,
     ).await? {
         return Err(deny());
     }
