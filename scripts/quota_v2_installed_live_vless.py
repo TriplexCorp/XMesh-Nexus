@@ -136,10 +136,13 @@ def run(xray,uuid,email,ceiling):
                     # has started its actual VLESS and private StatsService.
                     with socket.create_connection(("127.0.0.1",28401),timeout=4):
                         pass
-                    assert sum(stats(xray,email).values())==0
+                    # Xray creates user counters on authenticated dispatch.
+                    # The denied VLESS attempt must register both directions
+                    # before the cap gate rejects it.
                     denied()
-                    assert sum(stats(xray,email).values())==0
-                    return {"uplink":0,"downlink":0}
+                    actual = stats(xray, email)
+                    assert actual == {"uplink":0,"downlink":0}, actual
+                    return actual
                 assert ceiling>0 and ceiling%(2*16384)==0
                 data=b"x"*16384
                 with socks_stream() as stream:
