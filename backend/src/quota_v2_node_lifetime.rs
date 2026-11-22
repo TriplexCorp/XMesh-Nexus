@@ -114,12 +114,21 @@ pub async fn issued_within_limit(
     // Anchor any newly introduced lifetime quota conservatively, even if
     // there were V2 grants before the owner configured it.
     let _ = headroom(conn, user_id, node_id, user).await?;
+    // A newer signed V1 lifetime meter can exceed the frozen baseline.
+    // Delivery and renewal MUST use the same effective high-water floor as
+    // headroom(), otherwise an already-signed cap can be re-delivered even
+    // when the later V1 usage plus held V2 grants exceeds the lowered plan.
     let committed: bool = sqlx::query_scalar(
-        "SELECT baseline_bytes::numeric + COALESCE((
-           SELECT SUM(ceiling_bytes::numeric) FROM quota_v2_reservations
-            WHERE user_id=$1 AND node_id=$2
-         ),0) <= $3::numeric FROM quota_v2_node_lifetime_baselines
-          WHERE user_id=$1 AND node_id=$2",
+        "SELECT GREATEST(b.baseline_bytes::numeric, COALESCE((
+              SELECT (v.uplink_bytes+v.downlink_bytes)::numeric
+                FROM user_node_quota_lifetime v
+               WHERE v.user_id=$1 AND v.node_id=$2
+          ),0)) + COALESCE((
+              SELECT SUM(r.ceiling_bytes::numeric) FROM quota_v2_reservations r
+               WHERE r.user_id=$1 AND r.node_id=$2
+          ),0) <= $3::numeric
+          FROM quota_v2_node_lifetime_baselines b
+          WHERE b.user_id=$1 AND b.node_id=$2",
     )
     .bind(user_id)
     .bind(node_id)
