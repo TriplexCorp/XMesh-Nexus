@@ -25,6 +25,20 @@ BASELINE = 500_000
 ACCOUNT_LIMIT = 4_000_000
 
 
+def production_cdn_issued_sql():
+    source = (Path(__file__).resolve().parents[1]
+              / "backend/src/quota_v2_cdn_lifetime.rs").read_text()
+    headroom = source.split("pub async fn headroom(", 1)[1].split(
+        "pub async fn bounded_target(", 1)[0]
+    match = re.search(
+        r'let issued: i64 = sqlx::query_scalar\(\s*"([^"]+)"',
+        headroom, re.DOTALL,
+    )
+    if match is None:
+        raise AssertionError("production CDN liability SQL was not found")
+    return match.group(1)
+
+
 def locked_grant(node, amount):
     with psycopg.connect(DSN) as db:
         db.execute("SELECT pg_advisory_xact_lock(%s)", (USER ^ 0x51_4D_45_53_48,))
@@ -33,13 +47,15 @@ def locked_grant(node, amount):
             "WHERE user_id=%s AND epoch=%s FOR UPDATE", (USER,EPOCH)
         ).fetchone()
         assert account == (ACCOUNT_LIMIT,), account
-        committed = db.execute("""
-            SELECT COALESCE(SUM(r.ceiling_bytes::numeric),0)::bigint
-            FROM quota_v2_reservations r
-            LEFT JOIN quota_v2_reservation_classes s
-              ON s.reservation_id=r.reservation_id
-            WHERE r.user_id=%s AND (s.class IS NULL OR s.class<>'main')
-        """,(USER,)).fetchone()[0]
+        # Execute the exact SQL used by Nexus inside the same account lock.
+        # Copying its logic into the test could hide a real allocator bypass.
+        db.execute(
+            "PREPARE xmesh_cdn_issued(bigint) AS "
+            + production_cdn_issued_sql()
+        )
+        committed = db.execute(
+            f"EXECUTE xmesh_cdn_issued({USER})"
+        ).fetchone()[0]
         free = max(0,CDN_LIMIT-BASELINE-committed)
         ceiling = min(amount, free)
         meter, reserve = uuid.uuid4(), uuid.uuid4()
@@ -101,13 +117,13 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
             )
             # No classification for a historical reservation: full ceiling is
             # conservatively included in the CDN pool, not relabeled MAIN.
-            total=db.execute("""
-                SELECT COALESCE(SUM(r.ceiling_bytes::numeric),0)::bigint
-                FROM quota_v2_reservations r
-                LEFT JOIN quota_v2_reservation_classes s
-                  ON s.reservation_id=r.reservation_id
-                WHERE r.user_id=%s AND (s.class IS NULL OR s.class<>'main')
-            """,(USER,)).fetchone()[0]
+            db.execute(
+                "PREPARE xmesh_cdn_issued(bigint) AS "
+                + production_cdn_issued_sql()
+            )
+            total=db.execute(
+                f"EXECUTE xmesh_cdn_issued({USER})"
+            ).fetchone()[0]
         self.assertEqual(total,1_100_000)
 
     def test_later_v1_node_usage_blocks_signed_cap_redelivery(self):
