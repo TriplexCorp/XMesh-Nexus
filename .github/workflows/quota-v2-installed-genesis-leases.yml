@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'backend/src/quota_v2*.rs'
+      - 'backend/src/quota_v2_cap_delivery/**'
+      - 'backend/src/quota_wal_transport/**'
       - 'backend/src/quota_xray_genesis.rs'
       - 'backend/src/node_runtime_legacy.rs'
       - 'backend/src/main.rs'
@@ -49,12 +51,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 235c28755b2d59989ec070a613c82f3e43bbb663
+          ref: de1fa546c35dbcd925a21a546f891b12b0d95605
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '235c28755b2d59989ec070a613c82f3e43bbb663'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 'de1fa546c35dbcd925a21a546f891b12b0d95605'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py
       - uses: dtolnay/rust-toolchain@stable

@@ -519,19 +519,11 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert new["sharedCeilingBytes"] == cumulative + increment
         assert new["validUntilMs"] == installed["validUntilMs"]
         assert new["witnessedWalBytes"] == cumulative
-        scope = {"userId":uid, "policySha256":new["policySha256"],
-                 "accountEpoch":new["accountEpoch"], "meterEpoch":new["meterEpoch"],
-                 "reservationId":new["reservationId"], "revision":new["reservationRevision"],
-                 "nonce":request["requestChallenge"], "aliases":new["aliasScopes"]}
-        code = (
-            "import base64,json,sys; "
-            "sys.path.insert(0,'/usr/local/libexec/xmesh-quota-wal/quota-v2-physical-stop'); "
-            "from cap_install import install_in_xray; "
-            "print(json.dumps(install_in_xray(sys.argv[1],int(sys.argv[2]),sys.argv[3],"
-            "b'',base64.b64decode(sys.argv[4]),json.loads(sys.argv[5]))))"
-        )
-        receipt = json.loads(guest_a.exec("python3", "-c", code, MEASURED+"/wal/drain.sock",
-            str(measured[2]), measured[3], base64.b64encode(raw).decode(), json.dumps(scope)))
+        command = [*commands[0][:-1], request["requestChallenge"],
+                   "--previous-revision", str(installed["reservationRevision"])]
+        receipt = json.loads(guest_a.exec(*command, timeout=48))
+        saved = guest_a.exec("cat", STATE + f"/genesis-renewal-u{uid}-r{new['reservationRevision']}.json")
+        assert json.loads(saved)["signedEnvelope"].encode() == raw
         assert receipt == {"runtimeId":measured[3], "grantSha256":hashlib.sha256(raw).hexdigest()}
         live = probe(item, increment, measured, tags[0], cumulative)
         cumulative += increment
