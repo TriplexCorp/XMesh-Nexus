@@ -7,7 +7,16 @@
 CREATE OR REPLACE FUNCTION quota_v2_guard_closed_calendar()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    IF NOT EXISTS (
+    -- UPDATE must check the ORIGINAL reservation. Checking NEW alone
+    -- would let a changed reservation_id bypass an immutable closure.
+    IF TG_OP='UPDATE' AND TG_TABLE_NAME='quota_v2_reservations' THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM quota_v2_calendar_closures
+            WHERE reservation_id=OLD.reservation_id
+        ) THEN
+            RETURN NEW;
+        END IF;
+    ELSIF NOT EXISTS (
         SELECT 1 FROM quota_v2_calendar_closures
         WHERE reservation_id=NEW.reservation_id
     ) THEN
@@ -31,8 +40,7 @@ BEGIN
            -- charged bytes; this is never new discretionary reserve capacity.
            AND NEW.ceiling_bytes>=OLD.ceiling_bytes
            AND NEW.ceiling_bytes<=GREATEST(
-               OLD.ceiling_bytes,NEW.acknowledged_bytes,
-               NEW.conservative_burn_floor_bytes)
+               OLD.ceiling_bytes,NEW.acknowledged_bytes)
         THEN
             RETURN NEW;
         END IF;
