@@ -167,6 +167,23 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
             self.assertEqual(db.execute(
                 "SELECT class FROM quota_v2_reservation_classes "
                 "WHERE reservation_id=%s",(new_reserve,)).fetchone(),("cdn",))
+            # Verify the exact immutable class lookup used on every signed
+            # first-cap, replay and renewal. Missing classification remains
+            # untrusted even if a signed config now calls that Node MAIN.
+            lookup_source = source.split("pub async fn verify_class(",1)[1]
+            verified = re.search(
+                r'sqlx::query_scalar\\(\\s*"([^"]+)"', lookup_source,re.DOTALL)
+            self.assertIsNotNone(verified)
+            db.execute(
+                "PREPARE xmesh_class_check(uuid,bigint,bigint) AS "+verified.group(1))
+            lookup=lambda ident,node: (
+                f"EXECUTE xmesh_class_check('{ident}'::uuid,{USER},{node})"
+            )
+            self.assertIsNone(db.execute(lookup(old_reserve,84021)).fetchone())
+            self.assertEqual(db.execute(
+                lookup(new_reserve,84022)).fetchone(),("cdn",))
+            self.assertIsNone(db.execute(
+                lookup(new_reserve,84021)).fetchone())
 
     def test_later_v1_node_usage_blocks_signed_cap_redelivery(self):
         # Execute the EXACT SQL embedded in production Rust rather than a
