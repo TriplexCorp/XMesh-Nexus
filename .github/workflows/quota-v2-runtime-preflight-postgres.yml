@@ -9,6 +9,9 @@ on:
       - 'backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql'
       - 'backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql'
       - 'backend/migrations/0144_quota_v2_genesis_lease_replies.sql'
+      - 'backend/migrations/0147_quota_v2_node_lifetime_baselines.sql'
+      - 'backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql'
+      - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
       - 'scripts/test-quota-v2-quarantined-runtime-postgres.py'
       - 'scripts/test-quota-v2-genesis-quarantine-postgres.py'
       - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
@@ -81,6 +84,8 @@ jobs:
                   "backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql",
                   "backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql",
                   "backend/migrations/0144_quota_v2_genesis_lease_replies.sql",
+                  "backend/migrations/0147_quota_v2_node_lifetime_baselines.sql",
+                  "backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
@@ -100,3 +105,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/test-quota-v2-quarantined-runtime-postgres.py
           python3 scripts/test-quota-v2-quarantined-runtime-postgres.py -v
+      - name: Concurrent independently classified lifetime CDN reservations remain conserved
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-lifetime-dimensional-postgres.py
+          python3 scripts/test-quota-v2-lifetime-dimensional-postgres.py -v
