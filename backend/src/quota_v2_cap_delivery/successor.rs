@@ -75,8 +75,15 @@ fn verified_saved(
         || p["reservationId"] == previous.predecessor_id
         || p["reservationId"] == p["meterEpoch"]
         || p["issuedAtMs"].as_i64().is_none_or(|t| t < previous.valid_until_ms || t > now)
+        // A ZERO-SPEND preparation is an immutable historical receipt.
+        // A lost XSP reply may be retried after the 120-second planning
+        // window. Verify exact issued/expiry bounds but do not turn its
+        // historical expiry into a permanent idempotency dead-end.
+        // Future positive Xray admission MUST require a separate fresh
+        // signed grant and independent WAL/runtime proof.
         || p["validUntilMs"].as_i64().is_none_or(|t|
-            t <= now || t > p["issuedAtMs"].as_i64().unwrap_or_default().saturating_add(120_000))
+            t <= p["issuedAtMs"].as_i64().unwrap_or_default()
+                || t > p["issuedAtMs"].as_i64().unwrap_or_default().saturating_add(120_000))
     {
         return Err(deny());
     }
