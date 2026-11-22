@@ -55,7 +55,7 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: f175c17fee8ba3e0c2ba01f07d3e8387bbb83756
+          ref: 3f834db0baa5131fd14359c7f20e8de9c3311a0e
           path: .ci-reviewed-node
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
@@ -67,7 +67,7 @@ jobs:
           set -euo pipefail
           revision="$(git rev-parse HEAD)"
           version="$(tr -d '\r\n' < ../../AGENT_VERSION)"
-          test "$revision" = 'f175c17fee8ba3e0c2ba01f07d3e8387bbb83756'
+          test "$revision" = '3f834db0baa5131fd14359c7f20e8de9c3311a0e'
           test "$version" = 'control-v6.0.27'
           go build -trimpath -ldflags "-X main.version=$version -X main.sourceRevision=$revision" \
             -o "$RUNNER_TEMP/wal-product-agent" ./cmd/xmesh-agent-xspv2-product
