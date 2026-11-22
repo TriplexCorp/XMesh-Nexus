@@ -67,10 +67,12 @@ fn valid(req: &Request) -> bool {
         && req.user_id > 0
         && hex64(&req.challenge)
         && (req.calendar_successor.is_none()
-            || (req.renewal.is_none() && req.measurement.is_none()
+            || (req.renewal.is_none()
+                && req.measurement.is_none()
                 && req.calendar_successor_positive.is_none()))
         && (req.calendar_successor_positive.is_none()
-            || (req.renewal.is_none() && req.measurement.is_none()
+            || (req.renewal.is_none()
+                && req.measurement.is_none()
                 && req.calendar_successor.is_none()))
         && req.measurement.as_ref().is_none_or(|measurement| {
             measurement.host_pid > 0
@@ -100,30 +102,28 @@ pub async fn handle(
     }
     let activation =
         node_auth::authenticate_product_activation(&state, &headers, req.node_id, PATH).await?;
-    let (status, exact, fresh_genesis) =
-        if let Some(ref fields) = req.calendar_successor {
-            (
-                "prepared_calendar_successor",
-                successor::prepare(&state, &req, fields, activation).await?,
-                None,
-            )
-        } else if let Some(ref fields) = req.calendar_successor_positive {
-            let (grant, genesis) =
-                successor_positive::issue(&state, &req, fields, activation).await?;
-            ("committed_calendar_successor", grant, Some(genesis))
-        } else if let Some(ref fields) = req.renewal {
-            (
-                "committed_renewal",
-                renewal::issue(&state, &req, fields, activation).await?,
-                None,
-            )
-        } else {
-            (
-                "committed_first_cap",
-                first_cap(&state, &req, activation).await?,
-                None,
-            )
-        };
+    let (status, exact, fresh_genesis) = if let Some(ref fields) = req.calendar_successor {
+        (
+            "prepared_calendar_successor",
+            successor::prepare(&state, &req, fields, activation).await?,
+            None,
+        )
+    } else if let Some(ref fields) = req.calendar_successor_positive {
+        let (grant, genesis) = successor_positive::issue(&state, &req, fields, activation).await?;
+        ("committed_calendar_successor", grant, Some(genesis))
+    } else if let Some(ref fields) = req.renewal {
+        (
+            "committed_renewal",
+            renewal::issue(&state, &req, fields, activation).await?,
+            None,
+        )
+    } else {
+        (
+            "committed_first_cap",
+            first_cap(&state, &req, activation).await?,
+            None,
+        )
+    };
     let reply = if let Some(genesis) = fresh_genesis {
         json!({
             "status":status, "nodeId":req.node_id, "userId":req.user_id,
@@ -135,10 +135,7 @@ pub async fn handle(
             "signedEnvelope":exact
         })
     };
-    Ok((
-        [(header::CACHE_CONTROL, "no-store")],
-        Json(reply),
-    ))
+    Ok(([(header::CACHE_CONTROL, "no-store")], Json(reply)))
 }
 
 /// Acquire the allocator's per-user lock before reading the current plan.
