@@ -126,6 +126,48 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
             ).fetchone()[0]
         self.assertEqual(total,1_100_000)
 
+    def test_historic_nonzero_reservation_cannot_be_reclassified_as_main(self):
+        # Run production Rust's INSERT, including its zero-authority
+        # predicate, against real PostgreSQL. A pre-migration CDN reserve
+        # must remain an unknown, fully charged CDN liability.
+        source = (Path(__file__).resolve().parents[1]
+                  / "backend/src/quota_v2_cdn_lifetime.rs").read_text()
+        code = source.split("pub async fn record_class(", 1)[1]
+        match = re.search(r'sqlx::query\\(\\s*"([^"]+)"',code,re.DOTALL)
+        self.assertIsNotNone(match, "production classification SQL missing")
+        statement = match.group(1)
+        old_epoch,old_reserve,new_reserve = uuid.uuid4(),uuid.uuid4(),uuid.uuid4()
+        with psycopg.connect(DSN) as db:
+            db.execute(
+                "INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes,closed) "
+                "VALUES(%s,%s,%s,TRUE)",(USER,old_epoch,ACCOUNT_LIMIT))
+            for node,reserve,ceiling in (
+                (84021,old_reserve,125_000),(84022,new_reserve,0)):
+                db.execute(
+                    "INSERT INTO quota_v2_reservations("
+                    "user_id,epoch,node_id,meter_epoch,reservation_id,"
+                    "ceiling_bytes,valid_until) "
+                    "VALUES(%s,%s,%s,%s,%s,%s,NOW()+interval '2 hours')",
+                    (USER,old_epoch,node,uuid.uuid4(),reserve,ceiling))
+            # Parameterized PostgreSQL EXECUTE faithfully follows $1..$4.
+            db.execute("PREPARE xmesh_class(uuid,bigint,bigint,text) AS "+statement)
+            command=lambda reserve,node,classification: (
+                "EXECUTE xmesh_class("
+                f"'{reserve}'::uuid,{USER},{node},'{classification}')"
+            )
+            db.execute(command(old_reserve,84021,"main"))
+            self.assertIsNone(db.execute(
+                "SELECT class FROM quota_v2_reservation_classes "
+                "WHERE reservation_id=%s",(old_reserve,)).fetchone())
+            db.execute(command(new_reserve,84022,"cdn"))
+            self.assertEqual(db.execute(
+                "SELECT class FROM quota_v2_reservation_classes "
+                "WHERE reservation_id=%s",(new_reserve,)).fetchone(),("cdn",))
+            db.execute(command(new_reserve,84022,"main"))
+            self.assertEqual(db.execute(
+                "SELECT class FROM quota_v2_reservation_classes "
+                "WHERE reservation_id=%s",(new_reserve,)).fetchone(),("cdn",))
+
     def test_later_v1_node_usage_blocks_signed_cap_redelivery(self):
         # Execute the EXACT SQL embedded in production Rust rather than a
         # hand-written approximation. The immutable baseline by itself is
