@@ -383,10 +383,10 @@ pub async fn signed_cdn_ceiling(
         "mixed" if limit(user)?.is_none() => Ok(shared),
         "mixed" => {
             let held: Option<i64> = sqlx::query_scalar(
-                "SELECT m.held_bytes+COALESCE((
-                    SELECT SUM(t.added_bytes) FROM quota_v2_mixed_cdn_topups t
+                "SELECT (m.held_bytes::numeric+COALESCE((
+                    SELECT SUM(t.added_bytes::numeric) FROM quota_v2_mixed_cdn_topups t
                     WHERE t.reservation_id=m.reservation_id
-                ),0) FROM quota_v2_mixed_cdn_holds m
+                ),0))::bigint FROM quota_v2_mixed_cdn_holds m
                  WHERE m.reservation_id=$1::uuid AND m.user_id=$2 AND m.node_id=$3
                  FOR SHARE",
             )
@@ -433,10 +433,10 @@ pub async fn renew_mixed_cdn(
         return Err(deny());
     };
     let stored: i64 = sqlx::query_scalar(
-        "SELECT m.held_bytes+COALESCE((
-            SELECT SUM(t.added_bytes) FROM quota_v2_mixed_cdn_topups t
+        "SELECT (m.held_bytes::numeric+COALESCE((
+            SELECT SUM(t.added_bytes::numeric) FROM quota_v2_mixed_cdn_topups t
              WHERE t.reservation_id=m.reservation_id
-         ),0) FROM quota_v2_mixed_cdn_holds m
+         ),0))::bigint FROM quota_v2_mixed_cdn_holds m
          WHERE m.reservation_id=$1::uuid AND m.user_id=$2 AND m.node_id=$3 FOR SHARE",
     )
     .bind(reservation)
