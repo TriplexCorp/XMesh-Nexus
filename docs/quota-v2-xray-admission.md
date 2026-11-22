@@ -63,15 +63,22 @@ previous committed checkpoint intact.
 
 The existing Node counters use UTC. Days start at midnight, weeks at Monday
 00:00, and months at 00:00 on the first calendar day. The existing CDN panel
-setting supports lifetime and UTC-monthly counting. The staged independent
-Quota V2 allocator currently funds lifetime Node and CDN quotas.
+setting supports lifetime and UTC-monthly counting. For individual Node
+quotas, `XMESH_QUOTA_V2_NODE_CALENDAR_STAGING=1` enables funding within the
+original daily, weekly or monthly UTC window on the signed staging path.
+PostgreSQL pins the window before issuance and rejects another revision
+after its deadline. Signed first permits and renewals cannot outlive it.
+The allocator counts legacy usage, unbound V2 reservations and all earlier
+reservations with overlapping windows. Changing the rule does not move a
+bound reservation. This staging switch defaults to off.
 
 A periodic V2 reservation needs an immutable accounting epoch and an expiry
 at or before the next applicable UTC boundary. A later period may open only
 after the old spending authority has expired or been fenced. Outstanding
 old grants and late WAL remain booked to the original epoch. Policy edits
 must preserve the historical ledger and cannot free an unverified balance.
-The staged admission path has yet to support this lifecycle.
+Seamless rollover of an active session, global and CDN calendar funding,
+and replacement of the runtime still require separate lifecycle support.
 
 ## Required positive admission contract
 

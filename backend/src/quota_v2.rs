@@ -1453,6 +1453,29 @@ fn offline_reservation_target(user: &Value) -> i64 {
     }
 }
 
+async fn reservation_revocation(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    epoch: &str,
+    meter: &str,
+    reservation: &str,
+) -> Result<Option<String>, ApiError> {
+    sqlx::query_scalar(
+        "SELECT request_id::text FROM quota_v2_revocation_requests
+         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
+           AND meter_epoch=$4::uuid AND reservation_id=$5::uuid",
+    )
+    .bind(user_id)
+    .bind(epoch)
+    .bind(node_id)
+    .bind(meter)
+    .bind(reservation)
+    .fetch_optional(conn)
+    .await
+    .map_err(ApiError::from)
+}
+
 pub async fn issue_user(
     conn: &mut sqlx::PgConnection,
     user: &mut Value,
@@ -1476,18 +1499,16 @@ pub async fn issue_user(
     let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
     let (meter, reservation, confirmed) =
         lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
-    let revoke_id: Option<String> = sqlx::query_scalar(
-        "SELECT request_id::text FROM quota_v2_revocation_requests
-         WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
-           AND meter_epoch=$4::uuid AND reservation_id=$5::uuid",
+    let calendar_end = crate::quota_v2_node_lifetime::bind_deadline(
+        conn,
+        node_id,
+        user,
+        &reservation,
+        inbound_class != "unclassified",
     )
-    .bind(user_id)
-    .bind(&epoch)
-    .bind(node_id)
-    .bind(&meter)
-    .bind(&reservation)
-    .fetch_optional(&mut *conn)
     .await?;
+    let revoke_id =
+        reservation_revocation(conn, user_id, node_id, &epoch, &meter, &reservation).await?;
     let bounded_target = bounded_policy_target(
         conn,
         user_id,
@@ -1507,7 +1528,9 @@ pub async fn issue_user(
     } else {
         None
     };
-    let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
+    let until = now_ms
+        .saturating_add(24 * 60 * 60 * 1000)
+        .min(calendar_end.unwrap_or(i64::MAX));
     let lease = sqlx::query(
         "SELECT acknowledged_bytes,ceiling_bytes,revision,
                     (EXTRACT(EPOCH FROM valid_until)*1000)::BIGINT AS valid_until_ms

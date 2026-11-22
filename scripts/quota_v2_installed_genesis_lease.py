@@ -80,13 +80,26 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             "profileId":profile["id"],"xrayLocalPort":28401,
             "cdnMode":"all" if tag=="vless-cdn" else "standard",
         })
+    calendar = os.environ.get("XMESH_QUOTA_V2_NODE_CALENDAR_STAGING") == "1"
+    periods = ["lifetime", "lifetime"]
+    if calendar:
+        # Use two different UTC windows with sufficient time for the test.
+        # Exact boundary behavior is covered by the independent PostgreSQL job.
+        periods = [row[0] for row in db.execute(
+            "SELECT p FROM unnest(ARRAY['daily','weekly','monthly']) WITH ORDINALITY t(p,i) "
+            "WHERE upper(quota_v2_calendar_window(p,statement_timestamp())) "
+            "> statement_timestamp()+interval '15 minutes' ORDER BY i LIMIT 2"
+        )]
+        # At a simultaneous near-midnight day/week/month boundary, let the
+        # concurrency rehearsal continue with lifetime limits.
+        periods += ["lifetime"] * (2 - len(periods))
     peer_limit = 4 * 64 * 1024
     _,peer=owner.request("POST","/collections/users",{
         "username":"ci_genesis_lease_peer","squads":[squad["id"]],
         "hold":False,"used":0,"limit":2 * peer_limit / 1_000_000_000,"expireAt":0,
         "nodeTrafficLimits":{
-            str(guest.node):{"limitGb":peer_limit / 1_000_000_000,"period":"lifetime"}
-            for guest in pair
+            str(guest.node):{"limitGb":peer_limit / 1_000_000_000,"period":period}
+            for guest,period in zip(pair,periods)
         },
     })
     peer_id=peer["id"]
@@ -195,23 +208,24 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     # can change these settings without changing the VLESS client's UUID
     # or its compiled config, so the current plan must be checked separately.
     user_path=f"/collections/users/{uid}"
-    owner.request("PATCH",user_path,{
-        "nodeTrafficLimits":{
-            str(guest_a.node):{"limitGb":0.000000001,"period":"daily"},
-            str(guest_b.node):{"limitGb":0.000000001,"period":"daily"},
-        },
-        "cdnLimitGb":0.000000001,
-    })
-    try:
-        assert guest_a.request(LEASE_PATH,request_a)[0]==409
-        assert guest_b.request(LEASE_PATH,request_b)[0]==409
-        assert db.execute("SELECT count(*) FROM quota_v2_reservations WHERE user_id=%s",
-                          (uid,)).fetchone()==(0,)
-        assert db.execute("SELECT count(*) FROM quota_v2_genesis_lease_replies WHERE user_id=%s",
-                          (uid,)).fetchone()==(0,)
-    finally:
-        owner.request("PATCH",user_path,{"nodeTrafficLimits":{},"cdnLimitGb":0})
-    print("UTC-window Node and CDN limits cannot become global bootstrap grants.")
+    if not calendar:
+        owner.request("PATCH",user_path,{
+            "nodeTrafficLimits":{
+                str(guest_a.node):{"limitGb":0.000000001,"period":"daily"},
+                str(guest_b.node):{"limitGb":0.000000001,"period":"daily"},
+            },
+            "cdnLimitGb":0.000000001,
+        })
+        try:
+            assert guest_a.request(LEASE_PATH,request_a)[0]==409
+            assert guest_b.request(LEASE_PATH,request_b)[0]==409
+            assert db.execute("SELECT count(*) FROM quota_v2_reservations WHERE user_id=%s",
+                              (uid,)).fetchone()==(0,)
+            assert db.execute("SELECT count(*) FROM quota_v2_genesis_lease_replies WHERE user_id=%s",
+                              (uid,)).fetchone()==(0,)
+        finally:
+            owner.request("PATCH",user_path,{"nodeTrafficLimits":{},"cdnLimitGb":0})
+        print("UTC-window Node and CDN limits cannot become global bootstrap grants.")
     # This lifetime Node rule is conservative and independently bounded:
     # A has 700 KiB, while the two-Node shared balance is 1.5 MiB.
     node_a_lifetime = 716800
@@ -283,12 +297,14 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert hashlib.sha256(raw).hexdigest()==profile
         return observed
 
-    def probe(item,ceiling,observed,tag,previous=0,barrier=None,pause_after=0,subscriber=user):
+    def probe(item,ceiling,observed,tag,previous=0,barrier=None,pause_after=0,subscriber=user,
+              reuse_echo=False):
         guest,_,_=item
         raw=guest.exec("nsenter","--target",str(observed[2]),"--net","--",
                        "python3",MEASURED+"/live-vless.py",MEASURED+"/xray-client",
                        subscriber["xrayId"],f"xmesh-u{subscriber['id']}--{tag}",str(ceiling),str(previous),
                        *([barrier,str(pause_after)] if barrier else []),
+                       *(["--reuse-echo","--socks-port","28412"] if reuse_echo else []),
                        timeout=120 if barrier else 48)
         return json.loads(raw)
 
@@ -461,6 +477,17 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     commands=parallel(install,cap_jobs)
     print("PASS: the installed systemd Agent acquired and installed each first cap after signed quarantine.")
     assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone()==(4,)
+    if calendar:
+        bindings = db.execute(
+            "SELECT o.node_id, b.period, o.valid_until_ms "
+            "<= (EXTRACT(epoch FROM upper(b.calendar_window))*1000)::bigint "
+            "FROM quota_v2_signed_first_cap_outbox o "
+            "JOIN quota_v2_node_calendar_bindings b USING(reservation_id) WHERE o.user_id=%s",
+            (peer_id,),
+        ).fetchall()
+        assert sorted(bindings) == sorted((guest.node,period,True)
+            for guest,period in zip(pair,periods) if period != "lifetime"), bindings
+
     results=parallel(lambda value:probe(value[0][0],value[0][4],
                                        value[0][1],value[1]),zip(cap_jobs,tags))
     assert sum(sum(result.values()) for result in results)==account[0]
@@ -707,6 +734,13 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                                     "sh", barrier + ".ready") == b"ready":
                         break
                     time.sleep(.15)
+                # A second subscriber completes real traffic on this Xray
+                # while the first subscriber's VLESS stream stays open.
+                assert probe(item,peer_limit,measured,tags[0],subscriber=peer,
+                             reuse_echo=True) == {
+                    "uplink":peer_limit//2,"downlink":peer_limit//2,
+                }
+                assert not active.done()
                 cumulative += half
             else:
                 assert not active.done(), "VLESS ended before the automatic cap was applied"
@@ -732,14 +766,13 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     print("PASS: installed systemd Agent settled WAL and auto-renewed twice via Nexus; one uninterrupted VLESS stream crossed its earlier ceiling.")
 
     # Reuse the SAME live Xray processes. The first subscriber already
-    # exhausted both original reservations and renewed on A. The second
-    # subscriber must still be able to spend its own independent budget.
+    # exhausted both original reservations. The second subscriber already
+    # spent its own budget concurrently on A and now uses its share on B.
     guest_a.exec("systemctl","stop","xmesh-quota-v2-renewal.timer",
                  "xmesh-quota-v2-renewal.service")
-    assert parallel(
-        lambda job:probe(job[0],peer_limit,job[1],job[2],subscriber=peer),
-        zip(stages,measurements,tags),
-    ) == [{"uplink":peer_limit//2,"downlink":peer_limit//2}]*2
+    assert probe(stages[1],peer_limit,measurements[1],tags[1],subscriber=peer) == {
+        "uplink":peer_limit//2,"downlink":peer_limit//2,
+    }
     parallel(lambda guest: guest.exec(
         "systemctl","start","xmesh-quota-v2-renewal.service",timeout=95),pair)
     peer_settled=db.execute(

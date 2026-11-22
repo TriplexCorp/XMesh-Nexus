@@ -2422,12 +2422,14 @@ fn first_genesis_cap_aliases(
 
 // Lifetime per-Node reservations are independently bounded by the
 // immutable PostgreSQL baseline and ALL historical issued ceilings.
-// UTC-window Node quotas and CDN budgets still require separate period
-// reserve ledgers; never silently translate them into a global allowance.
+// Calendar Node quotas require the explicit staging allocator. CDN periods
+// retain their separate lifetime-only admission path.
 pub fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_cdn: bool) -> bool {
-    if !crate::node_user_quotas::rule_for(user, node_id)
-        .is_ok_and(|rule| rule.is_none_or(|limit| limit.period == "lifetime"))
-    {
+    if !crate::node_user_quotas::rule_for(user, node_id).is_ok_and(|rule| {
+        rule.is_none_or(|limit| {
+            limit.period == "lifetime" || crate::quota_v2_node_lifetime::calendar_enabled()
+        })
+    }) {
         return false;
     }
     if has_cdn && crate::quota_v2_cdn_lifetime::limit(user).is_err() {

@@ -1,8 +1,4 @@
-//! Conservative, independently bounded per-user/per-Node lifetime quota.
-//!
-//! This is intentionally limited to the "lifetime" period: allowing the
-//! daily/weekly/monthly variants without an independently settled UTC-window
-//! reserve ledger would silently refill quotas across a period boundary.
+//! Conservative, independently bounded per-user/per-Node quota.
 //!
 //! Node capacity is never refunded on expiry, stop, ACK or period turnover.
 //! An immutable baseline anchors *existing* legacy bytes before the first
@@ -18,8 +14,102 @@ use sqlx::PgConnection;
 fn deny() -> ApiError {
     ApiError::new(
         StatusCode::CONFLICT,
-        "Node lifetime Quota V2 cannot safely allocate another byte.",
+        "Node Quota V2 cannot safely allocate another byte.",
     )
+}
+
+pub fn calendar_enabled() -> bool {
+    std::env::var("XMESH_QUOTA_V2_NODE_CALENDAR_STAGING").as_deref() == Ok("1")
+}
+
+fn calendar_rule(
+    user: &Value,
+    node_id: i64,
+) -> Result<Option<node_user_quotas::QuotaRule>, ApiError> {
+    let rule = node_user_quotas::rule_for(user, node_id).map_err(|()| deny())?;
+    match rule {
+        Some(rule) if rule.period != "lifetime" && calendar_enabled() => Ok(Some(rule)),
+        Some(rule) if rule.period != "lifetime" => Err(deny()),
+        _ => Ok(None),
+    }
+}
+
+/// Bind before allocating a positive byte. The deferred FK permits this
+/// insert before the original allocator creates the zero-spend reservation.
+pub async fn bind_deadline(
+    conn: &mut PgConnection,
+    node_id: i64,
+    user: &Value,
+    reservation: &str,
+    classified: bool,
+) -> Result<Option<i64>, ApiError> {
+    if let Some(rule) = calendar_rule(user, node_id)? {
+        if !classified {
+            return Err(deny());
+        }
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM quota_v2_node_calendar_bindings WHERE reservation_id=$1::uuid)",
+        )
+        .bind(reservation)
+        .fetch_one(&mut *conn)
+        .await?;
+        if !exists {
+            sqlx::query(
+                "INSERT INTO quota_v2_node_calendar_bindings(reservation_id,period,calendar_window)
+                 VALUES($1::uuid,$2,quota_v2_calendar_window($2,statement_timestamp()))",
+            )
+            .bind(reservation)
+            .bind(rule.period)
+            .execute(&mut *conn)
+            .await?;
+        }
+    }
+    permit_deadline(conn, node_id, user, reservation).await
+}
+
+/// Also rejects changing an already bound reservation's period, including
+/// disabling its periodic rule, and rejects retroactive binding of old caps.
+pub async fn permit_deadline(
+    conn: &mut PgConnection,
+    node_id: i64,
+    user: &Value,
+    reservation: &str,
+) -> Result<Option<i64>, ApiError> {
+    let rule = calendar_rule(user, node_id)?;
+    let binding: Option<(String, i64, bool)> = sqlx::query_as(
+        "SELECT period,(extract(epoch FROM upper(calendar_window))*1000)::bigint,
+                calendar_window @> statement_timestamp()
+         FROM quota_v2_node_calendar_bindings WHERE reservation_id=$1::uuid",
+    )
+    .bind(reservation)
+    .fetch_optional(conn)
+    .await?;
+    match (rule, binding) {
+        (None, None) => Ok(None),
+        (Some(rule), Some((period, end, true))) if rule.period == period => Ok(Some(end)),
+        _ => Err(deny()),
+    }
+}
+
+async fn calendar_remaining(
+    conn: &mut PgConnection,
+    user_id: i64,
+    node_id: i64,
+    rule: node_user_quotas::QuotaRule,
+) -> Result<i64, ApiError> {
+    // Unbound history is conservatively counted in full. A policy edit
+    // counts grants from EVERY overlapping window, even if the period type
+    // changed. Expiry never erases balances or refunds outstanding bytes.
+    let remaining: i64 = sqlx::query_scalar(
+        "SELECT quota_v2_node_calendar_remaining($1,$2,$3,$4,statement_timestamp())",
+    )
+    .bind(user_id)
+    .bind(node_id)
+    .bind(rule.period)
+    .bind(rule.limit_bytes)
+    .fetch_one(conn)
+    .await?;
+    Ok(remaining)
 }
 
 pub fn lifetime_rule(user: &Value, node_id: i64) -> Result<Option<i64>, ApiError> {
@@ -40,6 +130,13 @@ pub async fn headroom(
     node_id: i64,
     user: &Value,
 ) -> Result<Option<i64>, ApiError> {
+    if let Some(rule) = calendar_rule(user, node_id)? {
+        return Ok(Some(
+            calendar_remaining(conn, user_id, node_id, rule)
+                .await?
+                .max(0),
+        ));
+    }
     let Some(limit) = lifetime_rule(user, node_id)? else {
         return Ok(None);
     };
@@ -108,6 +205,9 @@ pub async fn issued_within_limit(
     node_id: i64,
     user: &Value,
 ) -> Result<bool, ApiError> {
+    if let Some(rule) = calendar_rule(user, node_id)? {
+        return Ok(calendar_remaining(conn, user_id, node_id, rule).await? >= 0);
+    }
     let Some(limit) = lifetime_rule(user, node_id)? else {
         return Ok(true);
     };

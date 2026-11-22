@@ -23,7 +23,7 @@ import time
 import psycopg
 
 suite = runpy.run_path(str(Path(__file__).with_name("test-quota-wal-transport.py")))
-from wal_transport import _write_public, sync_checkpoint
+from wal_transport import WIRE_INDEX_LIMIT, _unpack_bundle, _write_public, sync_checkpoint
 import witness_inventory as producer
 from quota_wal_real_xray import MeteredXray
 
@@ -243,11 +243,45 @@ def reject_missing_history(agent):
     agent.sync("sync")
 
 
+def check_large_signed_checkpoint(agent, database):
+    # Protocol-size fixture only. The preceding VLESS checks establish
+    # physical metering; these records exercise the large XSP/2 wire format.
+    fixture = suite["fixture"]
+    inventory = agent.local.xray / fixture.meter_inventory_audit.NAME
+    original = inventory.read_bytes()
+    runtime = json.loads(original.splitlines()[0])["runtimeId"]
+    fixture.write_test_meter_intents({
+        "runtimeId": runtime,
+        "inboundMeters": [
+            {"email": f"xmesh-u{user}--vless-main", "uplinkBytes": 1, "downlinkBytes": 1}
+            for user in range(10_001, 10_501)
+        ],
+    }, agent.local.xray)
+    expected = inventory.read_bytes()
+    assert expected.startswith(original) and len(expected) > WIRE_INDEX_LIMIT
+    agent.drop_ack = True
+    try:
+        agent.sync("sync")
+    except ConnectionError:
+        pass
+    else:
+        raise AssertionError("large checkpoint response was not discarded")
+    recover_wal_head(agent, retry_unavailable=False)
+    returned = agent.request(suite["PATH"], suite["latest"](agent.node, secrets.token_hex(32)))
+    response, index = _unpack_bundle(returned)
+    assert response["inventoryEncoding"] == "gzip" and index == expected
+    assert database.execute(
+        "SELECT inventory_bytes FROM quota_v2_external_wal_birth_anchors "
+        "WHERE node_id=%s ORDER BY inventory_sequence DESC LIMIT 1", (agent.node,),
+    ).fetchone() == (expected,)
+    print(f"Large signed WAL checkpoint recovered over strict XSP/2 ({len(index)} raw bytes).")
+
+
 def main():
     assert os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
     binary = os.environ["XMESH_WAL_PRODUCT_AGENT"]
     identity = json.loads(subprocess.check_output([binary, "--identity"], timeout=10))
-    assert identity["version"] == "control-v6.0.25"
+    assert identity["version"] == "control-v6.0.27"
     pin = identity["sourceRevision"] + ":" + identity["artifactSha256"]
     with tempfile.TemporaryDirectory(prefix="xmesh-xsp-wal-") as directory:
         root = Path(directory)
@@ -330,7 +364,7 @@ def main():
                     "WHERE node_id=%s ORDER BY inventory_sequence", (agent.node,),
                 ).fetchall()
                 assert rows == [(2,), (4,)], rows
-            print("Two activated 6.0.25 agents stored independent WAL and recovered its current receipts over strict XSP/2.")
+            print("Two activated 6.0.27 agents stored independent WAL and recovered its current receipts over strict XSP/2.")
             if binary:
                 print("Both authenticated WAL heads survived a restart of the PostgreSQL service container.")
             provision_signed_policies(agents)
@@ -345,6 +379,7 @@ def main():
                 print("Real main and CDN VLESS traffic produced both WAL directions. "
                       "After SIGKILL, one node rejected losses of WAL files, the birth index, "
                       "and both together while its peer still verified.")
+            check_large_signed_checkpoint(agents[1], database)
 
 
 def wait_for_ready(path):

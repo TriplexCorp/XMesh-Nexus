@@ -4,6 +4,8 @@
 Only the disposable runner invokes this probe; no public ingress, no external
 target, no fixture-generated traffic counters.
 """
+import argparse
+from contextlib import ExitStack
 import json
 from pathlib import Path
 import socket
@@ -43,8 +45,8 @@ def exact(sock, length):
     return bytes(data)
 
 
-def socks_stream():
-    s = socket.create_connection(("127.0.0.1",SOCKS),timeout=4)
+def socks_stream(socks_port=SOCKS):
+    s = socket.create_connection(("127.0.0.1",socks_port),timeout=4)
     try:
         s.sendall(b"\x05\x01\x00")
         assert exact(s,2)==b"\x05\x00"
@@ -61,9 +63,9 @@ def socks_stream():
         raise
 
 
-def denied():
+def denied(socks_port=SOCKS):
     try:
-        with socks_stream() as s:
+        with socks_stream(socks_port) as s:
             s.sendall(b"x")
             assert not s.recv(1), "unexpected VLESS byte outside authority"
     except (OSError,EOFError):
@@ -101,14 +103,17 @@ def parse_stats(raw, email):
     return result
 
 
-def run(xray,uuid,email,ceiling,previous=0,barrier=None,pause_after=0):
-    with tempfile.TemporaryDirectory(prefix="xmesh-vless-ns-") as work, \
-         EchoServer(("127.0.0.1",ECHO),EchoHandler) as echo:
-        thread=threading.Thread(target=echo.serve_forever,daemon=True)
-        thread.start()
+def run(xray, uuid, email, ceiling, previous=0, barrier=None, pause_after=0,
+        *, socks_port=SOCKS, reuse_echo=False):
+    with tempfile.TemporaryDirectory(prefix="xmesh-vless-ns-") as work, ExitStack() as services:
+        if not reuse_echo:
+            echo = services.enter_context(EchoServer(("127.0.0.1", ECHO), EchoHandler))
+            thread = threading.Thread(target=echo.serve_forever, daemon=True)
+            thread.start()
+            services.callback(echo.shutdown)
         config={
             "log":{"loglevel":"warning"},
-            "inbounds":[{"tag":"local-socks","listen":"127.0.0.1","port":SOCKS,
+            "inbounds":[{"tag":"local-socks","listen":"127.0.0.1","port":socks_port,
                          "protocol":"socks","settings":{"auth":"noauth"}}],
             "outbounds":[{"tag":"server","protocol":"vless","settings":{"vnext":[
                 {"address":"127.0.0.1","port":28401,
@@ -125,7 +130,7 @@ def run(xray,uuid,email,ceiling,previous=0,barrier=None,pause_after=0):
                 while time.monotonic()<until:
                     assert process.poll() is None
                     try:
-                        with socket.create_connection(("127.0.0.1",SOCKS),timeout=1):
+                        with socket.create_connection(("127.0.0.1",socks_port),timeout=1):
                             break
                     except OSError:
                         time.sleep(.1)
@@ -139,7 +144,8 @@ def run(xray,uuid,email,ceiling,previous=0,barrier=None,pause_after=0):
                     # Xray creates user counters on authenticated dispatch.
                     # The denied VLESS attempt must register both directions
                     # before the cap gate rejects it.
-                    denied()
+                    denied(socks_port)
+                    assert process.poll() is None, "client exited during the admission probe"
                     actual = stats(xray, email)
                     assert actual == {"uplink":0,"downlink":0}, actual
                     return actual
@@ -147,7 +153,7 @@ def run(xray,uuid,email,ceiling,previous=0,barrier=None,pause_after=0):
                 if previous:
                     assert stats(xray,email)=={"uplink":previous//2,"downlink":previous//2}
                 data=b"x"*16384
-                with socks_stream() as stream:
+                with socks_stream(socks_port) as stream:
                     for sent in range(0, ceiling, 2*len(data)):
                         if barrier and sent == pause_after:
                             assert stats(xray,email)=={
@@ -166,7 +172,8 @@ def run(xray,uuid,email,ceiling,previous=0,barrier=None,pause_after=0):
                         assert not stream.recv(1),"existing stream exceeded signed cap"
                     except (OSError,EOFError):
                         pass
-                denied()
+                denied(socks_port)
+                assert process.poll() is None, "client exited during the exhaustion probe"
                 actual=stats(xray,email)
                 assert actual=={"uplink":(ceiling+previous)//2,"downlink":(ceiling+previous)//2},actual
                 return actual
@@ -183,13 +190,17 @@ def run(xray,uuid,email,ceiling,previous=0,barrier=None,pause_after=0):
                     except subprocess.TimeoutExpired:
                         process.kill()
                         process.wait(timeout=5)
-                echo.shutdown()
 
 
-if __name__=="__main__":
-    assert len(sys.argv) in (6,8)
-    kwargs = {} if len(sys.argv)==6 else {
-        "barrier":sys.argv[6], "pause_after":int(sys.argv[7]),
-    }
-    print(json.dumps(run(*sys.argv[1:4],*map(int,sys.argv[4:6]),**kwargs),
-                     sort_keys=True,separators=(",",":")))
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("xray")
+    parser.add_argument("uuid")
+    parser.add_argument("email")
+    parser.add_argument("ceiling", type=int)
+    parser.add_argument("previous", type=int)
+    parser.add_argument("barrier", nargs="?")
+    parser.add_argument("pause_after", type=int, nargs="?", default=0)
+    parser.add_argument("--socks-port", type=int, default=SOCKS)
+    parser.add_argument("--reuse-echo", action="store_true")
+    print(json.dumps(run(**vars(parser.parse_args())), sort_keys=True, separators=(",", ":")))

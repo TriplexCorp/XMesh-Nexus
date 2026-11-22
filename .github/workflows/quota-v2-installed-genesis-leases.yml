@@ -11,6 +11,7 @@ on:
       - 'backend/src/bin/quota_v2_ci_signed_cap.rs'
       - 'backend/Cargo.toml'
       - 'backend/migrations/014*.sql'
+      - 'backend/migrations/015*.sql'
       - 'deploy/xsp-v2-product-gateway/**'
       - 'scripts/run-quota-wal-transport-audit.sh'
       - 'scripts/test-quota-wal-installed.py'
@@ -51,12 +52,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 946794f4cd5ac280084a91d8dd6bbedd4fcb8d37
+          ref: 555ea7a61240ba923a07ea2f7a3fc3d6098496a0
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '946794f4cd5ac280084a91d8dd6bbedd4fcb8d37'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '555ea7a61240ba923a07ea2f7a3fc3d6098496a0'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py
       - uses: dtolnay/rust-toolchain@stable
@@ -100,6 +101,7 @@ jobs:
         env:
           XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
           XMESH_INSTALLED_NEXUS_REF: ${{ github.event.pull_request.head.sha }}
+          XMESH_QUOTA_V2_NODE_CALENDAR_STAGING: '1'
         run: |
           set -euo pipefail
           source "$RUNNER_TEMP/quota-wal/bin/activate"

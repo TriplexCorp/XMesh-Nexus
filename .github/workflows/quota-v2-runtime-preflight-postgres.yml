@@ -15,6 +15,8 @@ on:
       - 'backend/migrations/0149_quota_v2_mixed_class_cdn_holds.sql'
       - 'backend/migrations/0150_quota_v2_mixed_cdn_topups.sql'
       - 'backend/migrations/0151_quota_v2_cdn_signed_revision_integrity.sql'
+      - 'backend/migrations/0152_quota_v2_node_calendar.sql'
+      - 'scripts/test-quota-v2-node-calendar-postgres.py'
       - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
       - 'scripts/benchmark-quota-v2-postgres-allocator.py'
       - 'scripts/test-quota-v2-unlimited-main-postgres.py'
@@ -78,6 +80,12 @@ jobs:
                   "verified_traffic_deltas",
               ):
                   c.execute("CREATE TABLE "+historical+" (node_id BIGINT)")
+              for period, start in (("daily", "day_start"), ("weekly", "week_start"),
+                                    ("monthly", "month_start")):
+                  c.execute(f"""CREATE TABLE user_node_quota_{period}
+                      ({start} DATE NOT NULL,node_id BIGINT NOT NULL,user_id BIGINT NOT NULL,
+                       uplink_bytes BIGINT NOT NULL,downlink_bytes BIGINT NOT NULL,
+                       PRIMARY KEY ({start},node_id,user_id))""")
               for path in (
                   "backend/migrations/0125_quota_v2_reservations.sql",
                   "backend/migrations/0126_quota_v2_revocation_requests.sql",
@@ -97,6 +105,7 @@ jobs:
                   "backend/migrations/0149_quota_v2_mixed_class_cdn_holds.sql",
                   "backend/migrations/0150_quota_v2_mixed_cdn_topups.sql",
                   "backend/migrations/0151_quota_v2_cdn_signed_revision_integrity.sql",
+                  "backend/migrations/0152_quota_v2_node_calendar.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
@@ -104,6 +113,8 @@ jobs:
         run: |
           python3 -m py_compile scripts/test-quota-v2-runtime-preflight-postgres.py
           python3 scripts/test-quota-v2-runtime-preflight-postgres.py -v
+      - name: Independent calendar reservations use immutable UTC deadlines
+        run: python3 scripts/test-quota-v2-node-calendar-postgres.py
       - name: Exactly-once immutable signed-cap outbox and 20-way concurrency
         run: |
           python3 -m py_compile scripts/test-quota-v2-signed-cap-outbox-postgres.py

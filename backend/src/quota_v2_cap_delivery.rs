@@ -221,6 +221,7 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     .await?;
     let install: i64 = row.try_get("install_before_ms")?;
     let expires: i64 = row.try_get("valid_until_ms")?;
+    check_node_calendar(&mut tx, req, &current_user, &reservation, expires).await?;
     // The outbox/lease reads can wait behind a writer. The signed
     // installation window must still be open after those locks are taken.
     let delivery_now = database_now_ms(&mut tx).await?;
@@ -527,6 +528,8 @@ async fn issue_original(
     .await
     .map_err(reject_conflict)?;
     let now = database_now_ms(conn).await?;
+    let expires = now.saturating_add(3_600_000).min(lease.lease_expires);
+    check_node_calendar(conn, req, current_user, &lease.reservation, expires).await?;
     let aliases = scope
         .aliases
         .iter()
@@ -574,14 +577,31 @@ async fn issue_original(
             install_before_ms: now
                 .saturating_add(60_000)
                 .min(preflight.expires_ms)
+                .min(expires.saturating_sub(1))
                 .min(lease.prepared_ms.saturating_add(120_000)),
-            valid_until_ms: now.saturating_add(3_600_000).min(lease.lease_expires),
+            valid_until_ms: expires,
             aliases,
         },
         now,
     )
     .map_err(|_| deny())?;
     store_signed_first_cap(conn, state, req, &signed).await
+}
+
+async fn check_node_calendar(
+    conn: &mut PgConnection,
+    req: &Request,
+    user: &Value,
+    reservation: &str,
+    expires: i64,
+) -> Result<(), ApiError> {
+    if crate::quota_v2_node_lifetime::permit_deadline(conn, req.node_id, user, reservation)
+        .await?
+        .is_some_and(|end| expires > end)
+    {
+        return Err(deny());
+    }
+    Ok(())
 }
 
 async fn store_signed_first_cap(

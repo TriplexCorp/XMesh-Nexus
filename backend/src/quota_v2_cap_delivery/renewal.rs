@@ -197,6 +197,7 @@ pub(super) async fn issue(
     let payload = verified_payload(state, &permit, &lease, activation, scope)?;
     let now = super::database_now_ms(&mut tx).await?;
     let expires = payload["validUntilMs"].as_i64().ok_or_else(deny)?;
+    super::check_node_calendar(&mut tx, req, &user, &fields.reservation_id, expires).await?;
     let limit = crate::quota_v2::authoritative_shared_limit(&user).map_err(|_| deny())?;
     if !node_runtime::first_genesis_active_until(&user, now, expires) || limit < original_limit {
         return Err(deny());
