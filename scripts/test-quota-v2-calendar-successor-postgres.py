@@ -32,7 +32,7 @@ def main():
         node = 8700000000 + uuid.uuid4().int % 1000000000
         epoch, meter, predecessor = (uuid.uuid4() for _ in range(3))
         next_meter, next_reservation = (uuid.uuid4() for _ in range(2))
-        issued = 1800000000000
+        issued = int(datetime.now(timezone.utc).timestamp() * 1000)
         sample = (b'{"algorithm":"Ed25519","payload":{"kind":'
                   b'"xmesh.quota-v2.calendar-successor-prepared",'
                   b'"authorizedBytes":0,"canSpend":false,"canStart":false,'
@@ -83,6 +83,10 @@ def main():
         too_early[10] = int(boundary.timestamp() * 1000) - 1
         too_early[11] = too_early[10] + 60_000
         must_refuse(db, insert, tuple(too_early), {"23514"})
+        from_the_future = list(row)
+        from_the_future[10] = issued + 3_600_000
+        from_the_future[11] = from_the_future[10] + 60_000
+        must_refuse(db, insert, tuple(from_the_future), {"23514"})
         db.execute(insert, row)
         saved = db.execute(
             "SELECT signed_envelope FROM quota_v2_calendar_successor_preparations "
