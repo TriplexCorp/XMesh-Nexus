@@ -6,6 +6,7 @@ target, no fixture-generated traffic counters.
 """
 import json
 from pathlib import Path
+import re
 import socket
 import socketserver
 import struct
@@ -74,12 +75,32 @@ def stats(xray,email):
     raw=subprocess.check_output(
         [xray,"api","statsquery","--server=127.0.0.1:10085","-pattern",f"user>>>{email}"],
         timeout=8)
-    result={}
-    for item in (json.loads(raw).get("stat") or []):
-        for direction in ("uplink","downlink"):
-            if item["name"]==f"user>>>{email}>>>traffic>>>{direction}":
-                assert direction not in result
-                result[direction]=int(item["value"])
+    return parse_stats(raw, email)
+
+
+def parse_stats(raw, email):
+    document = json.loads(raw)
+    if not isinstance(document, dict) or not isinstance(document.get("stat"), list):
+        raise ValueError("missing StatsService counter list")
+    names = {f"user>>>{email}>>>traffic>>>{direction}": direction
+             for direction in ("uplink", "downlink")}
+    result = {}
+    for item in document["stat"]:
+        direction = names.get(item["name"])
+        if direction is None:
+            continue
+        if direction in result:
+            raise ValueError(f"duplicate StatsService counter: {direction}")
+        # ProtoJSON omits a default scalar and encodes an int64 as a string.
+        value = item.get("value", "0")
+        if not isinstance(value, str) or not re.fullmatch(r"0|[1-9][0-9]{0,18}", value):
+            raise ValueError(f"invalid StatsService counter: {direction}")
+        count = int(value)
+        if count > 2**63 - 1:
+            raise ValueError(f"StatsService counter overflow: {direction}")
+        result[direction] = count
+    if len(result) != len(names):
+        raise ValueError(f"missing StatsService counters: {sorted(set(names.values()) - result.keys())}")
     return result
 
 
