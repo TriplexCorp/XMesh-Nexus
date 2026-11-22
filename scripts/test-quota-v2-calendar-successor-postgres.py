@@ -15,7 +15,13 @@ def must_refuse(connection, statement, params=()):
     try:
         with connection.transaction():
             connection.execute(statement, params)
-    except psycopg.Error:
+    except psycopg.Error as error:
+        # Reject only the intended constraints/immutability guards. Syntax,
+        # missing relations or programming mistakes are test failures.
+        assert error.sqlstate in {"22023", "23505", "23503", "23514"}, (
+            "unexpected SQL failure instead of an immutability denial",
+            error.sqlstate,
+        )
         return
     raise AssertionError("immutable successor SQL accepted forbidden write")
 
