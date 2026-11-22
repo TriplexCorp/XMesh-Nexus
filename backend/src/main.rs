@@ -24,6 +24,7 @@ mod protocol_credentials;
 mod quota_v2;
 mod quota_v2_cap_delivery;
 mod quota_v2_cap_signing;
+mod quota_v2_cdn_lifetime;
 mod quota_v2_node_lifetime;
 mod quota_v2_genesis_reservation;
 mod quota_v2_policy_pin;
