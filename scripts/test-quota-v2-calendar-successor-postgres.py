@@ -260,7 +260,60 @@ def main():
             "SELECT count(*) FROM quota_v2_reservations WHERE "
             "reservation_id IN (%s,%s)",
             (next_reservation, candidate_reservation2)).fetchone() == (0,)
-    print("PASS: zero-spend calendar successor and immutable fresh-meter candidate only")
+
+        # PostgreSQL MUST NOT commit an unsigned successor reservation.
+        # A deferred constraint catches the otherwise invisible interval
+        # between the zero reservation INSERT and positive signing; a
+        # failed COMMIT rolls back ALL debit/hold changes atomically.
+        try:
+            with db.transaction():
+                db.execute(
+                    "INSERT INTO quota_v2_reservations "
+                    "(user_id,epoch,node_id,meter_epoch,reservation_id,"
+                    "valid_until,ceiling_bytes,revision,node_confirmed) "
+                    "VALUES(%s,%s,%s,%s,%s,%s,1,1,TRUE)",
+                    (user2, epoch2, node, candidate_meter2,
+                     candidate_reservation2,
+                     datetime.now(timezone.utc)+timedelta(minutes=3)))
+                db.execute(
+                    "SET CONSTRAINTS quota_v2_successor_must_sign_reservation IMMEDIATE")
+        except psycopg.Error as error:
+            assert error.sqlstate == "23514", (
+                "unsigned successor was refused for unexpected reason", error.sqlstate)
+        else:
+            raise AssertionError(
+                "PostgreSQL committed a new funded calendar reserve without any signed cap")
+        assert db.execute(
+            "SELECT count(*) FROM quota_v2_reservations "
+            "WHERE reservation_id=%s",
+            (candidate_reservation2,)).fetchone() == (0,)
+        assert db.execute(
+            "SELECT count(*) FROM quota_v2_calendar_successor_positive_caps "
+            "WHERE predecessor_id=%s",
+            (predecessor2,)).fetchone() == (0,)
+        # Signed issuer outbox must also refuse forged/invalid credentials
+        # before a candidate lease exists. A missing foreign-key row cannot
+        # become standalone new spending authority via an INSERT.
+        must_refuse(db,
+                    "INSERT INTO quota_v2_calendar_successor_positive_caps "
+                    "(predecessor_id,node_id,user_id,account_epoch,meter_epoch,"
+                    "reservation_id,fresh_runtime_id,policy_sha256,"
+                    "signer_public_key,nonce,revision,grant_bytes,"
+                    "cdn_ceiling_bytes,issued_at_ms,install_before_ms,"
+                    "valid_until_ms,signed_envelope,fresh_genesis_envelope) "
+                    "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,1,0,"
+                    "%s,%s,%s,%s,%s)",
+                    (predecessor2, node, user2, epoch2,
+                     candidate_meter2, candidate_reservation2,
+                     "e"*64, "d"*64, "b"*64, "f"*64,
+                     issued, issued+30_000, issued+90_000,
+                     b"0"*200, b"0"*200),
+                    {"P0002", "23503", "23514"})
+        assert db.execute(
+            "SELECT count(*) FROM quota_v2_calendar_successor_positive_caps"
+        ).fetchone() == (0,)
+
+    print("PASS: calendar successor preparation, fresh meter and atomic unsigned-reservation denial")
 
 
 if __name__ == "__main__":
