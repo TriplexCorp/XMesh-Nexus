@@ -1116,7 +1116,7 @@ fn policy_shared_limit(user: &Value, inbound_class: &str) -> Result<Option<i64>,
     if raw > 0 {
         return Ok(Some(raw));
     }
-    if raw == 0 && matches!(inbound_class, "main" | "cdn") {
+    if raw == 0 && matches!(inbound_class, "main" | "cdn" | "mixed") {
         return Ok(Some(i64::MAX));
     }
     if raw == 0 && inbound_class == "unclassified" {
@@ -1600,7 +1600,12 @@ mod unlimited_shared_account_tests {
             policy_shared_limit(&signed, "unclassified").unwrap(),
             None,
         );
-        assert!(policy_shared_limit(&signed, "mixed").is_err());
+        // A signed mixed scope is permitted only with an independently
+        // prefunded immutable CDN hold (checked in the SQL issuer).
+        assert_eq!(
+            policy_shared_limit(&signed, "mixed").unwrap(),
+            Some(i64::MAX),
+        );
         assert!(policy_shared_limit(&json!({"limitBytes": -1}), "main").is_err());
         assert_eq!(
             policy_shared_limit(&json!({"limitBytes": 1024}), "main").unwrap(),
