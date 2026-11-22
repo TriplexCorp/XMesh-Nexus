@@ -218,10 +218,7 @@ pub(super) async fn issue(
             .fetch_one(&mut *tx)
             .await?;
     let expires = payload["validUntilMs"].as_i64().ok_or_else(deny)?;
-    let limit = user["limit"]
-        .as_f64()
-        .map(crate::gb_to_bytes_i64)
-        .ok_or_else(deny)?;
+    let limit = crate::quota_v2::authoritative_shared_limit(&user).map_err(|_| deny())?;
     if !node_runtime::first_genesis_active_until(&user, now, expires) || limit < original_limit {
         return Err(deny());
     }
