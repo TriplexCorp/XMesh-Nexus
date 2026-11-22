@@ -123,12 +123,30 @@ FOR EACH STATEMENT EXECUTE FUNCTION quota_v2_runtime_preflight_immutable();
 CREATE FUNCTION quota_v2_guard_unfunded_successor_cap()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
+    -- A different reservation UUID with the SAME candidate meter epoch is
+    -- also forbidden; otherwise an issuer could bypass the zero-spend
+    -- predecessor outbox simply by substituting a new reservation ID.
     IF EXISTS (
         SELECT 1 FROM quota_v2_calendar_successor_preparations p
+        LEFT JOIN quota_v2_reservations r
+            ON r.reservation_id=NEW.reservation_id
         WHERE p.candidate_reservation_id=NEW.reservation_id
+           OR p.candidate_meter_epoch=r.meter_epoch
     ) THEN
         RAISE EXCEPTION 'unfunded calendar successor cannot issue a positive cap'
             USING ERRCODE='23514';
+    END IF;
+    IF TG_TABLE_NAME='quota_v2_signed_first_cap_outbox' THEN
+        -- Once a new runtime was declared a non-authorizing successor,
+        -- no legacy first-cap path may silently use it as a fresh genesis
+        -- for a different reservation or user.
+        IF EXISTS (
+            SELECT 1 FROM quota_v2_calendar_successor_meter_preflights pre
+            WHERE pre.fresh_runtime_id=NEW.runtime_id
+        ) THEN
+            RAISE EXCEPTION 'staged successor runtime cannot use legacy first-cap issuer'
+                USING ERRCODE='23514';
+        END IF;
     END IF;
     RETURN NEW;
 END
