@@ -133,7 +133,7 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1]
                   / "backend/src/quota_v2_cdn_lifetime.rs").read_text()
         code = source.split("pub async fn record_class(", 1)[1]
-        match = re.search(r'sqlx::query\\(\\s*"([^"]+)"',code,re.DOTALL)
+        match = re.search(r'sqlx::query\(\s*"([^"]+)"',code,re.DOTALL)
         self.assertIsNotNone(match, "production classification SQL missing")
         statement = match.group(1)
         old_epoch,old_reserve,new_reserve = uuid.uuid4(),uuid.uuid4(),uuid.uuid4()
@@ -172,7 +172,7 @@ class LifetimeBudgetSQLTests(unittest.TestCase):
             # untrusted even if a signed config now calls that Node MAIN.
             lookup_source = source.split("pub async fn verify_class(",1)[1]
             verified = re.search(
-                r'sqlx::query_scalar\\(\\s*"([^"]+)"', lookup_source,re.DOTALL)
+                r'sqlx::query_scalar\(\s*"([^"]+)"', lookup_source,re.DOTALL)
             self.assertIsNotNone(verified)
             db.execute(
                 "PREPARE xmesh_class_check(uuid,bigint,bigint) AS "+verified.group(1))
