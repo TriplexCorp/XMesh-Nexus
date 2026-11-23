@@ -178,7 +178,7 @@ async fn database_now_ms(conn: &mut PgConnection) -> Result<i64, sqlx::Error> {
         .await
 }
 
-pub(crate) async fn observe_closed_calendars(
+pub async fn observe_closed_calendars(
     conn: &mut PgConnection,
     user: i64,
     node: i64,
