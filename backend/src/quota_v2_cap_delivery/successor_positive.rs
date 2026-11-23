@@ -340,9 +340,7 @@ async fn persist_fresh_preflight(
     conn: &mut PgConnection,
     req: &Request,
     fields: &RequestFields,
-    epoch: &str,
-    meter: &str,
-    reservation: &str,
+    (epoch, meter, reservation): (&str, &str, &str),
     now: i64,
     class: &str,
 ) -> Result<(), ApiError> {
@@ -712,7 +710,7 @@ pub(super) async fn issue(
         return Ok(saved);
     }
     persist_fresh_preflight(
-        &mut tx, req, fields, &epoch, &meter, &reservation, now, class,
+        &mut tx, req, fields, (&epoch, &meter, &reservation), now, class,
     ).await?;
     let funded = fund_successor_reservation(
         &mut tx, req, &user,
