@@ -81,6 +81,20 @@ def inject():
         if payload["userId"] == user and payload["reservationId"] != first:
             kill_once("successor-ingress-published", payload["reservationId"])
 
+    fence = cap_install.fence_calendar_in_xray
+
+    @functools.wraps(fence)
+    def interrupt_fence(path, pid, runtime, old_scope):
+        scope = armed()
+        target = scope == (old_scope["userId"], old_scope["reservationId"])
+        if target:
+            kill_once("before-calendar-fence", old_scope["reservationId"])
+        result = fence(path, pid, runtime, old_scope)
+        if target:
+            kill_once("calendar-fence-unrecorded", old_scope["reservationId"])
+        return result
+
+    cap_install.fence_calendar_in_xray = interrupt_fence
     after(quarantine_policy, "_durable_store", after_write)
     after(wal_transport, "_post", after_charge)
     after(cap_install, "install_in_xray", after_ipc)

@@ -16,7 +16,8 @@ RENEW = "xmesh-quota-v2-renewal"
 INGRESS = "xmesh-quota-v2-ingress"
 FAULT_STATE = "/run/xmesh-quota-v2-faults"
 FAULT_POINTS = (
-    "wal-request-durable", "wal-response-unrecorded", "successor-delivery-durable",
+    "wal-request-durable", "wal-response-unrecorded", "before-calendar-fence",
+    "calendar-fence-unrecorded", "successor-delivery-durable",
     "successor-ipc-acknowledged", "successor-receipt-durable", "successor-ingress-published",
 )
 
@@ -160,6 +161,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         start_echo(main, 1, pid)
         if crashes:
             main.exec("test", "-f", FAULT_STATE + "/loaded")
+            main.exec("touch", WORK + "/check-xray-kill")
             main.exec("sh", "-ec", 'umask 077; printf "%s %s\n" "$1" "$2" > "$3/armed"',
                       "sh", str(uid), initial["reservationId"], FAULT_STATE)
         main.exec("touch", WORK + "/ready-1")
@@ -304,14 +306,37 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                 "nexusRejectedOlderSchema": True,
                 "ledgerUnchanged": True,
             }, indent=2))
+        if crashes:
+            active_container = f"xmesh-quota-u{uid}-" + chain[1]["reservationId"].replace("-", "")
+            assert int(main.exec("docker", "inspect", "-f", "{{.State.Pid}}", active_container)) == pid
+            main.exec("docker", "kill", "--signal", "KILL", active_container)
+            assert main.exec("docker", "inspect", "-f", "{{.State.Running}}:{{.State.ExitCode}}",
+                             active_container).strip() == b"false:137"
+            main.exec("touch", WORK + "/xray-killed")
+
+            def kill_checked():
+                assert process.poll() is None, "peer VLESS client disconnected after Xray SIGKILL"
+                return main.exec("sh", "-c", 'test ! -f "$1" || printf done', "sh",
+                                 WORK + "/xray-kill-checked") == b"done"
+
+            lab.wait_for(kill_checked, timeout=20, label="closed A ingress and live B after Xray SIGKILL")
+            main.exec("systemctl", "start", service, timeout=35)
+            assert main.exec("docker", "inspect", "-f", "{{.State.Running}}:{{.State.ExitCode}}",
+                             active_container).strip() == b"false:137"
+            assert snapshot(db) == before
+            (artifact / "xray-sigkill.json").write_text(json.dumps({
+                "generation": 3, "runtimeId": chain[2]["runtimeId"], "exitCode": 137,
+                "existingAndNewAConnectionsDenied": True, "peerReconnected": False,
+            }, indent=2))
         main.exec("touch", WORK + "/database-restarted")
         assert process.wait(timeout=20) == 0
         main.exec("test", "-f", WORK + "/peer-intact")
         if crashes:
             observed = {}
-            for i, point in enumerate(FAULT_POINTS):
+            for point in FAULT_POINTS:
                 observed[point] = main.exec("cat", f"{FAULT_STATE}/{point}").decode().strip()
-                assert observed[point] == chain[1 if i in (3, 5) else 0]["reservationId"]
+                successor = point in ("successor-ipc-acknowledged", "successor-ingress-published")
+                assert observed[point] == chain[int(successor)]["reservationId"]
             journal = main.exec("journalctl", "-u", service, "--no-pager", "-o", "cat",
                                 "--grep", "Main process exited, code=killed, status=9/KILL")
             assert len(journal.splitlines()) == len(FAULT_POINTS), journal

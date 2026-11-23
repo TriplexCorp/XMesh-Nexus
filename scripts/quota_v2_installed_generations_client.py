@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 
-from quota_v2_installed_live_vless import exact, socks_stream
+from quota_v2_installed_live_vless import denied, exact, socks_stream
 
 
 def run(binary, user, peer, state):
@@ -59,6 +59,19 @@ def run(binary, user, peer, state):
                         assert time.monotonic() < deadline, "successor never opened"
                         exchange(peer_stream, b"peer")
                         time.sleep(2)
+                    if generation == 3 and (directory / "check-xray-kill").exists():
+                        deadline = time.monotonic() + 180
+                        while not (directory / "xray-killed").exists():
+                            assert time.monotonic() < deadline, "active Xray was never killed"
+                            exchange(peer_stream, b"peer")
+                            time.sleep(2)
+                        try:
+                            active.sendall(b"after-kill")
+                            assert active.recv(1) == b"", "the killed Xray still served A"
+                        except (ConnectionResetError, BrokenPipeError):
+                            pass
+                        denied()
+                        (directory / "xray-kill-checked").touch()
                     if generation < 3:
                         try:
                             active.sendall(b"stale")
