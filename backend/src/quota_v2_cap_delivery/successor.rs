@@ -341,8 +341,14 @@ pub(super) async fn prepare(
         return Ok(exact);
     }
     let exact = persist_zero_successor_preparation(
-        &mut tx, state, req, fields, &old, (&signer, &earlier_epoch, activation, now),
-    ).await?;
+        &mut tx,
+        state,
+        req,
+        fields,
+        &old,
+        (&signer, &earlier_epoch, activation, now),
+    )
+    .await?;
     tx.commit().await?;
     Ok(exact)
 }
