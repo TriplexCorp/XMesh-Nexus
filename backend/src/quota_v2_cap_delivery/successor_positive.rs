@@ -433,13 +433,13 @@ struct FundingContext<'a> {
     floor: i64,
 }
 
-async fn fund_successor_reservation(
+async fn successor_headroom(
     conn: &mut PgConnection,
     req: &Request,
     user: &Value,
-    ctx: FundingContext<'_>,
-) -> Result<FundedSuccessor, ApiError> {
-    let FundingContext { epoch, meter, reservation, class, now, limit, floor } = ctx;
+    ctx: &FundingContext<'_>,
+) -> Result<(i64, i64, Option<i64>), ApiError> {
+    let FundingContext { epoch, reservation, class, now, limit, floor, .. } = *ctx;
     let node_end = crate::quota_v2_node_lifetime::bind_deadline(
         &mut *conn,
         req.node_id,
@@ -475,6 +475,19 @@ async fn fund_successor_reservation(
     if target <= 0 {
         return Err(deny());
     }
+    Ok((valid_until, target, cdn_free))
+}
+
+async fn fund_successor_reservation(
+    conn: &mut PgConnection,
+    req: &Request,
+    user: &Value,
+    ctx: FundingContext<'_>,
+) -> Result<FundedSuccessor, ApiError> {
+    let FundingContext { epoch, meter, reservation, class, limit, floor, .. } = ctx;
+    let (valid_until, target, cdn_free) = successor_headroom(
+        conn, req, user, &ctx,
+    ).await?;
     let (granted, revision): (i64, i64) = sqlx::query_as(
         "SELECT ceiling_bytes,revision
          FROM quota_v2_reserve($1,$2::uuid,$3,$4::uuid,$5::uuid,$6,0,
