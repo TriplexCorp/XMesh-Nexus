@@ -157,6 +157,52 @@ async fn original_predecessor(
     .ok_or_else(deny)
 }
 
+fn verify_preparation_replay(
+    row: &sqlx::postgres::PgRow,
+    state: &AppState,
+    req: &Request,
+    old: &Previous,
+    activation: &str,
+    signer: &str,
+    now: i64,
+) -> Result<String, ApiError> {
+    let node: i64 = row.try_get("node_id")?;
+    let user: i64 = row.try_get("user_id")?;
+    let challenge: String = row.try_get("request_challenge")?;
+    let public: String = row.try_get("signer_public_key")?;
+    let account_epoch: String = row.try_get("account_epoch")?;
+    let runtime: String = row.try_get("predecessor_runtime_id")?;
+    let policy: String = row.try_get("policy_sha256")?;
+    if node != req.node_id
+        || user != req.user_id
+        || challenge != req.challenge
+        || public != signer
+        || account_epoch != old.account_epoch
+        || runtime != old.predecessor_runtime_id
+        || policy != old.policy_sha256
+    {
+        return Err(deny());
+    }
+    let raw: Vec<u8> = row.try_get("signed_envelope")?;
+    let exact = verified_saved(state, &raw, req, &old, activation, now)?;
+    // The SQL row and signed immutable bytes must carry the SAME
+    // successor identifiers and validity. This guards against any
+    // partial/restored outbox state being mistaken for exact replay.
+    let saved_envelope: Value = serde_json::from_slice(&raw).map_err(|_| deny())?;
+    let payload = &saved_envelope["payload"];
+    let meter: String = row.try_get("candidate_meter_epoch")?;
+    let reservation: String = row.try_get("candidate_reservation_id")?;
+    let issued: i64 = row.try_get("issued_at_ms")?;
+    let until: i64 = row.try_get("valid_until_ms")?;
+    if payload["meterEpoch"] != meter
+        || payload["reservationId"] != reservation
+        || payload["issuedAtMs"] != issued
+        || payload["validUntilMs"] != until
+    {
+        return Err(deny());
+    }
+}
+ 
 pub(super) async fn prepare(
     state: &AppState,
     req: &Request,
@@ -225,41 +271,7 @@ pub(super) async fn prepare(
     .fetch_optional(&mut *tx)
     .await?;
     if let Some(row) = prior {
-        let node: i64 = row.try_get("node_id")?;
-        let user: i64 = row.try_get("user_id")?;
-        let challenge: String = row.try_get("request_challenge")?;
-        let public: String = row.try_get("signer_public_key")?;
-        let account_epoch: String = row.try_get("account_epoch")?;
-        let runtime: String = row.try_get("predecessor_runtime_id")?;
-        let policy: String = row.try_get("policy_sha256")?;
-        if node != req.node_id
-            || user != req.user_id
-            || challenge != req.challenge
-            || public != signer
-            || account_epoch != old.account_epoch
-            || runtime != old.predecessor_runtime_id
-            || policy != old.policy_sha256
-        {
-            return Err(deny());
-        }
-        let raw: Vec<u8> = row.try_get("signed_envelope")?;
-        let exact = verified_saved(state, &raw, req, &old, activation, now)?;
-        // The SQL row and signed immutable bytes must carry the SAME
-        // successor identifiers and validity. This guards against any
-        // partial/restored outbox state being mistaken for exact replay.
-        let saved_envelope: Value = serde_json::from_slice(&raw).map_err(|_| deny())?;
-        let payload = &saved_envelope["payload"];
-        let meter: String = row.try_get("candidate_meter_epoch")?;
-        let reservation: String = row.try_get("candidate_reservation_id")?;
-        let issued: i64 = row.try_get("issued_at_ms")?;
-        let until: i64 = row.try_get("valid_until_ms")?;
-        if payload["meterEpoch"] != meter
-            || payload["reservationId"] != reservation
-            || payload["issuedAtMs"] != issued
-            || payload["validUntilMs"] != until
-        {
-            return Err(deny());
-        }
+        let exact = verify_preparation_replay(&row, state, req, &old, activation, &signer, now)?;
         tx.commit().await?;
         return Ok(exact);
     }
