@@ -14,6 +14,11 @@ from quota_v2_installed_genesis_lease import (
 WORK = MEASURED + "/generations-ci"
 RENEW = "xmesh-quota-v2-renewal"
 INGRESS = "xmesh-quota-v2-ingress"
+FAULT_STATE = "/run/xmesh-quota-v2-faults"
+FAULT_POINTS = (
+    "wal-request-durable", "wal-response-unrecorded", "successor-delivery-durable",
+    "successor-ipc-acknowledged", "successor-receipt-durable", "successor-ingress-published",
+)
 
 
 def shorten_disposable_calendar(db, dsn):
@@ -53,6 +58,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn):
     service = RENEW + ".service"
     main = pair[0]
     node, uid = main.node, user["id"]
+    crashes = os.environ.get("XMESH_TEST_INSTALLED_CRASHES") == "1"
     echo = (f"import sys; sys.path.insert(0, {WORK!r}); "
             "from quota_v2_installed_live_vless import EchoHandler,EchoServer; "
             "EchoServer(('127.0.0.1',28421),EchoHandler).serve_forever()")
@@ -83,6 +89,16 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn):
                    f"/etc/systemd/system/{RENEW}.timer.d/ci.conf")
         for filename in ("quota_v2_installed_live_vless.py", "quota_v2_installed_generations_client.py"):
             lab.docker("cp", Path(__file__).with_name(filename), f"{guest.name}:{WORK}/{filename}")
+        if crashes and guest is main:
+            guest.exec("install", "-d", "-m", "0700", FAULT_STATE, WORK + "/crash-hook")
+            lab.docker("cp", Path(__file__).with_name("quota_v2_installed_generations_faults.py"),
+                       f"{guest.name}:{WORK}/crash-hook/sitecustomize.py")
+            dropin = f"/etc/systemd/system/{service}.d"
+            guest.exec("install", "-d", "-m", "0755", dropin)
+            guest.exec("sh", "-ec",
+                       'printf "%s\n" "[Service]" "Environment=XMESH_QUOTA_TEST_CRASH=1" '
+                       '"Environment=PYTHONPATH=$1" > "$2/crash.conf"',
+                       "sh", WORK + "/crash-hook", dropin)
         guest.exec("systemctl", "daemon-reload")
         ingress_service = INGRESS + ".service"
         assert guest.exec("systemctl", "show", ingress_service,
@@ -142,6 +158,10 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn):
         pid = ready_route(main, uid, initial)
         assert ready_route(main, peer["id"], stable) == pid
         start_echo(main, 1, pid)
+        if crashes:
+            main.exec("test", "-f", FAULT_STATE + "/loaded")
+            main.exec("sh", "-ec", 'umask 077; printf "%s %s\n" "$1" "$2" > "$3/armed"',
+                      "sh", str(uid), initial["reservationId"], FAULT_STATE)
         main.exec("touch", WORK + "/ready-1")
         process = subprocess.Popen([
             "docker", "exec", main.name, "python3", WORK + "/quota_v2_installed_generations_client.py",
@@ -257,6 +277,15 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn):
         main.exec("touch", WORK + "/database-restarted")
         assert process.wait(timeout=20) == 0
         main.exec("test", "-f", WORK + "/peer-intact")
+        if crashes:
+            observed = {}
+            for i, point in enumerate(FAULT_POINTS):
+                observed[point] = main.exec("cat", f"{FAULT_STATE}/{point}").decode().strip()
+                assert observed[point] == chain[1 if i in (3, 5) else 0]["reservationId"]
+            journal = main.exec("journalctl", "-u", service, "--no-pager", "-o", "cat",
+                                "--grep", "Main process exited, code=killed, status=9/KILL")
+            assert len(journal.splitlines()) == len(FAULT_POINTS), journal
+            (artifact / "agent-sigkill.json").write_text(json.dumps(observed, indent=2))
         (artifact / "charges.json").write_text(json.dumps(charges, indent=2))
         print("PASS: installed Agent and Nexus completed VLESS 1 → 2 → 3, "
               "with three separate WAL charges and no reconnect for user B.", flush=True)

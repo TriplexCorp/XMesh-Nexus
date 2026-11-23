@@ -31,11 +31,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [lease-recovery, managed-generations]
+        scenario: [lease-recovery, managed-generations, agent-sigkill]
     timeout-minutes: 50
     env:
       XMESH_AUDIT_DISPOSABLE: '1'
-      XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario == 'managed-generations' && '1' || '0' }}
+      XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario != 'lease-recovery' && '1' || '0' }}
+      XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
       XMESH_INSTALLED_NODE_REF: 621439f507f708904c1bc3ebad60ad119885276c
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
@@ -131,8 +132,8 @@ jobs:
           export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-installed
       - name: Save verified public quota evidence
-        if: always() && matrix.scenario == 'managed-generations'
+        if: always() && matrix.scenario != 'lease-recovery'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: quota-v2-generations-evidence
+          name: quota-v2-generations-evidence-${{ matrix.scenario }}
           path: ${{ runner.temp }}/quota-v2-generations-evidence
