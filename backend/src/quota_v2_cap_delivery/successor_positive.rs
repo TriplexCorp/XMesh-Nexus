@@ -425,18 +425,23 @@ struct FundedSuccessor {
     install_before: i64,
 }
 
+struct FundingContext<'a> {
+    epoch: &'a str,
+    meter: &'a str,
+    reservation: &'a str,
+    class: &'a str,
+    now: i64,
+    limit: i64,
+    floor: i64,
+}
+
 async fn fund_successor_reservation(
     conn: &mut PgConnection,
     req: &Request,
     user: &Value,
-    epoch: &str,
-    meter: &str,
-    reservation: &str,
-    class: &str,
-    now: i64,
-    limit: i64,
-    floor: i64,
+    ctx: FundingContext<'_>,
 ) -> Result<FundedSuccessor, ApiError> {
+    let FundingContext { epoch, meter, reservation, class, now, limit, floor } = ctx;
     let node_end = crate::quota_v2_node_lifetime::bind_deadline(
         &mut *conn,
         req.node_id,
@@ -710,7 +715,11 @@ pub(super) async fn issue(
         &mut tx, req, fields, &epoch, &meter, &reservation, now, class,
     ).await?;
     let funded = fund_successor_reservation(
-        &mut tx, req, &user, &epoch, &meter, &reservation, class, now, limit, floor,
+        &mut tx, req, &user,
+        FundingContext {
+            epoch: &epoch, meter: &meter, reservation: &reservation,
+            class, now, limit, floor,
+        },
     ).await?;
     let aliases = scope
         .aliases
