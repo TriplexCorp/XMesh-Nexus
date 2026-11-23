@@ -154,12 +154,7 @@ async fn latest_permit(
     Ok((permit, is_renewal))
 }
 
-pub(super) async fn issue(
-    state: &AppState,
-    req: &Request,
-    fields: &RequestFields,
-    activation: &str,
-) -> Result<String, ApiError> {
+fn next_canonical_revision(fields: &RequestFields) -> Result<i64, ApiError> {
     let next_revision = fields.previous_revision.checked_add(1).ok_or_else(deny)?;
     if fields.previous_revision <= 0
         || !uuid::Uuid::parse_str(&fields.reservation_id)
@@ -167,6 +162,16 @@ pub(super) async fn issue(
     {
         return Err(deny());
     }
+    Ok(next_revision)
+}
+
+pub(super) async fn issue(
+    state: &AppState,
+    req: &Request,
+    fields: &RequestFields,
+    activation: &str,
+) -> Result<String, ApiError> {
+    let next_revision = next_canonical_revision(fields)?;
     let scope =
         node_runtime::signed_first_genesis_scope(state, req.node_id, req.user_id, false).await?;
     let mut tx = state.pool.begin().await?;
