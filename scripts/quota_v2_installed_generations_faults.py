@@ -28,7 +28,7 @@ def inject():
             return None
         return int(user), reservation
 
-    def kill_once(point, reservation):
+    def interrupt_once(point, reservation, sig=signal.SIGKILL):
         try:
             fd = os.open(STATE / point, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except FileExistsError:
@@ -37,7 +37,7 @@ def inject():
             marker.write(reservation + "\n")
             marker.flush()
             os.fsync(marker.fileno())
-        os.kill(os.getpid(), signal.SIGKILL)
+        os.kill(os.getpid(), sig)
 
     def after(module, name, observe):
         original = getattr(module, name)
@@ -57,11 +57,11 @@ def inject():
         if data.get("userId") != user:
             return
         if target.startswith("wal-charge-request-") and data.get("reservationId") == first:
-            kill_once("wal-request-durable", first)
+            interrupt_once("wal-request-durable", first)
         elif target == f"calendar-delivery-u{user}-{first}.json":
-            kill_once("successor-delivery-durable", first)
+            interrupt_once("successor-delivery-durable", first)
         elif target == f"calendar-positive-u{user}-{first}.json":
-            kill_once("successor-receipt-durable", first)
+            interrupt_once("successor-receipt-durable", first)
 
     def after_charge(scope, result, root, request):
         _, first = scope
@@ -69,17 +69,17 @@ def inject():
             # The product client received the real response, but the Agent
             # cannot record or act on it before the process dies.
             assert wal_transport.observed.strict_json(result).get("receipt")
-            kill_once("wal-response-unrecorded", first)
+            interrupt_once("wal-response-unrecorded", first, signal.SIGSTOP)
 
     def after_ipc(scope, result, path, pid, runtime, genesis, grant, grant_scope):
         user, first = scope
         if grant_scope["userId"] == user and grant_scope["reservationId"] != first:
-            kill_once("successor-ipc-acknowledged", grant_scope["reservationId"])
+            interrupt_once("successor-ipc-acknowledged", grant_scope["reservationId"])
 
     def after_route(scope, result, fd, payload, measured, predecessor=None, **kwargs):
         user, first = scope
         if payload["userId"] == user and payload["reservationId"] != first:
-            kill_once("successor-ingress-published", payload["reservationId"])
+            interrupt_once("successor-ingress-published", payload["reservationId"])
 
     fence = cap_install.fence_calendar_in_xray
 
@@ -88,10 +88,10 @@ def inject():
         scope = armed()
         target = scope == (old_scope["userId"], old_scope["reservationId"])
         if target:
-            kill_once("before-calendar-fence", old_scope["reservationId"])
+            interrupt_once("before-calendar-fence", old_scope["reservationId"])
         result = fence(path, pid, runtime, old_scope)
         if target:
-            kill_once("calendar-fence-unrecorded", old_scope["reservationId"])
+            interrupt_once("calendar-fence-unrecorded", old_scope["reservationId"])
         return result
 
     cap_install.fence_calendar_in_xray = interrupt_fence

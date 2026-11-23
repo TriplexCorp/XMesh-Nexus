@@ -178,6 +178,37 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
             lab.wait_for(done, timeout=35, label=f"live bytes on generation {generation}")
 
         completed(1)
+        if crashes:
+            reservation = initial["reservationId"]
+
+            def committed_charge():
+                marker = main.exec("sh", "-c", 'test ! -f "$1" || cat "$1"', "sh",
+                                   FAULT_STATE + "/wal-response-unrecorded")
+                if marker.strip() != reservation.encode():
+                    return None
+                pid = main.exec("systemctl", "show", "-p", "MainPID", "--value", service).strip()
+                if not re.fullmatch(rb"[1-9][0-9]*", pid):
+                    return None
+                status = main.exec("cat", f"/proc/{int(pid)}/status")
+                return int(pid) if re.search(rb"^State:\s+T\b", status, re.MULTILINE) else None
+
+            def charge_rows(connection):
+                return connection.execute(
+                    "SELECT filename, stream_bytes FROM quota_v2_wal_charges "
+                    "WHERE reservation_id=%s ORDER BY filename, stream_bytes",
+                    (reservation,)).fetchall()
+
+            stopped_pid = lab.wait_for(committed_charge, timeout=285,
+                                       label="Agent stopped before recording committed WAL response")
+            committed = charge_rows(db)
+            assert committed and any(row[1] > 0 for row in committed), committed
+            db = lab.restart_postgres(stack, dsn, db)
+            assert charge_rows(db) == committed
+            main.exec("kill", "-KILL", str(stopped_pid))
+            (artifact / "wal-response-loss.json").write_text(json.dumps({
+                "reservationId": reservation, "agentPid": stopped_pid,
+                "committedCharges": committed, "rowsSurvivedRestart": True,
+            }, indent=2))
         chain = [initial]
         replay_requests = []
         for generation in (2, 3):
@@ -274,8 +305,30 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         db = lab.restart_postgres(stack, dsn, db)
         assert snapshot(db) == before
         for request, response in replay_requests:
-            assert main.request(CAP_PATH, request) == (200, response)
+            assert parallel(lambda body: main.request(CAP_PATH, body), (request, request)) == [
+                (200, response), (200, response),
+            ]
         assert snapshot(db) == before
+        budget = db.execute("""
+            SELECT a.epoch::text, a.limit_bytes, GREATEST(a.settled_bytes, a.observed_floor_bytes),
+                   COALESCE((
+                       SELECT SUM(GREATEST(r.ceiling_bytes -
+                           GREATEST(r.acknowledged_bytes, r.conservative_burn_floor_bytes), 0))
+                       FROM quota_v2_reservations r WHERE r.user_id=a.user_id AND r.epoch=a.epoch
+                   ), 0)::bigint,
+                   COALESCE((
+                       SELECT SUM(s.refunded_bytes) FROM quota_v2_terminal_settlements s
+                       WHERE s.user_id=a.user_id AND s.epoch=a.epoch
+                   ), 0)::bigint
+            FROM quota_v2_accounts a WHERE a.user_id=%s ORDER BY a.epoch
+        """, (uid,)).fetchall()
+        assert budget and all(refunded == 0 and spent + held + refunded <= limit
+                              for _, limit, spent, held, refunded in budget), budget
+        (artifact / "conservation.json").write_text(json.dumps([
+            {"accountEpoch": epoch, "limit": limit, "spentFloor": spent,
+             "held": held, "refunded": refunded}
+            for epoch, limit, spent, held, refunded in budget
+        ], indent=2))
         if crashes:
             old_node = "621439f507f708904c1bc3ebad60ad119885276c"
             result = main.exec(
