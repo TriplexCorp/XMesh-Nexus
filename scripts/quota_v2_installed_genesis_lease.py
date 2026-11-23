@@ -198,7 +198,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
 
     if generations:
         from quota_v2_installed_generations import exercise
-        exercise(pair, db, root, user, peer, lab)
+        exercise(pair, db, root, user, peer, lab, stack, dsn)
         return
 
     def helper(item,operation):

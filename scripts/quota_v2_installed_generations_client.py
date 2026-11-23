@@ -65,6 +65,11 @@ def run(binary, user, peer, state):
                             assert active.recv(1) == b"", "old generation delivered bytes"
                         except (ConnectionResetError, BrokenPipeError):
                             pass
+            deadline = time.monotonic() + 180
+            while not (directory / "database-restarted").exists():
+                assert time.monotonic() < deadline, "PostgreSQL recovery check did not finish"
+                exchange(peer_stream, b"peer")
+                time.sleep(2)
             exchange(peer_stream, b"peer")
             (directory / "peer-intact").touch()
         finally:

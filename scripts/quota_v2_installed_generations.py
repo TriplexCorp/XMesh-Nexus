@@ -8,7 +8,7 @@ import subprocess
 import time
 
 from quota_v2_installed_genesis_lease import (
-    CAP_DOMAIN, GENESIS_DOMAIN, MEASURED, STATE, independent_signature, parallel,
+    CAP_DOMAIN, CAP_PATH, GENESIS_DOMAIN, MEASURED, STATE, independent_signature, parallel,
 )
 
 WORK = MEASURED + "/generations-ci"
@@ -49,7 +49,7 @@ def shorten_disposable_calendar(db, dsn):
     """)
 
 
-def exercise(pair, db, root, user, peer, lab):
+def exercise(pair, db, root, user, peer, lab, stack, dsn):
     service = RENEW + ".service"
     main = pair[0]
     node, uid = main.node, user["id"]
@@ -136,6 +136,7 @@ def exercise(pair, db, root, user, peer, lab):
 
         completed(1)
         chain = [initial]
+        replay_requests = []
         for generation in (2, 3):
             old = chain[-1]
             predicate = (node, uid, old["reservationId"])
@@ -163,6 +164,26 @@ def exercise(pair, db, root, user, peer, lab):
             assert receipt["xrayReceipt"] == {
                 "runtimeId": runtime, "grantSha256": hashlib.sha256(raw_cap).hexdigest(),
             }
+            proof = read_when_present(main, STATE + f"/calendar-meter-u{uid}-{old['reservationId']}.json")
+            closure = read_when_present(main, STATE + f"/calendar-fence-u{uid}-{old['reservationId']}.json")
+            assert proof is not None and closure is not None
+            fields = ("predecessorId", "freshRuntimeId", "freshContainerId", "freshStartedAt",
+                      "freshHostPid", "freshExecutableSha256", "freshConfigSha256",
+                      "freshWalInventorySha256", "zeroInitialRawCounters", "isolatedNewWalRoot")
+            request = {
+                "nodeId": node, "userId": uid, "requestChallenge": grant["nonce"],
+                "calendarSuccessorPositive": {
+                    **{key: proof[key] for key in fields},
+                    "oldWalChargeHeadsSha256": closure["oldWalChargeConfirmation"]["chargeHeadsSha256"],
+                },
+            }
+            replay_requests.append((request, receipt["response"]))
+            assert main.request(CAP_PATH, request) == (200, receipt["response"])
+            conflict = {**request, "calendarSuccessorPositive": {
+                **request["calendarSuccessorPositive"],
+                "freshHostPid": request["calendarSuccessorPositive"]["freshHostPid"] + 1,
+            }}
+            assert main.request(CAP_PATH, conflict)[0] == 409
             pid = ready_route(main, uid, grant)
             (artifact / f"generation-{generation}.json").write_text(json.dumps({
                 "predecessorReservation": old["reservationId"], "installation": receipt,
@@ -179,8 +200,6 @@ def exercise(pair, db, root, user, peer, lab):
                   f"Node {node}, predecessor {old['reservationId']}, successor {reservation}, "
                   f"runtime {runtime}", flush=True)
 
-        assert process.wait(timeout=20) == 0
-        main.exec("test", "-f", WORK + "/peer-intact")
         for field in ("meterEpoch", "runtimeId", "reservationId"):
             assert len({grant[field] for grant in chain}) == 3
         charges = {}
@@ -192,6 +211,31 @@ def exercise(pair, db, root, user, peer, lab):
                 (reservation,)).fetchone()[0], timeout=75, label=f"WAL charge {reservation}")
             assert charged == 16384, (reservation, charged)
             charges[reservation] = charged
+        def snapshot(connection):
+            return (
+                connection.execute(
+                    "SELECT reservation_id, acknowledged_bytes, conservative_burn_floor_bytes "
+                    "FROM quota_v2_reservations WHERE user_id=%s ORDER BY reservation_id",
+                    (uid,)).fetchall(),
+                connection.execute(
+                    "SELECT settled_bytes, observed_floor_bytes FROM quota_v2_accounts "
+                    "WHERE user_id=%s ORDER BY epoch", (uid,)).fetchall(),
+                connection.execute(
+                    "SELECT reservation_id, signed_envelope, fresh_genesis_envelope "
+                    "FROM quota_v2_calendar_successor_positive_caps WHERE user_id=%s ORDER BY reservation_id",
+                    (uid,)).fetchall(),
+            )
+
+        before = snapshot(db)
+        assert len(before[2]) == 2
+        db = lab.restart_postgres(stack, dsn, db)
+        assert snapshot(db) == before
+        for request, response in replay_requests:
+            assert main.request(CAP_PATH, request) == (200, response)
+        assert snapshot(db) == before
+        main.exec("touch", WORK + "/database-restarted")
+        assert process.wait(timeout=20) == 0
+        main.exec("test", "-f", WORK + "/peer-intact")
         (artifact / "charges.json").write_text(json.dumps(charges, indent=2))
         print("PASS: installed Agent and Nexus completed VLESS 1 → 2 → 3, "
               "with three separate WAL charges and no reconnect for user B.", flush=True)
