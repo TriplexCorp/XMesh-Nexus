@@ -84,11 +84,31 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn):
         for filename in ("quota_v2_installed_live_vless.py", "quota_v2_installed_generations_client.py"):
             lab.docker("cp", Path(__file__).with_name(filename), f"{guest.name}:{WORK}/{filename}")
         guest.exec("systemctl", "daemon-reload")
-        guest.exec("systemctl", "start", INGRESS + ".service")
+        ingress_service = INGRESS + ".service"
+        assert guest.exec("systemctl", "show", ingress_service,
+                          "--property=ProtectSystem", "--value").strip() == b"strict"
+        initial_lock = guest.exec("stat", "-c", "%i:%u:%a", STATE + "/lock").strip()
+        assert initial_lock.endswith(b":0:600"), initial_lock
+        guest.exec("systemctl", "start", ingress_service)
+
+        def listener_pid():
+            pid = int(guest.exec("systemctl", "show", ingress_service,
+                                 "--property=MainPID", "--value"))
+            if not pid:
+                return None
+            sockets = guest.exec("ss", "-Hltnp", "sport", "=", ":28401")
+            return pid if f"pid={pid},".encode() in sockets else None
+
+        pid = lab.wait_for(listener_pid, timeout=25, label=f"clean ingress on Node {guest.node}")
+        options = guest.exec("findmnt", "--task", str(pid), "--target", STATE,
+                             "--noheadings", "--output", "VFS-OPTIONS").decode().strip().split(",")
+        assert "ro" in options, options
+        assert guest.exec("stat", "-c", "%i:%u:%a", STATE + "/lock").strip() == initial_lock
+        print(f"PASS: installed ingress Node {guest.node} bound VLESS with read-only state "
+              "and the original shared lock inode.", flush=True)
         guest.exec("systemctl", "start", RENEW + ".timer")
         guest.exec("systemctl", "--no-block", "start", service)
 
-    parallel(enable, pair)
 
     def first(guest, user_id):
         record = lab.wait_for(
@@ -114,6 +134,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn):
     (artifact / "nexus-policy.pem").write_bytes(Path(os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"]).read_bytes())
     process = None
     try:
+        parallel(enable, pair)
         initial = first(main, uid)
         stable = first(main, peer["id"])
         first(pair[1], uid)
