@@ -475,32 +475,32 @@ async fn verify_successor_birth_scope(
     index: &[u8],
 ) -> Result<(), ApiError> {
     let aliases: std::collections::HashSet<String> = sqlx::query_scalar(
-            "SELECT DISTINCT alias->>'email'
-               FROM quota_v2_calendar_successor_positive_caps c
-               JOIN quota_v2_calendar_successor_meter_preflights p USING(predecessor_id)
-               CROSS JOIN LATERAL jsonb_array_elements(
-                   convert_from(c.signed_envelope,'UTF8')::jsonb->'payload'->'aliasScopes'
-               ) alias
-              WHERE c.node_id=$1 AND c.fresh_runtime_id=$2 AND p.fresh_container_id=$3
-                AND p.fresh_started_at=$4::text::timestamptz
-                AND convert_from(c.signed_envelope,'UTF8')::jsonb
-                    ->'payload'->>'activationReceiptSha256'=$5",
-        )
-        .bind(node_id)
-        .bind(scope.id)
-        .bind(&w.old_container_id)
-        .bind(&w.old_started_at)
-        .bind(scope.activation)
-        .fetch_all(&mut *conn)
-        .await?
-        .into_iter()
-        .collect();
-        for line in index[..index.len() - 1].split(|byte| *byte == b'\n') {
-            let birth: Birth = serde_json::from_slice(line).map_err(|_| invalid())?;
-            if birth.runtime_id != scope.id || !aliases.contains(&birth.email) {
-                return Err(conflict());
-            }
+        "SELECT DISTINCT alias->>'email'
+           FROM quota_v2_calendar_successor_positive_caps c
+           JOIN quota_v2_calendar_successor_meter_preflights p USING(predecessor_id)
+           CROSS JOIN LATERAL jsonb_array_elements(
+               convert_from(c.signed_envelope,'UTF8')::jsonb->'payload'->'aliasScopes'
+           ) alias
+          WHERE c.node_id=$1 AND c.fresh_runtime_id=$2 AND p.fresh_container_id=$3
+            AND p.fresh_started_at=$4::text::timestamptz
+            AND convert_from(c.signed_envelope,'UTF8')::jsonb
+                ->'payload'->>'activationReceiptSha256'=$5",
+    )
+    .bind(node_id)
+    .bind(scope.id)
+    .bind(&w.old_container_id)
+    .bind(&w.old_started_at)
+    .bind(scope.activation)
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .collect();
+    for line in index[..index.len() - 1].split(|byte| *byte == b'\n') {
+        let birth: Birth = serde_json::from_slice(line).map_err(|_| invalid())?;
+        if birth.runtime_id != scope.id || !aliases.contains(&birth.email) {
+            return Err(conflict());
         }
+    }
     Ok(())
 }
 
