@@ -162,8 +162,8 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         if crashes:
             main.exec("test", "-f", FAULT_STATE + "/loaded")
             main.exec("touch", WORK + "/check-xray-kill")
-            main.exec("sh", "-ec", 'umask 077; printf "%s %s\n" "$1" "$2" > "$3/armed"',
-                      "sh", str(uid), initial["reservationId"], FAULT_STATE)
+            main.exec("sh", "-ec", 'umask 077; printf "%s %s %s\n" "$1" "$2" "$3" > "$4/armed"',
+                      "sh", str(uid), initial["reservationId"], "g2", FAULT_STATE)
             (root / "drop-wal-response-armed").write_text(initial["reservationId"])
         main.exec("touch", WORK + "/ready-1")
         process = subprocess.Popen([
@@ -261,6 +261,12 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
             start_echo(main, generation, pid)
             main.exec("touch", f"{WORK}/ready-{generation}")
             completed(generation)
+            if crashes and generation == 2:
+                # Re-arm crash injection with generation 2 as the
+                # predecessor, so the 2->3 handoff gets its own failures.
+                main.exec("sh", "-ec",
+                          'umask 077; printf "%s %s %s\\n" "$1" "$2" "$3" > "$4/armed"',
+                          "sh", str(uid), grant["reservationId"], "g3", FAULT_STATE)
             chain.append(grant)
             print(f"PASS: actual Nexus signed and installed generation {generation}: "
                   f"Node {node}, predecessor {old['reservationId']}, successor {reservation}, "
@@ -394,13 +400,15 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         main.exec("test", "-f", WORK + "/peer-intact")
         if crashes:
             observed = {}
-            for point in FAULT_POINTS:
-                observed[point] = main.exec("cat", f"{FAULT_STATE}/{point}").decode().strip()
-                successor = point in ("successor-ipc-acknowledged", "successor-ingress-published")
-                assert observed[point] == chain[int(successor)]["reservationId"]
+            for stage, predecessor_index in (("g2", 0), ("g3", 1)):
+                for point in FAULT_POINTS:
+                    name = point if stage == "g2" else f"{point}-g3"
+                    observed[name] = main.exec("cat", f"{FAULT_STATE}/{name}").decode().strip()
+                    successor = point in ("successor-ipc-acknowledged", "successor-ingress-published")
+                    assert observed[name] == chain[predecessor_index + int(successor)]["reservationId"]
             journal = main.exec("journalctl", "-u", service, "--no-pager", "-o", "cat",
                                 "--grep", "Main process exited, code=killed, status=9/KILL")
-            assert len(journal.splitlines()) == len(FAULT_POINTS), journal
+            assert len(journal.splitlines()) == len(FAULT_POINTS) * 2, journal
             (artifact / "agent-sigkill.json").write_text(json.dumps(observed, indent=2))
         (artifact / "charges.json").write_text(json.dumps(charges, indent=2))
         print("PASS: installed Agent and Nexus completed VLESS 1 → 2 → 3, "
