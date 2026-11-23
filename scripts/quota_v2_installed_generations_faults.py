@@ -23,14 +23,19 @@ def inject():
 
     def armed():
         try:
-            user, reservation = (STATE / "armed").read_text().split()
+            user, reservation, stage = (STATE / "armed").read_text().split()
         except FileNotFoundError:
             return None
-        return int(user), reservation
+        if stage not in ("g2", "g3"):
+            raise ValueError("invalid installed-generation crash stage")
+        return int(user), reservation, stage
 
-    def interrupt_once(point, reservation):
+    def interrupt_once(point, reservation, stage):
+        # Re-arm the same failure points against the actual generation-2
+        # predecessor. A marker from 1->2 must not suppress a 2->3 crash.
+        marker_name = point if stage == "g2" else point + "-g3"
         try:
-            fd = os.open(STATE / point, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            fd = os.open(STATE / marker_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except FileExistsError:
             return
         with os.fdopen(fd, "w") as marker:
@@ -53,45 +58,46 @@ def inject():
         setattr(module, name, wrapper)
 
     def after_write(scope, result, fd, data, target="genesis-quarantine-envelope.json"):
-        user, first = scope
+        user, first, stage = scope
         if data.get("userId") != user:
             return
         if target.startswith("wal-charge-request-") and data.get("reservationId") == first:
-            interrupt_once("wal-request-durable", first)
+            interrupt_once("wal-request-durable", first, stage)
         elif target == f"calendar-delivery-u{user}-{first}.json":
-            interrupt_once("successor-delivery-durable", first)
+            interrupt_once("successor-delivery-durable", first, stage)
         elif target == f"calendar-positive-u{user}-{first}.json":
-            interrupt_once("successor-receipt-durable", first)
+            interrupt_once("successor-receipt-durable", first, stage)
 
     def after_charge(scope, result, root, request):
-        _, first = scope
+        _, first, stage = scope
         if request.get("operation") == "charge" and request["reservationId"] == first:
             # The product client received the real response, but the Agent
             # cannot record or act on it before the process dies.
             assert wal_transport.observed.strict_json(result).get("receipt")
-            interrupt_once("wal-response-unrecorded", first)
+            interrupt_once("wal-response-unrecorded", first, stage)
 
     def after_ipc(scope, result, path, pid, runtime, genesis, grant, grant_scope):
-        user, first = scope
+        user, first, stage = scope
         if grant_scope["userId"] == user and grant_scope["reservationId"] != first:
-            interrupt_once("successor-ipc-acknowledged", grant_scope["reservationId"])
+            interrupt_once("successor-ipc-acknowledged", grant_scope["reservationId"], stage)
 
     def after_route(scope, result, fd, payload, measured, predecessor=None, **kwargs):
-        user, first = scope
+        user, first, stage = scope
         if payload["userId"] == user and payload["reservationId"] != first:
-            interrupt_once("successor-ingress-published", payload["reservationId"])
+            interrupt_once("successor-ingress-published", payload["reservationId"], stage)
 
     fence = cap_install.fence_calendar_in_xray
 
     @functools.wraps(fence)
     def interrupt_fence(path, pid, runtime, old_scope):
         scope = armed()
-        target = scope == (old_scope["userId"], old_scope["reservationId"])
+        target = (scope is not None and scope[:2] ==
+                  (old_scope["userId"], old_scope["reservationId"]))
         if target:
-            interrupt_once("before-calendar-fence", old_scope["reservationId"])
+            interrupt_once("before-calendar-fence", old_scope["reservationId"], scope[2])
         result = fence(path, pid, runtime, old_scope)
         if target:
-            interrupt_once("calendar-fence-unrecorded", old_scope["reservationId"])
+            interrupt_once("calendar-fence-unrecorded", old_scope["reservationId"], scope[2])
         return result
 
     cap_install.fence_calendar_in_xray = interrupt_fence
