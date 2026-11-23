@@ -390,7 +390,7 @@ async fn persist_fresh_preflight(
         "INSERT INTO quota_v2_reservations
          (user_id,epoch,node_id,meter_epoch,reservation_id,valid_until)
          VALUES($1,$2::uuid,$3,$4::uuid,$5::uuid,
-                to_timestamp($6::double precision/1000.0))",
+                to_timestamp(($6::bigint)::double precision/1000.0))",
     )
     .bind(req.user_id)
     .bind(epoch)
@@ -505,7 +505,7 @@ async fn fund_successor_reservation(
     let (granted, revision): (i64, i64) = sqlx::query_as(
         "SELECT ceiling_bytes,revision
          FROM quota_v2_reserve($1,$2::uuid,$3,$4::uuid,$5::uuid,$6,0,
-              to_timestamp($7::double precision/1000.0))",
+              to_timestamp(($7::bigint)::double precision/1000.0))",
     )
     .bind(req.user_id)
     .bind(epoch)
@@ -520,7 +520,7 @@ async fn fund_successor_reservation(
     if granted <= 0 || granted > target || revision != 1 {
         return Err(deny());
     }
-    sqlx::query(
+    let confirmed = sqlx::query(
         "UPDATE quota_v2_reservations SET node_confirmed=TRUE
          WHERE reservation_id=$1::uuid AND node_id=$2 AND user_id=$3
            AND revision=1 AND ceiling_bytes=$4 AND NOT node_confirmed",
@@ -532,6 +532,9 @@ async fn fund_successor_reservation(
     .execute(&mut *conn)
     .await
     .map_err(|_| deny())?;
+    if confirmed.rows_affected() != 1 {
+        return Err(deny());
+    }
     crate::quota_v2_cdn_lifetime::fund_mixed(
         &mut *conn,
         req.user_id,
