@@ -698,15 +698,20 @@ async fn commit_successor_and_encode(
     ))
 }
 
+fn ensure_successor_request_valid(req: &Request, fields: &RequestFields) -> Result<(), ApiError> {
+    if !request_valid(req, fields) {
+        return Err(deny());
+    }
+    Ok(())
+}
+
 pub(super) async fn issue(
     state: &AppState,
     req: &Request,
     fields: &RequestFields,
     activation: &str,
 ) -> Result<(String, String), ApiError> {
-    if !request_valid(req, fields) {
-        return Err(deny());
-    }
+    ensure_successor_request_valid(req, fields)?;
     // The original Genesis installation deadline has expired in a calendar
     // rollover. Recheck the signed policy and current scope, and use the
     // independently measured new runtime's own short installation window.
