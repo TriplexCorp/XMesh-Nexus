@@ -336,6 +336,85 @@ async fn existing_signed(
     Ok(Some((grant, genesis)))
 }
 
+async fn persist_fresh_preflight(
+    conn: &mut PgConnection,
+    req: &Request,
+    fields: &RequestFields,
+    epoch: &str,
+    meter: &str,
+    reservation: &str,
+    now: i64,
+    class: &str,
+) -> Result<(), ApiError> {
+    let previously: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM quota_v2_calendar_successor_meter_preflights
+          WHERE predecessor_id=$1::uuid)",
+    )
+    .bind(&fields.predecessor_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if previously {
+        return Err(deny());
+    }
+    // This row is a purported local measurement by an XSP-authenticated
+    // Node. Database constraints pin all candidate identities; SQL does
+    // NOT turn a root compromise into independent hardware attestation.
+    sqlx::query(
+        "INSERT INTO quota_v2_calendar_successor_meter_preflights
+         (predecessor_id,node_id,user_id,account_epoch,
+          candidate_meter_epoch,candidate_reservation_id,
+          fresh_runtime_id,fresh_container_id,fresh_started_at,fresh_host_pid,
+          fresh_executable_sha256,fresh_config_sha256,fresh_wal_inventory_sha256,
+          zero_initial_raw_counters,isolated_new_wal_root)
+         VALUES($1::uuid,$2,$3,$4::uuid,$5::uuid,$6::uuid,
+                $7,$8,$9::text::timestamptz,$10,$11,$12,$13,$14,$15)",
+    )
+    .bind(&fields.predecessor_id)
+    .bind(req.node_id)
+    .bind(req.user_id)
+    .bind(epoch)
+    .bind(meter)
+    .bind(reservation)
+    .bind(&fields.fresh_runtime_id)
+    .bind(&fields.fresh_container_id)
+    .bind(&fields.fresh_started_at)
+    .bind(fields.fresh_host_pid)
+    .bind(&fields.fresh_executable_sha256)
+    .bind(&fields.fresh_config_sha256)
+    .bind(&fields.fresh_wal_inventory_sha256)
+    .bind(fields.zero_initial_raw_counters)
+    .bind(fields.isolated_new_wal_root)
+    .execute(&mut *conn)
+    .await
+    .map_err(|_| deny())?;
+    // First create an EMPTY reservation; calendar/class bindings must be
+    // immutable before ANY positive byte is ever reserved.
+    sqlx::query(
+        "INSERT INTO quota_v2_reservations
+         (user_id,epoch,node_id,meter_epoch,reservation_id,valid_until)
+         VALUES($1,$2::uuid,$3,$4::uuid,$5::uuid,
+                to_timestamp($6::double precision/1000.0))",
+    )
+    .bind(req.user_id)
+    .bind(epoch)
+    .bind(req.node_id)
+    .bind(meter)
+    .bind(reservation)
+    .bind(now.saturating_add(1))
+    .execute(&mut *conn)
+    .await
+    .map_err(|_| deny())?;
+    crate::quota_v2_cdn_lifetime::record_class(
+        &mut *conn,
+        req.user_id,
+        req.node_id,
+        reservation,
+        class,
+    )
+    .await?;
+    Ok(())
+}
+
 pub(super) async fn issue(
     state: &AppState,
     req: &Request,
@@ -393,72 +472,9 @@ pub(super) async fn issue(
         tx.commit().await?;
         return Ok(saved);
     }
-    let previously: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM quota_v2_calendar_successor_meter_preflights
-          WHERE predecessor_id=$1::uuid)",
-    )
-    .bind(&fields.predecessor_id)
-    .fetch_one(&mut *tx)
-    .await?;
-    if previously {
-        return Err(deny());
-    }
-    // This row is a purported local measurement by an XSP-authenticated
-    // Node. Database constraints pin all candidate identities; SQL does
-    // NOT turn a root compromise into independent hardware attestation.
-    sqlx::query(
-        "INSERT INTO quota_v2_calendar_successor_meter_preflights
-         (predecessor_id,node_id,user_id,account_epoch,
-          candidate_meter_epoch,candidate_reservation_id,
-          fresh_runtime_id,fresh_container_id,fresh_started_at,fresh_host_pid,
-          fresh_executable_sha256,fresh_config_sha256,fresh_wal_inventory_sha256,
-          zero_initial_raw_counters,isolated_new_wal_root)
-         VALUES($1::uuid,$2,$3,$4::uuid,$5::uuid,$6::uuid,
-                $7,$8,$9::text::timestamptz,$10,$11,$12,$13,$14,$15)",
-    )
-    .bind(&fields.predecessor_id)
-    .bind(req.node_id)
-    .bind(req.user_id)
-    .bind(&epoch)
-    .bind(&meter)
-    .bind(&reservation)
-    .bind(&fields.fresh_runtime_id)
-    .bind(&fields.fresh_container_id)
-    .bind(&fields.fresh_started_at)
-    .bind(fields.fresh_host_pid)
-    .bind(&fields.fresh_executable_sha256)
-    .bind(&fields.fresh_config_sha256)
-    .bind(&fields.fresh_wal_inventory_sha256)
-    .bind(fields.zero_initial_raw_counters)
-    .bind(fields.isolated_new_wal_root)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| deny())?;
-    // First create an EMPTY reservation; calendar/class bindings must be
-    // immutable before ANY positive byte is ever reserved.
-    sqlx::query(
-        "INSERT INTO quota_v2_reservations
-         (user_id,epoch,node_id,meter_epoch,reservation_id,valid_until)
-         VALUES($1,$2::uuid,$3,$4::uuid,$5::uuid,
-                to_timestamp($6::double precision/1000.0))",
-    )
-    .bind(req.user_id)
-    .bind(&epoch)
-    .bind(req.node_id)
-    .bind(&meter)
-    .bind(&reservation)
-    .bind(now.saturating_add(1))
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| deny())?;
-    crate::quota_v2_cdn_lifetime::record_class(
-        &mut tx,
-        req.user_id,
-        req.node_id,
-        &reservation,
-        class,
-    )
-    .await?;
+    persist_fresh_preflight(
+        &mut tx, req, fields, &epoch, &meter, &reservation, now, class,
+    ).await?;
     let node_end = crate::quota_v2_node_lifetime::bind_deadline(
         &mut tx,
         req.node_id,
