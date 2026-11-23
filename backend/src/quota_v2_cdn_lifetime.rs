@@ -75,7 +75,11 @@ pub async fn record_class(
            -- even if its historical ceiling has now been fully spent.
            AND r.ceiling_bytes=r.acknowledged_bytes
            AND r.conservative_burn_floor_bytes<=r.acknowledged_bytes
-           AND r.revision=1 AND NOT r.node_confirmed
+           -- Explicit successor-positive staging inserts its own
+           -- still-empty candidate BEFORE quota_v2_reserve (revision=0).
+           -- Ordinary two-step policy prepare has revision=1. Neither
+           -- has been Node-confirmed or signed, so both remain zero-spend.
+           AND r.revision IN (0,1) AND NOT r.node_confirmed
            AND NOT EXISTS(
                SELECT 1 FROM quota_v2_signed_first_cap_outbox o
                 WHERE o.reservation_id=r.reservation_id
