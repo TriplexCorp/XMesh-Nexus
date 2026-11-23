@@ -415,6 +415,133 @@ async fn persist_fresh_preflight(
     Ok(())
 }
 
+struct FundedSuccessor {
+    granted: i64,
+    revision: i64,
+    valid_until: i64,
+    cdn_ceiling: i64,
+    held: i64,
+    signed_now: i64,
+    install_before: i64,
+}
+
+async fn fund_successor_reservation(
+    conn: &mut PgConnection,
+    req: &Request,
+    user: &Value,
+    epoch: &str,
+    meter: &str,
+    reservation: &str,
+    class: &str,
+    now: i64,
+    limit: i64,
+    floor: i64,
+) -> Result<FundedSuccessor, ApiError> {
+    let node_end = crate::quota_v2_node_lifetime::bind_deadline(
+        &mut *conn,
+        req.node_id,
+        user,
+        reservation,
+        true,
+    )
+    .await?;
+    let cdn_end =
+        crate::quota_v2_cdn_lifetime::bind_deadline(&mut *conn, user, reservation, class).await?;
+    if node_end.is_none() && cdn_end.is_none() {
+        return Err(deny());
+    }
+    let mut valid_until = now.saturating_add(3_600_000);
+    for deadline in node_end.into_iter().chain(cdn_end) {
+        valid_until = valid_until.min(deadline);
+    }
+    if valid_until <= now.saturating_add(90_000)
+        || !node_runtime::first_genesis_active_until(user, now, valid_until)
+    {
+        return Err(deny());
+    }
+    let global = available(&mut *conn, req.user_id, epoch, limit, floor).await?;
+    let node_free =
+        crate::quota_v2_node_lifetime::headroom(&mut *conn, req.user_id, req.node_id, user)
+            .await?
+            .unwrap_or(MAX_CAP);
+    let cdn_free = crate::quota_v2_cdn_lifetime::headroom(&mut *conn, req.user_id, user).await?;
+    let mut target = MAX_CAP.min(global).min(node_free);
+    if class == "cdn" {
+        target = target.min(cdn_free.unwrap_or(MAX_CAP));
+    }
+    if target <= 0 {
+        return Err(deny());
+    }
+    let (granted, revision): (i64, i64) = sqlx::query_as(
+        "SELECT ceiling_bytes,revision
+         FROM quota_v2_reserve($1,$2::uuid,$3,$4::uuid,$5::uuid,$6,0,
+              to_timestamp($7::double precision/1000.0))",
+    )
+    .bind(req.user_id)
+    .bind(epoch)
+    .bind(req.node_id)
+    .bind(meter)
+    .bind(reservation)
+    .bind(target)
+    .bind(valid_until)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|_| deny())?;
+    if granted <= 0 || granted > target || revision != 1 {
+        return Err(deny());
+    }
+    sqlx::query(
+        "UPDATE quota_v2_reservations SET node_confirmed=TRUE
+         WHERE reservation_id=$1::uuid AND node_id=$2 AND user_id=$3
+           AND revision=1 AND ceiling_bytes=$4 AND NOT node_confirmed",
+    )
+    .bind(reservation)
+    .bind(req.node_id)
+    .bind(req.user_id)
+    .bind(granted)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| deny())?;
+    crate::quota_v2_cdn_lifetime::fund_mixed(
+        &mut *conn,
+        req.user_id,
+        req.node_id,
+        user,
+        reservation,
+        class,
+        cdn_free,
+    )
+    .await?;
+    let cdn_ceiling = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
+        &mut *conn,
+        reservation,
+        req.user_id,
+        req.node_id,
+        user,
+        class,
+        granted,
+    )
+    .await?;
+    super::check_reservation_calendars(&mut *conn, req, user, reservation, class, valid_until)
+        .await?;
+    super::check_conservation(&mut *conn, req.user_id, epoch, limit, floor).await?;
+    let held: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::numeric-
+            GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::bigint
+         FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
+    )
+    .bind(req.user_id)
+    .bind(epoch)
+    .fetch_one(&mut *tx)
+    .await?;
+    let signed_now = database_now_ms(&mut *conn).await?;
+    let install_before = signed_now.saturating_add(60_000).min(valid_until - 1);
+    Ok(FundedSuccessor {
+        granted, revision, valid_until, cdn_ceiling, held,
+        signed_now, install_before,
+    })
+}
+
 pub(super) async fn issue(
     state: &AppState,
     req: &Request,
@@ -475,105 +602,9 @@ pub(super) async fn issue(
     persist_fresh_preflight(
         &mut tx, req, fields, &epoch, &meter, &reservation, now, class,
     ).await?;
-    let node_end = crate::quota_v2_node_lifetime::bind_deadline(
-        &mut tx,
-        req.node_id,
-        &user,
-        &reservation,
-        true,
-    )
-    .await?;
-    let cdn_end =
-        crate::quota_v2_cdn_lifetime::bind_deadline(&mut tx, &user, &reservation, class).await?;
-    if node_end.is_none() && cdn_end.is_none() {
-        return Err(deny());
-    }
-    let mut valid_until = now.saturating_add(3_600_000);
-    for deadline in node_end.into_iter().chain(cdn_end) {
-        valid_until = valid_until.min(deadline);
-    }
-    if valid_until <= now.saturating_add(90_000)
-        || !node_runtime::first_genesis_active_until(&user, now, valid_until)
-    {
-        return Err(deny());
-    }
-    let global = available(&mut tx, req.user_id, &epoch, limit, floor).await?;
-    let node_free =
-        crate::quota_v2_node_lifetime::headroom(&mut tx, req.user_id, req.node_id, &user)
-            .await?
-            .unwrap_or(MAX_CAP);
-    let cdn_free = crate::quota_v2_cdn_lifetime::headroom(&mut tx, req.user_id, &user).await?;
-    let mut target = MAX_CAP.min(global).min(node_free);
-    if class == "cdn" {
-        target = target.min(cdn_free.unwrap_or(MAX_CAP));
-    }
-    if target <= 0 {
-        return Err(deny());
-    }
-    let (granted, revision): (i64, i64) = sqlx::query_as(
-        "SELECT ceiling_bytes,revision
-         FROM quota_v2_reserve($1,$2::uuid,$3,$4::uuid,$5::uuid,$6,0,
-              to_timestamp($7::double precision/1000.0))",
-    )
-    .bind(req.user_id)
-    .bind(&epoch)
-    .bind(req.node_id)
-    .bind(&meter)
-    .bind(&reservation)
-    .bind(target)
-    .bind(valid_until)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(|_| deny())?;
-    if granted <= 0 || granted > target || revision != 1 {
-        return Err(deny());
-    }
-    sqlx::query(
-        "UPDATE quota_v2_reservations SET node_confirmed=TRUE
-         WHERE reservation_id=$1::uuid AND node_id=$2 AND user_id=$3
-           AND revision=1 AND ceiling_bytes=$4 AND NOT node_confirmed",
-    )
-    .bind(&reservation)
-    .bind(req.node_id)
-    .bind(req.user_id)
-    .bind(granted)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| deny())?;
-    crate::quota_v2_cdn_lifetime::fund_mixed(
-        &mut tx,
-        req.user_id,
-        req.node_id,
-        &user,
-        &reservation,
-        class,
-        cdn_free,
-    )
-    .await?;
-    let cdn_ceiling = crate::quota_v2_cdn_lifetime::signed_cdn_ceiling(
-        &mut tx,
-        &reservation,
-        req.user_id,
-        req.node_id,
-        &user,
-        class,
-        granted,
-    )
-    .await?;
-    super::check_reservation_calendars(&mut tx, req, &user, &reservation, class, valid_until)
-        .await?;
-    super::check_conservation(&mut tx, req.user_id, &epoch, limit, floor).await?;
-    let held: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(GREATEST(ceiling_bytes::numeric-
-            GREATEST(acknowledged_bytes,conservative_burn_floor_bytes),0)),0)::bigint
-         FROM quota_v2_reservations WHERE user_id=$1 AND epoch=$2::uuid",
-    )
-    .bind(req.user_id)
-    .bind(&epoch)
-    .fetch_one(&mut *tx)
-    .await?;
-    let signed_now = database_now_ms(&mut tx).await?;
-    let install_before = signed_now.saturating_add(60_000).min(valid_until - 1);
+    let funded = fund_successor_reservation(
+        &mut tx, req, &user, &epoch, &meter, &reservation, class, now, limit, floor,
+    ).await?;
     let aliases = scope
         .aliases
         .into_iter()
