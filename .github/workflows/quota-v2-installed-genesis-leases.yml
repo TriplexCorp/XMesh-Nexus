@@ -37,7 +37,7 @@ jobs:
       XMESH_AUDIT_DISPOSABLE: '1'
       XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario != 'lease-recovery' && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
-      XMESH_INSTALLED_NODE_REF: 380f5647906c11e2910c67922cc6b0e097239c31
+      XMESH_INSTALLED_NODE_REF: b07fd69c5e8b7cd7fc2374a93b69030ece069d78
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -62,12 +62,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 380f5647906c11e2910c67922cc6b0e097239c31
+          ref: b07fd69c5e8b7cd7fc2374a93b69030ece069d78
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '380f5647906c11e2910c67922cc6b0e097239c31'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 'b07fd69c5e8b7cd7fc2374a93b69030ece069d78'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py
       - uses: dtolnay/rust-toolchain@stable
