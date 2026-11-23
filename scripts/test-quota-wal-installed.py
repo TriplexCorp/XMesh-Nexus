@@ -159,6 +159,9 @@ systemctl stop docker.socket docker.service containerd.service
         process = subprocess.Popen(command, stdin=secondary, stdout=secondary, stderr=secondary)
         os.close(secondary)
         log = bytearray()
+        # Both guest bootstrap commands run in parallel. Keep a bounded,
+        # token-redacted per-guest tail to identify which installer failed.
+        recent = bytearray()
         port_confirmed = False
         delivered = False
         token_bytes = token.encode("ascii")
@@ -176,6 +179,9 @@ systemctl stop docker.socket docker.service containerd.service
                     if error.errno != errno.EIO:
                         raise
                     break
+                recent += chunk
+                if len(recent) > 8192:
+                    del recent[:-8192]
                 log += chunk
                 if not port_confirmed and b"TCP port for XMesh Node [8443]:" in log:
                     os.write(primary, b"\n")
@@ -185,19 +191,31 @@ systemctl stop docker.socket docker.service containerd.service
                     delivered = True
                 complete = log.rfind(b"\n") + 1
                 if complete:
-                    sys.stdout.buffer.write(bytes(log[:complete]).replace(token_bytes, b"[REDACTED]"))
+                    output = bytes(log[:complete]).replace(token_bytes, b"[REDACTED]")
+                    for line in output.splitlines(keepends=True):
+                        sys.stdout.buffer.write(f"[installed Node {self.node}] ".encode() + line)
                     sys.stdout.buffer.flush()
                     del log[:complete]
-            assert process.wait(timeout=5) == 0, f"bootstrap failed on Node {self.node}"
-            assert port_confirmed and delivered
+            returncode = process.wait(timeout=5)
+            if returncode != 0:
+                excerpt = bytes(recent[-4096:]).replace(token_bytes, b"[REDACTED]")
+                raise AssertionError(
+                    f"bootstrap failed on Node {self.node} (exit {returncode}); "
+                    f"last guest output: {excerpt.decode('utf-8', errors='replace')}"
+                )
+            assert port_confirmed and delivered, (
+                f"bootstrap on Node {self.node} omitted required interactive steps"
+            )
         finally:
             os.close(primary)
             if process.poll() is None:
                 process.kill()
                 process.wait(timeout=10)
             output = bytes(log).replace(token_bytes, b"[REDACTED]")
-            sys.stdout.buffer.write(output)
-            sys.stdout.buffer.flush()
+            if output:
+                for line in output.splitlines(keepends=True):
+                    sys.stdout.buffer.write(f"[installed Node {self.node}] ".encode() + line)
+                sys.stdout.buffer.flush()
 
         assert json.loads(self.exec(PRODUCT, "--identity")) == identity
         assert self.exec("sha256sum", PRODUCT).split()[0].decode() == identity["artifactSha256"]
