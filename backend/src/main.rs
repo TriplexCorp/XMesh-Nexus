@@ -903,6 +903,10 @@ async fn main() -> anyhow::Result<()> {
     };
 
     sqlx::migrate!("./migrations").run(&pool).await?;
+    // An operator changing the gate back to 0 must never silently expose
+    // legacy, non-v2 admission while any signed reservations still hold
+    // spendable bytes. Check after migrations and before HTTP starts.
+    quota_v2::refuse_disabled_with_funded_reservations(&pool).await?;
     // Preserve an existing custom dashboard path on upgrades. Migrate only the
     // former hardcoded default; the database remains authoritative thereafter.
     if let Ok(from_env) = env::var("DASHBOARD_PATH") {
