@@ -486,7 +486,7 @@ async fn fund_successor_reservation(
 ) -> Result<FundedSuccessor, ApiError> {
     let FundingContext { epoch, meter, reservation, class, limit, floor, .. } = ctx;
     let (valid_until, target, cdn_free) = successor_headroom(
-        conn, req, user, &ctx,
+        &mut *conn, req, user, &ctx,
     ).await?;
     let (granted, revision): (i64, i64) = sqlx::query_as(
         "SELECT ceiling_bytes,revision
