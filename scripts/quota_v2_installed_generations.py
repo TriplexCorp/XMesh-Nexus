@@ -345,7 +345,14 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                 "SELECT COUNT(*) FROM quota_v2_reservations "
                 "WHERE ceiling_bytes > GREATEST(acknowledged_bytes, conservative_burn_floor_bytes)"
             ).fetchone()[0]
-            assert funded > 0, "test has no funded reservation to protect"
+            signed_permits = db.execute(
+                "SELECT (SELECT COUNT(*) FROM quota_v2_signed_first_cap_outbox) + "
+                "(SELECT COUNT(*) FROM quota_v2_calendar_successor_positive_caps)"
+            ).fetchone()[0]
+            assert funded > 0 and signed_permits >= 3, (
+                "test lacks funded and historically signed quota evidence",
+                funded, signed_permits,
+            )
             current_nexus = Path("backend/target/debug/xmesh-api").resolve()
             assert current_nexus.is_file(), "current Nexus binary absent"
             downgrade = subprocess.run(
@@ -356,11 +363,12 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                 capture_output=True, text=True, timeout=20)
             diagnostics = downgrade.stdout + downgrade.stderr
             assert downgrade.returncode != 0 and (
-                "Quota V2 disabled while funded reservations remain" in diagnostics
+                "Quota V2 disabled while funded reservations or signed permits remain" in diagnostics
             ), diagnostics
             assert snapshot(db) == before
             (artifact / "gate-downgrade.json").write_text(json.dumps({
                 "fundedReservationCount": funded,
+                "historicalSignedPermitCount": signed_permits,
                 "disabledNexusRefusedStartup": True,
                 "ledgerUnchanged": True,
             }, indent=2))
