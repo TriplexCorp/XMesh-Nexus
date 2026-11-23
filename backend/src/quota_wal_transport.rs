@@ -474,8 +474,7 @@ async fn verify_successor_birth_scope(
     w: &Witness,
     index: &[u8],
 ) -> Result<(), ApiError> {
-    {
-        let aliases: std::collections::HashSet<String> = sqlx::query_scalar(
+    let aliases: std::collections::HashSet<String> = sqlx::query_scalar(
             "SELECT DISTINCT alias->>'email'
                FROM quota_v2_calendar_successor_positive_caps c
                JOIN quota_v2_calendar_successor_meter_preflights p USING(predecessor_id)
@@ -502,7 +501,6 @@ async fn verify_successor_birth_scope(
                 return Err(conflict());
             }
         }
-    }
     Ok(())
 }
 
