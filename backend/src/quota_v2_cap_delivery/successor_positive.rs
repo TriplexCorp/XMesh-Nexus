@@ -135,7 +135,7 @@ async fn verify_predecessor_wal_heads(
         conn,
         req.node_id,
         req.user_id,
-        &runtime,
+        runtime,
         old_successor,
         &canonical_heads,
     )
