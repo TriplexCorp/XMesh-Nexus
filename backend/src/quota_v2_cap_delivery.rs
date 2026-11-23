@@ -203,9 +203,9 @@ async fn verify_original_first_cap_limits(
     limit: i64,
     floor: i64,
 ) -> Result<(), ApiError> {
-    check_conservation(conn, req.user_id, epoch, limit, floor).await?;
+    check_conservation(&mut *conn, req.user_id, epoch, limit, floor).await?;
     if !crate::quota_v2_node_lifetime::issued_within_limit(
-        conn,
+        &mut *conn,
         req.user_id,
         req.node_id,
         current_user,
