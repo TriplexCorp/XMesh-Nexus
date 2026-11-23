@@ -164,6 +164,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
             main.exec("touch", WORK + "/check-xray-kill")
             main.exec("sh", "-ec", 'umask 077; printf "%s %s\n" "$1" "$2" > "$3/armed"',
                       "sh", str(uid), initial["reservationId"], FAULT_STATE)
+            (root / "drop-wal-response-armed").write_text(initial["reservationId"])
         main.exec("touch", WORK + "/ready-1")
         process = subprocess.Popen([
             "docker", "exec", main.name, "python3", WORK + "/quota_v2_installed_generations_client.py",
@@ -181,32 +182,23 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         if crashes:
             reservation = initial["reservationId"]
 
-            def committed_charge():
-                marker = main.exec("sh", "-c", 'test ! -f "$1" || cat "$1"', "sh",
-                                   FAULT_STATE + "/wal-response-unrecorded")
-                if marker.strip() != reservation.encode():
-                    return None
-                pid = main.exec("systemctl", "show", "-p", "MainPID", "--value", service).strip()
-                if not re.fullmatch(rb"[1-9][0-9]*", pid):
-                    return None
-                status = main.exec("cat", f"/proc/{int(pid)}/status")
-                return int(pid) if re.search(rb"^State:\s+T\b", status, re.MULTILINE) else None
-
             def charge_rows(connection):
                 return connection.execute(
                     "SELECT filename, stream_bytes FROM quota_v2_wal_charges "
                     "WHERE reservation_id=%s ORDER BY filename, stream_bytes",
                     (reservation,)).fetchall()
 
-            stopped_pid = lab.wait_for(committed_charge, timeout=285,
-                                       label="Agent stopped before recording committed WAL response")
+            lab.wait_for((root / "wal-response-held").is_file, timeout=285,
+                         label="XSP/2 gateway holding committed WAL response")
             committed = charge_rows(db)
             assert committed and any(row[1] > 0 for row in committed), committed
             db = lab.restart_postgres(stack, dsn, db)
             assert charge_rows(db) == committed
-            main.exec("kill", "-KILL", str(stopped_pid))
+            (root / "drop-wal-response").touch()
+            lab.wait_for((root / "wal-response-dropped").is_file, timeout=3,
+                         label="XSP/2 response discarded after database restart")
             (artifact / "wal-response-loss.json").write_text(json.dumps({
-                "reservationId": reservation, "agentPid": stopped_pid,
+                "reservationId": reservation, "xspResponseDroppedBeforeDelivery": True,
                 "committedCharges": committed, "rowsSurvivedRestart": True,
             }, indent=2))
         chain = [initial]

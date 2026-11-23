@@ -100,6 +100,10 @@ func TestServeWALTunnelFixture(t *testing.T) {
 	if g.panelURL != "http://127.0.0.1:38081" || len(g.internalToken) != 64 {
 		t.Fatal("disposable Nexus and internal gateway token required")
 	}
+	if os.Getenv("XMESH_TEST_INSTALLED_CRASHES") == "1" &&
+		address != "127.0.0.1" && dsn.Path == "/quota_wal_installed" {
+		g.httpClient.Transport = loseCommittedWALReply{dir: dir}
+	}
 	strict := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.TLS == nil || len(r.TLS.VerifiedChains) == 0 || len(r.TLS.PeerCertificates) == 0 {
 			http.Error(w, "mTLS required", http.StatusForbidden)
@@ -162,6 +166,51 @@ func TestServeWALTunnelFixture(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	t.Fatal("fixture timed out")
+}
+
+// Hold a real successful Nexus response after commit, then abort the
+// authenticated stream without sending any response to the Node.
+type loseCommittedWALReply struct{ dir string }
+
+func (f loseCommittedWALReply) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil || resp.StatusCode != http.StatusOK || req.GetBody == nil ||
+		req.URL.Path != "/api/v1/node/quota-v2/wal" {
+		return resp, err
+	}
+	first, err := os.ReadFile(filepath.Join(f.dir, "drop-wal-response-armed"))
+	if err != nil {
+		return resp, nil
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return resp, nil
+	}
+	defer body.Close()
+	var request struct {
+		Operation     string `json:"operation"`
+		ReservationID string `json:"reservationId"`
+	}
+	if json.NewDecoder(body).Decode(&request) != nil || request.Operation != "charge" ||
+		request.ReservationID != strings.TrimSpace(string(first)) {
+		return resp, nil
+	}
+	marker, err := os.OpenFile(filepath.Join(f.dir, "wal-response-held"),
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return resp, nil
+	}
+	marker.Close()
+	defer resp.Body.Close()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) && req.Context().Err() == nil {
+		if _, err := os.Stat(filepath.Join(f.dir, "drop-wal-response")); err == nil {
+			_ = os.WriteFile(filepath.Join(f.dir, "wal-response-dropped"), nil, 0o600)
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	panic(http.ErrAbortHandler)
 }
 
 func requireFixture(t *testing.T, err error) {

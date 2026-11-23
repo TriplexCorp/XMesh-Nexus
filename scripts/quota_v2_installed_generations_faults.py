@@ -28,7 +28,7 @@ def inject():
             return None
         return int(user), reservation
 
-    def interrupt_once(point, reservation, sig=signal.SIGKILL):
+    def interrupt_once(point, reservation):
         try:
             fd = os.open(STATE / point, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except FileExistsError:
@@ -37,7 +37,7 @@ def inject():
             marker.write(reservation + "\n")
             marker.flush()
             os.fsync(marker.fileno())
-        os.kill(os.getpid(), sig)
+        os.kill(os.getpid(), signal.SIGKILL)
 
     def after(module, name, observe):
         original = getattr(module, name)
@@ -69,7 +69,7 @@ def inject():
             # The product client received the real response, but the Agent
             # cannot record or act on it before the process dies.
             assert wal_transport.observed.strict_json(result).get("receipt")
-            interrupt_once("wal-response-unrecorded", first, signal.SIGSTOP)
+            interrupt_once("wal-response-unrecorded", first)
 
     def after_ipc(scope, result, path, pid, runtime, genesis, grant, grant_scope):
         user, first = scope
