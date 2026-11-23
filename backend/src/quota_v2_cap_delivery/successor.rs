@@ -201,8 +201,9 @@ fn verify_preparation_replay(
     {
         return Err(deny());
     }
+    Ok(exact)
 }
- 
+
 pub(super) async fn prepare(
     state: &AppState,
     req: &Request,
