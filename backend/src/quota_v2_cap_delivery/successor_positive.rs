@@ -56,7 +56,7 @@ fn confirmed_old_heads_hash(heads: &[(String, i64, String, i64)]) -> Result<Stri
             || *bytes <= 0
             || !super::hex64(digest)
             || !name.starts_with("meter-")
-            || !name.rsplit_once('.').is_some_and(|(_, ext)| ext == "jsonl")
+            || name.rsplit_once('.').is_none_or(|(_, ext)| ext != "jsonl")
         {
             return Err(deny());
         }
@@ -684,6 +684,20 @@ async fn sign_and_store_successor(
     Ok((signed, fresh_genesis))
 }
 
+// The deferred PostgreSQL constraint enforces that every committed successor
+// reservation has the exact durable signed outbox pair.
+async fn commit_successor_and_encode(
+    tx: sqlx::Transaction<'_, sqlx::Postgres>,
+    signed: Vec<u8>,
+    genesis: Vec<u8>,
+) -> Result<(String, String), ApiError> {
+    tx.commit().await.map_err(|_| deny())?;
+    Ok((
+        String::from_utf8(signed).map_err(|_| deny())?,
+        String::from_utf8(genesis).map_err(|_| deny())?,
+    ))
+}
+
 pub(super) async fn issue(
     state: &AppState,
     req: &Request,
@@ -791,13 +805,7 @@ pub(super) async fn issue(
         aliases,
     )
     .await?;
-    // PostgreSQL 0161 deferred constraint verifies that NO committed
-    // successor reservation exists without exactly these signed bytes.
-    tx.commit().await.map_err(|_| deny())?;
-    Ok((
-        String::from_utf8(signed).map_err(|_| deny())?,
-        String::from_utf8(fresh_genesis).map_err(|_| deny())?,
-    ))
+    commit_successor_and_encode(tx, signed, fresh_genesis).await
 }
 
 #[cfg(test)]
