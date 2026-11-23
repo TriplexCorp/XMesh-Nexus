@@ -210,7 +210,7 @@ async fn persist_zero_successor_preparation(
     req: &Request,
     fields: &RequestFields,
     old: &Previous,
-    (signer, earlier_epoch, now): (&str, &str, i64),
+    (signer, earlier_epoch, activation, now): (&str, &str, &str, i64),
 ) -> Result<String, ApiError> {
     // These are UNFUNDED candidate identifiers, not quota_v2_reservations.
     // Never advertise this receipt as a positive cap or a right to resume.
@@ -341,7 +341,7 @@ pub(super) async fn prepare(
         return Ok(exact);
     }
     let exact = persist_zero_successor_preparation(
-        &mut tx, state, req, fields, &old, (&signer, &earlier_epoch, now),
+        &mut tx, state, req, fields, &old, (&signer, &earlier_epoch, activation, now),
     ).await?;
     tx.commit().await?;
     Ok(exact)
