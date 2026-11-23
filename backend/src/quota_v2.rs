@@ -37,26 +37,29 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
-/// Refuse an accidental feature-gate downgrade while the database still
-/// holds live, conservatively funded byte rights. The legacy traffic path
-/// cannot safely replace an installed signed quota runtime simply because
-/// an environment variable changed. This is a startup safety check, not
-/// authorization to enable Quota V2 in a production fleet.
+/// Refuse an accidental feature-gate downgrade whenever an immutable
+/// spending permit has been issued, even if its SQL hold is fully burnt.
+/// A zero remaining hold cannot prove that remote Xray WAL is final, or
+/// that no old signed permit can be replayed. An explicit, separately
+/// verified migration is needed before returning to legacy admission.
+/// This startup check does NOT enable production Quota V2.
 pub async fn refuse_disabled_with_funded_reservations(pool: &PgPool) -> anyhow::Result<()> {
     if enabled() {
         return Ok(());
     }
-    let funded: bool = sqlx::query_scalar(
-        "SELECT EXISTS(
-            SELECT 1 FROM quota_v2_reservations
-            WHERE ceiling_bytes > GREATEST(acknowledged_bytes, conservative_burn_floor_bytes)
-        )",
+    let unsafe_downgrade: bool = sqlx::query_scalar(
+        "SELECT
+            EXISTS(SELECT 1 FROM quota_v2_reservations
+                   WHERE ceiling_bytes > GREATEST(
+                       acknowledged_bytes, conservative_burn_floor_bytes))
+            OR EXISTS(SELECT 1 FROM quota_v2_signed_first_cap_outbox)
+            OR EXISTS(SELECT 1 FROM quota_v2_calendar_successor_positive_caps)",
     )
     .fetch_one(pool)
     .await?;
-    if funded {
+    if unsafe_downgrade {
         anyhow::bail!(
-            "Quota V2 disabled while funded reservations remain; refusing unsafe legacy startup"
+            "Quota V2 disabled while funded reservations or signed permits remain; refusing unsafe legacy startup"
         );
     }
     Ok(())
