@@ -238,9 +238,8 @@ async fn signed_predecessor(
     {
         return Err(deny());
     }
-    verify_predecessor_wal_heads(
-        conn, req, fields, &runtime, row.try_get("old_successor")?,
-    ).await?;
+    verify_predecessor_wal_heads(conn, req, fields, &runtime, row.try_get("old_successor")?)
+        .await?;
     Ok((meter, reservation))
 }
 
@@ -440,7 +439,15 @@ async fn successor_headroom(
     user: &Value,
     ctx: &FundingContext<'_>,
 ) -> Result<(i64, i64, Option<i64>), ApiError> {
-    let FundingContext { epoch, reservation, class, now, limit, floor, .. } = *ctx;
+    let FundingContext {
+        epoch,
+        reservation,
+        class,
+        now,
+        limit,
+        floor,
+        ..
+    } = *ctx;
     let node_end = crate::quota_v2_node_lifetime::bind_deadline(
         &mut *conn,
         req.node_id,
@@ -485,10 +492,16 @@ async fn fund_successor_reservation(
     user: &Value,
     ctx: FundingContext<'_>,
 ) -> Result<FundedSuccessor, ApiError> {
-    let FundingContext { epoch, meter, reservation, class, limit, floor, .. } = ctx;
-    let (valid_until, target, cdn_free) = successor_headroom(
-        &mut *conn, req, user, &ctx,
-    ).await?;
+    let FundingContext {
+        epoch,
+        meter,
+        reservation,
+        class,
+        limit,
+        floor,
+        ..
+    } = ctx;
+    let (valid_until, target, cdn_free) = successor_headroom(&mut *conn, req, user, &ctx).await?;
     let (granted, revision): (i64, i64) = sqlx::query_as(
         "SELECT ceiling_bytes,revision
          FROM quota_v2_reserve($1,$2::uuid,$3,$4::uuid,$5::uuid,$6,0,
@@ -554,8 +567,13 @@ async fn fund_successor_reservation(
     let signed_now = database_now_ms(&mut *conn).await?;
     let install_before = signed_now.saturating_add(60_000).min(valid_until - 1);
     Ok(FundedSuccessor {
-        granted, revision, valid_until, cdn_ceiling, held,
-        signed_now, install_before,
+        granted,
+        revision,
+        valid_until,
+        cdn_ceiling,
+        held,
+        signed_now,
+        install_before,
     })
 }
 
@@ -724,15 +742,29 @@ pub(super) async fn issue(
         return Ok(saved);
     }
     persist_fresh_preflight(
-        &mut tx, req, fields, (&epoch, &meter, &reservation), now, class,
-    ).await?;
+        &mut tx,
+        req,
+        fields,
+        (&epoch, &meter, &reservation),
+        now,
+        class,
+    )
+    .await?;
     let funded = fund_successor_reservation(
-        &mut tx, req, &user,
+        &mut tx,
+        req,
+        &user,
         FundingContext {
-            epoch: &epoch, meter: &meter, reservation: &reservation,
-            class, now, limit, floor,
+            epoch: &epoch,
+            meter: &meter,
+            reservation: &reservation,
+            class,
+            now,
+            limit,
+            floor,
         },
-    ).await?;
+    )
+    .await?;
     let aliases = scope
         .aliases
         .into_iter()
@@ -742,13 +774,23 @@ pub(super) async fn issue(
         })
         .collect::<Vec<_>>();
     let (signed, fresh_genesis) = sign_and_store_successor(
-        &mut tx, state, req, fields,
+        &mut tx,
+        state,
+        req,
+        fields,
         SignedCapContext {
-            epoch: &epoch, meter: &meter, reservation: &reservation,
-            policy, activation, limit, floor,
+            epoch: &epoch,
+            meter: &meter,
+            reservation: &reservation,
+            policy,
+            activation,
+            limit,
+            floor,
         },
-        &funded, aliases,
-    ).await?;
+        &funded,
+        aliases,
+    )
+    .await?;
     // PostgreSQL 0161 deferred constraint verifies that NO committed
     // successor reservation exists without exactly these signed bytes.
     tx.commit().await.map_err(|_| deny())?;
