@@ -370,7 +370,7 @@ async fn previous_charge_receipt(
     .fetch_optional(conn)
     .await?;
     if let Some((saved, receipt)) = replay {
-        if raw != saved {
+        if raw != saved.as_slice() {
             return Err(conflict());
         }
         return Ok(Some(receipt));
