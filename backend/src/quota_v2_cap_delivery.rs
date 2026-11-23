@@ -194,6 +194,36 @@ pub(crate) async fn observe_closed_calendars(
     Ok(created > 0)
 }
 
+async fn verify_original_first_cap_limits(
+    conn: &mut PgConnection,
+    req: &Request,
+    current_user: &Value,
+    inbound_class: &str,
+    epoch: &str,
+    limit: i64,
+    floor: i64,
+) -> Result<(), ApiError> {
+    check_conservation(conn, req.user_id, epoch, limit, floor).await?;
+    if !crate::quota_v2_node_lifetime::issued_within_limit(
+        conn,
+        req.user_id,
+        req.node_id,
+        current_user,
+    )
+    .await?
+        || !crate::quota_v2_cdn_lifetime::issued_within_limit(
+            conn,
+            req.user_id,
+            current_user,
+            inbound_class,
+        )
+        .await?
+    {
+        return Err(deny());
+    }
+    Ok(())
+}
+
 async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<String, ApiError> {
     let scope =
         crate::node_runtime::original_first_genesis_cap_scope(state, req.node_id, req.user_id)
@@ -226,24 +256,9 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     {
         return Err(deny());
     }
-    check_conservation(&mut tx, req.user_id, &epoch, limit, floor).await?;
-    if !crate::quota_v2_node_lifetime::issued_within_limit(
-        &mut tx,
-        req.user_id,
-        req.node_id,
-        &current_user,
-    )
-    .await?
-        || !crate::quota_v2_cdn_lifetime::issued_within_limit(
-            &mut tx,
-            req.user_id,
-            &current_user,
-            inbound_class,
-        )
-        .await?
-    {
-        return Err(deny());
-    }
+    verify_original_first_cap_limits(
+        &mut tx, req, &current_user, inbound_class, &epoch, limit, floor,
+    ).await?;
     let mut row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     if row.is_none() {
         issue_original(
