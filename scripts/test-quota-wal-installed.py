@@ -32,6 +32,7 @@ DESIRED_PATH = "/api/v1/node/desired-config"
 GENESIS_DOMAIN = b"XMESH_XRAY_GENESIS_PREPARED_V1\0"
 XRAY = "xmesh-managed-xray"
 XRAY_CONFIG = b'{"inbounds":[],"outbounds":[{"protocol":"blackhole"}],"stats":{}}\n'
+AGENT_BUILDER = "golang:1.27.3-trixie"
 
 
 def docker(*args, timeout=40, **kwargs):
@@ -61,7 +62,7 @@ def reference_identity(root, revision):
     subprocess.run(["git", "-C", source, "checkout", "--detach", revision], check=True, timeout=30)
     subprocess.run(["sudo", "chown", "-R", "0:0", source], check=True, timeout=30)
     docker("run", "--rm", "-v", f"{source}:/src:ro", "-v", f"{output}:/out", "-w", "/src/agent/xspv2",
-           "golang:1.27.3-trixie", "env", "CGO_ENABLED=0", "go", "build", "-trimpath",
+           AGENT_BUILDER, "env", "CGO_ENABLED=0", "go", "build", "-trimpath",
            "-ldflags", f"-X main.version={version} -X main.sourceRevision={revision}",
            "-o", "/out/product", "./cmd/xmesh-agent-xspv2-product", timeout=350)
     digest = hashlib.sha256((output / "product").read_bytes()).hexdigest()
@@ -439,6 +440,12 @@ def main():
         stack.callback(subprocess.run, ["sudo", "chown", "-R", f"{os.getuid()}:{os.getgid()}", root],
                        check=True, timeout=25)
         identity = reference_identity(root, revision)
+        # Both clean guests build the reviewed Agent themselves. Share the
+        # host's already pulled compiler image to avoid three registry pulls
+        # on the same anonymous runner IP.
+        agent_builder = root / "agent-builder.tar"
+        docker("image", "save", "-o", agent_builder, AGENT_BUILDER, timeout=90)
+        builder_id = docker("image", "inspect", "--format", "{{.Id}}", AGENT_BUILDER).strip()
         image = docker("build", "-q", "-", input=(ROOT / "scripts/quota-wal-systemd.Dockerfile").read_bytes(),
                        timeout=480).decode().strip()
         network = "xmesh-systemd-lab-" + secrets.token_hex(8)
@@ -490,10 +497,15 @@ def main():
         def install(item):
             guest, token = item
             guest.prepare(root)
+            with agent_builder.open("rb") as archive:
+                docker("exec", "-i", guest.name, "docker", "image", "load", stdin=archive, timeout=120)
+            assert guest.exec("docker", "image", "inspect", "--format", "{{.Id}}",
+                              AGENT_BUILDER).strip() == builder_id
             return guest.install(panel, identity, nexus_revision, token)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             first, second = pool.map(install, guests)
+        agent_builder.unlink()
         assert first != second
         print(f"Two clean systemd guests installed pinned {identity['version']} and activated distinct XSP/2 identities.")
 
