@@ -679,6 +679,23 @@ mod tests {
         assert!(
             confirmed_old_heads_hash(&[(rows[0].0.clone(), 0, rows[0].2.clone(), 123)]).is_err()
         );
+        // WAL names are canonical, case-sensitive protocol identifiers:
+        // accepting a differently cased extension could misbind a signed
+        // off-host charge head to a local journal with a different name.
+        let upper = vec![(
+            format!("meter-{}.JSONL", "a".repeat(64)),
+            1,
+            "b".repeat(64),
+            123,
+        )];
+        assert!(confirmed_old_heads_hash(&upper).is_err());
+        let malformed = vec![(
+            format!("meter-{}.jsonl.bak", "a".repeat(64)),
+            1,
+            "b".repeat(64),
+            123,
+        )];
+        assert!(confirmed_old_heads_hash(&malformed).is_err());
     }
     #[test]
     fn successor_challenge_is_process_and_predecessor_bound() {
