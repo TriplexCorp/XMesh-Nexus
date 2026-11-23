@@ -673,6 +673,26 @@ def main():
         assert new_a["reservationId"]!=lease_a["reservationId"]
         assert new_a["ceilingBytes"]==new_a["acknowledgedBytes"]==lease_a["ceilingBytes"]
         assert new_b["ceilingBytes"]==new_b["acknowledgedBytes"]==lease_b["ceilingBytes"]
+        # The newly prepared epoch has an inherited absolute meter cursor,
+        # but ZERO new spending authority. Its immutable class must be
+        # recorded before confirmation even when that cursor is nonzero;
+        # otherwise the next ordinary signed Node policy fails with 409.
+        for node, reservation, old_absolute in (
+                (a, new_a, lease_a["ceilingBytes"]),
+                (b, new_b, lease_b["ceilingBytes"])):
+            recorded=query(
+                "SELECT r.node_confirmed::text||'|'||r.ceiling_bytes::text"
+                "||'|'||r.acknowledged_bytes::text||'|'||c.class"
+                " FROM quota_v2_reservations r"
+                " JOIN quota_v2_reservation_classes c"
+                " ON c.reservation_id=r.reservation_id"
+                " WHERE r.reservation_id='"+reservation["reservationId"]+"'"
+                " AND r.node_id="+str(node.id))
+            assert recorded == f"false|{old_absolute}|{old_absolute}|unclassified", recorded
+            assert query(
+                "SELECT count(*)::text FROM quota_v2_signed_first_cap_outbox"
+                " WHERE reservation_id='"+reservation["reservationId"]+"'") == "0"
+        print("PASS: fully settled old absolute meter reopens only as immutable zero-spend, unconfirmed new epoch")
         # Regression: a legacy/interrupted CLOSED epoch can still contain
         # spendable signed capacity even though the current epoch is already
         # zero-grant. Such debt MUST block admin reset, not be silently
