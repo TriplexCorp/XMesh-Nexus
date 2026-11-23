@@ -327,14 +327,11 @@ async fn reservation_totals(
     Ok((total, cdn))
 }
 
-pub(super) async fn charge(
-    state: &AppState,
-    node_id: i64,
-    activation: &str,
+fn validate_charge_request(
     reservation: &str,
     filename: &str,
     journal: &str,
-) -> Result<Value, ApiError> {
+) -> Result<(Vec<u8>, Step), ApiError> {
     if !filename
         .strip_prefix("meter-")
         .and_then(|s| s.strip_suffix(".jsonl"))
@@ -353,6 +350,43 @@ pub(super) async fn charge(
     if first.sequence <= 0 {
         return Err(invalid());
     }
+    Ok((raw, first))
+}
+
+async fn previous_charge_receipt(
+    conn: &mut PgConnection,
+    reservation: &str,
+    filename: &str,
+    first_sequence: i64,
+    raw: &[u8],
+) -> Result<Option<Vec<u8>>, ApiError> {
+    let replay: Option<(Vec<u8>, Vec<u8>)> = sqlx::query_as(
+        "SELECT journal,signed_receipt FROM quota_v2_wal_charges
+         WHERE reservation_id=$1::uuid AND filename=$2 AND first_sequence=$3",
+    )
+    .bind(reservation)
+    .bind(filename)
+    .bind(first_sequence)
+    .fetch_optional(conn)
+    .await?;
+    if let Some((saved, receipt)) = replay {
+        if raw != saved {
+            return Err(conflict());
+        }
+        return Ok(Some(receipt));
+    }
+    Ok(None)
+}
+
+pub(super) async fn charge(
+    state: &AppState,
+    node_id: i64,
+    activation: &str,
+    reservation: &str,
+    filename: &str,
+    journal: &str,
+) -> Result<Value, ApiError> {
+    let (raw, first) = validate_charge_request(reservation, filename, journal)?;
     let mut tx = state.pool.begin().await?;
     sqlx::query("SET LOCAL synchronous_commit TO on")
         .execute(&mut *tx)
@@ -386,19 +420,9 @@ pub(super) async fn charge(
         &cap.epoch,
     )
     .await?;
-    let replay: Option<(Vec<u8>, Vec<u8>)> = sqlx::query_as(
-        "SELECT journal,signed_receipt FROM quota_v2_wal_charges
-         WHERE reservation_id=$1::uuid AND filename=$2 AND first_sequence=$3",
-    )
-    .bind(reservation)
-    .bind(filename)
-    .bind(first.sequence)
-    .fetch_optional(&mut *tx)
-    .await?;
-    if let Some((saved, receipt)) = replay {
-        if raw != saved {
-            return Err(conflict());
-        }
+    if let Some(receipt) = previous_charge_receipt(
+        &mut tx, reservation, filename, first.sequence, &raw,
+    ).await? {
         tx.commit().await?;
         return Ok(json!({"receipt":STANDARD.encode(receipt)}));
     }
