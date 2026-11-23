@@ -204,6 +204,70 @@ fn verify_preparation_replay(
     Ok(exact)
 }
 
+async fn persist_zero_successor_preparation(
+    conn: &mut PgConnection,
+    state: &AppState,
+    req: &Request,
+    fields: &RequestFields,
+    old: &Previous,
+    (signer, earlier_epoch, now): (&str, &str, i64),
+) -> Result<String, ApiError> {
+    // These are UNFUNDED candidate identifiers, not quota_v2_reservations.
+    // Never advertise this receipt as a positive cap or a right to resume.
+    let meter = uuid::Uuid::new_v4().to_string();
+    let reservation = uuid::Uuid::new_v4().to_string();
+    let expires = now.saturating_add(120_000);
+    let payload = json!({
+        "schemaVersion": 1, "kind": "xmesh.quota-v2.calendar-successor-prepared",
+        "nodeId": req.node_id, "userId": req.user_id,
+        "nonce": req.challenge, "activationReceiptSha256": activation,
+        "policySha256": old.policy_sha256,
+        "predecessorRuntimeId": old.predecessor_runtime_id,
+        "predecessorId": old.predecessor_id,
+        "accountEpoch": old.account_epoch,
+        "meterEpoch": meter, "reservationId": reservation,
+        "issuedAtMs": now, "validUntilMs": expires,
+        "authorizedBytes": 0, "canSpend": false, "canStart": false,
+        "canResume": false, "finalMeterVerified": false,
+        "refundableBytes": 0
+    });
+    let signature = state
+        .node_policy_signer
+        .sign_domain(DOMAIN, &payload)
+        .map_err(|_| deny())?;
+    let exact = serde_json::to_string(&json!({
+        "algorithm": "Ed25519", "payload": payload, "signature": signature
+    }))
+    .map_err(|_| deny())?;
+    if exact.len() > 8192 {
+        return Err(deny());
+    }
+    sqlx::query(
+        "INSERT INTO quota_v2_calendar_successor_preparations
+         (predecessor_id,node_id,user_id,request_challenge,signer_public_key,
+          account_epoch,predecessor_runtime_id,policy_sha256,
+          candidate_meter_epoch,candidate_reservation_id,
+          issued_at_ms,valid_until_ms,signed_envelope)
+         VALUES($1::uuid,$2,$3,$4,$5,$6::uuid,$7,$8,$9::uuid,$10::uuid,$11,$12,$13)",
+    )
+    .bind(&fields.predecessor_id)
+    .bind(req.node_id)
+    .bind(req.user_id)
+    .bind(&req.challenge)
+    .bind(signer)
+    .bind(earlier_epoch)
+    .bind(&old.predecessor_runtime_id)
+    .bind(&old.policy_sha256)
+    .bind(&meter)
+    .bind(&reservation)
+    .bind(now)
+    .bind(expires)
+    .bind(exact.as_bytes())
+    .execute(&mut *conn)
+    .await?;
+    Ok(exact)
+}
+
 pub(super) async fn prepare(
     state: &AppState,
     req: &Request,
@@ -276,59 +340,9 @@ pub(super) async fn prepare(
         tx.commit().await?;
         return Ok(exact);
     }
-    // These are UNFUNDED candidate identifiers, not quota_v2_reservations.
-    // Never advertise this receipt as a positive cap or a right to resume.
-    let meter = uuid::Uuid::new_v4().to_string();
-    let reservation = uuid::Uuid::new_v4().to_string();
-    let expires = now.saturating_add(120_000);
-    let payload = json!({
-        "schemaVersion": 1, "kind": "xmesh.quota-v2.calendar-successor-prepared",
-        "nodeId": req.node_id, "userId": req.user_id,
-        "nonce": req.challenge, "activationReceiptSha256": activation,
-        "policySha256": old.policy_sha256,
-        "predecessorRuntimeId": old.predecessor_runtime_id,
-        "predecessorId": old.predecessor_id,
-        "accountEpoch": old.account_epoch,
-        "meterEpoch": meter, "reservationId": reservation,
-        "issuedAtMs": now, "validUntilMs": expires,
-        "authorizedBytes": 0, "canSpend": false, "canStart": false,
-        "canResume": false, "finalMeterVerified": false,
-        "refundableBytes": 0
-    });
-    let signature = state
-        .node_policy_signer
-        .sign_domain(DOMAIN, &payload)
-        .map_err(|_| deny())?;
-    let exact = serde_json::to_string(&json!({
-        "algorithm": "Ed25519", "payload": payload, "signature": signature
-    }))
-    .map_err(|_| deny())?;
-    if exact.len() > 8192 {
-        return Err(deny());
-    }
-    sqlx::query(
-        "INSERT INTO quota_v2_calendar_successor_preparations
-         (predecessor_id,node_id,user_id,request_challenge,signer_public_key,
-          account_epoch,predecessor_runtime_id,policy_sha256,
-          candidate_meter_epoch,candidate_reservation_id,
-          issued_at_ms,valid_until_ms,signed_envelope)
-         VALUES($1::uuid,$2,$3,$4,$5,$6::uuid,$7,$8,$9::uuid,$10::uuid,$11,$12,$13)",
-    )
-    .bind(&fields.predecessor_id)
-    .bind(req.node_id)
-    .bind(req.user_id)
-    .bind(&req.challenge)
-    .bind(&signer)
-    .bind(&earlier_epoch)
-    .bind(&old.predecessor_runtime_id)
-    .bind(&old.policy_sha256)
-    .bind(&meter)
-    .bind(&reservation)
-    .bind(now)
-    .bind(expires)
-    .bind(exact.as_bytes())
-    .execute(&mut *tx)
-    .await?;
+    let exact = persist_zero_successor_preparation(
+        &mut tx, state, req, fields, &old, (&signer, &earlier_epoch, now),
+    ).await?;
     tx.commit().await?;
     Ok(exact)
 }
