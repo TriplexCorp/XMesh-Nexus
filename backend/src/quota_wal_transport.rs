@@ -467,20 +467,14 @@ async fn enrolled_key(conn: &mut PgConnection, node_id: i64) -> Result<Verifying
     Ok(key)
 }
 
-async fn store(
-    state: &AppState,
+async fn verify_successor_birth_scope(
+    conn: &mut PgConnection,
     node_id: i64,
-    witness: &str,
-    inventory: &str,
-    encoding: Option<InventoryEncoding>,
-    scope: Option<RuntimeScope<'_>>,
-) -> Result<Value, ApiError> {
-    let raw = decode(witness, WITNESS_LIMIT)?;
-    let index = unpack_index(inventory, encoding)?;
-    let mut tx = state.pool.begin().await?;
-    let key = enrolled_key(&mut tx, node_id).await?;
-    let w = verify_witness(&raw, &index, node_id, &key)?;
-    if let Some(ref scope) = scope {
+    scope: &RuntimeScope<'_>,
+    w: &Witness,
+    index: &[u8],
+) -> Result<(), ApiError> {
+    {
         let aliases: std::collections::HashSet<String> = sqlx::query_scalar(
             "SELECT DISTINCT alias->>'email'
                FROM quota_v2_calendar_successor_positive_caps c
@@ -498,7 +492,7 @@ async fn store(
         .bind(&w.old_container_id)
         .bind(&w.old_started_at)
         .bind(scope.activation)
-        .fetch_all(&mut *tx)
+        .fetch_all(&mut *conn)
         .await?
         .into_iter()
         .collect();
@@ -508,6 +502,25 @@ async fn store(
                 return Err(conflict());
             }
         }
+    }
+    Ok(())
+}
+
+async fn store(
+    state: &AppState,
+    node_id: i64,
+    witness: &str,
+    inventory: &str,
+    encoding: Option<InventoryEncoding>,
+    scope: Option<RuntimeScope<'_>>,
+) -> Result<Value, ApiError> {
+    let raw = decode(witness, WITNESS_LIMIT)?;
+    let index = unpack_index(inventory, encoding)?;
+    let mut tx = state.pool.begin().await?;
+    let key = enrolled_key(&mut tx, node_id).await?;
+    let w = verify_witness(&raw, &index, node_id, &key)?;
+    if let Some(ref scope) = scope {
+        verify_successor_birth_scope(&mut tx, node_id, scope, &w, &index).await?;
     }
     // Never commit a large head that Nexus cannot deliver in the fixed envelope.
     if index.len() > WIRE_INDEX_LIMIT {
