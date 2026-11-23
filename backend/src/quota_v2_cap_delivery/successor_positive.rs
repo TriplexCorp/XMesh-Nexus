@@ -484,7 +484,7 @@ async fn fund_successor_reservation(
     .bind(reservation)
     .bind(target)
     .bind(valid_until)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *conn)
     .await
     .map_err(|_| deny())?;
     if granted <= 0 || granted > target || revision != 1 {
@@ -499,7 +499,7 @@ async fn fund_successor_reservation(
     .bind(req.node_id)
     .bind(req.user_id)
     .bind(granted)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await
     .map_err(|_| deny())?;
     crate::quota_v2_cdn_lifetime::fund_mixed(
@@ -532,7 +532,7 @@ async fn fund_successor_reservation(
     )
     .bind(req.user_id)
     .bind(epoch)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *conn)
     .await?;
     let signed_now = database_now_ms(&mut *conn).await?;
     let install_before = signed_now.saturating_add(60_000).min(valid_until - 1);
