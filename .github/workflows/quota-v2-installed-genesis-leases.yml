@@ -54,12 +54,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: bd22bab45821303ef1c6387452f6ab9d01349ef2
+          ref: da0b5f080544786c910064c5b2eaea63a0b946b0
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 'bd22bab45821303ef1c6387452f6ab9d01349ef2'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 'da0b5f080544786c910064c5b2eaea63a0b946b0'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py
       - uses: dtolnay/rust-toolchain@stable
@@ -96,6 +96,19 @@ jobs:
           echo "XMESH_WAL_XRAY_BINARY=$bundle/xray" >> "$GITHUB_ENV"
           echo "XMESH_WAL_XRAY_IMAGE=$(cat "$bundle/image-id")" >> "$GITHUB_ENV"
           echo "XMESH_WAL_XRAY_SHA256=$hash" >> "$GITHUB_ENV"
+      - name: Require stable VLESS cutover across real successor network namespace
+        env:
+          XMESH_DISPOSABLE_XRAY_PATCH_EXPERIMENT: '1'
+          XMESH_QUOTA_V2_CROSS_NETNS: '1'
+        run: |
+          set -euo pipefail
+          # This is a disposable Node-signed dataplane test, NOT a claim
+          # that the complete installed Nexus XSP/2 lifecycle is proven.
+          if ! command -v ip >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq iproute2
+          fi
+          python3 .ci-reviewed-node/experiments/xray-dataplane-fence/test_xray_live_ingress_cutover.py "$XMESH_WAL_XRAY_BINARY"
       - name: Build real strict XSP/2 gateway fixture
         working-directory: deploy/xsp-v2-product-gateway
         run: go test -mod=readonly -c -o "$RUNNER_TEMP/wal-tunnel-fixture"
