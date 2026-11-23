@@ -184,7 +184,7 @@ fn verify_preparation_replay(
         return Err(deny());
     }
     let raw: Vec<u8> = row.try_get("signed_envelope")?;
-    let exact = verified_saved(state, &raw, req, &old, activation, now)?;
+    let exact = verified_saved(state, &raw, req, old, activation, now)?;
     // The SQL row and signed immutable bytes must carry the SAME
     // successor identifiers and validity. This guards against any
     // partial/restored outbox state being mistaken for exact replay.
