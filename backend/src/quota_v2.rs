@@ -37,6 +37,31 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
+/// Refuse an accidental feature-gate downgrade while the database still
+/// holds live, conservatively funded byte rights. The legacy traffic path
+/// cannot safely replace an installed signed quota runtime simply because
+/// an environment variable changed. This is a startup safety check, not
+/// authorization to enable Quota V2 in a production fleet.
+pub async fn refuse_disabled_with_funded_reservations(pool: &PgPool) -> anyhow::Result<()> {
+    if enabled() {
+        return Ok(());
+    }
+    let funded: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM quota_v2_reservations
+            WHERE ceiling_bytes > GREATEST(acknowledged_bytes, conservative_burn_floor_bytes)
+        )",
+    )
+    .fetch_one(pool)
+    .await?;
+    if funded {
+        anyhow::bail!(
+            "Quota V2 disabled while funded reservations remain; refusing unsafe legacy startup"
+        );
+    }
+    Ok(())
+}
+
 /// Record an authenticated node/gateway protocol claim. The caller must have
 /// completed either registered Node Ed25519 authentication or strict-PQ
 /// product-gateway authorization first.
