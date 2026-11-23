@@ -338,6 +338,13 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                 'printf "%s" "$output"',
                 "sh", old_node, panel, str(node))
             assert b"Quota V2 spending state exists; cold bootstrap is blocked" in result, result
+            raw = main.exec(
+                "sh", "-ec",
+                'set +e; /usr/local/libexec/xmesh-xray-update.py --version 26.10.31 --command-id 9901; '
+                'status=$?; test "$status" -eq 1')
+            blocked = json.loads(raw)
+            assert blocked["success"] is False and blocked["rollback"] == "unchanged", blocked
+            assert blocked["detail"].startswith("Quota V2 runtime state present."), blocked
             assert ready_route(main, uid, chain[-1]) == pid
             assert ready_route(main, peer["id"], stable) != pid
 
@@ -356,6 +363,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
             assert snapshot(db) == before
             (artifact / "downgrade.json").write_text(json.dumps({
                 "nodeRejectedColdBootstrap": True,
+                "nodeRejectedOfficialXrayReplacement": True,
                 "nexusRejectedOlderSchema": True,
                 "ledgerUnchanged": True,
             }, indent=2))
