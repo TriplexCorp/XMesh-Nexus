@@ -257,8 +257,15 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
         return Err(deny());
     }
     verify_original_first_cap_limits(
-        &mut tx, req, &current_user, inbound_class, &epoch, limit, floor,
-    ).await?;
+        &mut tx,
+        req,
+        &current_user,
+        inbound_class,
+        &epoch,
+        limit,
+        floor,
+    )
+    .await?;
     let mut row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     if row.is_none() {
         issue_original(
