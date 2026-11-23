@@ -87,6 +87,16 @@ class SignedNode:
         code,data,_=self.post("/node/desired-config",
             {"node_id":self.id,"quotaProtocolVersion":2,"quotaLocalCounters":[row]},
             send_barrier=send_barrier)
+        if code != 200:
+            # A generic 409 hides which conservative guard intentionally
+            # refused the next epoch; retain a bounded sanitized API error
+            # in disposable CI rather than weakening any SQL protection.
+            reason = (data.get("error",data.get("message","unspecified"))
+                      if isinstance(data,dict) else "non-JSON failure")
+            if not isinstance(reason,str):
+                reason = "unstructured error"
+            print(f"QUOTA V2 DESIRED DENIED: node={self.id} http={code} "
+                  f"reason={reason[:240]!r}",flush=True)
         check(code,200,f"v2 desired-config issued to node {self.id}")
         assert data["policy"]["version"]==2,data
         policy=guard.verify_envelope(data,self.state,self.id,first_contact=True)
