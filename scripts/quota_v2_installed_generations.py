@@ -54,7 +54,7 @@ def shorten_disposable_calendar(db, dsn):
     """)
 
 
-def exercise(pair, db, root, user, peer, lab, stack, dsn):
+def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
     service = RENEW + ".service"
     main = pair[0]
     node, uid = main.node, user["id"]
@@ -274,6 +274,36 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn):
         for request, response in replay_requests:
             assert main.request(CAP_PATH, request) == (200, response)
         assert snapshot(db) == before
+        if crashes:
+            old_node = "621439f507f708904c1bc3ebad60ad119885276c"
+            result = main.exec(
+                "sh", "-ec",
+                'if output=$(env "XMESH_NODE_RELEASE_REF=$1" '
+                'bash /opt/xmesh-node/bootstrap.sh "$2" "$3" 2>&1); then exit 1; fi; '
+                'printf "%s" "$output"',
+                "sh", old_node, panel, str(node))
+            assert b"Quota V2 spending state exists; cold bootstrap is blocked" in result, result
+            assert ready_route(main, uid, chain[-1]) == pid
+            assert ready_route(main, peer["id"], stable) != pid
+
+            migrations = db.execute(
+                "SELECT version,checksum FROM _sqlx_migrations ORDER BY version"
+            ).fetchall()
+            result = subprocess.run(
+                [os.environ["XMESH_TEST_OLD_NEXUS"]],
+                env={**os.environ, "APP_ADDR": "127.0.0.1:38082",
+                     "CORE_DATA_DIR": str(root / "downgrade-core"), "XMESH_QUOTA_V2_ENABLED": "0"},
+                capture_output=True, text=True, timeout=20)
+            log = result.stdout + result.stderr
+            assert result.returncode != 0 and re.search(
+                r"migration.*(?:missing|previously applied|mismatch)", log, re.I), log
+            assert db.execute("SELECT version,checksum FROM _sqlx_migrations ORDER BY version").fetchall() == migrations
+            assert snapshot(db) == before
+            (artifact / "downgrade.json").write_text(json.dumps({
+                "nodeRejectedColdBootstrap": True,
+                "nexusRejectedOlderSchema": True,
+                "ledgerUnchanged": True,
+            }, indent=2))
         main.exec("touch", WORK + "/database-restarted")
         assert process.wait(timeout=20) == 0
         main.exec("test", "-f", WORK + "/peer-intact")

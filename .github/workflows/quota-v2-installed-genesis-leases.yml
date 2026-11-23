@@ -37,7 +37,7 @@ jobs:
       XMESH_AUDIT_DISPOSABLE: '1'
       XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario != 'lease-recovery' && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
-      XMESH_INSTALLED_NODE_REF: 621439f507f708904c1bc3ebad60ad119885276c
+      XMESH_INSTALLED_NODE_REF: 0c667b4f0e1715a3ef451b669b8f7f8f5dcf4ab5
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -62,12 +62,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 621439f507f708904c1bc3ebad60ad119885276c
+          ref: 0c667b4f0e1715a3ef451b669b8f7f8f5dcf4ab5
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '621439f507f708904c1bc3ebad60ad119885276c'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '0c667b4f0e1715a3ef451b669b8f7f8f5dcf4ab5'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py
       - uses: dtolnay/rust-toolchain@stable
@@ -75,6 +75,22 @@ jobs:
         env:
           CARGO_PROFILE_DEV_DEBUG: '0'
         run: cargo build --manifest-path backend/Cargo.toml --bin xmesh-api
+      - name: Build the pinned older Nexus for schema downgrade verification
+        if: matrix.scenario == 'agent-sigkill'
+        env:
+          CARGO_PROFILE_DEV_DEBUG: '0'
+        run: |
+          set -euo pipefail
+          old="$RUNNER_TEMP/nexus-before-generations"
+          revision=cf7a3092dbe4f18abd383e228c5cbc461ec07972
+          git fetch --depth=1 origin "$revision"
+          git worktree add --detach "$old" FETCH_HEAD
+          test "$(git -C "$old" rev-parse HEAD)" = "$revision"
+          mv backend/target/debug/xmesh-api "$RUNNER_TEMP/xmesh-api-current"
+          cargo build --manifest-path "$old/backend/Cargo.toml" --target-dir "$PWD/backend/target" --bin xmesh-api
+          mv backend/target/debug/xmesh-api "$RUNNER_TEMP/xmesh-api-before-generations"
+          mv "$RUNNER_TEMP/xmesh-api-current" backend/target/debug/xmesh-api
+          echo "XMESH_TEST_OLD_NEXUS=$RUNNER_TEMP/xmesh-api-before-generations" >> "$GITHUB_ENV"
       - name: Prepare disposable test dependencies
         run: |
           python3 -m venv "$RUNNER_TEMP/quota-wal"
