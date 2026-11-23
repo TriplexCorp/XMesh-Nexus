@@ -423,6 +423,7 @@ struct FundedSuccessor {
     install_before: i64,
 }
 
+#[derive(Clone, Copy)]
 struct FundingContext<'a> {
     epoch: &'a str,
     meter: &'a str,
