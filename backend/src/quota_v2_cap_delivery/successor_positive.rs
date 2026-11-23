@@ -542,6 +542,113 @@ async fn fund_successor_reservation(
     })
 }
 
+struct SignedCapContext<'a> {
+    epoch: &'a str,
+    meter: &'a str,
+    reservation: &'a str,
+    policy: &'a str,
+    activation: &'a str,
+    limit: i64,
+    floor: i64,
+}
+
+async fn sign_and_store_successor(
+    conn: &mut PgConnection,
+    state: &AppState,
+    req: &Request,
+    fields: &RequestFields,
+    ctx: SignedCapContext<'_>,
+    funded: &FundedSuccessor,
+    aliases: Vec<Alias>,
+) -> Result<(Vec<u8>, Vec<u8>), ApiError> {
+    let fresh_genesis_payload = json!({
+        "schemaVersion":1,"kind":"xmesh.xray.genesis-prepared",
+        "nodeId":req.node_id,"activationReceiptSha256":ctx.activation,
+        "candidateRuntimeId":fields.fresh_runtime_id,
+        "challenge":req.challenge,
+        "preparedAtMs":funded.signed_now,
+        "validUntilMs":funded.signed_now.saturating_add(120_000),
+        "authorizedBytes":0,"canStart":false,"canResume":false
+    });
+    let fresh_signature = state
+        .node_policy_signer
+        .sign_domain(FRESH_GENESIS_DOMAIN, &fresh_genesis_payload)
+        .map_err(|_| deny())?;
+    let fresh_genesis = serde_json::to_vec(&json!({
+        "algorithm":"Ed25519",
+        "payload":fresh_genesis_payload,
+        "signature":fresh_signature
+    }))
+    .map_err(|_| deny())?;
+    if fresh_genesis.len() > 4096 {
+        return Err(deny());
+    }
+    let signed = sign_snapshot(
+        &state.node_policy_signer,
+        &SqlSnapshot {
+            user_id: req.user_id,
+            node_id: req.node_id,
+            activation_sha: ctx.activation.into(),
+            runtime_id: fields.fresh_runtime_id.clone(),
+            policy_sha: ctx.policy.to_owned(),
+            account_epoch: ctx.epoch.to_owned(),
+            meter_epoch: ctx.meter.to_owned(),
+            reservation_id: ctx.reservation.to_owned(),
+            revision: funded.revision,
+            nonce: req.challenge.clone(),
+            original_inventory_head: "0".repeat(64),
+            acknowledged: 0,
+            measured_wal: 0,
+            measured_cdn_wal: 0,
+            ceiling: funded.granted,
+            node_ceiling: funded.granted,
+            cdn_ceiling: funded.cdn_ceiling,
+            shared_account_limit: ctx.limit,
+            shared_account_floor: ctx.floor,
+            all_node_held: funded.held,
+            sql_preflight_expires_ms: funded.install_before,
+            lease_expires_ms: funded.valid_until,
+            issued_at_ms: funded.signed_now,
+            install_before_ms: funded.install_before,
+            valid_until_ms: funded.valid_until,
+            aliases,
+        },
+        funded.signed_now,
+    )
+    .map_err(|_| deny())?;
+    sqlx::query(
+        "INSERT INTO quota_v2_calendar_successor_positive_caps
+         (predecessor_id,node_id,user_id,account_epoch,meter_epoch,
+          reservation_id,fresh_runtime_id,policy_sha256,signer_public_key,
+          nonce,revision,grant_bytes,cdn_ceiling_bytes,issued_at_ms,
+          install_before_ms,valid_until_ms,signed_envelope,fresh_genesis_envelope)
+         VALUES($1::uuid,$2,$3,$4::uuid,$5::uuid,$6::uuid,
+                $7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)",
+    )
+    .bind(&fields.predecessor_id)
+    .bind(req.node_id)
+    .bind(req.user_id)
+    .bind(ctx.epoch)
+    .bind(ctx.meter)
+    .bind(ctx.reservation)
+    .bind(&fields.fresh_runtime_id)
+    .bind(ctx.policy)
+    .bind(state.node_policy_signer.public_key())
+    .bind(&req.challenge)
+    .bind(funded.revision)
+    .bind(funded.granted)
+    .bind(funded.cdn_ceiling)
+    .bind(funded.signed_now)
+    .bind(funded.install_before)
+    .bind(funded.valid_until)
+    .bind(&signed)
+    .bind(&fresh_genesis)
+    .execute(&mut *conn)
+    .await
+    .map_err(|_| deny())?;
+    Ok((signed, fresh_genesis))
+}
+
 pub(super) async fn issue(
     state: &AppState,
     req: &Request,
@@ -613,91 +720,14 @@ pub(super) async fn issue(
             class: a.class,
         })
         .collect::<Vec<_>>();
-    let fresh_genesis_payload = json!({
-        "schemaVersion":1,"kind":"xmesh.xray.genesis-prepared",
-        "nodeId":req.node_id,"activationReceiptSha256":activation,
-        "candidateRuntimeId":fields.fresh_runtime_id,
-        "challenge":req.challenge,
-        "preparedAtMs":signed_now,
-        "validUntilMs":signed_now.saturating_add(120_000),
-        "authorizedBytes":0,"canStart":false,"canResume":false
-    });
-    let fresh_signature = state
-        .node_policy_signer
-        .sign_domain(FRESH_GENESIS_DOMAIN, &fresh_genesis_payload)
-        .map_err(|_| deny())?;
-    let fresh_genesis = serde_json::to_vec(&json!({
-        "algorithm":"Ed25519",
-        "payload":fresh_genesis_payload,
-        "signature":fresh_signature
-    }))
-    .map_err(|_| deny())?;
-    if fresh_genesis.len() > 4096 {
-        return Err(deny());
-    }
-    let signed = sign_snapshot(
-        &state.node_policy_signer,
-        &SqlSnapshot {
-            user_id: req.user_id,
-            node_id: req.node_id,
-            activation_sha: activation.into(),
-            runtime_id: fields.fresh_runtime_id.clone(),
-            policy_sha: policy.clone(),
-            account_epoch: epoch.clone(),
-            meter_epoch: meter.clone(),
-            reservation_id: reservation.clone(),
-            revision,
-            nonce: req.challenge.clone(),
-            original_inventory_head: "0".repeat(64),
-            acknowledged: 0,
-            measured_wal: 0,
-            measured_cdn_wal: 0,
-            ceiling: granted,
-            node_ceiling: granted,
-            cdn_ceiling,
-            shared_account_limit: limit,
-            shared_account_floor: floor,
-            all_node_held: held,
-            sql_preflight_expires_ms: install_before,
-            lease_expires_ms: valid_until,
-            issued_at_ms: signed_now,
-            install_before_ms: install_before,
-            valid_until_ms: valid_until,
-            aliases,
+    let (signed, fresh_genesis) = sign_and_store_successor(
+        &mut tx, state, req, fields,
+        SignedCapContext {
+            epoch: &epoch, meter: &meter, reservation: &reservation,
+            policy, activation, limit, floor,
         },
-        signed_now,
-    )
-    .map_err(|_| deny())?;
-    sqlx::query(
-        "INSERT INTO quota_v2_calendar_successor_positive_caps
-         (predecessor_id,node_id,user_id,account_epoch,meter_epoch,
-          reservation_id,fresh_runtime_id,policy_sha256,signer_public_key,
-          nonce,revision,grant_bytes,cdn_ceiling_bytes,issued_at_ms,
-          install_before_ms,valid_until_ms,signed_envelope,fresh_genesis_envelope)
-         VALUES($1::uuid,$2,$3,$4::uuid,$5::uuid,$6::uuid,
-                $7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)",
-    )
-    .bind(&fields.predecessor_id)
-    .bind(req.node_id)
-    .bind(req.user_id)
-    .bind(&epoch)
-    .bind(&meter)
-    .bind(&reservation)
-    .bind(&fields.fresh_runtime_id)
-    .bind(policy)
-    .bind(state.node_policy_signer.public_key())
-    .bind(&req.challenge)
-    .bind(revision)
-    .bind(granted)
-    .bind(cdn_ceiling)
-    .bind(signed_now)
-    .bind(install_before)
-    .bind(valid_until)
-    .bind(&signed)
-    .bind(&fresh_genesis)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| deny())?;
+        &funded, aliases,
+    ).await?;
     // PostgreSQL 0161 deferred constraint verifies that NO committed
     // successor reservation exists without exactly these signed bytes.
     tx.commit().await.map_err(|_| deny())?;
