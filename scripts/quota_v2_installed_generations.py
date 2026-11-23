@@ -259,14 +259,15 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
             }, indent=2))
             assert ready_route(main, peer["id"], stable) != pid
             start_echo(main, generation, pid)
-            main.exec("touch", f"{WORK}/ready-{generation}")
-            completed(generation)
             if crashes and generation == 2:
-                # Re-arm crash injection with generation 2 as the
-                # predecessor, so the 2->3 handoff gets its own failures.
+                # Arm before releasing client bytes into generation 2.
+                # Otherwise its first WAL charge might commit before the
+                # g3 fault marker is visible, silently skipping a crash.
                 main.exec("sh", "-ec",
                           'umask 077; printf "%s %s %s\\n" "$1" "$2" "$3" > "$4/armed.next"; mv -f "$4/armed.next" "$4/armed"',
                           "sh", str(uid), grant["reservationId"], "g3", FAULT_STATE)
+            main.exec("touch", f"{WORK}/ready-{generation}")
+            completed(generation)
             chain.append(grant)
             print(f"PASS: actual Nexus signed and installed generation {generation}: "
                   f"Node {node}, predecessor {old['reservationId']}, successor {reservation}, "
