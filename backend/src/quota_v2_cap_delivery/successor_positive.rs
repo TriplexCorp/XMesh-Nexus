@@ -56,7 +56,7 @@ fn confirmed_old_heads_hash(heads: &[(String, i64, String, i64)]) -> Result<Stri
             || *bytes <= 0
             || !super::hex64(digest)
             || !name.starts_with("meter-")
-            || !name.ends_with(".jsonl")
+            || !name.rsplit_once('.').is_some_and(|(_, ext)| ext == "jsonl")
         {
             return Err(deny());
         }
