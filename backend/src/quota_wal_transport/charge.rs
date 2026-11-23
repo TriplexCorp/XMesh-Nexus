@@ -420,9 +420,9 @@ pub(super) async fn charge(
         &cap.epoch,
     )
     .await?;
-    if let Some(receipt) = previous_charge_receipt(
-        &mut tx, reservation, filename, first.sequence, &raw,
-    ).await? {
+    if let Some(receipt) =
+        previous_charge_receipt(&mut tx, reservation, filename, first.sequence, &raw).await?
+    {
         tx.commit().await?;
         return Ok(json!({"receipt":STANDARD.encode(receipt)}));
     }
