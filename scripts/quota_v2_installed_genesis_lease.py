@@ -64,6 +64,14 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         "hold":False,"used":0,"limit":0.001572864,"expireAt":0,
     })
     uid=user["id"]
+    generations = os.environ.get("XMESH_TEST_INSTALLED_GENERATIONS") == "1"
+    if generations:
+        owner.request("PATCH", f"/collections/users/{uid}", {
+            "limit": 0.016,
+            "nodeTrafficLimits": {
+                str(pair[0].node): {"limitGb": 0.000262144, "period": "daily"}
+            },
+        })
     for guest,tag in zip(pair,tags):
         _,profile=owner.request("POST","/collections/profiles",{
             "name":"First Genesis "+tag,
@@ -82,7 +90,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         })
     calendar = os.environ.get("XMESH_QUOTA_V2_NODE_CALENDAR_STAGING") == "1"
     periods = ["lifetime", "lifetime"]
-    if calendar:
+    if calendar and not generations:
         # Use two different UTC windows with sufficient time for the test.
         # Exact boundary behavior is covered by the independent PostgreSQL job.
         periods = [row[0] for row in db.execute(
@@ -93,7 +101,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         # At a simultaneous near-midnight day/week/month boundary, let the
         # concurrency rehearsal continue with lifetime limits.
         periods += ["lifetime"] * (2 - len(periods))
-    monthly_cdn = os.environ.get("XMESH_QUOTA_V2_CDN_CALENDAR_STAGING") == "1" and db.execute(
+    monthly_cdn = not generations and os.environ.get("XMESH_QUOTA_V2_CDN_CALENDAR_STAGING") == "1" and db.execute(
         "SELECT upper(quota_v2_calendar_window('monthly',statement_timestamp())) "
         "> statement_timestamp()+interval '15 minutes'"
     ).fetchone()[0]
@@ -180,10 +188,18 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
              "genesisChallenge":g["challenge"]}
         return guest,req,common
 
+    if generations:
+        from quota_v2_installed_generations import shorten_disposable_calendar
+        shorten_disposable_calendar(db, dsn)
     stages=parallel(stage,zip(pair,tags))
     assert db.execute("SELECT count(*) FROM quota_v2_reservations").fetchone()==(0,)
     assert db.execute("SELECT count(*) FROM node_desired_revisions").fetchone()==(0,)
     print("Both installed 6.0.27 Agents got real signed preview and quarantine on measured isolated Xray.")
+
+    if generations:
+        from quota_v2_installed_generations import exercise
+        exercise(pair, db, root, user, peer, lab)
+        return
 
     def helper(item,operation):
         guest,_,common=item

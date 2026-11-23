@@ -19,6 +19,7 @@ on:
       - 'scripts/test-quota-wal-product-tunnel.py'
       - 'scripts/quota_v2_installed_genesis_lease.py'
       - 'scripts/quota_v2_installed_live_vless.py'
+      - 'scripts/quota_v2_installed_generations*.py'
       - 'scripts/quota-wal-systemd.Dockerfile'
       - '.github/workflows/quota-v2-installed-genesis-leases.yml'
 permissions:
@@ -27,9 +28,15 @@ jobs:
   installed-leases:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [lease-recovery, managed-generations]
     timeout-minutes: 50
     env:
       XMESH_AUDIT_DISPOSABLE: '1'
+      XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario == 'managed-generations' && '1' || '0' }}
+      XMESH_INSTALLED_NODE_REF: 51d15f49f008080eb71257dc602f5d7fb7dc83cb
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -123,3 +130,9 @@ jobs:
           source "$RUNNER_TEMP/quota-wal/bin/activate"
           export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-installed
+      - name: Save verified public quota evidence
+        if: always() && matrix.scenario == 'managed-generations'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: quota-v2-generations-evidence
+          path: ${{ runner.temp }}/quota-v2-generations-evidence

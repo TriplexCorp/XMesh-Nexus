@@ -296,6 +296,8 @@ else:
                input=json.dumps(binding, sort_keys=True, separators=(",", ":")).encode())
         cap_env = ["-e", "XMESH_EXPERIMENTAL_SIGNED_CAP_BINDING=/run/xmesh-quota-runtime/cap-binding.json",
                    "-e", "XMESH_EXPERIMENTAL_SCOPED_INBOUNDS=" + tag]
+    if binding and os.environ.get("XMESH_TEST_INSTALLED_GENERATIONS") == "1":
+        cap_env += ["-e", "XMESH_QUOTA_PRIVATE_VLESS=1"]
     guest.exec("docker", "run", "-d", "--name", XRAY, "--network", "none", "--restart=no",
                "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                "--user", "0:0", "-e", "GITHUB_ACTIONS=true", "-e", "XMESH_EXPERIMENTAL_DRAIN=1",
