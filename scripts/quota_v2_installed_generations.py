@@ -271,12 +271,20 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         charges = {}
         for grant in chain:
             reservation = grant["reservationId"]
-            charged = lab.wait_for(lambda: db.execute(
-                "SELECT SUM(stream_bytes) FROM (SELECT MAX(stream_bytes) AS stream_bytes "
-                "FROM quota_v2_wal_charges WHERE reservation_id=%s GROUP BY filename) streams",
-                (reservation,)).fetchone()[0], timeout=75, label=f"WAL charge {reservation}")
-            assert charged == 16384, (reservation, charged)
-            charges[reservation] = int(charged)
+
+            def both_wal_directions():
+                charged, streams, largest = db.execute(
+                    "SELECT COALESCE(SUM(stream_bytes),0), COUNT(*), COALESCE(MAX(stream_bytes),0) "
+                    "FROM (SELECT MAX(stream_bytes) AS stream_bytes FROM quota_v2_wal_charges "
+                    "WHERE reservation_id=%s GROUP BY filename) streams",
+                    (reservation,)).fetchone()
+                # The uplink and downlink are separate transactions. One
+                # direction may commit while the worker is retrying the other.
+                assert largest <= 8192 and streams <= 2, (reservation, charged, streams, largest)
+                return int(charged) if (charged, streams) == (16384, 2) else None
+
+            charges[reservation] = lab.wait_for(
+                both_wal_directions, timeout=75, label=f"16384 bytes in both WAL directions {reservation}")
         def snapshot(connection):
             return (
                 connection.execute(
