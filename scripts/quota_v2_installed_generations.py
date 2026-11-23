@@ -162,7 +162,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         if crashes:
             main.exec("test", "-f", FAULT_STATE + "/loaded")
             main.exec("touch", WORK + "/check-xray-kill")
-            main.exec("sh", "-ec", 'umask 077; printf "%s %s %s\n" "$1" "$2" "$3" > "$4/armed"',
+            main.exec("sh", "-ec", 'umask 077; printf "%s %s %s\n" "$1" "$2" "$3" > "$4/armed.next"; mv -f "$4/armed.next" "$4/armed"',
                       "sh", str(uid), initial["reservationId"], "g2", FAULT_STATE)
             (root / "drop-wal-response-armed").write_text(initial["reservationId"])
         main.exec("touch", WORK + "/ready-1")
@@ -265,7 +265,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                 # Re-arm crash injection with generation 2 as the
                 # predecessor, so the 2->3 handoff gets its own failures.
                 main.exec("sh", "-ec",
-                          'umask 077; printf "%s %s %s\\n" "$1" "$2" "$3" > "$4/armed"',
+                          'umask 077; printf "%s %s %s\\n" "$1" "$2" "$3" > "$4/armed.next"; mv -f "$4/armed.next" "$4/armed"',
                           "sh", str(uid), grant["reservationId"], "g3", FAULT_STATE)
             chain.append(grant)
             print(f"PASS: actual Nexus signed and installed generation {generation}: "
