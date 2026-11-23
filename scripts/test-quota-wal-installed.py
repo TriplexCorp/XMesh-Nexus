@@ -179,9 +179,9 @@ systemctl stop docker.socket docker.service containerd.service
                     if error.errno != errno.EIO:
                         raise
                     break
-                recent += chunk
-                if len(recent) > 8192:
-                    del recent[:-8192]
+                # Raw PTY data is only retained until a complete line is
+                # available; the diagnostic tail must never store the raw
+                # enrollment token, even transiently.
                 log += chunk
                 if not port_confirmed and b"TCP port for XMesh Node [8443]:" in log:
                     os.write(primary, b"\n")
@@ -192,13 +192,16 @@ systemctl stop docker.socket docker.service containerd.service
                 complete = log.rfind(b"\n") + 1
                 if complete:
                     output = bytes(log[:complete]).replace(token_bytes, b"[REDACTED]")
+                    recent += output
+                    if len(recent) > 8192:
+                        del recent[:-8192]
                     for line in output.splitlines(keepends=True):
                         sys.stdout.buffer.write(f"[installed Node {self.node}] ".encode() + line)
                     sys.stdout.buffer.flush()
                     del log[:complete]
             returncode = process.wait(timeout=5)
             if returncode != 0:
-                excerpt = bytes(recent[-4096:]).replace(token_bytes, b"[REDACTED]")
+                excerpt = bytes(recent[-4096:])
                 raise AssertionError(
                     f"bootstrap failed on Node {self.node} (exit {returncode}); "
                     f"last guest output: {excerpt.decode('utf-8', errors='replace')}"
