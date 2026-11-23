@@ -67,7 +67,27 @@ pub async fn record_class(
          SELECT r.reservation_id,r.user_id,r.node_id,$4
          FROM quota_v2_reservations r
          WHERE r.reservation_id=$1::uuid AND r.user_id=$2 AND r.node_id=$3
-           AND r.ceiling_bytes=0 AND r.acknowledged_bytes=0
+           -- The very first prepared policy can preserve an OLD absolute
+           -- Xray meter baseline. ceiling=ack is ZERO outstanding authority,
+           -- not a positive grant. It is safe to freeze its class only while
+           -- the new lease is unconfirmed and has never had a signed cap.
+           -- A closed/previously confirmed lease cannot be reclassified,
+           -- even if its historical ceiling has now been fully spent.
+           AND r.ceiling_bytes=r.acknowledged_bytes
+           AND r.conservative_burn_floor_bytes<=r.acknowledged_bytes
+           AND r.revision=1 AND NOT r.node_confirmed
+           AND NOT EXISTS(
+               SELECT 1 FROM quota_v2_signed_first_cap_outbox o
+                WHERE o.reservation_id=r.reservation_id
+           )
+           AND NOT EXISTS(
+               SELECT 1 FROM quota_v2_cap_renewals x
+                WHERE x.reservation_id=r.reservation_id
+           )
+           AND NOT EXISTS(
+               SELECT 1 FROM quota_v2_calendar_successor_positive_caps y
+                WHERE y.reservation_id=r.reservation_id
+           )
          ON CONFLICT(reservation_id) DO NOTHING",
     )
     .bind(reservation)
