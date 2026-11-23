@@ -96,6 +96,53 @@ fn request_valid(req: &Request, fields: &RequestFields) -> bool {
 /// The planning deadline may have elapsed; it is never reused to install
 /// an actual spending cap. Only a new fresh-signature installation window
 /// can authorize use of the new Xray.
+async fn verify_predecessor_wal_heads(
+    conn: &mut PgConnection,
+    req: &Request,
+    fields: &RequestFields,
+    runtime: &str,
+    old_successor: bool,
+) -> Result<(), ApiError> {
+    // The Node's original nonfinal fence marker carries the SHA256 of
+    // EACH last signed WAL-charge head from the predecessor. Reconstruct
+    // those same exact bytes from PostgreSQL's immutable charge receipts
+    // BEFORE funding any new cap. A made-up local "all tails ACK" marker
+    // can no longer hide a missing or altered remote old-reservation debt.
+    // Birth history before the first off-host checkpoint is separately
+    // guarded and remains a release gate, not a refund authority.
+    let old_heads = sqlx::query(
+        "SELECT DISTINCT ON (filename) filename,last_sequence,last_digest,stream_bytes
+         FROM quota_v2_wal_charges WHERE reservation_id=$1::uuid
+         ORDER BY filename,first_sequence DESC",
+    )
+    .bind(&fields.predecessor_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut canonical_heads = Vec::with_capacity(old_heads.len());
+    for row in &old_heads {
+        canonical_heads.push((
+            row.try_get::<String, _>("filename")?,
+            row.try_get::<i64, _>("last_sequence")?,
+            row.try_get::<String, _>("last_digest")?,
+            row.try_get::<i64, _>("stream_bytes")?,
+        ));
+    }
+    let expected_heads = confirmed_old_heads_hash(&canonical_heads)?;
+    if expected_heads != fields.old_wal_charge_heads_sha256 {
+        return Err(deny());
+    }
+    crate::quota_wal_transport::require_closed_stream_charges(
+        conn,
+        req.node_id,
+        req.user_id,
+        &runtime,
+        old_successor,
+        &canonical_heads,
+    )
+    .await?;
+    Ok(())
+}
+
 async fn signed_predecessor(
     conn: &mut PgConnection,
     state: &AppState,
@@ -191,43 +238,9 @@ async fn signed_predecessor(
     {
         return Err(deny());
     }
-    // The Node's original nonfinal fence marker carries the SHA256 of
-    // EACH last signed WAL-charge head from the predecessor. Reconstruct
-    // those same exact bytes from PostgreSQL's immutable charge receipts
-    // BEFORE funding any new cap. A made-up local "all tails ACK" marker
-    // can no longer hide a missing or altered remote old-reservation debt.
-    // Birth history before the first off-host checkpoint is separately
-    // guarded and remains a release gate, not a refund authority.
-    let old_heads = sqlx::query(
-        "SELECT DISTINCT ON (filename) filename,last_sequence,last_digest,stream_bytes
-         FROM quota_v2_wal_charges WHERE reservation_id=$1::uuid
-         ORDER BY filename,first_sequence DESC",
-    )
-    .bind(&fields.predecessor_id)
-    .fetch_all(&mut *conn)
-    .await?;
-    let mut canonical_heads = Vec::with_capacity(old_heads.len());
-    for row in &old_heads {
-        canonical_heads.push((
-            row.try_get::<String, _>("filename")?,
-            row.try_get::<i64, _>("last_sequence")?,
-            row.try_get::<String, _>("last_digest")?,
-            row.try_get::<i64, _>("stream_bytes")?,
-        ));
-    }
-    let expected_heads = confirmed_old_heads_hash(&canonical_heads)?;
-    if expected_heads != fields.old_wal_charge_heads_sha256 {
-        return Err(deny());
-    }
-    crate::quota_wal_transport::require_closed_stream_charges(
-        conn,
-        req.node_id,
-        req.user_id,
-        &runtime,
-        row.try_get("old_successor")?,
-        &canonical_heads,
-    )
-    .await?;
+    verify_predecessor_wal_heads(
+        conn, req, fields, &runtime, row.try_get("old_successor")?,
+    ).await?;
     Ok((meter, reservation))
 }
 
