@@ -247,8 +247,8 @@ pub(super) async fn prepare(
         // The SQL row and signed immutable bytes must carry the SAME
         // successor identifiers and validity. This guards against any
         // partial/restored outbox state being mistaken for exact replay.
-        let signed: Value = serde_json::from_slice(&raw).map_err(|_| deny())?;
-        let payload = &signed["payload"];
+        let saved_envelope: Value = serde_json::from_slice(&raw).map_err(|_| deny())?;
+        let payload = &saved_envelope["payload"];
         let meter: String = row.try_get("candidate_meter_epoch")?;
         let reservation: String = row.try_get("candidate_reservation_id")?;
         let issued: i64 = row.try_get("issued_at_ms")?;
