@@ -231,7 +231,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn):
                 "FROM quota_v2_wal_charges WHERE reservation_id=%s GROUP BY filename) streams",
                 (reservation,)).fetchone()[0], timeout=75, label=f"WAL charge {reservation}")
             assert charged == 16384, (reservation, charged)
-            charges[reservation] = charged
+            charges[reservation] = int(charged)
         def snapshot(connection):
             return (
                 connection.execute(
