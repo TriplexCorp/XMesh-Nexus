@@ -337,6 +337,33 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
             for epoch, limit, spent, held, refunded in budget
         ], indent=2))
         if crashes:
+            # The same production binary must refuse a gate downgrade when
+            # funded signed reservations exist, before serving legacy HTTP.
+            # The disposable runner already proved that gate=0 starts with
+            # an empty ledger; now prove the inverse on the live SQL ledger.
+            funded = db.execute(
+                "SELECT COUNT(*) FROM quota_v2_reservations "
+                "WHERE ceiling_bytes > GREATEST(acknowledged_bytes, conservative_burn_floor_bytes)"
+            ).fetchone()[0]
+            assert funded > 0, "test has no funded reservation to protect"
+            current_nexus = Path("backend/target/debug/xmesh-api").resolve()
+            assert current_nexus.is_file(), "current Nexus binary absent"
+            downgrade = subprocess.run(
+                [str(current_nexus)],
+                env={**os.environ, "XMESH_QUOTA_V2_ENABLED": "0",
+                     "APP_ADDR": "127.0.0.1:38083",
+                     "CORE_DATA_DIR": str(root / "gate-downgrade-core")},
+                capture_output=True, text=True, timeout=20)
+            diagnostics = downgrade.stdout + downgrade.stderr
+            assert downgrade.returncode != 0 and (
+                "Quota V2 disabled while funded reservations remain" in diagnostics
+            ), diagnostics
+            assert snapshot(db) == before
+            (artifact / "gate-downgrade.json").write_text(json.dumps({
+                "fundedReservationCount": funded,
+                "disabledNexusRefusedStartup": True,
+                "ledgerUnchanged": True,
+            }, indent=2))
             old_node = "621439f507f708904c1bc3ebad60ad119885276c"
             result = main.exec(
                 "sh", "-ec",
