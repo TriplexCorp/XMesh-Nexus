@@ -143,7 +143,7 @@ class CandidateTest(unittest.TestCase):
 
     def test_independently_qualified_xray_is_required_for_the_whole_matrix(self):
         source = Path(__file__).resolve().parents[1]
-        qualification = read_xray_qualification(source / "deploy/metered-xray-qualification.json")
+        qualification = read_xray_qualification(source / "scripts/metered-xray-qualification.json")
         binary = self.root / "xray"
         raw = b"reviewed candidate"
         binary.write_bytes(raw)
