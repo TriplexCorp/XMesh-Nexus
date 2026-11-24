@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from quota_v2_release_candidate import ACTIVATION, PRODUCT, SCENARIOS, verify, verify_measured_xray, write_installed_evidence
+from quota_v2_release_candidate import ACTIVATION, PRODUCT, SCENARIOS, verify, verify_measured_xray, verify_running_xray, write_installed_evidence
 
 
 class CandidateTest(unittest.TestCase):
@@ -106,6 +106,46 @@ class CandidateTest(unittest.TestCase):
         binary.write_bytes(b"changed after docker image build")
         with self.assertRaisesRegex(ValueError, "executable changed"):
             verify_measured_xray(binary, digest)
+
+    def test_live_nested_xray_elf_hash_is_bound_to_stable_kernel_process(self):
+        expected = "a" * 64
+        container = "xmesh-managed-xray"
+
+        class FakeGuest:
+            def __init__(self):
+                self.inspections = 0
+                self.digest = expected
+                self.pid = "23456"
+                self.change_pid_after_measure = False
+
+            def exec(self, *args):
+                if args[:2] == ("docker", "inspect"):
+                    self.inspections += 1
+                    pid = ("23457" if self.change_pid_after_measure
+                           and self.inspections > 1 else self.pid)
+                    return ("b" * 64 + " " + pid + " 2026-11-24T08:00:00Z").encode()
+                if args[0] == "sha256sum":
+                    return (self.digest + "  /proc/" + self.pid + "/exe").encode()
+                raise AssertionError("unexpected external subprocess")
+
+        guest = FakeGuest()
+        self.assertEqual(verify_running_xray(guest, container, expected), expected)
+        self.assertEqual(guest.inspections, 2)
+        guest.inspections = 0
+        guest.digest = "c" * 64
+        with self.assertRaisesRegex(ValueError, "differs from pinned binary"):
+            verify_running_xray(guest, container, expected)
+        guest.digest = expected
+        guest.inspections = 0
+        guest.change_pid_after_measure = True
+        with self.assertRaisesRegex(ValueError, "changed during executable measurement"):
+            verify_running_xray(guest, container, expected)
+        with self.assertRaisesRegex(ValueError, "untrusted Docker Xray container"):
+            verify_running_xray(guest, "foreign-xray", expected)
+        guest.change_pid_after_measure = False
+        guest.pid = "0"
+        with self.assertRaisesRegex(ValueError, "untrusted live Xray Docker"):
+            verify_running_xray(guest, container, expected)
 
     def test_xray_binary_symlink_is_not_release_evidence(self):
         actual = self.root / "real-xray"
