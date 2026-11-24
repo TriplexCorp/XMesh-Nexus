@@ -543,6 +543,46 @@ def main():
         assert first != second
         print(f"Two clean systemd guests installed pinned {identity['version']} and activated distinct XSP/2 identities.")
 
+        if os.environ.get("XMESH_INSTALLED_GENESIS_LEASE") == "1":
+            # Exercise the actual signed activation-recovery protocol on
+            # installed Agent, before touching Xray. Node 1 loses the local
+            # receipt and active marker after PostgreSQL committed. Node 2
+            # loses only the active marker (fsynced receipt survives).
+            # Both must recover the EXACT original XSP/2 identity without
+            # re-enrollment, changing the node key or issuing new quotas.
+            for index, (guest, _) in enumerate(guests):
+                state = "/var/lib/xmesh-agent/product"
+                original = {
+                    name: guest.exec("sha256sum", f"{state}/{name}").split()[0].decode()
+                    for name in ("activation-request.json", "activation-receipt.json",
+                                 "active.json", "config.json")
+                }
+                before = db.execute(
+                    "SELECT activation_request_sha256,receipt_sha256,release_source_revision "
+                    "FROM node_xsp_product_nodes WHERE node_id=%s", (guest.node,)
+                ).fetchone()
+                assert before and before[0] and before[1]
+                guest.exec("rm", f"{state}/active.json")
+                if index == 0:
+                    guest.exec("rm", f"{state}/activation-receipt.json")
+                guest.exec(PRODUCT, "resume-activation", timeout=60)
+                guest.exec(PRODUCT, "verify-active", "--panel", panel,
+                           "--node-id", str(guest.node))
+                for name, digest in original.items():
+                    actual = guest.exec("sha256sum", f"{state}/{name}").split()[0].decode()
+                    assert actual == digest, (
+                        f"Node {guest.node} altered {name} during activation recovery"
+                    )
+                after = db.execute(
+                    "SELECT activation_request_sha256,receipt_sha256,release_source_revision "
+                    "FROM node_xsp_product_nodes WHERE node_id=%s", (guest.node,)
+                ).fetchone()
+                assert after == before, (
+                    f"Node {guest.node} recovery mutated the signed activation ledger"
+                )
+            print("Two installed Agents recovered lost activation files with unchanged "
+                  "original signed requests, receipts, database identity and keys.")
+
         def samples(node):
             return db.execute("SELECT count(*) FROM server_metric_samples WHERE node_id=%s", (str(node),)).fetchone()[0]
 
