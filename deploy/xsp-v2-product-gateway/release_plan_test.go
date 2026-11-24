@@ -172,6 +172,32 @@ func TestReleasePlanPostgres(t *testing.T) {
 	if !bytes.Equal(assembled, artifact) {
 		t.Fatal("downloaded artifact differs")
 	}
+	// The immutable outbox must NOT make a previously signed plan usable
+	// after the active command expires, is cancelled, or the Node is disabled.
+	// Both plan replay and EACH subsequent chunk must recheck live SQL state.
+	assertReleaseRevoked := func(reason string) {
+		t.Helper()
+		if status, _ := g.planRelease(ctx, request, node, body); status != http.StatusConflict {
+			t.Fatalf("%s: old signed plan replay returned %d", reason, status)
+		}
+		if status, _ := download(planSHA, 0); status != http.StatusConflict {
+			t.Fatalf("%s: old signed artifact chunk returned %d", reason, status)
+		}
+	}
+	exec("UPDATE node_restart_commands SET claimed_at=now() - interval '16 minutes' WHERE id=1")
+	assertReleaseRevoked("expired update claim")
+	exec("UPDATE node_restart_commands SET claimed_at=now() WHERE id=1")
+	exec("UPDATE node_restart_commands SET state='failed',finished_at=now() WHERE id=1")
+	assertReleaseRevoked("failed update command")
+	exec("UPDATE node_restart_commands SET state='claimed',finished_at=NULL WHERE id=1")
+	exec("UPDATE panel_records SET data=jsonb_set(data, '{disabled}', 'true'::jsonb, true) WHERE id=1")
+	assertReleaseRevoked("disabled Node")
+	exec("UPDATE panel_records SET data='{}'::jsonb WHERE id=1")
+	// Recovery of the unchanged original receipt, not a newly signed plan.
+	if status, same := g.planRelease(ctx, request, node, body); status != http.StatusOK ||
+		!bytes.Equal(same, results[0]) {
+		t.Fatal("safe release replay changed after transient command guard")
+	}
 	if status, _ := download(strings.Repeat("0", 64), 0); status != http.StatusConflict {
 		t.Fatal("wrong plan digest accepted")
 	}
@@ -192,4 +218,9 @@ func TestReleasePlanPostgres(t *testing.T) {
 			t.Fatalf("changed activation returned %d", status)
 		}
 	}
+	// Even the exact earlier dual-signed response cannot be re-delivered
+	// through a revoked enrolled key epoch. No stale chunk bypasses this.
+	exec("UPDATE node_xsp_product_nodes SET receipt_sha256=$1,receipt_envelope=$2", digest[:], receipt)
+	exec("UPDATE node_xsp_public_keysets SET revoked_at=now() WHERE node_id=1 AND purpose='node_request'")
+	assertReleaseRevoked("revoked enrolled Node keys")
 }
