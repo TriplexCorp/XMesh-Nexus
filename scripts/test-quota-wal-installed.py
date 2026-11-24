@@ -350,6 +350,10 @@ else:
         return subprocess.run(command, timeout=10, capture_output=True).returncode == 0
 
     wait_for(candidate_ready, timeout=20, label=f"isolated Xray observation socket on Node {guest.node}")
+    # Hash the executable backing this ACTUAL running kernel process,
+    # not merely the build-host source artifact or Docker image tag.
+    from quota_v2_release_candidate import verify_running_xray
+    verify_running_xray(guest, XRAY, os.environ["XMESH_WAL_XRAY_SHA256"])
 
 
 def try_genesis(guests, db, root, panel):
