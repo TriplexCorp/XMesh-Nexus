@@ -42,3 +42,16 @@ func TestFreshProductEnrollmentRequiresExactReleasePin(t *testing.T) {
 		t.Fatal("legacy bootstrap accepted for a fresh enrollment")
 	}
 }
+
+func TestCurrentWALCandidateRejectsRetiredVersion(t *testing.T) {
+	revision, artifact := strings.Repeat("a", 40), strings.Repeat("b", 64)
+	pin := revision + ":" + artifact
+	release := releaseIdentity{targetAgentVersion, revision, artifact}
+	if !pinnedWALCandidate(release, "1", pin) || pinnedWALCandidate(release, "0", pin) {
+		t.Fatal("current WAL candidate must require the enabled exact rehearsal pin")
+	}
+	release.Version = "control-v6.0.27"
+	if releaseAllowedForEnrollment(release, pin, "1", pin) {
+		t.Fatal("retired 6.0.27 identity must not enroll with current release pins")
+	}
+}

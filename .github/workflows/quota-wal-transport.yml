@@ -2,6 +2,8 @@ name: Quota WAL authenticated transport
 on:
   pull_request:
     paths:
+      - 'AGENT_VERSION'
+      - 'deploy/agent-release-pin.conf'
       - 'backend/src/quota_wal_transport.rs'
       - 'backend/src/quota_wal_transport/**'
       - 'backend/src/quota_xray_genesis.rs'
@@ -60,7 +62,7 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 4f5f160ca5c7a12afd94be77f548fbc78924a6ef
+          ref: d2e071e4034f834852d422a41d1150da7eb25f13
           path: .ci-reviewed-node
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
@@ -72,8 +74,10 @@ jobs:
           set -euo pipefail
           revision="$(git rev-parse HEAD)"
           version="$(tr -d '\r\n' < ../../AGENT_VERSION)"
-          test "$revision" = '4f5f160ca5c7a12afd94be77f548fbc78924a6ef'
-          test "$version" = 'control-v6.0.27'
+          test "$revision" = 'd2e071e4034f834852d422a41d1150da7eb25f13'
+          test "$version" = 'control-v6.0.28'
+          test "$version" = "$(tr -d '\r\n' < ../../../AGENT_VERSION)"
+          grep -Fxq "sourceRevision=$revision" ../../../deploy/agent-release-pin.conf
           go build -trimpath -ldflags "-X main.version=$version -X main.sourceRevision=$revision" \
             -o "$RUNNER_TEMP/wal-product-agent" ./cmd/xmesh-agent-xspv2-product
           "$RUNNER_TEMP/wal-product-agent" --identity | python3 -c '
@@ -135,7 +139,7 @@ jobs:
       - name: Install two isolated systemd Nodes and verify cold-start quarantine
         env:
           XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
-          XMESH_INSTALLED_NEXUS_REF: 18b6aaa09d6bdf635f1348076ac86e1b30c72c53
+          XMESH_INSTALLED_NEXUS_REF: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           source "$RUNNER_TEMP/quota-wal/bin/activate"

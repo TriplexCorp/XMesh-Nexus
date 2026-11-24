@@ -7,6 +7,7 @@ uses a clean unassigned guest, not a node with active quota reservations.
 import hashlib
 import json
 import os
+import time
 from urllib.parse import urlsplit
 
 PRODUCT = "/usr/local/bin/xmesh-agent-xspv2-product"
@@ -69,12 +70,22 @@ def check_first_successor(guest, db, panel, initial, target):
             "SELECT count(*) FROM node_xsp_product_release_commits WHERE node_id=%s", (node,),
         ).fetchone()[0]
 
+    def poll_control():
+        # The installed control service has a normal 5-start / 10-second
+        # systemd limit. The fixture compresses multiple manual polls that
+        # would ordinarily be spaced by its timer. Honor the real rate
+        # window; never reset failed state or change the unit in this test.
+        assert guest.exec("systemctl", "show", "-p", "StartLimitIntervalUSec",
+                          "--value", CONTROL + ".service").strip() == b"10s"
+        time.sleep(11)
+        guest.exec("systemctl", "start", CONTROL + ".service", timeout=90)
+
     def queue():
         command, = db.execute(
             "SELECT command_id FROM queue_node_xsp_product_first_successor(%s,%s,%s)",
             (node, target["version"], "disposable-first-successor"),
         ).fetchone()
-        guest.exec("systemctl", "start", CONTROL + ".service", timeout=90)
+        poll_control()
         assert command_state(command) == "claimed"
         assert json.loads(guest.exec("cat", f"{STATE}/command.json")) == {
             "id": command, "action": "update_agent", "targetVersion": target["version"],
@@ -131,7 +142,7 @@ def check_first_successor(guest, db, panel, initial, target):
     assert activation_files() == before_files and activation_row() == before_row
     guest.exec("systemctl", "restart", "xmesh-pq-activation-recovery.service", timeout=90)
     guest.exec(PRODUCT, "verify-active", "--panel", panel, "--node-id", str(node))
-    guest.exec("systemctl", "start", CONTROL + ".service", timeout=90)
+    poll_control()
     version, = db.execute("SELECT version FROM node_runtime_heartbeats WHERE node_id=%s", (node,)).fetchone()
     assert version == target["version"]
     assert db.execute(
