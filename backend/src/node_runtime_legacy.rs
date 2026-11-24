@@ -437,13 +437,15 @@ pub async fn heartbeat(
     )
     .await?;
     // A self-upgrade can replace its own running worker before its ACK is sent.
-    // A fresh, authenticated heartbeat with the exact requested version is
-    // stronger evidence of success than the lost acknowledgement.
+    // A fresh authenticated version can recover only historical unbound
+    // commands. Bound releases require their exact ACK or signed COMMIT;
+    // even a later successful release must not resurrect an earlier ABORT.
     sqlx::query(
         "UPDATE node_restart_commands AS c SET state='succeeded',
          result='Версия агента подтверждена подписанным heartbeat',
          finished_at=NOW()
          WHERE c.node_id=$1 AND c.action='update_agent'
+           AND c.release_manifest_id IS NULL
            AND c.state IN ('pending','claimed','failed')
            AND c.target_version=$2
            AND c.requested_at <= NOW()

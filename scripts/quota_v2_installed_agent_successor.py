@@ -122,6 +122,11 @@ def check_first_successor(guest, db, panel, initial, target):
     guest.exec("sh", "-ec", 'umask 077; printf "abort\\n" > "$1"', "sh", f"{STATE}/abort-{command}")
     guest.exec("systemctl", "start", SUPERVISOR + ".service", timeout=180)
     assert command_state(command) == "failed" and commit_count() == 0
+    aborted_command = command
+    aborted_row = db.execute(
+        "SELECT state,result,finished_at,release_ack_success FROM node_restart_commands WHERE id=%s",
+        (aborted_command,),
+    ).fetchone()
     assert image() == initial
     assert activation_files() == before_files and activation_row() == before_row
     guest.exec("test", "!", "-e", f"{STATE}/command.json")
@@ -145,6 +150,13 @@ def check_first_successor(guest, db, panel, initial, target):
     poll_control()
     version, = db.execute("SELECT version FROM node_runtime_heartbeats WHERE node_id=%s", (node,)).fetchone()
     assert version == target["version"]
+    # The new effective revision is the same target as the earlier ABORT.
+    # A healthy heartbeat must not resurrect that terminal failed command.
+    assert db.execute(
+        "SELECT state,result,finished_at,release_ack_success FROM node_restart_commands WHERE id=%s",
+        (aborted_command,),
+    ).fetchone() == aborted_row
+    assert command_state(command) == "succeeded" and commit_count() == 1
     assert db.execute(
         "SELECT command_id FROM queue_node_xsp_product_first_successor(%s,%s,%s)",
         (node, target["version"], "disposable-first-successor"),
