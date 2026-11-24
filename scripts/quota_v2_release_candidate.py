@@ -56,6 +56,41 @@ def verify_measured_xray(path, expected_sha):
     return actual_sha
 
 
+def read_xray_qualification(path):
+    doc = read_json(path)
+    exact_keys(doc, ("schemaVersion", "kind", "nodeSourceRevision",
+                     "upstreamSourceRevision", "patchSourceTree", "goVersion", "artifactSha256",
+                     "independentRebuildMatched", "candidateOnly",
+                     "productionActivationAuthorized", "workflowRunId"), "Xray qualification")
+    require(type(doc["schemaVersion"]) is int and doc["schemaVersion"] == 1
+            and doc["kind"] == "xmesh.metered-xray-candidate"
+            and hex_field(doc["nodeSourceRevision"], 40)
+            and hex_field(doc["upstreamSourceRevision"], 40)
+            and hex_field(doc["patchSourceTree"], 40)
+            and isinstance(doc["goVersion"], str)
+            and re.fullmatch(r"go version go[0-9.]+ linux/amd64", doc["goVersion"])
+            and hex_field(doc["artifactSha256"], 64)
+            and doc["independentRebuildMatched"] is True
+            and doc["candidateOnly"] is True
+            and doc["productionActivationAuthorized"] is False
+            and type(doc["workflowRunId"]) is int and doc["workflowRunId"] > 0,
+            "invalid Xray qualification")
+    return doc
+
+
+def verify_qualified_xray(binary, qualification, upstream_revision, patch_tree, go_version):
+    require(qualification["upstreamSourceRevision"] == upstream_revision
+            and qualification["patchSourceTree"] == patch_tree
+            and qualification["goVersion"] == go_version,
+            "Xray build inputs differ from independent qualification")
+    return verify_measured_xray(binary, qualification["artifactSha256"])
+
+
+def verify_matrix_xray(matrix, qualification):
+    require(matrix["testedXrayArtifactSha256"] == [qualification["artifactSha256"]],
+            "installed matrix used a different Xray than the independently qualified candidate")
+
+
 def verify_running_xray(guest, container, expected_sha):
     """Measure the executable of the actual nested-Docker Xray process.
 
@@ -234,12 +269,29 @@ def verify(candidate, evidence, node_revision, nexus_revision):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", type=Path)
+    parser.add_argument("--xray-qualification", type=Path)
+    parser.add_argument("--check-xray", type=Path)
+    parser.add_argument("--upstream-revision")
+    parser.add_argument("--patch-tree")
+    parser.add_argument("--go-version")
     parser.add_argument("--matrix-only", action="store_true")
-    parser.add_argument("--node-revision", required=True)
-    parser.add_argument("--nexus-revision", required=True)
-    parser.add_argument("--evidence", required=True, nargs=3, type=Path)
+    parser.add_argument("--node-revision")
+    parser.add_argument("--nexus-revision")
+    parser.add_argument("--evidence", nargs=3, type=Path)
     args = parser.parse_args()
     try:
+        qualification = (read_xray_qualification(args.xray_qualification)
+                         if args.xray_qualification else None)
+        if args.check_xray:
+            require(qualification is not None, "independent Xray qualification required")
+            require(not (args.matrix_only or args.candidate or args.evidence
+                         or args.node_revision or args.nexus_revision),
+                    "Xray verification cannot also qualify an installed matrix")
+            print(verify_qualified_xray(args.check_xray, qualification,
+                                        args.upstream_revision, args.patch_tree, args.go_version))
+            return
+        require(args.evidence is not None and args.node_revision and args.nexus_revision,
+                "installed evidence and both source revisions required")
         if args.matrix_only:
             require(args.candidate is None, "matrix-only cannot accept a candidate")
             result = verify_installed_matrix(
@@ -248,6 +300,8 @@ def main():
             require(args.candidate is not None, "candidate directory required")
             result = verify(
                 args.candidate, args.evidence, args.node_revision, args.nexus_revision)
+        if qualification:
+            verify_matrix_xray(result, qualification)
     except (ValueError, OSError) as error:
         parser.exit(1, "Candidate qualification rejected: " + str(error) + "\n")
     print(json.dumps(result, sort_keys=True, indent=2))

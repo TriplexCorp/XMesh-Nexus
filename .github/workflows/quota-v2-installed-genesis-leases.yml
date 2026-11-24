@@ -22,6 +22,7 @@ on:
       - 'scripts/quota_v2_installed_live_vless.py'
       - 'scripts/quota_v2_installed_generations*.py'
       - 'scripts/quota_v2_release_candidate.py'
+      - 'deploy/metered-xray-qualification.json'
       - 'scripts/test-quota-v2-release-candidate.py'
       - 'scripts/quota-wal-systemd.Dockerfile'
       - '.github/workflows/quota-v2-installed-genesis-leases.yml'
@@ -108,7 +109,7 @@ jobs:
         with:
           go-version-file: .ci-reviewed-node/agent/xspv2/go.mod
           cache: false
-      - name: Build the reviewed instrumented Xray and record its binary hash
+      - name: Build and match the independently qualified metered Xray
         env:
           GOTOOLCHAIN: go1.27.4
         run: |
@@ -121,10 +122,16 @@ jobs:
           test "$(git -C "$source" rev-parse HEAD)" = a4a3dff5b20c2faae567b742c172c7b95e75c083
           python3 .ci-reviewed-node/experiments/xray-dataplane-fence/apply-experiment.py "$source"
           mkdir "$bundle"
-          (cd "$source" && CGO_ENABLED=0 go build -trimpath -o "$bundle/xray" ./main)
+          (cd "$source" &&
+            env GOFLAGS= GOOS=linux GOARCH=amd64 GOAMD64=v1 CGO_ENABLED=0 \
+              go build -trimpath -o "$bundle/xray" ./main)
+          hash="$(python3 scripts/quota_v2_release_candidate.py --check-xray "$bundle/xray" \
+            --xray-qualification deploy/metered-xray-qualification.json \
+            --upstream-revision "$(git -C "$source" rev-parse HEAD)" \
+            --patch-tree "$(git -C .ci-reviewed-node rev-parse HEAD:experiments/xray-dataplane-fence)" \
+            --go-version "$(go version)")"
           printf 'FROM scratch\nCOPY xray /xray\nENTRYPOINT ["/xray"]\n' > "$bundle/Dockerfile"
           docker build --iidfile "$bundle/image-id" "$bundle"
-          read -r hash _ < <(sha256sum "$bundle/xray")
           echo "Instrumented Xray SHA-256 $hash"
           echo "XMESH_WAL_XRAY_BINARY=$bundle/xray" >> "$GITHUB_ENV"
           echo "XMESH_WAL_XRAY_IMAGE=$(cat "$bundle/image-id")" >> "$GITHUB_ENV"
@@ -204,7 +211,7 @@ jobs:
           set -euo pipefail
           python3 scripts/test-quota-v2-release-candidate.py
           python3 scripts/quota_v2_release_candidate.py \
-            --matrix-only \
+            --matrix-only --xray-qualification deploy/metered-xray-qualification.json \
             --node-revision "$XMESH_INSTALLED_NODE_REF" \
             --nexus-revision "$XMESH_INSTALLED_NEXUS_REF" \
             --evidence \
