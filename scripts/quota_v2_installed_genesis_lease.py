@@ -309,6 +309,16 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert retried==confirmed
     assert db.execute(lease_sql,(uid,)).fetchall()==rows
     assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone()==(0,)
+    for guest in pair:
+        _, refusal = owner.request(
+            "POST", f"/nodes/{guest.node}/xray-update", {"version": "26.10.31"},
+            expected_status=409,
+        )
+        assert "Standard Xray updates are blocked for nodes with Quota V2 state." in refusal["error"]
+        assert db.execute(
+            "SELECT NOT EXISTS (SELECT 1 FROM node_restart_commands "
+            "WHERE node_id=%s AND action='update_xray')", (guest.node,),
+        ).fetchone() == (True,)
     assert db.execute("SELECT count(*) FROM node_desired_revisions").fetchone()==(0,)
     print("Both original zero-authority replies recovered after lost responses; simultaneous reservations conserve global quota.")
 

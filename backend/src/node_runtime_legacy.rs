@@ -810,12 +810,37 @@ pub async fn request_verified_xray_update(
     Json(body): Json<Value>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     crate::require_mutation(&actor)?;
+    if node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
+    }
     let target = body
         .as_object()
         .filter(|object| object.len() == 1)
         .and_then(|object| object.get("version"))
         .and_then(Value::as_str)
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Некорректная версия Xray"))?;
+    // The official-image updater cannot carry measured WAL ownership or
+    // signed release authority across a runtime change. Keep the fence
+    // even when issuance is paused or the feature flag is off.
+    let metered = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (
+             SELECT 1 FROM quota_v2_genesis_quarantine_policies WHERE node_id=$1
+         ) OR EXISTS (
+             SELECT 1 FROM quota_v2_reservations WHERE node_id=$1
+         )",
+    )
+    .bind(node_id)
+    .fetch_one(&state.pool)
+    .await?;
+    if metered {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            concat!(
+                "Обычное обновление Xray недоступно для ноды с состоянием Quota V2. ",
+                "Standard Xray updates are blocked for nodes with Quota V2 state."
+            ),
+        ));
+    }
     let releases = state
         .core
         .all_node_releases()
