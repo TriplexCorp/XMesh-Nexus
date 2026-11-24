@@ -199,5 +199,13 @@ jobs:
             --evidence \
               "$XMESH_INSTALLED_MATRIX_PATH/quota-v2-release-qualification-lease-recovery/installed-evidence.json" \
               "$XMESH_INSTALLED_MATRIX_PATH/quota-v2-release-qualification-managed-generations/installed-evidence.json" \
-              "$XMESH_INSTALLED_MATRIX_PATH/quota-v2-release-qualification-agent-sigkill/installed-evidence.json"
+              "$XMESH_INSTALLED_MATRIX_PATH/quota-v2-release-qualification-agent-sigkill/installed-evidence.json" \
+            | tee "$RUNNER_TEMP/quota-v2-matrix-consistency.json"
           # Matrix consistency is not a signed release or production authority.
+      - name: Save staging-only cross-scenario consistency evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: quota-v2-installed-matrix-consistency
+          path: ${{ runner.temp }}/quota-v2-matrix-consistency.json
+          if-no-files-found: error
+          retention-days: 30
