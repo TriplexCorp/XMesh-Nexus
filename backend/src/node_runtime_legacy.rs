@@ -2177,6 +2177,66 @@ fn configure_first_genesis_stats(config: &mut Value) -> Result<(), ApiError> {
     Ok(())
 }
 
+// The installed ingress and metering path has been qualified with plain
+// VLESS over TCP. Reject any other stream profile before it can obtain
+// either a signed genesis policy or a spending scope.
+fn validate_metered_first_genesis_profile(
+    config: &Value,
+    tls_provisioned: bool,
+    geo_data_provisioned: bool,
+) -> Result<(), ApiError> {
+    fn qualified_inbound(inbound: &Value) -> bool {
+        let qualified_stream = inbound.get("streamSettings").is_none_or(|stream| {
+            stream.as_object().is_some_and(|settings| {
+                settings.iter().all(|(key, value)| match key.as_str() {
+                    "network" => matches!(value.as_str(), Some("tcp" | "raw")),
+                    "security" => value == "none",
+                    _ => false,
+                })
+            })
+        });
+        let settings = &inbound["settings"];
+        let qualified_clients = settings["clients"].as_array().is_some_and(|clients| {
+            clients.iter().all(|client| {
+                client.is_object()
+                    && client.get("reverse").is_none()
+                    && client.get("flow").is_none_or(|flow| flow == "")
+            })
+        });
+        inbound["protocol"] == "vless"
+            && matches!(inbound["tag"].as_str(), Some("vless-main" | "vless-cdn"))
+            && inbound["listen"] == "127.0.0.1"
+            && settings["decryption"] == "none"
+            && settings.get("fallbacks").is_none()
+            && qualified_stream
+            && qualified_clients
+    }
+
+    let qualified = config["inbounds"].as_array().is_some_and(|inbounds| {
+        !inbounds.is_empty()
+            && inbounds.len() <= 2
+            && inbounds.iter().all(qualified_inbound)
+            && (inbounds.len() == 1 || inbounds[0]["tag"] != inbounds[1]["tag"])
+    });
+    if !qualified || tls_provisioned || geo_data_provisioned {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Quota V2 requires a qualified VLESS TCP profile with no TLS, tunnel transport, flow, or fallbacks.",
+        ));
+    }
+    Ok(())
+}
+
+fn compiled_profile_revision(config: &Value) -> Result<String, ApiError> {
+    let bytes = serde_json::to_vec(config).map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to encode node profile.",
+        )
+    })?;
+    Ok(hex::encode(sha2::Sha256::digest(bytes)))
+}
+
 async fn compile_node_profile(
     state: &AppState,
     node_id: i64,
@@ -2254,14 +2314,14 @@ async fn compile_node_profile(
     let hosts = crate::load_records(&state.pool, "hosts").await?;
     let geo_data = crate::node_geodata::apply(&node, &mut config)?;
     crate::node_routing::apply(&node, &mut config, &nodes, &hosts)?;
-    let digest = hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).map_err(
-        |_| {
-            ApiError::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to encode node profile.",
-            )
-        },
-    )?));
+    if matches!(mode, NodeProfileMode::FirstGenesis) {
+        validate_metered_first_genesis_profile(
+            &config,
+            tls_provision.is_some(),
+            geo_data.is_some(),
+        )?;
+    }
+    let digest = compiled_profile_revision(&config)?;
 
     // Conserve offline allowances across all currently enabled nodes. Large
     // deployments should replace this bound with server-side reserved leases.
@@ -2306,22 +2366,6 @@ pub async fn first_genesis_config_preview(
     node_id: i64,
 ) -> Result<Value, ApiError> {
     let compiled = compile_node_profile(state, node_id, NodeProfileMode::FirstGenesis).await?;
-    if compiled.tls_provision.is_some() || compiled.geo_data.is_some() {
-        return Err(cap_policy_denied());
-    }
-    let inbounds = compiled.config["inbounds"]
-        .as_array()
-        .ok_or_else(cap_policy_denied)?;
-    if inbounds.iter().any(|inbound| {
-        let protocol = inbound["protocol"].as_str();
-        let tag = inbound["tag"].as_str();
-        !matches!(
-            (protocol, tag),
-            (Some("vless"), Some("vless-main" | "vless-cdn"))
-        )
-    }) {
-        return Err(cap_policy_denied());
-    }
     Ok(json!({
         "profileId":compiled.profile_id,
         "port":compiled.port,
@@ -3147,6 +3191,61 @@ mod provision_tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn genesis_admission_only_accepts_the_qualified_transport_and_scope() {
+        let profile = json!({"inbounds":[{
+            "tag":"vless-main", "listen":"127.0.0.1", "protocol":"vless",
+            "settings":{"decryption":"none","clients":[{"id":"client","email":"xmesh-u1--vless-main"}]},
+            "streamSettings":{"network":"tcp","security":"none"}
+        }]});
+        assert!(validate_metered_first_genesis_profile(&profile, false, false).is_ok());
+        let mut mixed = profile.clone();
+        let mut cdn = profile["inbounds"][0].clone();
+        cdn["tag"] = json!("vless-cdn");
+        mixed["inbounds"].as_array_mut().unwrap().push(cdn);
+        assert!(validate_metered_first_genesis_profile(&mixed, false, false).is_ok());
+
+        for (pointer, value) in [
+            ("/streamSettings/network", json!("ws")),
+            ("/streamSettings/network", json!("grpc")),
+            ("/streamSettings/network", json!("xhttp")),
+            ("/streamSettings/security", json!("tls")),
+            ("/streamSettings/security", json!("reality")),
+            (
+                "/streamSettings",
+                json!({"network":"tcp","tcpSettings":{"header":{"type":"http"}}}),
+            ),
+            ("/protocol", json!("hysteria")),
+            ("/listen", json!("0.0.0.0")),
+            (
+                "/settings",
+                json!({"decryption":"none","clients":[],"fallbacks":[{"dest":443}]}),
+            ),
+            (
+                "/settings/clients/0",
+                json!({"id":"client","flow":"xtls-rprx-vision"}),
+            ),
+            (
+                "/settings/clients/0",
+                json!({"id":"client","reverse":{"tag":"tunnel"}}),
+            ),
+        ] {
+            let mut unqualified = profile.clone();
+            *unqualified["inbounds"][0].pointer_mut(pointer).unwrap() = value;
+            assert!(
+                validate_metered_first_genesis_profile(&unqualified, false, false).is_err(),
+                "{pointer}"
+            );
+        }
+        assert!(validate_metered_first_genesis_profile(&profile, true, false).is_err());
+        assert!(validate_metered_first_genesis_profile(&profile, false, true).is_err());
+        assert!(
+            validate_metered_first_genesis_profile(&json!({"inbounds":[]}), false, false).is_err()
+        );
+        mixed["inbounds"][1]["tag"] = json!("vless-main");
+        assert!(validate_metered_first_genesis_profile(&mixed, false, false).is_err());
     }
 
     #[test]
