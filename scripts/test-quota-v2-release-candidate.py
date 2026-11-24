@@ -64,7 +64,9 @@ class CandidateTest(unittest.TestCase):
         self.assertEqual(set(result["stagingScenarios"]), SCENARIOS)
 
     def test_installed_matrix_denies_mixed_commits_binaries_and_scenarios(self):
-        path = self.evidence[0]
+        # Preserve the first scenario as the identity anchor, then attempt
+        # to smuggle foreign evidence through one of the remaining scenarios.
+        path = self.evidence[1]
         original = json.loads(path.read_text())
         for field, replacement, error in (
             ("nexusRevision", "e" * 40, "Nexus source revision mismatch"),
