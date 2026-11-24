@@ -132,6 +132,8 @@ type gateway struct {
 	panelURL      string
 	internalToken string
 	httpClient    *http.Client
+	// Set only by the disposable Go test fixture, never by production input.
+	releaseTargetVersion string
 }
 
 func fail(w http.ResponseWriter, status int, message string) {

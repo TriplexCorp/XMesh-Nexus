@@ -316,8 +316,14 @@ async fn queue_first_product_successor(
     .fetch_optional(&state.pool)
     .await
     .map_err(|error| {
-        if error.to_string().contains("node already has an active control command") {
-            ApiError::new(StatusCode::CONFLICT, "Node already has an active control command.")
+        if error
+            .to_string()
+            .contains("node already has an active control command")
+        {
+            ApiError::new(
+                StatusCode::CONFLICT,
+                "Node already has an active control command.",
+            )
         } else {
             error.into()
         }

@@ -100,6 +100,18 @@ func TestServeWALTunnelFixture(t *testing.T) {
 	if g.panelURL != "http://127.0.0.1:38081" || len(g.internalToken) != 64 {
 		t.Fatal("disposable Nexus and internal gateway token required")
 	}
+	if os.Getenv("XMESH_TEST_INSTALLED_FIRST_SUCCESSOR") == "1" {
+		if address == "127.0.0.1" || dsn.Path != "/quota_wal_installed" ||
+			os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("RUNNER_ENVIRONMENT") != "github-hosted" {
+			t.Fatal("first-successor rehearsal requires the private hosted lab")
+		}
+		// The test binary alone supplies a synthetic successor. Enrollment
+		// still uses the real initial release and its production pin.
+		g.releaseTargetVersion = "control-v6.0.28"
+		t.Setenv("XSP_V2_PRODUCT_RELEASE_PLANNING", "1")
+		t.Setenv("XSP_V2_PRODUCT_RELEASE_COMMIT", "1")
+		t.Setenv("XSP_V2_PRODUCT_RELEASE_ARTIFACT_DIR", filepath.Join(dir, "successor-artifacts"))
+	}
 	if os.Getenv("XMESH_TEST_INSTALLED_CRASHES") == "1" &&
 		address != "127.0.0.1" && dsn.Path == "/quota_wal_installed" {
 		g.httpClient.Transport = loseCommittedWALReply{dir: dir}

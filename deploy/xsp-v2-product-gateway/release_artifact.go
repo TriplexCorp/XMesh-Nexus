@@ -203,7 +203,7 @@ func (g *gateway) releaseArtifact(ctx context.Context, parsed parsedEnvelope, n 
 		plan.NodeID != parsed.Env.NodeID || plan.KeyEpoch != n.KeyEpoch || plan.CommandID != req.CommandID ||
 		plan.ActivationSHA256 != hex.EncodeToString(activation[:]) ||
 		plan.Current != n.Release || plan.Target.SourceRevision != signed.Env.Revision ||
-		plan.Target.Version != targetAgentVersion || !validForwardProductRelease(n.Release, plan.Target) ||
+		plan.Target.Version != g.approvedReleaseTarget() || !validForwardProductRelease(n.Release, plan.Target) ||
 		plan.ExpiresAtMS <= time.Now().UnixMilli() {
 		return http.StatusConflict, []byte("{}")
 	}

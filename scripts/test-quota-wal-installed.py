@@ -496,8 +496,13 @@ def main():
         stack.callback(docker, "network", "rm", network)
         bridge = docker("network", "inspect", "--format", "{{(index .IPAM.Config 0).Gateway}}", network).decode().strip()
         assert ipaddress.IPv4Address(bridge).is_private
+        rehearsal_successor = None
+        if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "lease-recovery":
+            from quota_v2_installed_agent_successor import build_fixture_successor
+            rehearsal_successor = build_fixture_successor(root, revision, AGENT_BUILDER, docker)
         gateway = subprocess.Popen([os.environ["XMESH_WAL_TUNNEL_FIXTURE"], "-test.run=^TestServeWALTunnelFixture$", "-test.v"],
                                    env={**os.environ, "XMESH_WAL_TEST_BRIDGE": bridge,
+                                        "XMESH_TEST_INSTALLED_FIRST_SUCCESSOR": str(int(rehearsal_successor is not None)),
                                         "XMESH_QUOTA_V2_WAL_TRANSPORT": "1",
                                         "XMESH_WAL_TUNNEL_FIXTURE_DIR": directory,
                                         "XSP_V2_PRODUCT_AGENT_PIN": (
@@ -586,6 +591,9 @@ def main():
             ).fetchone()
             assert heartbeat == (identity["version"],), heartbeat
             print("Clean Agent installed with its original recovery image and enabled update timer, without rehearsal flags or bridge, and sent an authenticated heartbeat.")
+            from quota_v2_installed_agent_successor import check_first_successor
+            assert rehearsal_successor is not None
+            check_first_successor(clean, db, panel, identity, rehearsal_successor)
         agent_builder.unlink()
         assert first != second
         print(f"Two clean systemd guests installed pinned {identity['version']} and activated distinct XSP/2 identities.")

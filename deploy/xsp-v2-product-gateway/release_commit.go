@@ -157,7 +157,7 @@ func (g *gateway) finishRelease(ctx context.Context, parsed parsedEnvelope, n no
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return http.StatusServiceUnavailable, empty
 	}
-	if !abort && (!eligible || approved.Version != targetAgentVersion || os.Getenv("XSP_V2_PRODUCT_RELEASE_COMMIT") != "1") {
+	if !abort && (!eligible || approved.Version != g.approvedReleaseTarget() || os.Getenv("XSP_V2_PRODUCT_RELEASE_COMMIT") != "1") {
 		return http.StatusConflict, empty
 	}
 

@@ -18,6 +18,7 @@ on:
       - 'scripts/test-quota-wal-installed.py'
       - 'scripts/test-quota-wal-product-tunnel.py'
       - 'scripts/quota_v2_installed_genesis_lease.py'
+      - 'scripts/quota_v2_installed_agent_successor.py'
       - 'scripts/quota_v2_installed_live_vless.py'
       - 'scripts/quota_v2_installed_generations*.py'
       - 'scripts/quota_v2_release_candidate.py'
@@ -77,7 +78,7 @@ jobs:
           test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '1f1e9e127d7ce3eb3f98045eca3fdee62e573d95'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 scripts/test-quota-v2-release-candidate.py
-          python3 -m py_compile scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py
+          python3 -m py_compile scripts/quota_v2_installed_agent_successor.py scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
         env:

@@ -17,6 +17,13 @@ import (
 
 const releasePlanPath = "/api/v1/node/agent-release-plan"
 
+func (g *gateway) approvedReleaseTarget() string {
+	if g.releaseTargetVersion != "" {
+		return g.releaseTargetVersion
+	}
+	return targetAgentVersion
+}
+
 type releasePlanRequest struct {
 	CommandID int64           `json:"commandId"`
 	Current   releaseIdentity `json:"current"`
@@ -62,7 +69,7 @@ func (g *gateway) loadReleasePlan(ctx context.Context, parsed parsedEnvelope, n 
 		return http.StatusBadRequest, []byte("{}")
 	}
 	if request.Current != n.Release || parsed.Env.Revision != n.Release.SourceRevision ||
-		!forwardProductVersion(n.Release.Version, targetAgentVersion) || len(n.Receipt) == 0 {
+		!forwardProductVersion(n.Release.Version, g.approvedReleaseTarget()) || len(n.Receipt) == 0 {
 		return http.StatusConflict, []byte("{}")
 	}
 	tx, err := g.db.BeginTx(ctx, pgx.TxOptions{})
@@ -93,7 +100,7 @@ func (g *gateway) loadReleasePlan(ctx context.Context, parsed parsedEnvelope, n 
           AND p.release_version=$5 AND p.release_source_revision=$6 AND p.release_artifact_sha256=$7
           AND (d.data->'disabled') IS DISTINCT FROM 'true'::jsonb
         FOR UPDATE OF c FOR SHARE OF p,k,d`, request.CommandID, parsed.Env.NodeID, n.KeyEpoch,
-		activation[:], n.Release.Version, n.Release.SourceRevision, n.Release.ArtifactSHA256, targetAgentVersion).
+		activation[:], n.Release.Version, n.Release.SourceRevision, n.Release.ArtifactSHA256, g.approvedReleaseTarget()).
 		Scan(&target.Version, &target.SourceRevision, &target.ArtifactSHA256, &expiry)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return http.StatusConflict, []byte("{}")
