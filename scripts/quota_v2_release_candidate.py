@@ -44,6 +44,18 @@ def read_regular(path, limit):
     return raw
 
 
+def verify_measured_xray(path, expected_sha):
+    """Re-hash the very Xray executable used to build the tested image.
+
+    A workflow variable or earlier build log alone is not binary evidence:
+    bytes on disk may have changed before the installed scenario finished.
+    """
+    require(hex_field(expected_sha, 64), "invalid expected Xray digest")
+    actual_sha = hashlib.sha256(read_regular(path, MAX_ARTIFACT_BYTES)).hexdigest()
+    require(actual_sha == expected_sha, "measured Xray executable changed after build")
+    return actual_sha
+
+
 def read_json(path):
     def unique(pairs):
         doc = {}
