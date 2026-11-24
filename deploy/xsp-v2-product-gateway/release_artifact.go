@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -54,6 +55,75 @@ func decodeReleaseArtifactRequest(body []byte) (releaseArtifactRequest, error) {
 	return req, nil
 }
 
+// A successful stat is not proof that <sha256>.bin contains those bytes.
+// Cache a VERIFIED digest only while the same Linux inode, size, mtime and
+// ctime remain unchanged. Re-hashing 64 MiB for each 128 KiB chunk would
+// make one legitimate download read ~32 GiB and create a denial of service.
+type releaseArtifactIdentity struct {
+	digest        string
+	dev, ino      uint64
+	size          int64
+	modified      syscall.Timespec
+	changed       syscall.Timespec
+}
+
+var releaseVerifiedArtifacts = struct {
+	sync.Mutex
+	entries map[releaseArtifactIdentity]struct{}
+}{entries: make(map[releaseArtifactIdentity]struct{})}
+
+func releaseArtifactFingerprint(digest string, info os.FileInfo) (releaseArtifactIdentity, error) {
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return releaseArtifactIdentity{}, errors.New("artifact has no kernel identity")
+	}
+	return releaseArtifactIdentity{
+		digest: digest, dev: uint64(st.Dev), ino: st.Ino,
+		size: info.Size(), modified: st.Mtim, changed: st.Ctim,
+	}, nil
+}
+
+func verifyReleaseArtifactBytes(file *os.File, digest string, info os.FileInfo) error {
+	initial, err := releaseArtifactFingerprint(digest, info)
+	if err != nil {
+		return err
+	}
+	// Serialize first verification: concurrent chunk requests must not all
+	// hash the same big binary while an installer is preparing its next step.
+	releaseVerifiedArtifacts.Lock()
+	defer releaseVerifiedArtifacts.Unlock()
+	_, cached := releaseVerifiedArtifacts.entries[initial]
+	if !cached {
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		hash := sha256.New()
+		n, err := io.CopyN(hash, file, info.Size())
+		if err != nil || n != info.Size() {
+			return errors.New("artifact changed during SHA-256 measurement")
+		}
+		if hex.EncodeToString(hash.Sum(nil)) != digest {
+			return errors.New("artifact bytes differ from immutable manifest digest")
+		}
+	}
+	after, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	confirmed, err := releaseArtifactFingerprint(digest, after)
+	if err != nil || confirmed != initial || after.Mode() != info.Mode() ||
+		after.Size() != info.Size() {
+		return errors.New("artifact changed during SHA-256 verification")
+	}
+	if !cached {
+		if len(releaseVerifiedArtifacts.entries) >= 32 {
+			clear(releaseVerifiedArtifacts.entries)
+		}
+		releaseVerifiedArtifacts.entries[initial] = struct{}{}
+	}
+	return nil
+}
+
 func readReleaseChunk(root, digest string, offset int64) ([]byte, int64, error) {
 	if !filepath.IsAbs(root) || len(digest) != 64 || !isLowerHex(digest) ||
 		offset < 0 || offset >= maxReleaseArtifactBytes || offset % releaseChunkBytes != 0 {
@@ -79,10 +149,23 @@ func readReleaseChunk(root, digest string, offset int64) ([]byte, int64, error) 
 		info.Size() <= 0 || info.Size() > maxReleaseArtifactBytes || offset >= info.Size() {
 		return nil, 0, errors.New("unsafe or out-of-range artifact")
 	}
+	if err := verifyReleaseArtifactBytes(file, digest, info); err != nil {
+		return nil, 0, err
+	}
 	size := min(int64(releaseChunkBytes), info.Size()-offset)
 	data := make([]byte, int(size))
 	if _, err := file.ReadAt(data, offset); err != nil {
 		return nil, 0, err
+	}
+	after, err := file.Stat()
+	if err != nil {
+		return nil, 0, err
+	}
+	priorID, priorErr := releaseArtifactFingerprint(digest, info)
+	afterID, afterErr := releaseArtifactFingerprint(digest, after)
+	if priorErr != nil || afterErr != nil || priorID != afterID ||
+		after.Mode() != info.Mode() {
+		return nil, 0, errors.New("artifact changed while serving chunk")
 	}
 	return data, info.Size(), nil
 }
