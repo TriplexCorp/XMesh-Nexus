@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from quota_v2_release_candidate import ACTIVATION, PRODUCT, SCENARIOS, verify, write_installed_evidence
+from quota_v2_release_candidate import ACTIVATION, PRODUCT, SCENARIOS, verify, verify_measured_xray, write_installed_evidence
 
 
 class CandidateTest(unittest.TestCase):
@@ -97,6 +97,24 @@ class CandidateTest(unittest.TestCase):
         path.write_text(json.dumps(doc))
         with self.assertRaisesRegex(ValueError, "different Xray binaries"):
             self.verify()
+
+    def test_xray_binary_rechecked_at_installed_evidence_export(self):
+        binary = self.root / "xray"
+        binary.write_bytes(b"exact tested instrumented xray")
+        digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+        self.assertEqual(verify_measured_xray(binary, digest), digest)
+        binary.write_bytes(b"changed after docker image build")
+        with self.assertRaisesRegex(ValueError, "executable changed"):
+            verify_measured_xray(binary, digest)
+
+    def test_xray_binary_symlink_is_not_release_evidence(self):
+        actual = self.root / "real-xray"
+        actual.write_bytes(b"test instrumented runtime")
+        link = self.root / "xray-symlink"
+        link.symlink_to(actual)
+        digest = hashlib.sha256(actual.read_bytes()).hexdigest()
+        with self.assertRaises(OSError):
+            verify_measured_xray(link, digest)
 
     def test_symlink_candidate_artifact_rejected(self):
         path = self.candidate / PRODUCT
