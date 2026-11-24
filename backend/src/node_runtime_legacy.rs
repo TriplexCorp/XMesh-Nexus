@@ -2695,6 +2695,36 @@ pub async fn original_first_genesis_cap_scope(
     signed_first_genesis_scope(state, node_id, user_id, true).await
 }
 
+async fn verify_first_genesis_cdn_scope(
+    state: &AppState,
+    node_id: i64,
+    config: &Value,
+    aliases: &[FirstGenesisCapAlias],
+) -> Result<(), ApiError> {
+    // The real CDN classification is derived from settings + Node policy,
+    // never from an alias's spelling. First-genesis supports only the
+    // explicit names used by the measured Xray, and rejects a mismatch.
+    let node: Value =
+        sqlx::query_scalar("SELECT data FROM panel_records WHERE collection='nodes' AND id=$1")
+            .bind(node_id)
+            .fetch_one(&state.pool)
+            .await?;
+    let settings = crate::read_settings(&state.pool).await?;
+    let cdn_tags =
+        crate::cdn_quota::tags_for_node(&settings, &node, &managed_inbound_tags(config))?;
+    for alias in aliases {
+        let tag = alias
+            .email
+            .split_once("--")
+            .ok_or_else(cap_policy_denied)?
+            .1;
+        if cdn_tags.contains(tag) != (alias.class == "cdn") {
+            return Err(cap_policy_denied());
+        }
+    }
+    Ok(())
+}
+
 pub async fn signed_first_genesis_scope(
     state: &AppState,
     node_id: i64,
@@ -2761,27 +2791,7 @@ pub async fn signed_first_genesis_scope(
         return Err(cap_policy_denied());
     }
     let aliases = first_genesis_cap_aliases(&compiled.config, &policy, user_id)?;
-    // The real CDN classification is derived from settings + Node policy,
-    // never from an alias's spelling. First-genesis supports only the
-    // explicit names used by the measured Xray, and rejects a mismatch.
-    let node: Value =
-        sqlx::query_scalar("SELECT data FROM panel_records WHERE collection='nodes' AND id=$1")
-            .bind(node_id)
-            .fetch_one(&state.pool)
-            .await?;
-    let settings = crate::read_settings(&state.pool).await?;
-    let cdn_tags =
-        crate::cdn_quota::tags_for_node(&settings, &node, &managed_inbound_tags(&compiled.config))?;
-    for alias in &aliases {
-        let tag = alias
-            .email
-            .split_once("--")
-            .ok_or_else(cap_policy_denied)?
-            .1;
-        if cdn_tags.contains(tag) != (alias.class == "cdn") {
-            return Err(cap_policy_denied());
-        }
-    }
+    verify_first_genesis_cdn_scope(state, node_id, &compiled.config, &aliases).await?;
     let current_user = compiled
         .users
         .iter()
@@ -2926,7 +2936,7 @@ mod first_genesis_cap_scope_tests {
             match attack {
                 0 => {
                     changed["inbounds"][0]["settings"]["clients"][0]["id"] =
-                        json!("44444444-4444-4444-8444-444444444444")
+                        json!("44444444-4444-4444-8444-444444444444");
                 }
                 1 => {
                     changed["inbounds"][1]["settings"]["clients"]
