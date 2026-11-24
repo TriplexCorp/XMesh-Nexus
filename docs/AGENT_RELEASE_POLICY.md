@@ -44,14 +44,9 @@ Current target: **`control-v6.0.28`**.
 `deploy/agent-release-pin.conf` binds the exact source revision, both Agent
 artifact digests, and immutable Go builder. The record is parsed as data, never
 sourced as shell. A dedicated CI job independently rebuilds both binaries and
-must match their recorded digests. The previous candidate and its installed matrix matched exactly ([Node](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45346121399), [Nexus](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/45346249796)). The current candidate includes forward-release, activation-recovery, V1 local grant conservation, V2 reservation downgrade fixes, and the clean-install recovery supervisor ([Node build](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45352245611)); it requires a fresh installed matrix and reproducible-build check before approval.
+must match their recorded digests. The exact current 6.0.28 candidate was built in [Node CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45360660315), independently reproduced in [Nexus CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/45366366675), and matched all three installed scenarios in [Nexus CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/45366366448) at Nexus revision `11dff82c870f6dddb0940835d0f3fab3e561fa7d`. The matrix verified the product artifact SHA-256 and exact Node revision recorded in the pin; the isolated clean-install lifecycle also completed signed ABORT, synthetic first-successor COMMIT and activation recovery.
 
-`firstInstallApproved=0` is deliberately retained while the release remains
-a candidate. Only a reviewed first-install promotion may change this to 1.
-After promotion the full installer automatically imports the canonical pin;
-it never overwrites an existing different approval. No separate manual pin
-copy is required for that approved first release. An explicitly supplied,
-matching operator pin is still accepted for reviewed testing.
+`firstInstallApproved=1` approves only the exact initial Agent identity for a new installation. The full installer automatically imports the canonical pin; it never overwrites an existing different approval. No separate manual pin copy is required. An explicitly supplied matching operator pin is still accepted. The approval does not authorize the synthetic successor, a full runtime-bundle upgrade or production quota activation.
 
 The record does not enable Quota V2, authorize production traffic, or grant
 update/rollback authority. The successor release still needs the signed
