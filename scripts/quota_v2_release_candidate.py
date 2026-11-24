@@ -143,6 +143,10 @@ def verify(candidate, evidence, node_revision, nexus_revision):
         seen.add(scenario)
         xray_digests.add(doc["xrayArtifactSha256"])
     require(seen == SCENARIOS, "missing installed scenario")
+    # A passing suite must exercise ONE reproducible, exactly measured Xray
+    # binary. Otherwise three unrelated binaries could falsely qualify the
+    # same Agent+dataplane release across the independent installed runs.
+    require(len(xray_digests) == 1, "installed scenarios tested different Xray binaries")
     return {
         "candidateIdentity": identity, "nexusRevision": nexus_revision,
         "stagingScenarios": sorted(seen), "testedXrayArtifactSha256": sorted(xray_digests),
