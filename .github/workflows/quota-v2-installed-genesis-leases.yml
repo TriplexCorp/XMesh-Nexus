@@ -24,6 +24,10 @@ on:
       - 'scripts/test-quota-v2-release-candidate.py'
       - 'scripts/quota-wal-systemd.Dockerfile'
       - '.github/workflows/quota-v2-installed-genesis-leases.yml'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:
