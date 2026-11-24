@@ -38,3 +38,23 @@ The first install does not require the bridge package. Unbound Agent update requ
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.
 
 Current target: **`control-v6.0.27`**.
+
+## First-install release record
+
+`deploy/agent-release-pin.conf` binds the exact source revision, both Agent
+artifact digests, and immutable Go builder. The record is parsed as data, never
+sourced as shell. A dedicated CI job independently rebuilds both binaries and
+must match their recorded digests. Current evidence: [Node candidate](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45346121399)
+and [three installed Nexus scenarios](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/45346249796)
+report the same product binary.
+
+`firstInstallApproved=0` is deliberately retained while the release remains
+a candidate. Only a reviewed first-install promotion may change this to 1.
+After promotion the full installer automatically imports the canonical pin;
+it never overwrites an existing different approval. No separate manual pin
+copy is required for that approved first release. An explicitly supplied,
+matching operator pin is still accepted for reviewed testing.
+
+The record does not enable Quota V2, authorize production traffic, or grant
+update/rollback authority. The successor release still needs the signed
+update protocol and installed lifecycle acceptance.

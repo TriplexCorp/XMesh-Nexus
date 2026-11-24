@@ -23,6 +23,10 @@ class FreshAgentPinTest(unittest.TestCase):
         self.bootstrap = self.root / "frontend/js/features/nodes/node-bootstrap-v6.js"
         self.bootstrap.parent.mkdir(parents=True)
         self.bootstrap.write_text(f"const XMESH_V6_NODE_BOOTSTRAP_SHA='{REV}';\n")
+        shutil.copyfile(ROOT / "scripts/read-agent-release-pin.sh",
+                        self.root / "scripts/read-agent-release-pin.sh")
+        (self.root / "AGENT_VERSION").write_text("control-v6.0.27\n")
+        (self.root / "deploy").mkdir()
         self.env = os.environ.copy()
         self.env.pop("XSP_V2_PRODUCT_AGENT_PIN", None)
 
@@ -33,6 +37,40 @@ class FreshAgentPinTest(unittest.TestCase):
             (self.root / ".env").write_text(stored)
         return subprocess.run(["bash", str(self.script)], env=self.env,
                               capture_output=True, text=True, timeout=5)
+
+    def release_record(self, approved=0, revision=REV):
+        (self.root / "deploy/agent-release-pin.conf").write_text(
+            f"version=control-v6.0.27\nsourceRevision={revision}\n"
+            f"productSha256={'b' * 64}\nactivationSha256={'c' * 64}\n"
+            f"builder=golang:1.27.3-trixie@sha256:{'d' * 64}\n"
+            f"firstInstallApproved={approved}\n")
+
+    def test_candidate_does_not_auto_approve(self):
+        self.release_record()
+        self.assertNotEqual(self.run_check().returncode, 0)
+
+    def test_reviewed_release_supplies_pin_without_operator_input(self):
+        self.release_record(approved=1)
+        result = self.run_check()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), PIN)
+
+    def test_reviewed_release_cannot_override_existing_pin(self):
+        self.release_record(approved=1)
+        old = f"XSP_V2_PRODUCT_AGENT_PIN={REV}:" + "e" * 64 + "\n"
+        self.assertNotEqual(self.run_check(stored=old).returncode, 0)
+
+    def test_candidate_with_explicit_matching_pin(self):
+        self.release_record()
+        self.assertEqual(self.run_check(PIN).stdout.strip(), PIN)
+
+    def test_wrong_manifest_revision_is_rejected(self):
+        self.release_record(approved=1, revision="e" * 40)
+        self.assertNotEqual(self.run_check(PIN).returncode, 0)
+
+    def test_malformed_approval_cannot_grant_authority(self):
+        self.release_record(approved="true")
+        self.assertNotEqual(self.run_check().returncode, 0)
 
     def test_missing_pin(self):
         self.assertNotEqual(self.run_check().returncode, 0)

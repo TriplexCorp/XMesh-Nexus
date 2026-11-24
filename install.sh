@@ -14,7 +14,8 @@ if [[ "$prepare_only" == 0 ]]; then
     fi
     exec sudo --preserve-env=PANEL_DOMAIN,PANEL_ACME_EMAIL,XSP_V2_PRODUCT_AGENT_PIN bash "$PWD/install.sh" "$@"
   fi
-  bash scripts/validate-panel-agent-pin.sh
+  XSP_V2_PRODUCT_AGENT_PIN="$(bash scripts/validate-panel-agent-pin.sh)"
+  export XSP_V2_PRODUCT_AGENT_PIN
   bash deploy/install-panel-host.sh deps
 fi
 
