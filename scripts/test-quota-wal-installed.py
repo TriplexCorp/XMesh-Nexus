@@ -564,7 +564,16 @@ def main():
             assert clean.exec("systemctl", "is-enabled", "xmesh-node-control.timer").strip() == b"enabled"
             clean.exec("grep", "-Fx",
                        f'AGENT_VERSION = "{identity["version"]}"', "/usr/local/libexec/xmesh-xray-update.py")
-            clean.exec("test", "!", "-e", "/usr/local/libexec/xmesh-product-upgrade-coordinator.py")
+            assert clean.exec("systemctl", "is-enabled", "xmesh-product-release-update.timer").strip() == b"enabled"
+            assert clean.exec("systemctl", "is-active", "xmesh-product-release-update.timer").strip() == b"active"
+            recovery = "/usr/local/libexec/xmesh-agent-release-recovery"
+            assert clean.exec("sha256sum", recovery).split()[0].decode() == identity["artifactSha256"]
+            assert clean.exec("cat", "/etc/xmesh-agent-release-recovery.sha256").strip().decode() == identity["artifactSha256"]
+            clean.exec("/usr/bin/python3", "-I", "/usr/local/libexec/xmesh-product-upgrade-coordinator.py",
+                       "--fresh", "ready")
+            clean.exec("test", "!", "-e", "/usr/local/libexec/xmesh-agent-release-bridge")
+            clean.exec("test", "!", "-e", "/etc/xmesh-agent-release-bridge.sha256")
+            clean.exec("test", "!", "-e", "/var/lib/xmesh-node-control/product-upgrade/command.json")
             clean.exec("test", "!", "-e", "/etc/xmesh-quota-v2-staging")
             clean.exec("systemctl", "start", "xmesh-node-control.service", timeout=65)
             registered = db.execute(
@@ -576,7 +585,7 @@ def main():
                 "SELECT version FROM node_runtime_heartbeats WHERE node_id=%s", (node,),
             ).fetchone()
             assert heartbeat == (identity["version"],), heartbeat
-            print("Clean Agent installed without rehearsal flags or bridge and sent an authenticated heartbeat.")
+            print("Clean Agent installed with its original recovery image and enabled update timer, without rehearsal flags or bridge, and sent an authenticated heartbeat.")
         agent_builder.unlink()
         assert first != second
         print(f"Two clean systemd guests installed pinned {identity['version']} and activated distinct XSP/2 identities.")
