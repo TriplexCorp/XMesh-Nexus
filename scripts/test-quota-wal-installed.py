@@ -657,7 +657,7 @@ def main():
             # succeeds, never from setup or a partially completed test.
             qualification = os.environ.get("XMESH_RELEASE_QUALIFICATION_EVIDENCE")
             if qualification:
-                from quota_v2_release_candidate import write_installed_evidence
+                from quota_v2_release_candidate import verify_measured_xray, write_installed_evidence
                 scenario = os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"]
                 expected_scenario = (
                     "agent-sigkill" if os.environ.get("XMESH_TEST_INSTALLED_CRASHES") == "1"
@@ -679,9 +679,16 @@ def main():
                         ).fetchone()
                         assert enrolled == ("active", identity["version"], identity["sourceRevision"], identity["artifactSha256"])
                         measured.append({"nodeId": guest.node, "identity": actual})
+                # Compare the artifact that actually backed the tested
+                # Docker Xray image to its originally recorded build hash.
+                # A stale environment digest must never qualify new bytes.
+                xray_sha = verify_measured_xray(
+                    Path(os.environ["XMESH_WAL_XRAY_BINARY"]),
+                    os.environ["XMESH_WAL_XRAY_SHA256"],
+                )
                 write_installed_evidence(
                     Path(qualification), scenario, nexus_revision, identity,
-                    measured, os.environ["XMESH_WAL_XRAY_SHA256"],
+                    measured, xray_sha,
                 )
             return
 
