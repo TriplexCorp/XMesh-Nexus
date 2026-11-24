@@ -2488,6 +2488,96 @@ fn first_genesis_cap_aliases(
     Ok(aliases)
 }
 
+/// Bind each original client to the full non-roster configuration plus
+/// that client's exact inbound records. Other clients cannot change this
+/// commitment. Duplicate or cross-user UUIDs are rejected, not normalized.
+fn first_genesis_user_config_scopes(config: &Value) -> Result<Value, ApiError> {
+    let mut topology = config.clone();
+    let inbounds = topology["inbounds"]
+        .as_array_mut()
+        .ok_or_else(cap_policy_denied)?;
+    let mut records = std::collections::BTreeMap::<i64, Vec<Value>>::new();
+    let mut identities = std::collections::HashMap::<uuid::Uuid, i64>::new();
+    let mut user_ids = std::collections::HashMap::<i64, uuid::Uuid>::new();
+    let mut seen = std::collections::HashSet::new();
+    for inbound in inbounds {
+        let tag = inbound["tag"]
+            .as_str()
+            .filter(|tag| matches!(*tag, "vless-main" | "vless-cdn"))
+            .ok_or_else(cap_policy_denied)?
+            .to_owned();
+        if inbound["protocol"] != "vless" {
+            return Err(cap_policy_denied());
+        }
+        let clients = inbound["settings"]["clients"]
+            .as_array_mut()
+            .ok_or_else(cap_policy_denied)?;
+        for client in std::mem::take(clients) {
+            let email = client["email"].as_str().ok_or_else(cap_policy_denied)?;
+            let user = email
+                .strip_prefix("xmesh-u")
+                .and_then(|value| value.split_once("--"))
+                .and_then(|(id, suffix)| {
+                    (suffix == tag).then_some(id)
+                })
+                .and_then(|id| id.parse::<i64>().ok())
+                .filter(|id| *id > 0)
+                .ok_or_else(cap_policy_denied)?;
+            let id = client["id"]
+                .as_str()
+                .and_then(|value| uuid::Uuid::parse_str(value).ok())
+                .ok_or_else(cap_policy_denied)?;
+            if email != format!("xmesh-u{user}--{tag}")
+                || !seen.insert((user, tag.clone()))
+                || identities.insert(id, user).is_some_and(|owner| owner != user)
+                || user_ids.insert(user, id).is_some_and(|old| old != id)
+            {
+                return Err(cap_policy_denied());
+            }
+            records
+                .entry(user)
+                .or_default()
+                .push(json!({"tag":tag,"client":client}));
+        }
+    }
+    let topology_sha = compiled_profile_revision(&topology)?;
+    let mut scopes = serde_json::Map::new();
+    for (user, clients) in records {
+        let digest = compiled_profile_revision(&json!({
+            "domain":"xmesh.quota-v2.original-user-config-scope.v1",
+            "topologySha256":topology_sha,
+            "clients":clients,
+        }))?;
+        scopes.insert(user.to_string(), json!(digest));
+    }
+    Ok(Value::Object(scopes))
+}
+
+/// First issuance is still bound to the entire original config. Existing
+/// reservations may use the original signed per-user commitment only when
+/// the full digest changed. Historical policies without it fail closed.
+fn first_genesis_config_scope_matches(
+    config: &Value,
+    current_revision: &str,
+    original_revision: &str,
+    signed_policy: &Value,
+    user_id: i64,
+    first_issuance: bool,
+) -> Result<bool, ApiError> {
+    if current_revision == original_revision {
+        return Ok(true);
+    }
+    if first_issuance {
+        return Ok(false);
+    }
+    let key = user_id.to_string();
+    let Some(original) = signed_policy["quotaV2UserConfigScopes"][&key].as_str() else {
+        return Ok(false);
+    };
+    let current = first_genesis_user_config_scopes(config)?;
+    Ok(current[&key].as_str() == Some(original))
+}
+
 // Lifetime per-Node reservations are independently bounded by the
 // immutable PostgreSQL baseline and ALL historical issued ceilings.
 // Calendar Node quotas require the explicit staging allocator. CDN periods
@@ -2652,13 +2742,21 @@ pub async fn signed_first_genesis_scope(
     {
         return Err(cap_policy_denied());
     }
-    // This compiler uses real Node/profile/squad/user assignments, not the
-    // preflight's caller-provided aliases. Any concurrent edit changing the
-    // signed profile digest blocks first-genesis issuance.
+    // Compile the real Node/profile/squad/user assignments, never aliases
+    // provided by the Node. Preserve the original full digest for first
+    // issuance and the immutable reservation. An existing user may renew
+    // across unrelated roster edits only with its original signed scope.
     let compiled = compile_node_profile(state, node_id, NodeProfileMode::FirstGenesis).await?;
-    if compiled.revision != revision
-        || policy["configSha256"] != revision
+    if policy["configSha256"] != revision
         || policy["nodeId"] != node_id
+        || !first_genesis_config_scope_matches(
+            &compiled.config,
+            &compiled.revision,
+            &revision,
+            &policy,
+            user_id,
+            first_issuance,
+        )?
     {
         return Err(cap_policy_denied());
     }
@@ -2773,6 +2871,58 @@ mod first_genesis_cap_scope_tests {
         assert_eq!(scopes[0].class, "cdn");
         assert_eq!(scopes[1].class, "main");
         assert_eq!(scopes[0].email, "xmesh-u19--vless-cdn");
+    }
+
+    #[test]
+    fn existing_scope_survives_only_unrelated_roster_changes() {
+        let (config, mut policy) = test_config();
+        let revision = compiled_profile_revision(&config).unwrap();
+        policy["quotaV2UserConfigScopes"] = first_genesis_user_config_scopes(&config).unwrap();
+        let mut peer = config.clone();
+        peer["inbounds"][0]["settings"]["clients"].as_array_mut().unwrap().push(json!({
+            "id":"22222222-2222-4222-8222-222222222222",
+            "email":"xmesh-u20--vless-main"
+        }));
+        let matches = |candidate: &Value, first: bool| {
+            first_genesis_config_scope_matches(
+                candidate, &compiled_profile_revision(candidate).unwrap(),
+                &revision, &policy, 19, first,
+            )
+        };
+        assert!(matches(&peer, false).unwrap());
+        assert!(!matches(&peer, true).unwrap());
+        assert!(matches(&config, true).unwrap());
+        let mut legacy = policy.clone();
+        legacy.as_object_mut().unwrap().remove("quotaV2UserConfigScopes");
+        assert!(!first_genesis_config_scope_matches(
+            &peer, &compiled_profile_revision(&peer).unwrap(), &revision,
+            &legacy, 19, false,
+        ).unwrap());
+        // The new roster entry is not in the original signed policy.
+        assert!(first_genesis_cap_aliases(&peer, &policy, 20).is_err());
+        let mut changed_peer = peer.clone();
+        changed_peer["inbounds"][0]["settings"]["clients"][1]["id"] =
+            json!("33333333-3333-4333-8333-333333333333");
+        assert!(matches(&changed_peer, false).unwrap());
+        for attack in 0..5 {
+            let mut changed = peer.clone();
+            match attack {
+                0 => changed["inbounds"][0]["settings"]["clients"][0]["id"] =
+                    json!("44444444-4444-4444-8444-444444444444"),
+                1 => {
+                    changed["inbounds"][1]["settings"]["clients"].as_array_mut().unwrap().clear();
+                }
+                2 => changed["routing"] = json!({"rules":[{"outboundTag":"other"}]}),
+                3 => changed["inbounds"][0]["port"] = json!(12345),
+                4 => changed["inbounds"][0]["settings"]["clients"][0]["flow"] = json!("other"),
+                _ => unreachable!(),
+            }
+            assert!(!matches(&changed, false).unwrap_or(false), "attack {attack}");
+        }
+        let mut collision = peer;
+        collision["inbounds"][0]["settings"]["clients"][1]["id"] =
+            config["inbounds"][0]["settings"]["clients"][0]["id"].clone();
+        assert!(matches(&collision, false).is_err());
     }
 
     #[test]
@@ -3083,6 +3233,7 @@ async fn serve_compiled_policy(
     );
     if let Some((prepared, runtime, challenge)) = &quarantined {
         quarantine_first_genesis_policy(&mut policy, prepared, runtime, challenge)?;
+        policy["quotaV2UserConfigScopes"] = first_genesis_user_config_scopes(&config)?;
     } else {
         // The existing desired-config path remains unchanged and marks the
         // Node's first-genesis eligibility as permanently consumed.
