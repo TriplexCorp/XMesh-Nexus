@@ -90,6 +90,14 @@ class CandidateTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not independent"):
             self.verify()
 
+    def test_mixed_xray_binaries_cannot_qualify_one_release(self):
+        path = self.evidence[0]
+        doc = json.loads(path.read_text())
+        doc["xrayArtifactSha256"] = "e" * 64
+        path.write_text(json.dumps(doc))
+        with self.assertRaisesRegex(ValueError, "different Xray binaries"):
+            self.verify()
+
     def test_symlink_candidate_artifact_rejected(self):
         path = self.candidate / PRODUCT
         target = self.root / "foreign"
