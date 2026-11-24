@@ -50,6 +50,10 @@ func decodeReleasePlanRequest(body []byte) (releasePlanRequest, error) {
 }
 
 func (g *gateway) planRelease(ctx context.Context, parsed parsedEnvelope, n nodeIdentity, body []byte) (int, []byte) {
+	return g.loadReleasePlan(ctx, parsed, n, body, true)
+}
+
+func (g *gateway) loadReleasePlan(ctx context.Context, parsed parsedEnvelope, n nodeIdentity, body []byte, allowCreate bool) (int, []byte) {
 	if os.Getenv("XSP_V2_PRODUCT_RELEASE_PLANNING") != "1" {
 		return http.StatusNotFound, []byte("{}")
 	}
@@ -103,6 +107,9 @@ func (g *gateway) planRelease(ctx context.Context, parsed parsedEnvelope, n node
 		return http.StatusConflict, []byte("{}")
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
+		if !allowCreate {
+			return http.StatusConflict, []byte("{}")
+		}
 		plan := releasePlan{Schema: "xmesh-product-agent-release-plan-v1",
 			NodeID: parsed.Env.NodeID, KeyEpoch: n.KeyEpoch, CommandID: request.CommandID,
 			ExpiresAtMS: expiry, ActivationSHA256: hex.EncodeToString(activation[:]), Current: n.Release, Target: target}

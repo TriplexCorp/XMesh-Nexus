@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -76,7 +77,12 @@ func TestReleasePlanPostgres(t *testing.T) {
 	g := &gateway{db: db, panelEd: ed, panelPQ: pq,
 		panelEdID: fingerprint("ed-", pub), panelPQID: fingerprint("pq-", pq.PublicKey().Bytes())}
 	current := releaseIdentity{"control-v6.0.24", strings.Repeat("a", 40), strings.Repeat("b", 64)}
-	target := releaseIdentity{"control-v6.0.27", strings.Repeat("c", 40), strings.Repeat("d", 64)}
+	artifact := bytes.Repeat([]byte("a"), releaseChunkBytes+17)
+	artifactDigest := sha256.Sum256(artifact)
+	target := releaseIdentity{"control-v6.0.27", strings.Repeat("c", 40), fmt.Sprintf("%x", artifactDigest)}
+	artifactDir := t.TempDir()
+	t.Setenv("XSP_V2_PRODUCT_RELEASE_ARTIFACT_DIR", artifactDir)
+	requireFixture(t, os.WriteFile(filepath.Join(artifactDir, target.ArtifactSHA256+".bin"), artifact, 0600))
 	receipt := []byte("existing activation envelope")
 	digest := sha256.Sum256(receipt)
 	exec("INSERT INTO panel_records(collection,data) VALUES('nodes','{}')")
@@ -98,6 +104,14 @@ func TestReleasePlanPostgres(t *testing.T) {
 	requireFixture(t, err)
 	request := parsedEnvelope{Env: envelope{NodeID: 1, Revision: current.SourceRevision}}
 	node := nodeIdentity{KeyEpoch: 1, Release: current, Receipt: receipt}
+	download := func(planSHA string, offset int64) (int, []byte) {
+		raw, err := json.Marshal(releaseArtifactRequest{CommandID: 1, Current: current, PlanSHA256: planSHA, Offset: offset})
+		requireFixture(t, err)
+		return g.releaseArtifact(ctx, request, node, raw)
+	}
+	if status, _ := download(strings.Repeat("0", 64), 0); status != http.StatusConflict {
+		t.Fatalf("download without issued plan returned %d", status)
+	}
 	var wg sync.WaitGroup
 	results := make([][]byte, 8)
 	for i := range results {
@@ -138,9 +152,41 @@ func TestReleasePlanPostgres(t *testing.T) {
 			t.Fatalf("outbox permitted mutation: %s", statement)
 		}
 	}
+	planHash := sha256.Sum256(results[0])
+	planSHA := fmt.Sprintf("%x", planHash)
+	var assembled []byte
+	for _, offset := range []int64{0, releaseChunkBytes} {
+		status, raw := download(planSHA, offset)
+		if status != http.StatusOK {
+			t.Fatalf("artifact chunk returned %d", status)
+		}
+		var chunk releaseArtifactChunk
+		requireFixture(t, json.Unmarshal(raw, &chunk))
+		if chunk.Offset != offset || chunk.TotalBytes != int64(len(artifact)) || chunk.PlanSHA256 != planSHA || chunk.ArtifactSHA256 != target.ArtifactSHA256 {
+			t.Fatal("wrong chunk binding")
+		}
+		data, err := b64.DecodeString(chunk.DataB64)
+		requireFixture(t, err)
+		assembled = append(assembled, data...)
+	}
+	if !bytes.Equal(assembled, artifact) {
+		t.Fatal("downloaded artifact differs")
+	}
+	if status, _ := download(strings.Repeat("0", 64), 0); status != http.StatusConflict {
+		t.Fatal("wrong plan digest accepted")
+	}
+	if status, _ := download(planSHA, 1); status != http.StatusBadRequest {
+		t.Fatal("unaligned offset accepted")
+	}
+	if status, _ := download(planSHA, 2*releaseChunkBytes); status != http.StatusConflict {
+		t.Fatal("out-of-range offset accepted")
+	}
 	newReceipt := []byte("another activation envelope")
 	newDigest := sha256.Sum256(newReceipt)
 	exec("UPDATE node_xsp_product_nodes SET receipt_sha256=$1,receipt_envelope=$2", newDigest[:], newReceipt)
+	if status, _ := download(planSHA, 0); status != http.StatusConflict {
+		t.Fatal("stale activation still permits artifact delivery")
+	}
 	for _, candidate := range []nodeIdentity{node, {KeyEpoch: 1, Release: current, Receipt: newReceipt}} {
 		if status, _ := g.planRelease(ctx, request, candidate, body); status != http.StatusConflict {
 			t.Fatalf("changed activation returned %d", status)
