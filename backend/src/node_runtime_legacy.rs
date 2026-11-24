@@ -2517,9 +2517,7 @@ fn first_genesis_user_config_scopes(config: &Value) -> Result<Value, ApiError> {
             let user = email
                 .strip_prefix("xmesh-u")
                 .and_then(|value| value.split_once("--"))
-                .and_then(|(id, suffix)| {
-                    (suffix == tag).then_some(id)
-                })
+                .and_then(|(id, suffix)| (suffix == tag).then_some(id))
                 .and_then(|id| id.parse::<i64>().ok())
                 .filter(|id| *id > 0)
                 .ok_or_else(cap_policy_denied)?;
@@ -2529,7 +2527,9 @@ fn first_genesis_user_config_scopes(config: &Value) -> Result<Value, ApiError> {
                 .ok_or_else(cap_policy_denied)?;
             if email != format!("xmesh-u{user}--{tag}")
                 || !seen.insert((user, tag.clone()))
-                || identities.insert(id, user).is_some_and(|owner| owner != user)
+                || identities
+                    .insert(id, user)
+                    .is_some_and(|owner| owner != user)
                 || user_ids.insert(user, id).is_some_and(|old| old != id)
             {
                 return Err(cap_policy_denied());
@@ -2879,25 +2879,42 @@ mod first_genesis_cap_scope_tests {
         let revision = compiled_profile_revision(&config).unwrap();
         policy["quotaV2UserConfigScopes"] = first_genesis_user_config_scopes(&config).unwrap();
         let mut peer = config.clone();
-        peer["inbounds"][0]["settings"]["clients"].as_array_mut().unwrap().push(json!({
-            "id":"22222222-2222-4222-8222-222222222222",
-            "email":"xmesh-u20--vless-main"
-        }));
+        peer["inbounds"][0]["settings"]["clients"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({
+                "id":"22222222-2222-4222-8222-222222222222",
+                "email":"xmesh-u20--vless-main"
+            }));
         let matches = |candidate: &Value, first: bool| {
             first_genesis_config_scope_matches(
-                candidate, &compiled_profile_revision(candidate).unwrap(),
-                &revision, &policy, 19, first,
+                candidate,
+                &compiled_profile_revision(candidate).unwrap(),
+                &revision,
+                &policy,
+                19,
+                first,
             )
         };
         assert!(matches(&peer, false).unwrap());
         assert!(!matches(&peer, true).unwrap());
         assert!(matches(&config, true).unwrap());
         let mut legacy = policy.clone();
-        legacy.as_object_mut().unwrap().remove("quotaV2UserConfigScopes");
-        assert!(!first_genesis_config_scope_matches(
-            &peer, &compiled_profile_revision(&peer).unwrap(), &revision,
-            &legacy, 19, false,
-        ).unwrap());
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("quotaV2UserConfigScopes");
+        assert!(
+            !first_genesis_config_scope_matches(
+                &peer,
+                &compiled_profile_revision(&peer).unwrap(),
+                &revision,
+                &legacy,
+                19,
+                false,
+            )
+            .unwrap()
+        );
         // The new roster entry is not in the original signed policy.
         assert!(first_genesis_cap_aliases(&peer, &policy, 20).is_err());
         let mut changed_peer = peer.clone();
@@ -2907,17 +2924,25 @@ mod first_genesis_cap_scope_tests {
         for attack in 0..5 {
             let mut changed = peer.clone();
             match attack {
-                0 => changed["inbounds"][0]["settings"]["clients"][0]["id"] =
-                    json!("44444444-4444-4444-8444-444444444444"),
+                0 => {
+                    changed["inbounds"][0]["settings"]["clients"][0]["id"] =
+                        json!("44444444-4444-4444-8444-444444444444")
+                }
                 1 => {
-                    changed["inbounds"][1]["settings"]["clients"].as_array_mut().unwrap().clear();
+                    changed["inbounds"][1]["settings"]["clients"]
+                        .as_array_mut()
+                        .unwrap()
+                        .clear();
                 }
                 2 => changed["routing"] = json!({"rules":[{"outboundTag":"other"}]}),
                 3 => changed["inbounds"][0]["port"] = json!(12345),
                 4 => changed["inbounds"][0]["settings"]["clients"][0]["flow"] = json!("other"),
                 _ => unreachable!(),
             }
-            assert!(!matches(&changed, false).unwrap_or(false), "attack {attack}");
+            assert!(
+                !matches(&changed, false).unwrap_or(false),
+                "attack {attack}"
+            );
         }
         let mut collision = peer;
         collision["inbounds"][0]["settings"]["clients"][1]["id"] =
