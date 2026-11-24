@@ -203,7 +203,8 @@ func (g *gateway) releaseArtifact(ctx context.Context, parsed parsedEnvelope, n 
 		plan.NodeID != parsed.Env.NodeID || plan.KeyEpoch != n.KeyEpoch || plan.CommandID != req.CommandID ||
 		plan.ActivationSHA256 != hex.EncodeToString(activation[:]) ||
 		plan.Current != n.Release || plan.Target.SourceRevision != signed.Env.Revision ||
-		plan.Target.Version != "control-v6.0.27" || plan.ExpiresAtMS <= time.Now().UnixMilli() {
+		plan.Target.Version != targetAgentVersion || !validForwardProductRelease(n.Release, plan.Target) ||
+		plan.ExpiresAtMS <= time.Now().UnixMilli() {
 		return http.StatusConflict, []byte("{}")
 	}
 	data, total, err := readReleaseChunk(os.Getenv("XSP_V2_PRODUCT_RELEASE_ARTIFACT_DIR"), plan.Target.ArtifactSHA256, req.Offset)

@@ -1057,13 +1057,15 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	}
 	// Only the dedicated commit handler may receive a target revision
 	// before it is effective. Every normal operation uses the durable revision.
+	effective := n.Release
 	if inner.Path != releaseCommitPath {
-		revision, err := g.effectiveReleaseRevision(ctx, n, parsed.Env.NodeID)
+		var err error
+		effective, err = g.effectiveRelease(ctx, n, parsed.Env.NodeID)
 		if err != nil {
 			fail(w, http.StatusServiceUnavailable, "strict-PQ release state unavailable")
 			return
 		}
-		if parsed.Env.Revision != revision {
+		if parsed.Env.Revision != effective.SourceRevision {
 			fail(w, http.StatusConflict, "strict-PQ tunnel release differs from enrollment")
 			return
 		}
@@ -1122,7 +1124,7 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 				fail(w, http.StatusBadRequest, "invalid committed product heartbeat")
 				return
 			}
-			report["version"] = json.RawMessage(`"control-v6.0.27"`)
+			report["version"] = json.RawMessage(strconv.Quote(effective.Version))
 			body, err = json.Marshal(report)
 			if err != nil {
 				fail(w, http.StatusInternalServerError, "cannot encode committed product heartbeat")

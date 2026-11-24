@@ -43,15 +43,31 @@ type releaseCommitReceipt struct {
 	Installed        releaseIdentity `json:"installed"`
 }
 
-func (g *gateway) effectiveReleaseRevision(ctx context.Context, n nodeIdentity, nodeID int64) (string, error) {
+func (g *gateway) effectiveRelease(ctx context.Context, n nodeIdentity, nodeID int64) (releaseIdentity, error) {
 	activation := sha256.Sum256(n.Receipt)
-	var revision string
-	err := g.db.QueryRow(ctx, "SELECT source_revision FROM node_xsp_product_release_commits WHERE node_id=$1 AND activation_sha256=$2",
-		nodeID, activation[:]).Scan(&revision)
+	var effective releaseIdentity
+	var manifestRevision string
+	err := g.db.QueryRow(ctx, `SELECT rc.source_revision,m.version,m.artifact_sha256,m.source_revision
+        FROM node_xsp_product_release_commits rc
+        JOIN node_restart_commands c ON c.id=rc.command_id AND c.node_id=rc.node_id
+        JOIN node_xsp_agent_release_manifests m ON m.id=c.release_manifest_id
+        WHERE rc.node_id=$1 AND rc.activation_sha256=$2`,
+		nodeID, activation[:]).Scan(&effective.SourceRevision, &effective.Version, &effective.ArtifactSHA256, &manifestRevision)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return n.Release.SourceRevision, nil
+		return n.Release, nil
 	}
-	return revision, err
+	if err != nil {
+		return releaseIdentity{}, err
+	}
+	if effective.SourceRevision != manifestRevision || !validForwardProductRelease(n.Release, effective) {
+		return releaseIdentity{}, errors.New("committed release identity mismatch")
+	}
+	return effective, nil
+}
+
+func (g *gateway) effectiveReleaseRevision(ctx context.Context, n nodeIdentity, nodeID int64) (string, error) {
+	effective, err := g.effectiveRelease(ctx, n, nodeID)
+	return effective.SourceRevision, err
 }
 
 // Only the holding node can commit the exact approved target. This is a
@@ -75,8 +91,8 @@ func (g *gateway) finishRelease(ctx context.Context, parsed parsedEnvelope, n no
 	if abort {
 		expectedRevision = n.Release.SourceRevision
 	}
-	if req.Installed.Version != "control-v6.0.27" || parsed.Env.Revision != expectedRevision ||
-		n.Release.Version != "control-v6.0.24" || n.Release.SourceRevision == req.Installed.SourceRevision || len(n.Receipt) == 0 {
+	if !validForwardProductRelease(n.Release, req.Installed) || parsed.Env.Revision != expectedRevision ||
+		len(n.Receipt) == 0 {
 		return http.StatusConflict, empty
 	}
 
@@ -141,7 +157,7 @@ func (g *gateway) finishRelease(ctx context.Context, parsed parsedEnvelope, n no
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return http.StatusServiceUnavailable, empty
 	}
-	if !abort && (!eligible || os.Getenv("XSP_V2_PRODUCT_RELEASE_COMMIT") != "1") {
+	if !abort && (!eligible || approved.Version != targetAgentVersion || os.Getenv("XSP_V2_PRODUCT_RELEASE_COMMIT") != "1") {
 		return http.StatusConflict, empty
 	}
 

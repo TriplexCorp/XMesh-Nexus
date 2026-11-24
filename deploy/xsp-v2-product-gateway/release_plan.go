@@ -62,7 +62,7 @@ func (g *gateway) loadReleasePlan(ctx context.Context, parsed parsedEnvelope, n 
 		return http.StatusBadRequest, []byte("{}")
 	}
 	if request.Current != n.Release || parsed.Env.Revision != n.Release.SourceRevision ||
-		n.Release.Version != "control-v6.0.24" || len(n.Receipt) == 0 {
+		!forwardProductVersion(n.Release.Version, targetAgentVersion) || len(n.Receipt) == 0 {
 		return http.StatusConflict, []byte("{}")
 	}
 	tx, err := g.db.BeginTx(ctx, pgx.TxOptions{})
@@ -88,18 +88,21 @@ func (g *gateway) loadReleasePlan(ctx context.Context, parsed parsedEnvelope, n 
         WHERE c.id=$1 AND p.node_id=$2 AND c.state='claimed' AND c.action='update_agent'
           AND c.claimed_at IS NOT NULL
           AND LEAST(c.requested_at,c.claimed_at) > clock_timestamp() - interval '15 minutes'
-          AND c.target_version=m.version AND m.version='control-v6.0.27'
+          AND c.target_version=m.version AND m.version=$8
           AND p.state='active' AND p.key_epoch=$3 AND p.receipt_sha256=$4
           AND p.release_version=$5 AND p.release_source_revision=$6 AND p.release_artifact_sha256=$7
           AND (d.data->'disabled') IS DISTINCT FROM 'true'::jsonb
         FOR UPDATE OF c FOR SHARE OF p,k,d`, request.CommandID, parsed.Env.NodeID, n.KeyEpoch,
-		activation[:], n.Release.Version, n.Release.SourceRevision, n.Release.ArtifactSHA256).
+		activation[:], n.Release.Version, n.Release.SourceRevision, n.Release.ArtifactSHA256, targetAgentVersion).
 		Scan(&target.Version, &target.SourceRevision, &target.ArtifactSHA256, &expiry)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return http.StatusConflict, []byte("{}")
 	}
 	if err != nil {
 		return http.StatusServiceUnavailable, []byte("{}")
+	}
+	if !validForwardProductRelease(n.Release, target) {
+		return http.StatusConflict, []byte("{}")
 	}
 	var activationStored, receipt []byte
 	err = tx.QueryRow(ctx, "SELECT activation_sha256,signed_envelope FROM node_xsp_product_release_plans WHERE command_id=$1",
