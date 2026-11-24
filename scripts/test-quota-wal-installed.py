@@ -623,7 +623,13 @@ def main():
                         "bash", state, PRODUCT, panel, str(guest.node),
                         timeout=60,
                     )
-                    assert result.strip() == b"resumed", (
+                    # The enabled systemd recovery unit can restore the same
+                    # signed request and receipt before this installer guard
+                    # runs. In that case verify-active returns "active" rather
+                    # than "resumed". Both outcomes are safe only because we
+                    # verify the original file digests and PostgreSQL identity
+                    # immediately below (and never request enrollment again).
+                    assert result.strip() in (b"resumed", b"active"), (
                         f"Node {guest.node} installer re-enrollment guard failed: {result!r}"
                     )
                 else:
