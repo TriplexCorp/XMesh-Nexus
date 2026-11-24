@@ -268,6 +268,7 @@ async fn first_cap(state: &AppState, req: &Request, activation: &str) -> Result<
     .await?;
     let mut row = load_outbox(&mut tx, req, &scope, &epoch, &key, activation).await?;
     if row.is_none() {
+        crate::quota_v2::require_issuance_open()?;
         issue_original(
             &mut tx,
             state,

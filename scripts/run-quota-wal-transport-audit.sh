@@ -73,6 +73,8 @@ python3 -c 'import sys; from pathlib import Path; sys.stdout.buffer.write(bytes.
 if [[ "${2:-}" == --with-product ]]; then
     python3 scripts/test-quota-wal-product-tunnel.py
 elif [[ "${2:-}" == --with-installed ]]; then
+    export XMESH_TEST_NEXUS_PID="$server"
+    export XMESH_TEST_NEXUS_BINARY="$(realpath "$1")"
     python3 scripts/test-quota-wal-installed.py
 else
     python3 scripts/test-quota-wal-transport.py

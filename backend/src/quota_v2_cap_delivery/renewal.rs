@@ -247,6 +247,7 @@ pub(super) async fn issue(
     {
         return Err(deny());
     }
+    crate::quota_v2::require_issuance_open()?;
     let signed = extend(
         &mut tx,
         state,

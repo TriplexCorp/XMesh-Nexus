@@ -2818,6 +2818,9 @@ async fn prepare_policy_issuance(
     policy: &mut Value,
     now_ms: i64,
 ) -> Result<(), ApiError> {
+    if crate::quota_v2::enabled() {
+        crate::quota_v2::require_issuance_open()?;
+    }
     crate::quota_xray_genesis::close_for_policy(&state.pool, request.node_id).await?;
     if crate::quota_v2::enabled() {
         crate::quota_v2::issue(

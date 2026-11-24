@@ -223,6 +223,19 @@ systemctl stop docker.socket docker.service containerd.service
         assert json.loads(self.exec(PRODUCT, "--identity")) == identity
         assert self.exec("sha256sum", PRODUCT).split()[0].decode() == identity["artifactSha256"]
         self.exec(PRODUCT, "verify-active", "--panel", panel, "--node-id", str(self.node))
+        if os.environ.get("XMESH_TEST_INSTALLED_CRASHES") == "1":
+            denied = self.exec(
+                "sh", "-ec",
+                """candidate=$(mktemp /usr/local/bin/.ci-identity.XXXXXXXX)
+trap 'rm -f "$candidate"' EXIT
+cp "$1" "$candidate"
+chmod 0700 "$candidate"
+printf x >>"$candidate"
+if output=$("$candidate" verify-active --panel "$2" --node-id "$3" 2>&1); then exit 1; fi
+printf '%s\n' "$output"
+""", "sh", PRODUCT, panel, str(self.node))
+            assert b"running strict-PQ Agent differs from enrolled release identity" in denied, denied
+            self.exec(PRODUCT, "verify-active", "--panel", panel, "--node-id", str(self.node))
         return json.loads(self.exec(PRODUCT, "wal-evidence", "--panel", panel, "--node-id", str(self.node)))["publicKey"]
 
     def check_quarantine(self):

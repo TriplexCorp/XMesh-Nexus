@@ -37,6 +37,26 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
+fn issuance_paused() -> bool {
+    match std::env::var("XMESH_QUOTA_V2_PAUSE_ISSUANCE") {
+        Ok(value) => value != "0",
+        Err(std::env::VarError::NotPresent) => false,
+        Err(std::env::VarError::NotUnicode(_)) => true,
+    }
+}
+
+/// Pause new reservations and spending permits while keeping the existing
+/// v2 ledger, WAL endpoints and immutable receipt replay available.
+pub(crate) fn require_issuance_open() -> Result<(), ApiError> {
+    if issuance_paused() {
+        return Err(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "New Quota V2 issuance is paused.",
+        ));
+    }
+    Ok(())
+}
+
 /// Refuse an accidental feature-gate downgrade whenever an immutable
 /// spending permit has been issued, even if its SQL hold is fully burnt.
 /// A zero remaining hold cannot prove that remote Xray WAL is final, or
@@ -443,9 +463,11 @@ pub async fn fleet_protocol_readiness(
     let mut fleet = summarize_fleet_nodes(&entries)?;
     recheck_authoritative_profile_revisions(&state, &mut fleet).await;
     let all_claim_v2 = fleet.serving > 0 && fleet.serving == fleet.compatible;
+    let paused = issuance_paused();
     Ok(Json(json!({
         "protocol":"v2",
         "featureEnabled":enabled(),
+        "issuancePaused":paused,
         "servingNodes":fleet.serving,
         "protocolCompatibleNodes":fleet.compatible,
         "protocolPreflightPassed":all_claim_v2,
@@ -456,7 +478,7 @@ pub async fn fleet_protocol_readiness(
         "applicationCompatibleNodes":fleet.application_compatible,
         "applicationPreflightPassed":fleet.serving>0 && fleet.application_compatible==fleet.serving,
         "activationCandidateNodes":fleet.activation_candidates,
-        "activationCandidatePreflightPassed":fleet.serving>0 && fleet.activation_candidates==fleet.serving,
+        "activationCandidatePreflightPassed":!paused && fleet.serving>0 && fleet.activation_candidates==fleet.serving,
         "runtimeHeartbeatFreshnessSeconds":65,
         "agentHeartbeatFreshnessSeconds":65,
         "legacyAgentQuietPeriodMinutes":15,
@@ -1533,6 +1555,7 @@ pub async fn issue_user(
     now_ms: i64,
     inbound_class: &str,
 ) -> Result<(), ApiError> {
+    require_issuance_open()?;
     let Some(limit) = policy_shared_limit(user, inbound_class)? else {
         // The generic V1/unknown-inbound policy path cannot manufacture
         // a positive unsigned V2 lease for an unlimited subscriber.

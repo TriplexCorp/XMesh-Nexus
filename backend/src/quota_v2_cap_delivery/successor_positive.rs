@@ -763,6 +763,7 @@ pub(super) async fn issue(
         tx.commit().await?;
         return Ok(saved);
     }
+    crate::quota_v2::require_issuance_open()?;
     persist_fresh_preflight(
         &mut tx,
         req,

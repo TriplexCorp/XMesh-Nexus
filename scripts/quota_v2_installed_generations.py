@@ -4,8 +4,12 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
+import signal
 import subprocess
 import time
+from urllib.error import URLError
+from urllib.request import urlopen
 
 from quota_v2_installed_genesis_lease import (
     CAP_DOMAIN, CAP_PATH, GENESIS_DOMAIN, MEASURED, STATE, independent_signature, parallel,
@@ -53,6 +57,46 @@ def shorten_disposable_calendar(db, dsn):
             FROM (SELECT date_bin(interval '240 seconds', p_at, TIMESTAMPTZ '{origin}+00') AS bucket) bounds
         $$
     """)
+
+
+def restart_nexus_paused(root, lab, stack):
+    binary = Path(os.environ["XMESH_TEST_NEXUS_BINARY"]).resolve()
+    pid = int(os.environ["XMESH_TEST_NEXUS_PID"])
+    assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
+    assert os.environ["XMESH_TEST_URL"] == "http://127.0.0.1:38081"
+    assert Path(f"/proc/{pid}/exe").resolve(strict=True) == binary
+    os.kill(pid, signal.SIGKILL)
+    lab.wait_for(lambda: not Path(f"/proc/{pid}/exe").exists(),
+                 timeout=10, label="old disposable Nexus stopped")
+    log = stack.enter_context((root / "paused-nexus.log").open("w+"))
+    server = subprocess.Popen([str(binary)], stdout=log, stderr=subprocess.STDOUT,
+                              env={**os.environ, "XMESH_QUOTA_V2_PAUSE_ISSUANCE": "1",
+                                   "XMESH_QUOTA_V2_WAL_TRANSPORT": "1"})
+
+    def stop():
+        if server.poll() is None:
+            server.terminate()
+            try:
+                server.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait(timeout=10)
+
+    stack.callback(stop)
+
+    def ready():
+        if server.poll() is not None:
+            log.seek(0)
+            raise AssertionError(log.read()[-4000:])
+        try:
+            with urlopen(os.environ["XMESH_TEST_URL"] + "/api/v1/health/ready", timeout=2) as response:
+                return response.status == 200
+        except URLError:
+            return False
+
+    lab.wait_for(ready, timeout=25, label="paused Nexus against the same ledger")
+    _, report = lab.Owner(stack).request("GET", "/quota-v2/fleet-readiness", None)
+    assert report["featureEnabled"] is True and report["issuancePaused"] is True, report
 
 
 def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
@@ -266,6 +310,24 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                 main.exec("sh", "-ec",
                           'umask 077; printf "%s %s %s\\n" "$1" "$2" "$3" > "$4/armed.next"; mv -f "$4/armed.next" "$4/armed"',
                           "sh", str(uid), grant["reservationId"], "g3", FAULT_STATE)
+            if crashes and generation == 3:
+                restart_nexus_paused(root, lab, stack)
+                # Only an exact late reply may still be delivered. The new
+                # valid request reaches the funding boundary and is refused.
+                assert main.request(CAP_PATH, request) == (200, receipt["response"])
+                peer_pid = ready_route(main, peer["id"], stable)
+                peer_container = main.exec("docker", "inspect", "--format", "{{.Id}}",
+                                           "xmesh-managed-xray").decode().strip()
+                blocked = main.request(CAP_PATH, {
+                    "nodeId": node, "userId": peer["id"], "requestChallenge": secrets.token_hex(32),
+                    "measurement": {"runtimeId": stable["runtimeId"],
+                                    "containerId": peer_container, "hostPid": peer_pid},
+                    "renewal": {"reservationId": stable["reservationId"],
+                                "previousRevision": stable["reservationRevision"]},
+                })
+                assert blocked[0] == 503 and "issuance is paused" in str(blocked[1]), blocked
+                assert db.execute("SELECT COUNT(*) FROM quota_v2_wal_charges WHERE reservation_id=%s",
+                                  (reservation,)).fetchone()[0] == 0
             main.exec("touch", f"{WORK}/ready-{generation}")
             completed(generation)
             chain.append(grant)
@@ -292,6 +354,11 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
 
             charges[reservation] = lab.wait_for(
                 both_wal_directions, timeout=75, label=f"16384 bytes in both WAL directions {reservation}")
+        if crashes:
+            (artifact / "issuance-paused.json").write_text(json.dumps({
+                "nexusSigkill": True, "newRenewalRefused": True, "exactPermitReplayed": True,
+                "walChargedWhilePaused": charges[chain[-1]["reservationId"]],
+            }, indent=2))
         def snapshot(connection):
             return (
                 connection.execute(
