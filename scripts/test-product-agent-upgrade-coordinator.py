@@ -216,5 +216,83 @@ class FreshCoordinatorTest(CoordinatorTest):
         self.assertEqual(self.calls, ["rollback-release", "verify-active"])
         self.assertFalse((self.state / "command.json").exists())
 
+
+    def expired_candidate(self):
+        COORDINATOR.store_command(self.command)
+        self.write(self.product, b"new")
+        payload = json.dumps({"target": self.release, "commandId": self.command["id"],
+                              "expiresAtMs": 1}).encode()
+        self.write(self.state / "plan-5.json",
+                   json.dumps({"payloadB64": base64.b64encode(payload).decode()}).encode(), 0o600)
+
+    def test_expired_uncommitted_candidate_recovers_with_signed_abort(self):
+        self.expired_candidate()
+
+        def expired(binary, phase, *args):
+            if phase == "confirm-release":
+                raise subprocess.CalledProcessError(1, [binary, phase])
+            return self.invoke(binary, phase, *args)
+
+        with patch.object(COORDINATOR, "invoke", side_effect=expired):
+            COORDINATOR.main("run")
+        self.assertEqual(self.calls, ["--identity", "rollback-release", "verify-active"])
+        self.assertEqual(self.product.read_bytes(), b"old")
+        self.assertFalse((self.state / "command.json").exists())
+        self.assertFalse((self.state / "expired-recovery-5").exists())
+
+    def test_expired_lost_commit_reply_cannot_authorize_rollback(self):
+        self.expired_candidate()
+
+        def lost_reply(binary, phase, *args):
+            if phase in ("confirm-release", "rollback-release"):
+                # COMMIT was already recorded; signed ABORT is refused.
+                raise subprocess.CalledProcessError(1, [binary, phase])
+            return self.invoke(binary, phase, *args)
+
+        with patch.object(COORDINATOR, "invoke", side_effect=lost_reply):
+            with self.assertRaises(subprocess.CalledProcessError):
+                COORDINATOR.main("run")
+        self.assertEqual(self.product.read_bytes(), b"new")
+        self.assertTrue((self.state / "expired-recovery-5").exists())
+        self.assertTrue((self.state / "command.json").exists())
+        self.calls.clear()
+        with patch.object(COORDINATOR, "invoke", side_effect=self.invoke):
+            COORDINATOR.main("run")
+        self.assertEqual(self.calls, ["--identity", "confirm-release", "verify-active"])
+        self.assertEqual(self.product.read_bytes(), b"new")
+        self.assertFalse((self.state / "expired-recovery-5").exists())
+        self.assertFalse((self.state / "command.json").exists())
+
+    def test_expired_recovery_survives_crash_after_signed_abort_restore(self):
+        self.expired_candidate()
+
+        def interrupted(binary, phase, *args):
+            if phase == "confirm-release":
+                raise subprocess.CalledProcessError(1, [binary, phase])
+            if phase == "rollback-release":
+                self.invoke(binary, phase, *args)
+                raise OSError("interrupted after signed ABORT and restore")
+            return self.invoke(binary, phase, *args)
+
+        with patch.object(COORDINATOR, "invoke", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                COORDINATOR.main("run")
+        self.assertEqual(self.product.read_bytes(), b"old")
+        self.assertTrue((self.state / "expired-recovery-5").exists())
+        self.calls.clear()
+        with patch.object(COORDINATOR, "invoke", side_effect=self.invoke):
+            COORDINATOR.main("run")
+        self.assertEqual(self.calls, ["rollback-release", "verify-active"])
+        self.assertFalse((self.state / "command.json").exists())
+        self.assertFalse((self.state / "expired-recovery-5").exists())
+
+    def test_expiry_hint_rejects_foreign_plan(self):
+        self.expired_candidate()
+        path = self.state / "plan-5.json"
+        self.assertTrue(COORDINATOR.expired_plan_hint(path, self.command))
+        self.assertFalse(COORDINATOR.expired_plan_hint(path, {**self.command, "id": 6}))
+        wrong = {**self.command, "releaseIdentity": {**self.release, "artifactSha256": "f" * 64}}
+        self.assertFalse(COORDINATOR.expired_plan_hint(path, wrong))
+
 if __name__ == "__main__":
     unittest.main()

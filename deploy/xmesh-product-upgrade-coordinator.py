@@ -15,6 +15,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 
 
 PRODUCT = Path("/usr/local/bin/xmesh-agent-xspv2-product")
@@ -190,13 +191,40 @@ def invoke(executable, phase, *arguments):
     return subprocess.run([executable, phase, *arguments], check=True, capture_output=True, timeout=120).stdout
 
 
+def expired_plan_hint(path, command):
+    # The deadline only decides when to ASK Nexus for its signed outcome.
+    # It never authorizes replacement or rollback. The Go recovery image
+    # independently verifies the exact immutable plan and signed ABORT.
+    try:
+        envelope = json.loads(private_file(path, 0o600, 16384))
+        payload = json.loads(base64.b64decode(envelope["payloadB64"], validate=True))
+        expires = payload["expiresAtMs"]
+        return (payload.get("commandId") == command["id"]
+                and payload.get("target") == command["releaseIdentity"]
+                and type(expires) is int and 0 < expires <= time.time_ns() // 1000000)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return False
+
+
 def run_update(command):
     release = command["releaseIdentity"]
     args = ("--command-id", str(command["id"]))
     phase_file = STATE / f"plan-{command['id']}.json"
     config, previous = enrollment()
     abort = STATE / f"abort-{command['id']}"
-    if abort.exists():
+    expired_recovery = STATE / f"expired-recovery-{command['id']}"
+    recovering_expiry = FRESH and (expired_recovery.exists() or expired_recovery.is_symlink())
+    if recovering_expiry:
+        if private_file(expired_recovery, 0o600, 32) != b"resolve\n":
+            raise ValueError("invalid expired update recovery checkpoint")
+        if digest_image(PRODUCT) == previous:
+            # A previous signed ABORT may already have restored the original
+            # bytes before the supervisor was killed. Reverify that outcome
+            # before removing the durable command. Never fetch a new plan.
+            invoke(BRIDGE, "rollback-release", *args)
+            invoke(PRODUCT, "verify-active", "--panel", config["panelUrl"], "--node-id", str(config["nodeId"]))
+            return
+    if abort.exists() or abort.is_symlink():
         private_file(abort, 0o600, 32)
         invoke(BRIDGE, "rollback-release", *args)
         if FRESH:
@@ -229,9 +257,26 @@ def run_update(command):
         if FRESH:
             invoke(PRODUCT, "verify-active", "--panel", config["panelUrl"], "--node-id", str(config["nodeId"]))
         return
-    # Transport failure here is ambiguous. Leave the target in place and
-    # retry through the timer; Nexus replays its original signed COMMIT.
-    invoke(PRODUCT, "confirm-release", *args)
+    # Always try COMMIT first, including after a lost reply and deadline.
+    # If it was durably committed, Nexus replays that exact signed result.
+    # An expired uncommitted candidate would otherwise remain installed
+    # forever with neither operational authority nor a route back.
+    try:
+        invoke(PRODUCT, "confirm-release", *args)
+    except (OSError, subprocess.SubprocessError):
+        if not FRESH or not (recovering_expiry or expired_plan_hint(phase_file, command)):
+            raise
+        # Persist recovery intent before asking for ABORT. This is NOT a
+        # decision to roll back: Nexus rejects ABORT after a durable COMMIT.
+        # If that request fails, the next timer still retries COMMIT first
+        # while the candidate remains installed.
+        if not recovering_expiry:
+            store_bytes(expired_recovery, b"resolve\n")
+        invoke(BRIDGE, "rollback-release", *args)
+        if digest_image(PRODUCT) != previous:
+            raise ValueError("signed ABORT did not restore original Agent")
+        invoke(PRODUCT, "verify-active", "--panel", config["panelUrl"], "--node-id", str(config["nodeId"]))
+        return
     invoke(PRODUCT, "verify-active", "--panel", config["panelUrl"], "--node-id", str(config["nodeId"]))
 
 
@@ -269,6 +314,7 @@ def main(action):
             sync_directory()
             (STATE / f"plan-{command['id']}.json").unlink(missing_ok=True)
             (STATE / f"abort-{command['id']}").unlink(missing_ok=True)
+            (STATE / f"expired-recovery-{command['id']}").unlink(missing_ok=True)
             sync_directory()
         else:
             raise ValueError("unknown product update coordinator action")
