@@ -60,7 +60,7 @@ if apt_isolated "$work/foreign-state" update > "$work/foreign.log" 2>&1; then
  echo "APT accepted metadata signed by an untrusted release key" >&2
  exit 1
 fi
-rg -qi 'no_pubkey|missing key|public key|not signed' "$work/foreign.log"
+grep -Eqi 'no_pubkey|missing key|public key|not signed' "$work/foreign.log"
 
 cp "$repo/Release" "$work/fresh-release"
 sed -i "s/^Valid-Until:.*/Valid-Until: $(date -Ru -d 'yesterday')/" "$repo/Release"
@@ -69,7 +69,7 @@ if apt_isolated "$work/expired-state" update > "$work/expired.log" 2>&1; then
  echo "APT accepted expired signed release metadata" >&2
  exit 1
 fi
-rg -qi 'expired' "$work/expired.log"
+grep -Eqi 'expired' "$work/expired.log"
 cp "$work/fresh-release" "$repo/Release"
 
 sign_index trusted
@@ -90,5 +90,5 @@ if (cd "$work/download" && apt_isolated "$work/trusted-state" download xmesh-age
  echo "APT accepted a package that disagreed with signed metadata" >&2
  exit 1
 fi
-rg -qi 'hash sum mismatch|hashes of expected file' "$work/tampered.log"
+grep -Eqi 'hash sum mismatch|hashes of expected file' "$work/tampered.log"
 echo 'APT accepted only the independently pinned signature and exact package bytes.'
