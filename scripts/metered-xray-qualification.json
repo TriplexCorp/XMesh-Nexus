@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "kind": "xmesh.metered-xray-candidate",
-  "nodeSourceRevision": "62dcacb3da8d5a7463757ca91969388958f5469f",
-  "patchSourceTree": "d9ef27c488cdd79b6eaff339d766e05869d80a7b",
+  "nodeSourceRevision": "af66e1bc0e16e686462be3405509c265eb9be66d",
+  "patchSourceTree": "27b8535d80514d6c9775df46ffb286cbf7884a9f",
   "upstreamSourceRevision": "a4a3dff5b20c2faae567b742c172c7b95e75c083",
   "goVersion": "go version go1.27.4 linux/amd64",
-  "artifactSha256": "2884c0707cbe9026ef40dd46e16c6f9e7c0fd68c460b3a3ef8d38e35f0604244",
+  "artifactSha256": "28117fb4b4a749dab7c264d27b608cba0a8865ded1bb4766d9c4d5434a1e4d11",
   "independentRebuildMatched": true,
   "candidateOnly": true,
   "productionActivationAuthorized": false,
-  "workflowRunId": 45377806408
+  "workflowRunId": 45422892720
 }
