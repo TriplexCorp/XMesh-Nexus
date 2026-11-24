@@ -1,0 +1,108 @@
+"""Keep one peer VLESS connection open while the measured user reconnects."""
+from contextlib import ExitStack
+import json
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+from quota_v2_installed_live_vless import denied, exact, socks_stream
+
+
+def run(binary, user, peer, state):
+    directory = Path(state)
+    config = directory / "client.json"
+    client_ids = {"a": user, "b": peer}
+    config.write_text(json.dumps({
+        "inbounds": [
+            {"tag": tag, "listen": "127.0.0.1", "port": 28411 + i,
+             "protocol": "socks", "settings": {"auth": "noauth"}}
+            for i, tag in enumerate(client_ids)
+        ],
+        "outbounds": [
+            {"tag": tag, "protocol": "vless", "settings": {"vnext": [{
+                "address": "127.0.0.1", "port": 28401,
+                "users": [{"id": user_id, "encryption": "none"}],
+            }]}} for tag, user_id in client_ids.items()
+        ],
+        "routing": {"rules": [{"type": "field", "inboundTag": [tag], "outboundTag": tag}
+                              for tag in client_ids]},
+    }))
+
+    def exchange(sock, data):
+        sock.sendall(data)
+        assert exact(sock, len(data)) == data
+
+    with subprocess.Popen([binary, "run", "-config", config]) as process, ExitStack() as streams:
+        try:
+            deadline = time.monotonic() + 20
+            while True:
+                try:
+                    peer_stream = streams.enter_context(socks_stream(28412))
+                    exchange(peer_stream, b"peer")
+                    break
+                except (OSError, EOFError):
+                    if time.monotonic() >= deadline:
+                        raise
+                    time.sleep(.3)
+            for generation in (1, 2, 3):
+                deadline = time.monotonic() + 380
+                while not (directory / f"ready-{generation}").exists():
+                    assert time.monotonic() < deadline, f"generation {generation} never opened"
+                    exchange(peer_stream, b"peer")
+                    time.sleep(2)
+                data = bytes([generation]) * 8192
+                with socks_stream() as active:
+                    crash_case = generation == 3 and (directory / "check-xray-kill").exists()
+                    if crash_case:
+                        # Establish A on generation 3 while admissions are still enabled.
+                        # Keep that exact connection across the pause and charge new bytes.
+                        midpoint = len(data) // 2
+                        exchange(active, data[:midpoint])
+                        (directory / "before-pause-3").touch()
+                        deadline = time.monotonic() + 60
+                        while not (directory / "issuance-paused-3").exists():
+                            assert time.monotonic() < deadline, "issuance pause was never activated"
+                            exchange(peer_stream, b"peer")
+                            time.sleep(2)
+                        denied()
+                        exchange(active, data[midpoint:])
+                    else:
+                        exchange(active, data)
+                    (directory / f"done-{generation}").touch()
+                    while generation < 3 and not (directory / f"ready-{generation + 1}").exists():
+                        assert time.monotonic() < deadline, "successor never opened"
+                        exchange(peer_stream, b"peer")
+                        time.sleep(2)
+                    if crash_case:
+                        deadline = time.monotonic() + 180
+                        while not (directory / "xray-killed").exists():
+                            assert time.monotonic() < deadline, "active Xray was never killed"
+                            exchange(peer_stream, b"peer")
+                            time.sleep(2)
+                        try:
+                            active.sendall(b"after-kill")
+                            assert active.recv(1) == b"", "the killed Xray still served A"
+                        except (ConnectionResetError, BrokenPipeError):
+                            pass
+                        denied()
+                        (directory / "xray-kill-checked").touch()
+                    if generation < 3:
+                        try:
+                            active.sendall(b"stale")
+                            assert active.recv(1) == b"", "old generation delivered bytes"
+                        except (ConnectionResetError, BrokenPipeError):
+                            pass
+            deadline = time.monotonic() + 180
+            while not (directory / "database-restarted").exists():
+                assert time.monotonic() < deadline, "PostgreSQL recovery check did not finish"
+                exchange(peer_stream, b"peer")
+                time.sleep(2)
+            exchange(peer_stream, b"peer")
+            (directory / "peer-intact").touch()
+        finally:
+            process.terminate()
+
+
+if __name__ == "__main__":
+    run(*sys.argv[1:])

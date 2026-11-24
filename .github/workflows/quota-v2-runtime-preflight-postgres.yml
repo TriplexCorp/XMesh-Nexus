@@ -1,0 +1,180 @@
+name: Quota V2 PostgreSQL runtime preflight and immutable signed-cap outbox
+on:
+  pull_request:
+    paths:
+      - 'backend/migrations/0138_quota_v2_runtime_preflight_ledger.sql'
+      - 'backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql'
+      - 'backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql'
+      - 'backend/migrations/0141_quota_v2_genesis_quarantine_policy.sql'
+      - 'backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql'
+      - 'backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql'
+      - 'backend/migrations/0144_quota_v2_genesis_lease_replies.sql'
+      - 'backend/migrations/0146_quota_v2_cap_renewals.sql'
+      - 'backend/migrations/0147_quota_v2_node_lifetime_baselines.sql'
+      - 'backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql'
+      - 'backend/migrations/0149_quota_v2_mixed_class_cdn_holds.sql'
+      - 'backend/migrations/0150_quota_v2_mixed_cdn_topups.sql'
+      - 'backend/migrations/0151_quota_v2_cdn_signed_revision_integrity.sql'
+      - 'backend/migrations/0152_quota_v2_node_calendar.sql'
+      - 'backend/migrations/0153_quota_v2_cdn_calendar.sql'
+      - 'backend/migrations/0154_quota_v2_cdn_day_week.sql'
+      - 'backend/migrations/0155_quota_v2_calendar_closures.sql'
+      - 'backend/migrations/0156_quota_v2_wal_stream_owners.sql'
+      - 'backend/migrations/0157_quota_v2_calendar_successor_zero_authority.sql'
+      - 'backend/migrations/0158_quota_v2_calendar_closed_settlement_guard.sql'
+      - 'backend/migrations/0159_quota_v2_successor_predecessor_binding.sql'
+      - 'backend/migrations/0160_quota_v2_successor_fresh_meter_staging.sql'
+      - 'backend/migrations/0161_quota_v2_calendar_successor_positive_outbox.sql'
+      - 'backend/migrations/0162_quota_v2_runtime_wal_anchors.sql'
+      - 'scripts/test-quota-v2-calendar-successor-postgres.py'
+      - 'scripts/test-quota-v2-sql-migration-delimiters.py'
+      - 'scripts/test-quota-v2-node-calendar-postgres.py'
+      - 'scripts/test-quota-v2-lifetime-dimensional-postgres.py'
+      - 'scripts/benchmark-quota-v2-postgres-allocator.py'
+      - 'scripts/test-quota-v2-unlimited-main-postgres.py'
+      - 'scripts/test-quota-v2-mixed-main-cdn-postgres.py'
+      - 'scripts/test-quota-v2-quarantined-runtime-postgres.py'
+      - 'scripts/test-quota-v2-genesis-quarantine-postgres.py'
+      - 'scripts/test-quota-v2-signed-cap-outbox-postgres.py'
+      - 'scripts/test-quota-v2-runtime-preflight-postgres.py'
+      - '.github/workflows/quota-v2-runtime-preflight-postgres.yml'
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quota_preflight_test
+          POSTGRES_PASSWORD: quota_preflight_disposable
+          POSTGRES_DB: quota_preflight_test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      XMESH_AUDIT_DISPOSABLE: '1'
+      QUOTA_TEST_DSN: postgresql://quota_preflight_test:quota_preflight_disposable@127.0.0.1:5432/quota_preflight_test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install disposable SQL test driver
+        run: python3 -m pip install 'psycopg[binary]==3.2.3' --break-system-packages
+      - name: Reject malformed quota calendar PL/pgSQL dollar delimiters before migration
+        run: python3 scripts/test-quota-v2-sql-migration-delimiters.py
+      - name: Apply REAL existing allocator and staged Xray preparation migrations
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import psycopg
+          with psycopg.connect(os.environ["QUOTA_TEST_DSN"]) as c:
+              # Minimal database dependency of the existing 0137 trigger.
+              # The test DOES NOT fake quota_v2_reserve or admissions.
+              c.execute("""
+                  CREATE TABLE node_xsp_product_nodes (
+                    node_id BIGINT PRIMARY KEY,
+                    state TEXT NOT NULL,
+                    receipt_sha256 BYTEA
+                  )
+              """)
+              # Disposable shadows of earlier production v1/WAL tables.
+              # Their mere presence is what the REAL 0141 history guard
+              # checks; never stub a quota reserve or signed-cap allocator.
+              for historical in (
+                  "node_desired_revisions",
+                  "quota_v2_external_wal_birth_anchors",
+                  "user_node_quota_lifetime",
+                  "verified_traffic_deltas",
+              ):
+                  c.execute("CREATE TABLE "+historical+" (node_id BIGINT)")
+              for period, start in (("daily", "day_start"), ("weekly", "week_start"),
+                                    ("monthly", "month_start")):
+                  c.execute(f"""CREATE TABLE user_node_quota_{period}
+                      ({start} DATE NOT NULL,node_id BIGINT NOT NULL,user_id BIGINT NOT NULL,
+                       uplink_bytes BIGINT NOT NULL,downlink_bytes BIGINT NOT NULL,
+                       PRIMARY KEY ({start},node_id,user_id))""")
+              c.execute("""CREATE TABLE user_inbound_traffic_monthly
+                  (month_start DATE NOT NULL,user_id BIGINT NOT NULL,
+                   quota_uplink_bytes BIGINT NOT NULL,quota_downlink_bytes BIGINT NOT NULL,
+                   updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+              c.execute("""INSERT INTO user_inbound_traffic_monthly
+                  VALUES ('2028-02-01',2637315403,7,0,'2028-02-01T00:00:00Z')""")
+              for path in (
+                  "backend/migrations/0125_quota_v2_reservations.sql",
+                  "backend/migrations/0126_quota_v2_revocation_requests.sql",
+                  "backend/migrations/0127_quota_v2_revocation_freeze.sql",
+                  "backend/migrations/0128_quota_v2_conservative_burn.sql",
+                  "backend/migrations/0137_quota_v2_xray_genesis.sql",
+                  "backend/migrations/0138_quota_v2_runtime_preflight_ledger.sql",
+                  "backend/migrations/0139_quota_v2_signed_first_cap_outbox.sql",
+                  "backend/migrations/0140_quota_v2_xsp2_cap_attestation_staging.sql",
+                  "backend/migrations/0141_quota_v2_genesis_quarantine_policy.sql",
+                  "backend/migrations/0142_quota_v2_quarantined_runtime_preflight.sql",
+                  "backend/migrations/0143_quota_v2_quarantine_blocks_legacy_policy.sql",
+                  "backend/migrations/0144_quota_v2_genesis_lease_replies.sql",
+                  "backend/migrations/0145_quota_v2_wal_charges.sql",
+                  "backend/migrations/0146_quota_v2_cap_renewals.sql",
+                  "backend/migrations/0147_quota_v2_node_lifetime_baselines.sql",
+                  "backend/migrations/0148_quota_v2_cdn_lifetime_scope.sql",
+                  "backend/migrations/0149_quota_v2_mixed_class_cdn_holds.sql",
+                  "backend/migrations/0150_quota_v2_mixed_cdn_topups.sql",
+                  "backend/migrations/0151_quota_v2_cdn_signed_revision_integrity.sql",
+                  "backend/migrations/0152_quota_v2_node_calendar.sql",
+                  "backend/migrations/0153_quota_v2_cdn_calendar.sql",
+                  "backend/migrations/0154_quota_v2_cdn_day_week.sql",
+                  "backend/migrations/0155_quota_v2_calendar_closures.sql",
+                  "backend/migrations/0156_quota_v2_wal_stream_owners.sql",
+                  "backend/migrations/0157_quota_v2_calendar_successor_zero_authority.sql",
+                  "backend/migrations/0158_quota_v2_calendar_closed_settlement_guard.sql",
+                  "backend/migrations/0159_quota_v2_successor_predecessor_binding.sql",
+                  "backend/migrations/0160_quota_v2_successor_fresh_meter_staging.sql",
+                  "backend/migrations/0161_quota_v2_calendar_successor_positive_outbox.sql",
+                  "backend/migrations/0162_quota_v2_runtime_wal_anchors.sql",
+              ):
+                  c.execute(Path(path).read_text(encoding="utf-8"))
+          PY
+      - name: Immutable successor and independent empty WAL meter candidate cannot create traffic authority
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-calendar-successor-postgres.py
+          python3 scripts/test-quota-v2-calendar-successor-postgres.py
+      - name: Concurrent Node reservation and immutable zero-authority snapshot
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-runtime-preflight-postgres.py
+          python3 scripts/test-quota-v2-runtime-preflight-postgres.py -v
+      - name: Independent calendar reservations use immutable UTC deadlines
+        run: python3 scripts/test-quota-v2-node-calendar-postgres.py
+      - name: Exactly-once immutable signed-cap outbox and 20-way concurrency
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-signed-cap-outbox-postgres.py
+          python3 scripts/test-quota-v2-signed-cap-outbox-postgres.py -v
+      - name: Strict first-genesis quarantined policy never grants traffic or clears historical evidence
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-genesis-quarantine-postgres.py
+          python3 scripts/test-quota-v2-genesis-quarantine-postgres.py -v
+      - name: Real global allocator and signed quarantined policy agree before any runtime preflight
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-quarantined-runtime-postgres.py
+          python3 scripts/test-quota-v2-quarantined-runtime-postgres.py -v
+      - name: Concurrent independently classified lifetime CDN reservations remain conserved
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-lifetime-dimensional-postgres.py
+          python3 scripts/test-quota-v2-lifetime-dimensional-postgres.py -v
+      - name: Lifetime CDN never constrains MAIN on an unlimited subscriber
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-unlimited-main-postgres.py
+          python3 scripts/test-quota-v2-unlimited-main-postgres.py
+      - name: Mixed MAIN/CDN independently prefunded sub-cap under real PostgreSQL concurrency
+        run: |
+          python3 -m py_compile scripts/test-quota-v2-mixed-main-cdn-postgres.py
+          python3 scripts/test-quota-v2-mixed-main-cdn-postgres.py
+      - name: Real global SQL allocator stress - 10, 100 and 500 users, two concurrent Nodes each
+        run: |
+          python3 -m py_compile scripts/benchmark-quota-v2-postgres-allocator.py
+          python3 scripts/benchmark-quota-v2-postgres-allocator.py

@@ -12,14 +12,22 @@ if [[ "$prepare_only" == 0 ]]; then
       echo "Full installation requires root privileges (sudo not found)." >&2
       exit 1
     fi
-    exec sudo --preserve-env=PANEL_DOMAIN,PANEL_ACME_EMAIL bash "$PWD/install.sh" "$@"
+    exec sudo --preserve-env=PANEL_DOMAIN,PANEL_ACME_EMAIL,XSP_V2_PRODUCT_AGENT_PIN bash "$PWD/install.sh" "$@"
   fi
+  XSP_V2_PRODUCT_AGENT_PIN="$(bash scripts/validate-panel-agent-pin.sh)"
+  export XSP_V2_PRODUCT_AGENT_PIN
   bash deploy/install-panel-host.sh deps
 fi
 
 if ! command -v docker >/dev/null 2>&1; then echo "Docker is required. Install Docker Engine and the Compose plugin first." >&2; exit 1; fi
 if ! docker compose version >/dev/null 2>&1; then echo "Docker Compose plugin is required (docker compose)." >&2; exit 1; fi
 if ! command -v openssl >/dev/null 2>&1; then echo "openssl is required to generate secrets." >&2; exit 1; fi
+
+# The operator or verified release configuration supplies the reviewed product identity.
+if [[ -n "${XSP_V2_PRODUCT_AGENT_PIN:-}" && ! "$XSP_V2_PRODUCT_AGENT_PIN" =~ ^[0-9a-f]{40}:[0-9a-f]{64}$ ]]; then
+  echo 'Invalid XSP_V2_PRODUCT_AGENT_PIN; expected source SHA:artifact SHA-256.' >&2
+  exit 1
+fi
 
 created_env=0
 new_dashboard_path="/dashboard/$(openssl rand -hex 24)"
@@ -64,6 +72,17 @@ else
     echo 'Created the private strict-PQ gateway authorization secret.'
   fi
   chmod 600 .env
+fi
+
+if [[ -n "${XSP_V2_PRODUCT_AGENT_PIN:-}" ]]; then
+  stored_agent_pin="$(sed -n 's/^XSP_V2_PRODUCT_AGENT_PIN=//p' .env | tail -n 1)"
+  if [[ -n "$stored_agent_pin" && "$stored_agent_pin" != "$XSP_V2_PRODUCT_AGENT_PIN" ]]; then
+    echo 'Refusing to change the approved Agent identity during installation.' >&2
+    exit 1
+  fi
+  if [[ -z "$stored_agent_pin" ]]; then
+    printf '\nXSP_V2_PRODUCT_AGENT_PIN=%s\n' "$XSP_V2_PRODUCT_AGENT_PIN" >> .env
+  fi
 fi
 
 product_internal_token="$(sed -n 's/^XSP_V2_PRODUCT_INTERNAL_TOKEN=//p' .env | tail -n 1)"

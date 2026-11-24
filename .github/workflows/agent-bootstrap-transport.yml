@@ -19,3 +19,24 @@ jobs:
         run: python3 scripts/test-agent-bootstrap-transport.py --node-root .node-transport-fixture
       - name: Prevent independent Xray restart and reactivation during signed quota revoke
         run: python3 scripts/test-agent-revocation-control.py
+      - name: Reject missing or inconsistent approved Agent identity before full Nexus install
+        run: python3 scripts/test-panel-agent-install-pin.py
+      - name: Verify first-release recovery supervisor with root-owned files and crash retries
+        run: sudo python3 scripts/test-product-agent-upgrade-coordinator.py
+  immutable-release-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: d2e071e4034f834852d422a41d1150da7eb25f13
+          path: .node-release-source
+          persist-credentials: false
+      - name: Reproduce both exact reviewed Agent binaries with digest-pinned Go builder
+        run: |
+          sudo chown -R 0:0 .node-release-source
+          sudo bash scripts/verify-agent-release-pin-build.sh .node-release-source

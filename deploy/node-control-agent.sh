@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.24"
+AGENT_VERSION="control-v6.0.28"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -161,7 +161,7 @@ update_managed_xray(){
   detail='Xray update denied: signed quota revocation pending'
   return 1
  fi
- [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.24"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
+ [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.28"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
  # Only fixed JSON stages and a sanitized final result cross the signed channel.
  # The worker preserves the exact old container until preflight succeeds and
  # validates all actual TLS/GeoData mounts with run -test before switching.
@@ -436,7 +436,17 @@ if [[ "$action" == update_xray ]];then
  if update_managed_xray "$target_version";then success=true;fi
 elif [[ "$action" == update_agent ]];then
  clear_agent_release_identity
- if [[ "$release_version" != - ]];then
+ if [[ "${XMESH_STRICT_PQ_REQUIRED:-0}" == 1 ]];then
+  # The authenticated poll supplies only an immutable manifest identity.
+  # The installed recovery supervisor obtains and verifies a signed XSP/2
+  # plan itself. Never acknowledge a queued strict update through legacy ACK.
+  coordinator=/usr/local/libexec/xmesh-product-upgrade-coordinator.py
+  if [[ "$release_version" != - && -f "$coordinator" && ! -L "$coordinator" ]];then
+   printf '%s' "$reply" | /usr/bin/python3 -c 'import json,sys;print(json.dumps(json.load(sys.stdin)["command"],separators=(",",":")))' | /usr/bin/python3 -I "$coordinator" --fresh receive
+   exit 0
+  fi
+  detail='An approved signed product update is required'
+ elif [[ "$release_version" != - ]];then
   if ! stage_agent_release_identity "$release_version" "$source_revision" "$artifact_sha256";then
    detail='Invalid or unstorable Agent release identity'
   elif run_agent_updater "$release_version" && verify_staged_agent_package "$release_version" "$source_revision" "$artifact_sha256";then

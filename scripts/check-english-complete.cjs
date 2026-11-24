@@ -4,6 +4,8 @@
 const {runtime,candidates}=require('./ci/english-audit.cjs');
 const assert=require('node:assert/strict');
 const api=runtime(),phrases=candidates();const missing=[];
+assert.equal(api.translate("У запущенной сборки Nexus нет подтверждённой ревизии."),"The running Nexus build has no verified revision.");
+assert.equal(api.translate("CDN: режим сброса должен быть lifetime, daily, weekly или monthly."),"CDN: reset period must be lifetime, daily, weekly or monthly.");
 // Exercise real interpolated API copy, not just untranslated source templates.
 assert.equal(api.translate('Например, 123456789'),'For example, 123456789');
 assert.equal(api.translate("Нельзя изменить лимит: квота v2 уже зарезервирована на нодах. Сначала согласуйте расход."), "Cannot change this quota: v2 traffic is reserved on nodes. Reconcile usage first.");

@@ -87,6 +87,16 @@ class SignedNode:
         code,data,_=self.post("/node/desired-config",
             {"node_id":self.id,"quotaProtocolVersion":2,"quotaLocalCounters":[row]},
             send_barrier=send_barrier)
+        if code != 200:
+            # A generic 409 hides which conservative guard intentionally
+            # refused the next epoch; retain a bounded sanitized API error
+            # in disposable CI rather than weakening any SQL protection.
+            reason = (data.get("error",data.get("message","unspecified"))
+                      if isinstance(data,dict) else "non-JSON failure")
+            if not isinstance(reason,str):
+                reason = "unstructured error"
+            print(f"QUOTA V2 DESIRED DENIED: node={self.id} http={code} "
+                  f"reason={reason[:240]!r}",flush=True)
         check(code,200,f"v2 desired-config issued to node {self.id}")
         assert data["policy"]["version"]==2,data
         policy=guard.verify_envelope(data,self.state,self.id,first_contact=True)
@@ -241,7 +251,7 @@ def main():
         # by the correct Ed25519 Node identity, but they are NOT executable
         # attestation or proof that Xray has physically stopped.
         initial_release=fleet()
-        assert initial_release["targetAgentVersion"]=="control-v6.0.24",initial_release
+        assert initial_release["targetAgentVersion"]=="control-v6.0.28",initial_release
         assert initial_release["protocolPreflightPassed"],initial_release
         assert not initial_release["rolloutPreflightPassed"],initial_release
         assert initial_release["agentReleaseCompatibleNodes"]==0,initial_release
@@ -253,7 +263,7 @@ def main():
             check(status,200,f"authenticated Node {node.id} heartbeat for {version}")
             assert data["accepted"] is True,data
         heartbeat(a,"control-v6.0.20")
-        heartbeat(b,"control-v6.0.24")
+        heartbeat(b,"control-v6.0.28")
         obsolete_agent=fleet()
         assert not obsolete_agent["rolloutPreflightPassed"],obsolete_agent
         outdated=next(row for row in obsolete_agent["nodes"] if row["nodeId"]==a.id)
@@ -262,12 +272,12 @@ def main():
         assert obsolete_agent["agentReleaseCompatibleNodes"]==1,obsolete_agent
         # Upgrading an old worker cannot erase evidence of a second stale
         # worker sharing its Node key. Require 15 minutes without v6.0.20.
-        heartbeat(a,"control-v6.0.24")
+        heartbeat(a,"control-v6.0.28")
         mixed=fleet()
         assert mixed["protocolPreflightPassed"] and not mixed["rolloutPreflightPassed"],mixed
         mixed_a=next(row for row in mixed["nodes"] if row["nodeId"]==a.id)
         assert mixed_a["agentBlocker"]=="outdated_agent_seen_recently",mixed
-        assert mixed_a["reportedAgentVersion"]=="control-v6.0.24",mixed
+        assert mixed_a["reportedAgentVersion"]=="control-v6.0.28",mixed
         query("UPDATE quota_v2_authenticated_agent_release_observations "
               "SET last_non_target_at=NOW()-INTERVAL '16 minutes' "
               "WHERE node_id="+str(a.id))
@@ -286,7 +296,7 @@ def main():
                 revision=query("SELECT revision FROM node_desired_revisions WHERE node_id="+str(node.id))
             assert len(revision)==64 and revision.isalnum(),revision
             status,data,_=node.post("/node/heartbeat",{
-                "node_id":node.id,"version":"control-v6.0.24",
+                "node_id":node.id,"version":"control-v6.0.28",
                 "router_running":True,"xray_running":running,
                 "appliedRevision":revision,"profileCheck":profile_check
             })
@@ -387,12 +397,12 @@ def main():
         assert not expired["rolloutPreflightPassed"],expired
         expired_b=next(row for row in expired["nodes"] if row["nodeId"]==b.id)
         assert expired_b["agentBlocker"]=="missing_or_stale_authenticated_agent_heartbeat",expired
-        heartbeat(b,"control-v6.0.24")
+        heartbeat(b,"control-v6.0.28")
         assert fleet()["rolloutPreflightPassed"],fleet()
-        print("PASS: v6.0.24 release preflight needs fresh signed heartbeats and an old-Agent quiet window")
+        print("PASS: v6.0.28 release preflight needs fresh signed heartbeats and an old-Agent quiet window")
         # Re-execute the migration's EXACT seed statement in this disposable
         # database with a pre-existing live Agent heartbeat. The backfill
-        # must conservatively quarantine even an already-correct v6.0.24
+        # must conservatively quarantine even an already-correct v6.0.28
         # report because historical concurrent old workers are unknowable.
         query("DELETE FROM quota_v2_authenticated_agent_release_observations "
               "WHERE node_id="+str(a.id))
@@ -406,7 +416,7 @@ def main():
         migrated=fleet()
         assert not migrated["rolloutPreflightPassed"],migrated
         migrated_a=next(row for row in migrated["nodes"] if row["nodeId"]==a.id)
-        assert migrated_a["reportedAgentVersion"]=="control-v6.0.24",migrated
+        assert migrated_a["reportedAgentVersion"]=="control-v6.0.28",migrated
         assert migrated_a["agentBlocker"]=="outdated_agent_seen_recently",migrated
         query("UPDATE quota_v2_authenticated_agent_release_observations "
               "SET last_non_target_at=NOW()-INTERVAL '16 minutes' "
@@ -663,6 +673,26 @@ def main():
         assert new_a["reservationId"]!=lease_a["reservationId"]
         assert new_a["ceilingBytes"]==new_a["acknowledgedBytes"]==lease_a["ceilingBytes"]
         assert new_b["ceilingBytes"]==new_b["acknowledgedBytes"]==lease_b["ceilingBytes"]
+        # The newly prepared epoch has an inherited absolute meter cursor,
+        # but ZERO new spending authority. Its immutable class must be
+        # recorded before confirmation even when that cursor is nonzero;
+        # otherwise the next ordinary signed Node policy fails with 409.
+        for node, reservation, old_absolute in (
+                (a, new_a, lease_a["ceilingBytes"]),
+                (b, new_b, lease_b["ceilingBytes"])):
+            recorded=query(
+                "SELECT r.node_confirmed::text||'|'||r.ceiling_bytes::text"
+                "||'|'||r.acknowledged_bytes::text||'|'||c.class"
+                " FROM quota_v2_reservations r"
+                " JOIN quota_v2_reservation_classes c"
+                " ON c.reservation_id=r.reservation_id"
+                " WHERE r.reservation_id='"+reservation["reservationId"]+"'"
+                " AND r.node_id="+str(node.id))
+            assert recorded == f"false|{old_absolute}|{old_absolute}|unclassified", recorded
+            assert query(
+                "SELECT count(*)::text FROM quota_v2_signed_first_cap_outbox"
+                " WHERE reservation_id='"+reservation["reservationId"]+"'") == "0"
+        print("PASS: fully settled old absolute meter reopens only as immutable zero-spend, unconfirmed new epoch")
         # Regression: a legacy/interrupted CLOSED epoch can still contain
         # spendable signed capacity even though the current epoch is already
         # zero-grant. Such debt MUST block admin reset, not be silently

@@ -15,6 +15,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "У запущенной сборки Nexus нет подтверждённой ревизии.": "The running Nexus build has no verified revision.",
+    "CDN: режим сброса должен быть lifetime, daily, weekly или monthly.": "CDN: reset period must be lifetime, daily, weekly or monthly.",
     "Нельзя изменить лимит: квота v2 уже зарезервирована на нодах. Сначала согласуйте расход.": "Cannot change this quota: v2 traffic is reserved on nodes. Reconcile usage first.",
     "Смена безлимитного тарифа при квотах v2 требует подтверждения всех нод.": "Switching unlimited plans under quota v2 requires confirmation from all nodes.",
     "Сброс квоты v2 невозможен: на нодах остался неподтверждённый резерв трафика.": "Cannot reset quota v2: some nodes still hold unacknowledged traffic reservations.",
@@ -1664,6 +1666,10 @@ window.XMeshI18n=(()=>{
     'все inbound':'all inbounds',
     'Период квоты LTE':'LTE quota period',
     'Накопительный · без автоматического сброса':'Lifetime · no automatic reset',
+    'Каждые календарные сутки · UTC':'Every calendar day · UTC',
+    'Каждая календарная неделя · UTC':'Every calendar week · UTC',
+    '· текущие сутки':'· current day',
+    '· текущая неделя':'· current week',
     'Каждый календарный месяц · UTC':'Every calendar month · UTC',
     'При выборе месячного режима новый период начинается 1-го числа в 00:00 UTC. Учитываются только подтверждённые приращения счётчиков с момента установки этого обновления.':'In monthly mode, periods begin at 00:00 UTC on the first of each month. Only verified counter increments since this update count.',
     'В одной подписке могут быть безлимитные обычные узлы и отдельные LTE-узлы с квотой пользователя. LTE-узел отмечается на вкладке «Трафик» его настроек; старый выбор inbound ниже сохранён для совместимости.':'One subscription may combine unlimited regular nodes and quota-limited LTE nodes. Mark LTE nodes on the Traffic tab; the legacy global inbound list remains below.',

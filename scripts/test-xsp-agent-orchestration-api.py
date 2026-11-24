@@ -163,31 +163,18 @@ def main():
     assert admin["role"] == "admin"
     admin_cookie = login(ADMIN_USER, ADMIN_PASSWORD)
 
-    # Legacy behavior is deliberately unchanged: ordinary admin mutation rights
-    # can still queue, poll and ACK the historical unbound fixed-version update.
-    code, legacy, _ = request(
-        "POST", f"/nodes/{node_id}/agent-update", {}, cookie=admin_cookie)
-    expect(code, 202, "admin legacy empty Agent update remains unchanged")
-    assert legacy["action"] == "update_agent" and legacy["targetVersion"].startswith("control-v")
-    code, legacy_poll, _ = signed_post(
+    # Fresh releases never queue historical unbound self-updates.
+    # Both roles must fail closed; only the separately qualified, immutable
+    # successor path may accept an empty update request.
+    for cookie, role in ((admin_cookie, "admin"), (owner_cookie, "owner")):
+        code, _, _ = request(
+            "POST", f"/nodes/{node_id}/agent-update", {}, cookie=cookie)
+        expect(code, 409, f"{role} cannot queue unbound Agent update")
+    assert sql(f"SELECT count(*) FROM node_restart_commands WHERE node_id={node_id};") == "0"
+    code, polled, _ = signed_post(
         "/node/restart/poll", {"node_id": node_id}, node_id, keyfile, message_file)
-    expect(code, 200, "signed legacy Agent update poll remains compatible")
-    assert legacy_poll["command"] == {
-        "id": int(legacy["id"]),
-        "action": "update_agent",
-        "targetVersion": legacy["targetVersion"],
-    }, legacy_poll
-    code, _, _ = signed_post(
-        "/node/restart/ack",
-        {"node_id": node_id, "command_id": int(legacy["id"]), "success": True, "detail": "legacy update confirmed"},
-        node_id, keyfile, message_file)
-    expect(code, 200, "legacy Agent ACK remains identity-free")
-    legacy_row = sql(
-        "SELECT action,target_version,COALESCE(release_manifest_id::text,'NULL'),requested_by,state,"
-        "COALESCE(release_ack_version,'NULL') "
-        f"FROM node_restart_commands WHERE id={int(legacy['id'])};"
-    )
-    assert legacy_row == f"update_agent|{legacy['targetVersion']}|NULL|{ADMIN_USER}|succeeded|NULL", legacy_row
+    expect(code, 200, "signed poll remains healthy after rejected unbound update")
+    assert polled["command"] is None, polled
 
     code, _, _ = request(
         "POST", f"/nodes/{node_id}/agent-update",

@@ -437,13 +437,15 @@ pub async fn heartbeat(
     )
     .await?;
     // A self-upgrade can replace its own running worker before its ACK is sent.
-    // A fresh, authenticated heartbeat with the exact requested version is
-    // stronger evidence of success than the lost acknowledgement.
+    // A fresh authenticated version can recover only historical unbound
+    // commands. Bound releases require their exact ACK or signed COMMIT;
+    // even a later successful release must not resurrect an earlier ABORT.
     sqlx::query(
         "UPDATE node_restart_commands AS c SET state='succeeded',
          result='Версия агента подтверждена подписанным heartbeat',
          finished_at=NOW()
          WHERE c.node_id=$1 AND c.action='update_agent'
+           AND c.release_manifest_id IS NULL
            AND c.state IN ('pending','claimed','failed')
            AND c.target_version=$2
            AND c.requested_at <= NOW()
@@ -507,7 +509,7 @@ pub async fn status(
             // authenticated desired-config endpoint. A stale issued record
             // must never make an outdated node look current.
             let (expected, desired_source, compile_error) = if fresh {
-                match compile_node_profile(&state, node_id).await {
+                match compile_node_profile(&state, node_id, NodeProfileMode::Standard).await {
                     Ok(compiled) => (Some(compiled.revision), "current", None),
                     Err(error) => {
                         let reason = profile_compile_error_code(&error);
@@ -1230,8 +1232,8 @@ fn configure_private_xray_stats(config: &mut Value) -> Result<(), ApiError> {
             "XRAY STUDIO profile already defines an API. Remove the conflicting API or use the dedicated node telemetry configuration.",
         ));
     }
-    // Xray StatsService does not accept api.listen. It must be routed via
-    // a private dokodemo-door inbound to an API-tagged outbound.
+    // Retain the routed private StatsService for the existing fleet.
+    // First-genesis candidates use the native listener of the pinned Xray.
     config["api"] = json!({"tag":"xmesh_stats_api","services":["StatsService"]});
     config["stats"] = json!({});
     let inbounds = config
@@ -2111,9 +2113,52 @@ fn configure_node_tls_with_contact(
     })))
 }
 
+#[derive(Clone, Copy)]
+enum NodeProfileMode {
+    Standard,
+    FirstGenesis,
+}
+
+// Instrumented Xray uses a strict admission dispatcher for data-plane
+// connections. Keep StatsService on its own loopback listener so a
+// diagnostic query never depends on data-plane routing or a user grant.
+fn configure_first_genesis_stats(config: &mut Value) -> Result<(), ApiError> {
+    let inbounds = config["inbounds"]
+        .as_array_mut()
+        .ok_or_else(cap_policy_denied)?;
+    let existing = inbounds
+        .iter()
+        .position(|inbound| {
+            inbound["tag"] == "xmesh_stats_in"
+                && inbound["listen"] == "127.0.0.1"
+                && inbound["port"] == 10085
+                && inbound["protocol"] == "dokodemo-door"
+        })
+        .ok_or_else(cap_policy_denied)?;
+    inbounds.remove(existing);
+    let rules = config["routing"]["rules"]
+        .as_array_mut()
+        .ok_or_else(cap_policy_denied)?;
+    let route = rules
+        .iter()
+        .position(|rule| {
+            rule["inboundTag"] == json!(["xmesh_stats_in"])
+                && rule["outboundTag"] == "xmesh_stats_api"
+        })
+        .ok_or_else(cap_policy_denied)?;
+    rules.remove(route);
+    config["api"] = json!({
+        "tag": "xmesh_stats_api",
+        "listen": "127.0.0.1:10085",
+        "services": ["StatsService"],
+    });
+    Ok(())
+}
+
 async fn compile_node_profile(
     state: &AppState,
     node_id: i64,
+    mode: NodeProfileMode,
 ) -> Result<CompiledNodeProfile, ApiError> {
     let node = sqlx::query_scalar::<_, Value>(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
@@ -2178,6 +2223,9 @@ async fn compile_node_profile(
     let inbound_tags = managed_inbound_tags(&config);
     let cdn_tags = crate::cdn_quota::tags_for_node(&settings, &node, &inbound_tags)?;
     provision_proxy_users(&mut config, node_id, &users, &squads, now, &cdn_tags)?;
+    if matches!(mode, NodeProfileMode::FirstGenesis) {
+        configure_first_genesis_stats(&mut config)?;
+    }
     // Keep the source XRAY STUDIO profile immutable: every source node gets
     // its own GeoData assets and its own validated routing/exit graph.
     let nodes = crate::load_records(&state.pool, "nodes").await?;
@@ -2222,7 +2270,481 @@ pub async fn current_compiled_node_profile_revision(
     state: &AppState,
     node_id: i64,
 ) -> Result<String, ApiError> {
-    Ok(compile_node_profile(state, node_id).await?.revision)
+    Ok(
+        compile_node_profile(state, node_id, NodeProfileMode::Standard)
+            .await?
+            .revision,
+    )
+}
+
+/// Candidate config for an isolated first-Genesis process. This is not a
+/// served desired revision, user permission or legacy offline policy.
+pub async fn first_genesis_config_preview(
+    state: &AppState,
+    node_id: i64,
+) -> Result<Value, ApiError> {
+    let compiled = compile_node_profile(state, node_id, NodeProfileMode::FirstGenesis).await?;
+    if compiled.tls_provision.is_some() || compiled.geo_data.is_some() {
+        return Err(cap_policy_denied());
+    }
+    let inbounds = compiled.config["inbounds"]
+        .as_array()
+        .ok_or_else(cap_policy_denied)?;
+    if inbounds.iter().any(|inbound| {
+        let protocol = inbound["protocol"].as_str();
+        let tag = inbound["tag"].as_str();
+        !matches!(
+            (protocol, tag),
+            (Some("vless"), Some("vless-main" | "vless-cdn"))
+        )
+    }) {
+        return Err(cap_policy_denied());
+    }
+    Ok(json!({
+        "profileId":compiled.profile_id,
+        "port":compiled.port,
+        "config":compiled.config,
+        "configSha256":compiled.revision,
+    }))
+}
+
+/// Read-only, zero-authority derivation of the EXACT VLESS MAIN/CDN scope
+/// from the authoritative XRAY STUDIO compilation and the first signed,
+/// immutable quarantine policy. Never accept aliases supplied by the Node.
+#[derive(Clone, Debug)]
+pub struct FirstGenesisCapAlias {
+    pub email: String,
+    pub class: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct FirstGenesisCapPolicyScope {
+    pub policy_sha256: String,
+    pub profile_revision: String,
+    pub aliases: Vec<FirstGenesisCapAlias>,
+}
+
+impl FirstGenesisCapPolicyScope {
+    pub fn inbound_class(&self) -> &'static str {
+        if self.aliases.iter().all(|alias| alias.class == "cdn") {
+            "cdn"
+        } else if self.aliases.iter().all(|alias| alias.class == "main") {
+            "main"
+        } else {
+            "mixed"
+        }
+    }
+}
+
+fn cap_policy_denied() -> ApiError {
+    ApiError::new(
+        StatusCode::CONFLICT,
+        "Original first-genesis signed Xray policy or user scope unavailable.",
+    )
+}
+
+fn first_genesis_cap_aliases(
+    config: &Value,
+    policy: &Value,
+    user_id: i64,
+) -> Result<Vec<FirstGenesisCapAlias>, ApiError> {
+    if user_id <= 0
+        || policy.get("kind").and_then(Value::as_str)
+            != Some("xmesh.quota-v2.genesis-quarantine-policy")
+        || policy["quotaV2Genesis"]["mode"] != "quarantined"
+        || policy["quotaV2Genesis"]["authorizedBytes"] != 0
+        || policy["quotaV2Genesis"]["canStart"] != false
+        || policy["quotaV2Genesis"]["canResume"] != false
+    {
+        return Err(cap_policy_denied());
+    }
+    let users = policy["users"].as_array().ok_or_else(cap_policy_denied)?;
+    let matching: Vec<&Value> = users
+        .iter()
+        .filter(|u| u.get("userId").and_then(Value::as_i64) == Some(user_id))
+        .collect();
+    if matching.len() != 1
+        || matching[0]["onHold"] != true
+        || matching[0]["offlineBudgetBytes"] != 0
+    {
+        return Err(cap_policy_denied());
+    }
+    let original_id = matching[0]["xrayId"]
+        .as_str()
+        .filter(|s| uuid::Uuid::parse_str(s).is_ok())
+        .ok_or_else(cap_policy_denied)?;
+    let inbounds = config["inbounds"]
+        .as_array()
+        .ok_or_else(cap_policy_denied)?;
+    let prefix = format!("xmesh-u{user_id}--");
+    let mut aliases = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for inbound in inbounds {
+        let protocol = inbound["protocol"].as_str().unwrap_or("");
+        let tag = inbound["tag"].as_str().unwrap_or("");
+        if protocol != "vless" && (protocol != "dokodemo-door" || tag != "xmesh_stats_in") {
+            return Err(cap_policy_denied());
+        }
+        let clients = inbound["settings"]["clients"].as_array();
+        if let Some(clients) = clients {
+            for client in clients {
+                let email = client["email"].as_str().unwrap_or("");
+                let id = client["id"].as_str().unwrap_or("");
+                if !email.starts_with(&prefix) && id != original_id {
+                    continue;
+                }
+                // Fail closed on ANY user alias outside exactly one VLESS
+                // MAIN/CDN tagged inbound. This prevents a second unmetered
+                // path with the same Xray ID or user email.
+                let class = match tag {
+                    "vless-main" => "main",
+                    "vless-cdn" => "cdn",
+                    _ => return Err(cap_policy_denied()),
+                };
+                if protocol != "vless"
+                    || email != format!("{prefix}{tag}")
+                    || id != original_id
+                    || !seen.insert(email.to_owned())
+                {
+                    return Err(cap_policy_denied());
+                }
+                aliases.push(FirstGenesisCapAlias {
+                    email: email.to_owned(),
+                    class: class.to_owned(),
+                });
+            }
+        }
+    }
+    if aliases.is_empty() || aliases.len() > 16 {
+        return Err(cap_policy_denied());
+    }
+    aliases.sort_by(|a, b| a.email.cmp(&b.email));
+    Ok(aliases)
+}
+
+// Lifetime per-Node reservations are independently bounded by the
+// immutable PostgreSQL baseline and ALL historical issued ceilings.
+// Calendar Node quotas require the explicit staging allocator. CDN periods
+// retain their separate lifetime-only admission path.
+pub fn first_genesis_rehearsal_limits_supported(user: &Value, node_id: i64, has_cdn: bool) -> bool {
+    if !crate::node_user_quotas::rule_for(user, node_id).is_ok_and(|rule| {
+        rule.is_none_or(|limit| {
+            limit.period == "lifetime" || crate::quota_v2_node_lifetime::calendar_enabled()
+        })
+    }) {
+        return false;
+    }
+    if has_cdn && crate::quota_v2_cdn_lifetime::limit(user).is_err() {
+        return false;
+    }
+    crate::quota_v2::authoritative_shared_limit(user).is_ok()
+}
+
+/// A spending-only first cap must never start a waiting subscription or
+/// remain valid past the authoritative subscriber expiry. No finality,
+/// renewal, or hold-activation protocol exists in this rehearsal.
+pub fn first_genesis_active_until(user: &Value, now_ms: i64, until_ms: i64) -> bool {
+    if until_ms <= now_ms || crate::user_status(user, now_ms) != "ACTIVE" {
+        return false;
+    }
+    user.get("expireAt").is_none_or(|value| {
+        value
+            .as_i64()
+            .is_some_and(|expiry| expiry == 0 || expiry >= until_ms)
+    })
+}
+
+#[cfg(test)]
+mod first_genesis_rehearsal_limit_tests {
+    use super::{
+        first_genesis_active_until, first_genesis_rehearsal_limits_supported as supported,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn spending_only_cap_never_starts_waiting_or_outlives_subscription() {
+        let now = 1_800_000_000_000_i64;
+        let end = now + 3_600_000;
+        assert!(first_genesis_active_until(&json!({"limit":2}), now, end));
+        assert!(first_genesis_active_until(
+            &json!({"limit":2,"expireAt":end}),
+            now,
+            end
+        ));
+        for user in [
+            json!({"limit":2,"hold":true,"holdDays":30}),
+            json!({"limit":2,"disabled":true}),
+            json!({"limit":2,"used":2}),
+            json!({"limit":2,"expireAt":end-1}),
+            json!({"limit":2,"expireAt":"invalid"}),
+            json!({"limit":2,"expireAt":-1}),
+        ] {
+            assert!(!first_genesis_active_until(&user, now, end));
+        }
+        assert!(!first_genesis_active_until(&json!({"limit":2}), now, now));
+    }
+
+    #[test]
+    fn independent_quotas_are_not_global_bootstrap_bytes() {
+        assert!(supported(&json!({"limit":0.001_572_864}), 47, true));
+        assert!(supported(&json!({"limit":0}), 47, false));
+        assert!(supported(&json!({"limit":0,"cdnLimitGb":1}), 47, true));
+        assert!(supported(&json!({"limit":0,"cdnLimitGb":0.05}), 47, false));
+        assert!(!supported(&json!({"limit":-1}), 47, false));
+        for period in ["daily", "weekly", "monthly", "lifetime"] {
+            let limited = json!({"limit":2,
+                "nodeTrafficLimits":{"47":{"limitGb":0.000_000_001,"period":period}}});
+            assert_eq!(supported(&limited, 47, false), period == "lifetime");
+            assert_eq!(supported(&limited, 47, true), period == "lifetime");
+            assert!(supported(&limited, 48, false));
+        }
+        for malformed in [json!(null), json!([]), json!({"47":{"limitGb":0}})] {
+            assert!(!supported(
+                &json!({"limit":2,"nodeTrafficLimits":malformed}),
+                47,
+                false
+            ));
+        }
+        for cap in [json!(0.000_000_001), json!(1)] {
+            let limited = json!({"limit":2,"cdnLimitGb":cap});
+            assert!(supported(&limited, 47, true));
+            // A positive CDN cap requires a verified inbound classification.
+            // Mixed grants have their own pre-funded CDN sub-ceiling.
+            assert!(crate::quota_v2_cdn_lifetime::supported(&limited, "cdn"));
+            assert!(crate::quota_v2_cdn_lifetime::supported(&limited, "mixed"));
+            assert!(!crate::quota_v2_cdn_lifetime::supported(
+                &limited,
+                "unclassified"
+            ));
+            assert!(supported(&limited, 47, false));
+        }
+        for cap in [json!("1"), json!(null), json!(-1)] {
+            let limited = json!({"limit":2,"cdnLimitGb":cap});
+            assert!(!supported(&limited, 47, true));
+        }
+        assert!(supported(&json!({"limit":2,"cdnLimitGb":0}), 47, true));
+    }
+}
+
+/// Future issuer prerequisite, NOT positive authority. Refuses profile
+/// changes, policy key rotation, invalid original signatures and unknown
+/// users instead of building synthetic xmesh-u101 test aliases.
+/// Caller must separately establish strict XSP/2, live kernel runtime,
+/// signed complete WAL and a conserved SQL lease before signing bytes.
+pub async fn original_first_genesis_cap_scope(
+    state: &AppState,
+    node_id: i64,
+    user_id: i64,
+) -> Result<FirstGenesisCapPolicyScope, ApiError> {
+    signed_first_genesis_scope(state, node_id, user_id, true).await
+}
+
+pub async fn signed_first_genesis_scope(
+    state: &AppState,
+    node_id: i64,
+    user_id: i64,
+    first_issuance: bool,
+) -> Result<FirstGenesisCapPolicyScope, ApiError> {
+    if node_id <= 0 || user_id <= 0 {
+        return Err(cap_policy_denied());
+    }
+    let original = sqlx::query(
+        "SELECT signed_policy_bytes,policy_signature,policy_sha256,
+                profile_revision,signer_public_key,
+                prepared_ms
+         FROM quota_v2_genesis_quarantine_policies
+         WHERE node_id=$1",
+    )
+    .bind(node_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(cap_policy_denied)?;
+    let signed: Vec<u8> = original.try_get("signed_policy_bytes")?;
+    let sig: String = original.try_get("policy_signature")?;
+    let sha: String = original.try_get("policy_sha256")?;
+    let revision: String = original.try_get("profile_revision")?;
+    let pubkey: String = original.try_get("signer_public_key")?;
+    let prepared_ms: i64 = original.try_get("prepared_ms")?;
+    let now_ms: i64 =
+        sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::bigint")
+            .fetch_one(&state.pool)
+            .await?;
+    if now_ms < prepared_ms
+        || (first_issuance && now_ms >= prepared_ms.saturating_add(120_000))
+        || hex::encode(sha2::Sha256::digest(&signed)) != sha
+        || pubkey != state.node_policy_signer.public_key()
+    {
+        return Err(cap_policy_denied());
+    }
+    let policy: Value = serde_json::from_slice(&signed).map_err(|_| cap_policy_denied())?;
+    if serde_json::to_vec(&policy).map_err(|_| cap_policy_denied())? != signed
+        || state
+            .node_policy_signer
+            .sign(&policy)
+            .map_err(|_| cap_policy_denied())?
+            != sig
+    {
+        return Err(cap_policy_denied());
+    }
+    // This compiler uses real Node/profile/squad/user assignments, not the
+    // preflight's caller-provided aliases. Any concurrent edit changing the
+    // signed profile digest blocks first-genesis issuance.
+    let compiled = compile_node_profile(state, node_id, NodeProfileMode::FirstGenesis).await?;
+    if compiled.revision != revision
+        || policy["configSha256"] != revision
+        || policy["nodeId"] != node_id
+    {
+        return Err(cap_policy_denied());
+    }
+    let aliases = first_genesis_cap_aliases(&compiled.config, &policy, user_id)?;
+    // The real CDN classification is derived from settings + Node policy,
+    // never from an alias's spelling. First-genesis supports only the
+    // explicit names used by the measured Xray, and rejects a mismatch.
+    let node: Value =
+        sqlx::query_scalar("SELECT data FROM panel_records WHERE collection='nodes' AND id=$1")
+            .bind(node_id)
+            .fetch_one(&state.pool)
+            .await?;
+    let settings = crate::read_settings(&state.pool).await?;
+    let cdn_tags =
+        crate::cdn_quota::tags_for_node(&settings, &node, &managed_inbound_tags(&compiled.config))?;
+    for alias in &aliases {
+        let tag = alias
+            .email
+            .split_once("--")
+            .ok_or_else(cap_policy_denied)?
+            .1;
+        if cdn_tags.contains(tag) != (alias.class == "cdn") {
+            return Err(cap_policy_denied());
+        }
+    }
+    let current_user = compiled
+        .users
+        .iter()
+        .find(|user| user["id"].as_i64() == Some(user_id))
+        .ok_or_else(cap_policy_denied)?;
+    let class = if aliases.iter().all(|a| a.class == "cdn") {
+        "cdn"
+    } else if aliases.iter().all(|a| a.class == "main") {
+        "main"
+    } else {
+        "mixed"
+    };
+    if !crate::quota_v2_cdn_lifetime::supported(current_user, class) {
+        return Err(cap_policy_denied());
+    }
+    if !first_genesis_rehearsal_limits_supported(
+        current_user,
+        node_id,
+        aliases.iter().any(|a| a.class == "cdn"),
+    ) || !first_genesis_active_until(
+        current_user,
+        now_ms,
+        now_ms.saturating_add(if first_issuance { 3_600_000 } else { 1 }),
+    ) {
+        return Err(cap_policy_denied());
+    }
+    Ok(FirstGenesisCapPolicyScope {
+        policy_sha256: sha,
+        profile_revision: revision,
+        aliases,
+    })
+}
+
+#[cfg(test)]
+mod first_genesis_cap_scope_tests {
+    use super::*;
+
+    fn test_config() -> (Value, Value) {
+        let id = "11111111-1111-4111-8111-111111111111";
+        (
+            json!({"inbounds":[
+                {"tag":"vless-main","protocol":"vless","settings":{"clients":[
+                    {"email":"xmesh-u19--vless-main","id":id}
+                ]}},
+                {"tag":"vless-cdn","protocol":"vless","settings":{"clients":[
+                    {"email":"xmesh-u19--vless-cdn","id":id}
+                ]}}
+            ]}),
+            json!({"kind":"xmesh.quota-v2.genesis-quarantine-policy",
+                "users":[{"userId":19,"xrayId":id,"onHold":true,
+                          "offlineBudgetBytes":0}],
+                "quotaV2Genesis":{"mode":"quarantined","authorizedBytes":0,
+                                  "canStart":false,"canResume":false}}),
+        )
+    }
+
+    #[test]
+    fn quarantine_stats_listener_is_private_and_does_not_use_data_routing() {
+        let (mut config, policy) = test_config();
+        let route = json!({"type":"field","inboundTag":["vless-main"],"outboundTag":"direct"});
+        config["routing"] = json!({"rules":[route]});
+        configure_private_xray_stats(&mut config).unwrap();
+        let legacy = config.clone();
+        configure_first_genesis_stats(&mut config).unwrap();
+
+        assert_eq!(legacy["inbounds"].as_array().unwrap().len(), 3);
+        assert!(legacy["api"]["listen"].is_null());
+        assert_eq!(config["api"]["listen"], "127.0.0.1:10085");
+        assert_eq!(config["api"]["services"], json!(["StatsService"]));
+        assert_eq!(config["routing"]["rules"], json!([route]));
+        assert_eq!(config["inbounds"].as_array().unwrap().len(), 2);
+        assert_eq!(config["policy"]["levels"]["0"]["statsUserUplink"], true);
+        assert_eq!(config["policy"]["levels"]["0"]["statsUserDownlink"], true);
+        assert_eq!(
+            first_genesis_cap_aliases(&config, &policy, 19)
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn derive_exact_sorted_authoritative_scope() {
+        let (config, policy) = test_config();
+        let scopes = first_genesis_cap_aliases(&config, &policy, 19).unwrap();
+        assert_eq!(scopes.len(), 2);
+        assert_eq!(scopes[0].class, "cdn");
+        assert_eq!(scopes[1].class, "main");
+        assert_eq!(scopes[0].email, "xmesh-u19--vless-cdn");
+    }
+
+    #[test]
+    fn refuse_foreign_unmetered_duplicate_or_cross_user_scope() {
+        let (config, policy) = test_config();
+        assert!(first_genesis_cap_aliases(&config, &policy, 20).is_err());
+        for attack in 0..8 {
+            let mut config = config.clone();
+            let mut policy = policy.clone();
+            match attack {
+                0 => config["inbounds"][0]["protocol"] = json!("trojan"),
+                1 => config["inbounds"][0]["tag"] = json!("custom-unmetered"),
+                2 => {
+                    config["inbounds"][1]["settings"]["clients"][0]["id"] =
+                        json!("22222222-2222-4222-8222-222222222222");
+                }
+                3 => {
+                    config["inbounds"][1]["settings"]["clients"][0]["email"] =
+                        json!("xmesh-u20--vless-cdn");
+                }
+                4 => {
+                    let copied = config["inbounds"][0]["settings"]["clients"][0].clone();
+                    config["inbounds"][0]["settings"]["clients"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(copied);
+                }
+                5 => policy["users"][0]["onHold"] = json!(false),
+                6 => policy["users"][0]["offlineBudgetBytes"] = json!(1),
+                7 => policy["users"][0]["xrayId"] = json!("33333333-3333-4333-8333-333333333333"),
+                _ => unreachable!(),
+            }
+            assert!(
+                first_genesis_cap_aliases(&config, &policy, 19).is_err(),
+                "attack {attack} must not be granted a signed scope"
+            );
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -2233,17 +2755,75 @@ struct DesiredConfigRequest {
     quota_protocol_version: Option<u8>,
     #[serde(default, alias = "quotaLocalCounters")]
     quota_local_counters: Option<Vec<crate::quota_v2::LocalQuotaCounter>>,
+    #[serde(default, alias = "quotaGenesisQuarantine")]
+    quota_genesis_quarantine: bool,
+    #[serde(default, alias = "quotaGenesisRuntimeId")]
+    quota_genesis_runtime_id: Option<String>,
+    #[serde(default, alias = "quotaGenesisChallenge")]
+    quota_genesis_challenge: Option<String>,
+}
+
+/// This is only a sealed policy candidate for an already prepared, first-ever
+/// Xray. It cannot authorize legacy offline spending or open public ingress.
+/// The signed policy may later be compared with independent Xray measurements,
+/// but its existence is NOT an admission or a complete WAL witness.
+fn quarantine_first_genesis_policy(
+    policy: &mut Value,
+    prepared: &crate::quota_xray_genesis::QuarantinePrepared,
+    runtime: &str,
+    challenge: &str,
+) -> Result<(), ApiError> {
+    let users = policy
+        .get_mut("users")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| {
+            ApiError::new(StatusCode::CONFLICT, "Invalid first-genesis policy users.")
+        })?;
+    for user in users {
+        let object = user.as_object_mut().ok_or_else(|| {
+            ApiError::new(StatusCode::CONFLICT, "Invalid user policy in quarantine.")
+        })?;
+        object.insert("offlineBudgetBytes".to_owned(), json!(0));
+        object.insert("onHold".to_owned(), json!(true));
+    }
+    let record = policy
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid first-genesis policy."))?;
+    record.insert(
+        "kind".to_owned(),
+        json!("xmesh.quota-v2.genesis-quarantine-policy"),
+    );
+    record.insert("issuedAtMs".to_owned(), json!(prepared.prepared_ms));
+    record.insert(
+        "validUntilMs".to_owned(),
+        json!(prepared.prepared_ms.saturating_add(120_000)),
+    );
+    record.insert(
+        "quotaV2Genesis".to_owned(),
+        json!({
+            "mode":"quarantined",
+            "runtimeId":runtime,"challenge":challenge,
+            "firstActivationReceiptSha256":prepared.activation_sha256,
+            "authorizedBytes":0,"canStart":false,"canResume":false,
+            "refundableBytes":0
+        }),
+    );
+    Ok(())
 }
 
 /// Authenticated, outbound-only desired Xray configuration retrieval.
 /// The node signs the request with its registered Ed25519 identity.
 /// Inbounds are bound to loopback so the edge router alone owns public TCP ports.
-async fn apply_quota_v2_if_enabled(
+async fn prepare_policy_issuance(
     state: &AppState,
     request: &DesiredConfigRequest,
     policy: &mut Value,
     now_ms: i64,
 ) -> Result<(), ApiError> {
+    if crate::quota_v2::enabled() {
+        crate::quota_v2::require_issuance_open()?;
+    }
+    crate::quota_xray_genesis::close_for_policy(&state.pool, request.node_id).await?;
     if crate::quota_v2::enabled() {
         crate::quota_v2::issue(
             &state.pool,
@@ -2318,6 +2898,20 @@ pub async fn desired_config(
             "Quota-v2 requires an upgraded node agent.",
         ));
     }
+    if request.quota_genesis_quarantine && request.quota_protocol_version != Some(2) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "First-genesis quarantine requires quota protocol v2.",
+        ));
+    }
+    if !request.quota_genesis_quarantine
+        && (request.quota_genesis_runtime_id.is_some() || request.quota_genesis_challenge.is_some())
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Unexpected Xray genesis fields on the normal policy path.",
+        ));
+    }
     reject_legacy_policy_after_v2_issuance(&state.pool).await?;
     // Enrollment precedes profile authoring. Authenticated nodes without a
     // profile receive a non-successful-to-apply but healthy pending response.
@@ -2345,6 +2939,59 @@ pub async fn desired_config(
             })),
         ));
     }
+    let compiled = compile_node_profile(
+        &state,
+        request.node_id,
+        if request.quota_genesis_quarantine {
+            NodeProfileMode::FirstGenesis
+        } else {
+            NodeProfileMode::Standard
+        },
+    )
+    .await?;
+    serve_compiled_policy(&state, &headers, &request, compiled).await
+}
+
+async fn prepared_policy_scope<'a>(
+    state: &AppState,
+    headers: &HeaderMap,
+    request: &'a DesiredConfigRequest,
+) -> Result<
+    Option<(
+        crate::quota_xray_genesis::QuarantinePrepared,
+        &'a str,
+        &'a str,
+    )>,
+    ApiError,
+> {
+    if !request.quota_genesis_quarantine {
+        return Ok(None);
+    }
+    let runtime = request
+        .quota_genesis_runtime_id
+        .as_deref()
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Missing prepared Xray runtime."))?;
+    let challenge = request
+        .quota_genesis_challenge
+        .as_deref()
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Missing genesis challenge."))?;
+    let prepared = crate::quota_xray_genesis::quarantine_prepared(
+        state,
+        headers,
+        request.node_id,
+        runtime,
+        challenge,
+    )
+    .await?;
+    Ok(Some((prepared, runtime, challenge)))
+}
+
+async fn serve_compiled_policy(
+    state: &AppState,
+    headers: &HeaderMap,
+    request: &DesiredConfigRequest,
+    compiled: CompiledNodeProfile,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
     let CompiledNodeProfile {
         profile_id,
         port,
@@ -2355,16 +3002,61 @@ pub async fn desired_config(
         now_ms: now,
         active_nodes,
         revision: digest,
-    } = compile_node_profile(&state, request.node_id).await?;
-    let mut policy =
-        build_offline_policy(&config, &users, request.node_id, now, &digest, active_nodes);
-    apply_quota_v2_if_enabled(&state, &request, &mut policy, now).await?;
+    } = compiled;
+    let quarantined = prepared_policy_scope(state, headers, request).await?;
+    let policy_time = quarantined
+        .as_ref()
+        .map_or(now, |(prepared, _, _)| prepared.prepared_ms);
+    let mut policy = build_offline_policy(
+        &config,
+        &users,
+        request.node_id,
+        policy_time,
+        &digest,
+        active_nodes,
+    );
+    if let Some((prepared, runtime, challenge)) = &quarantined {
+        quarantine_first_genesis_policy(&mut policy, prepared, runtime, challenge)?;
+    } else {
+        // The existing desired-config path remains unchanged and marks the
+        // Node's first-genesis eligibility as permanently consumed.
+        prepare_policy_issuance(state, request, &mut policy, now).await?;
+    }
     if let Some(tls) = tls_provision {
         policy["tlsProvision"] = tls;
     }
     // Metadata is covered by the existing Ed25519 node-policy signature.
     if let Some(manifest) = geo_data {
         policy["geoData"] = manifest;
+    }
+    if let Some((prepared, runtime, challenge)) = quarantined {
+        let signed = crate::quota_xray_genesis::stage_quarantine_policy(
+            state,
+            request.node_id,
+            &prepared,
+            runtime,
+            challenge,
+            &digest,
+            &policy,
+        )
+        .await?;
+        // Crucially DO NOT write node_desired_revisions or call
+        // close_for_policy: both permanently end first-genesis eligibility.
+        // The response uses a separate status and exposes no positive cap.
+        return Ok((
+            StatusCode::OK,
+            Json(json!({
+                "status":"quarantined",
+                "nodeId":request.node_id,"profileId":profile_id,
+                "listen":"127.0.0.1","port":port,"revision":digest,
+                "config":config,"policy":signed.policy,
+                "policySignature":signed.signature,
+                "policyPublicKey":state.node_policy_signer.public_key(),
+                "policySha256":signed.sha256,
+                "publicIngressAllowed":false,"canStart":false,
+                "canResume":false,"authorizedBytes":0
+            })),
+        ));
     }
     let signature = state.node_policy_signer.sign(&policy).map_err(|_| {
         ApiError::new(
@@ -2396,6 +3088,45 @@ pub async fn desired_config(
 #[cfg(test)]
 mod provision_tests {
     use super::*;
+    #[test]
+    fn quarantined_policy_cannot_issue_legacy_spend_or_extend_genesis() {
+        let prepared = crate::quota_xray_genesis::QuarantinePrepared {
+            prepared_ms: 1_800_000_000_000,
+            activation_sha256: "c".repeat(64),
+        };
+        let mut original = json!({
+            "version":1,"nodeId":47,"configSha256":"d".repeat(64),
+            "issuedAtMs":1_800_000_000_999_i64,
+            "validUntilMs":1_900_000_000_000_i64,
+            "users":[
+                {"userId":1,"offlineBudgetBytes":null,"onHold":false},
+                {"userId":2,"offlineBudgetBytes":67_108_864,"onHold":false}
+            ]
+        });
+        quarantine_first_genesis_policy(&mut original, &prepared, &"a".repeat(64), &"b".repeat(64))
+            .unwrap();
+        assert_eq!(original["kind"], "xmesh.quota-v2.genesis-quarantine-policy");
+        assert_eq!(original["issuedAtMs"], prepared.prepared_ms);
+        assert_eq!(original["validUntilMs"], prepared.prepared_ms + 120_000);
+        assert_eq!(original["quotaV2Genesis"]["authorizedBytes"], 0);
+        assert_eq!(original["quotaV2Genesis"]["canStart"], false);
+        assert_eq!(original["quotaV2Genesis"]["canResume"], false);
+        for user in original["users"].as_array().unwrap() {
+            assert_eq!(user["offlineBudgetBytes"], 0);
+            assert_eq!(user["onHold"], true);
+        }
+        let mut broken = json!({"users":[1]});
+        assert!(
+            quarantine_first_genesis_policy(
+                &mut broken,
+                &prepared,
+                &"a".repeat(64),
+                &"b".repeat(64)
+            )
+            .is_err()
+        );
+    }
+
     #[test]
     fn profile_assignment_is_optional_until_provisioning() {
         for node in [

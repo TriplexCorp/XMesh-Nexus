@@ -1,0 +1,48 @@
+name: Quota V2 genuine Nexus PolicySigner first-genesis contract (disposable)
+on:
+  pull_request:
+    paths:
+      - 'backend/src/quota_v2_cap_signing.rs'
+      - 'backend/src/node_runtime_legacy.rs'
+      - 'backend/src/quota_v2_genesis_reservation.rs'
+      - 'backend/src/quota_v2_policy_pin.rs'
+      - 'deploy/xsp-v2-product-gateway/main.go'
+      - 'backend/src/quota_xray_genesis.rs'
+      - 'backend/src/bin/quota_v2_ci_signed_cap.rs'
+      - 'backend/Cargo.toml'
+      - 'backend/src/main.rs'
+      - '.github/workflows/quota-v2-policy-signer-contract.yml'
+permissions:
+  contents: read
+jobs:
+  signed-first-genesis:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify committed Rust formatting
+        run: |
+          rustup component add rustfmt
+          cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+      - name: Nexus Ed25519 domain and fail-closed grant invariants
+        run: |
+          cargo test --manifest-path backend/Cargo.toml quota_v2_cap_signing -- --nocapture
+      - name: Ensure quarantined Node policy cannot issue legacy offline allowances
+        run: |
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- quarantined_policy_cannot_issue_legacy_spend_or_extend_genesis
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- policy_key_discovery_is_strictly_gated_and_never_admits
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- first_genesis_cap_scope_tests
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- first_genesis_rehearsal_limit_tests
+          cargo test --manifest-path backend/Cargo.toml --bin xmesh-api -- quota_v2_genesis_reservation::tests
+      - name: Build opt-in disposable SQL signer, NOT the shipping API
+        run: |
+          cargo build --manifest-path backend/Cargo.toml \
+            --features quota-v2-disposable-cap-issuer --bin quota-v2-ci-signed-cap
+      - name: Run strict Clippy on the disposable signer
+        run: |
+          rustup component add clippy
+          cargo clippy --manifest-path backend/Cargo.toml \
+            --features quota-v2-disposable-cap-issuer --bin quota-v2-ci-signed-cap -- \
+            -D warnings -D clippy::pedantic -D clippy::nursery -F unsafe-code

@@ -1,0 +1,547 @@
+"""Hosted E2E with installed Agent, strict XSP/2 and genuine Nexus receipts."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import secrets
+import signal
+import subprocess
+import time
+from urllib.error import URLError
+from urllib.request import urlopen
+
+from quota_v2_installed_genesis_lease import (
+    CAP_DOMAIN, CAP_PATH, GENESIS_DOMAIN, MEASURED, STATE, independent_signature, parallel,
+)
+
+WORK = MEASURED + "/generations-ci"
+RENEW = "xmesh-quota-v2-renewal"
+INGRESS = "xmesh-quota-v2-ingress"
+FAULT_STATE = "/run/xmesh-quota-v2-faults"
+FAULT_POINTS = (
+    "wal-request-durable", "wal-response-unrecorded", "before-calendar-fence",
+    "calendar-fence-unrecorded", "successor-delivery-durable",
+    "successor-ipc-acknowledged", "successor-receipt-durable", "successor-ingress-published",
+)
+
+
+def shorten_disposable_calendar(db, dsn):
+    # All participants still use real time. Only the duration of the daily
+    # calendar in this disposable database changes, before any reservation.
+    assert os.environ.get("GITHUB_ACTIONS") == "true"
+    assert os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+    assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
+    assert dsn.endswith("@127.0.0.1:5432/quota_wal_installed")
+    assert db.execute("SELECT current_database(), current_user").fetchone() == (
+        "quota_wal_installed", "quota_test")
+    assert db.execute("SELECT count(*) FROM quota_v2_reservations").fetchone() == (0,)
+    origin = db.execute(
+        "SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')"
+    ).fetchone()[0]
+    assert re.fullmatch(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d", origin)
+    definition = db.execute(
+        "SELECT pg_get_functiondef('quota_v2_calendar_window(text,timestamptz)'::regprocedure)"
+    ).fetchone()[0]
+    original = "FUNCTION public.quota_v2_calendar_window("
+    assert definition.count(original) == 1
+    db.execute(definition.replace(original, "FUNCTION public.quota_v2_original_calendar_window("))
+    # Preserve the function OID referenced by calendar table constraints.
+
+    db.execute(f"""
+        CREATE OR REPLACE FUNCTION quota_v2_calendar_window(p_period TEXT, p_at TIMESTAMPTZ)
+        RETURNS TSTZRANGE LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
+            SELECT CASE WHEN p_period='daily' THEN
+                tstzrange(bucket, bucket + interval '240 seconds')
+            ELSE quota_v2_original_calendar_window(p_period,p_at) END
+            FROM (SELECT date_bin(interval '240 seconds', p_at, TIMESTAMPTZ '{origin}+00') AS bucket) bounds
+        $$
+    """)
+
+
+def restart_nexus_paused(root, lab, stack):
+    binary = Path(os.environ["XMESH_TEST_NEXUS_BINARY"]).resolve()
+    pid = int(os.environ["XMESH_TEST_NEXUS_PID"])
+    assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
+    assert os.environ["XMESH_TEST_URL"] == "http://127.0.0.1:38081"
+    assert Path(f"/proc/{pid}/exe").resolve(strict=True) == binary
+    os.kill(pid, signal.SIGKILL)
+    lab.wait_for(lambda: not Path(f"/proc/{pid}/exe").exists(),
+                 timeout=10, label="old disposable Nexus stopped")
+    log = stack.enter_context((root / "paused-nexus.log").open("w+"))
+    server = subprocess.Popen([str(binary)], stdout=log, stderr=subprocess.STDOUT,
+                              env={**os.environ, "XMESH_QUOTA_V2_PAUSE_ISSUANCE": "1",
+                                   "XMESH_QUOTA_V2_WAL_TRANSPORT": "1"})
+
+    def stop():
+        if server.poll() is None:
+            server.terminate()
+            try:
+                server.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait(timeout=10)
+
+    stack.callback(stop)
+
+    def ready():
+        if server.poll() is not None:
+            log.seek(0)
+            raise AssertionError(log.read()[-4000:])
+        try:
+            with urlopen(os.environ["XMESH_TEST_URL"] + "/api/v1/health/ready", timeout=2) as response:
+                return response.status == 200
+        except URLError:
+            return False
+
+    lab.wait_for(ready, timeout=25, label="paused Nexus against the same ledger")
+    _, report = lab.Owner(stack).request("GET", "/quota-v2/fleet-readiness", None)
+    assert report["featureEnabled"] is True and report["issuancePaused"] is True, report
+
+
+def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
+    service = RENEW + ".service"
+    main = pair[0]
+    node, uid = main.node, user["id"]
+    crashes = os.environ.get("XMESH_TEST_INSTALLED_CRASHES") == "1"
+    echo = (f"import sys; sys.path.insert(0, {WORK!r}); "
+            "from quota_v2_installed_live_vless import EchoHandler,EchoServer; "
+            "EchoServer(('127.0.0.1',28421),EchoHandler).serve_forever()")
+
+    def start_echo(guest, generation, pid):
+        assert guest.exec("readlink", f"/proc/{pid}/ns/net") != guest.exec("readlink", "/proc/1/ns/net")
+        guest.exec("systemd-run", "--collect", f"--unit=xmesh-ci-echo-{generation}",
+                   "/usr/bin/nsenter", f"--net=/proc/{pid}/ns/net", "--",
+                   "/usr/bin/python3", "-c", echo)
+        lab.wait_for(lambda: b":28421" in guest.exec("nsenter", f"--net=/proc/{pid}/ns/net",
+                                                    "--", "ss", "-ltn"),
+                     timeout=12, label=f"echo target in generation {generation} namespace")
+
+    def read_when_present(guest, path):
+        raw = guest.exec("sh", "-c", 'if test -f "$1"; then cat "$1"; fi', "sh", path)
+        return json.loads(raw) if raw else None
+
+    def enable(guest):
+        guest.exec("install", "-d", "-m", "0700", WORK)
+        guest.exec("chown", "root:root", MEASURED + "/xray-client")
+        guest.exec("install", "-m", "0600", "/dev/null", "/etc/xmesh-quota-v2-staging")
+        guest.exec("sh", "-ec", "umask 077; printf '%s\\n' "
+                   "GITHUB_ACTIONS=true XMESH_QUOTA_V2_INGRESS_STAGING=1 "
+                   "XMESH_QUOTA_V2_MANAGED_GENERATIONS_STAGING=1 "
+                   "> /etc/xmesh-quota-generations-staging.env")
+        guest.exec("install", "-d", f"/etc/systemd/system/{RENEW}.timer.d")
+        guest.exec("sh", "-ec", "printf '[Timer]\\nOnUnitInactiveSec=4s\\nAccuracySec=1s\\n' > "
+                   f"/etc/systemd/system/{RENEW}.timer.d/ci.conf")
+        for filename in ("quota_v2_installed_live_vless.py", "quota_v2_installed_generations_client.py"):
+            lab.docker("cp", Path(__file__).with_name(filename), f"{guest.name}:{WORK}/{filename}")
+        if crashes and guest is main:
+            guest.exec("install", "-d", "-m", "0700", FAULT_STATE, WORK + "/crash-hook")
+            lab.docker("cp", Path(__file__).with_name("quota_v2_installed_generations_faults.py"),
+                       f"{guest.name}:{WORK}/crash-hook/sitecustomize.py")
+            dropin = f"/etc/systemd/system/{service}.d"
+            guest.exec("install", "-d", "-m", "0755", dropin)
+            guest.exec("sh", "-ec",
+                       'printf "%s\n" "[Service]" "Environment=XMESH_QUOTA_TEST_CRASH=1" '
+                       '"Environment=PYTHONPATH=$1" > "$2/crash.conf"',
+                       "sh", WORK + "/crash-hook", dropin)
+        guest.exec("systemctl", "daemon-reload")
+        ingress_service = INGRESS + ".service"
+        assert guest.exec("systemctl", "show", ingress_service,
+                          "--property=ProtectSystem", "--value").strip() == b"strict"
+        initial_lock = guest.exec("stat", "-c", "%i:%u:%a", STATE + "/lock").strip()
+        assert initial_lock.endswith(b":0:600"), initial_lock
+        guest.exec("systemctl", "start", ingress_service)
+
+        def listener_pid():
+            pid = int(guest.exec("systemctl", "show", ingress_service,
+                                 "--property=MainPID", "--value"))
+            if not pid:
+                return None
+            sockets = guest.exec("ss", "-Hltnp", "sport", "=", ":28401")
+            return pid if f"pid={pid},".encode() in sockets else None
+
+        pid = lab.wait_for(listener_pid, timeout=25, label=f"clean ingress on Node {guest.node}")
+        options = guest.exec("findmnt", "--task", str(pid), "--target", STATE,
+                             "--noheadings", "--output", "VFS-OPTIONS").decode().strip().split(",")
+        assert "ro" in options, options
+        assert guest.exec("stat", "-c", "%i:%u:%a", STATE + "/lock").strip() == initial_lock
+        print(f"PASS: installed ingress Node {guest.node} bound VLESS with read-only state "
+              "and the original shared lock inode.", flush=True)
+        guest.exec("systemctl", "start", RENEW + ".timer")
+        guest.exec("systemctl", "--no-block", "start", service)
+
+
+    def first(guest, user_id):
+        record = lab.wait_for(
+            lambda: read_when_present(guest, STATE + f"/genesis-positive-cap-u{user_id}.json"),
+            timeout=100, label=f"initial signed grant for Node {guest.node} user {user_id}")
+        signed = json.loads(record["signedEnvelope"])
+        independent_signature(root, f"first-{guest.node}-{user_id}", signed, CAP_DOMAIN)
+        grant = signed["payload"]
+        assert (grant["nodeId"], grant["userId"]) == (guest.node, user_id)
+        (artifact / f"initial-{guest.node}-{user_id}.json").write_bytes(
+            record["signedEnvelope"].encode())
+        return grant
+
+    def ready_route(guest, user_id, grant):
+        def check():
+            route = guest.exec("sh", "-c", 'readlink "$1" || true', "sh",
+                               STATE + f"/ingress-u{user_id}").decode().strip()
+            return re.fullmatch(r"/proc/([1-9][0-9]*)/root/dev/shm/xmesh-" + grant["runtimeId"], route)
+        return int(lab.wait_for(check, timeout=30, label="installed generation ingress").group(1))
+
+    artifact = Path(os.environ["RUNNER_TEMP"]) / "quota-v2-generations-evidence"
+    artifact.mkdir(mode=0o700)
+    (artifact / "nexus-policy.pem").write_bytes(Path(os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"]).read_bytes())
+    process = None
+    try:
+        parallel(enable, pair)
+        initial = first(main, uid)
+        stable = first(main, peer["id"])
+        first(pair[1], uid)
+        first(pair[1], peer["id"])
+        pid = ready_route(main, uid, initial)
+        assert ready_route(main, peer["id"], stable) == pid
+        start_echo(main, 1, pid)
+        if crashes:
+            main.exec("test", "-f", FAULT_STATE + "/loaded")
+            main.exec("touch", WORK + "/check-xray-kill")
+            main.exec("sh", "-ec", 'umask 077; printf "%s %s %s\n" "$1" "$2" "$3" > "$4/armed.next"; mv -f "$4/armed.next" "$4/armed"',
+                      "sh", str(uid), initial["reservationId"], "g2", FAULT_STATE)
+            (root / "drop-wal-response-armed").write_text(initial["reservationId"])
+        main.exec("touch", WORK + "/ready-1")
+        process = subprocess.Popen([
+            "docker", "exec", main.name, "python3", WORK + "/quota_v2_installed_generations_client.py",
+            MEASURED + "/xray-client", user["xrayId"], peer["xrayId"], WORK,
+        ])
+
+        def completed(generation):
+            def done():
+                assert process.poll() in (None, 0), "real VLESS client exited early"
+                return main.exec("sh", "-c", 'test ! -f "$1" || printf done', "sh",
+                                 f"{WORK}/done-{generation}") == b"done"
+            lab.wait_for(done, timeout=35, label=f"live bytes on generation {generation}")
+
+        completed(1)
+        if crashes:
+            reservation = initial["reservationId"]
+
+            def charge_rows(connection):
+                return connection.execute(
+                    "SELECT filename, stream_bytes FROM quota_v2_wal_charges "
+                    "WHERE reservation_id=%s ORDER BY filename, stream_bytes",
+                    (reservation,)).fetchall()
+
+            lab.wait_for((root / "wal-response-held").is_file, timeout=285,
+                         label="XSP/2 gateway holding committed WAL response")
+            committed = charge_rows(db)
+            assert committed and any(row[1] > 0 for row in committed), committed
+            db = lab.restart_postgres(stack, dsn, db)
+            assert charge_rows(db) == committed
+            (root / "drop-wal-response").touch()
+            lab.wait_for((root / "wal-response-dropped").is_file, timeout=3,
+                         label="XSP/2 response discarded after database restart")
+            (artifact / "wal-response-loss.json").write_text(json.dumps({
+                "reservationId": reservation, "xspResponseDroppedBeforeDelivery": True,
+                "committedCharges": committed, "rowsSurvivedRestart": True,
+            }, indent=2))
+        chain = [initial]
+        replay_requests = []
+        for generation in (2, 3):
+            old = chain[-1]
+            predicate = (node, uid, old["reservationId"])
+            row = lab.wait_for(lambda: db.execute(
+                "SELECT reservation_id::text,fresh_runtime_id, signed_envelope, fresh_genesis_envelope "
+                "FROM quota_v2_calendar_successor_positive_caps WHERE node_id=%s AND user_id=%s "
+                "AND predecessor_id=%s", predicate).fetchone(), timeout=340,
+                label=f"Nexus generation {generation} positive outbox")
+            reservation, runtime, raw_cap, raw_genesis = row
+            cap, genesis = json.loads(bytes(raw_cap)), json.loads(bytes(raw_genesis))
+            independent_signature(root, f"gen{generation}-cap", cap, CAP_DOMAIN)
+            independent_signature(root, f"gen{generation}-genesis", genesis, GENESIS_DOMAIN)
+            grant = cap["payload"]
+            assert (grant["nodeId"], grant["userId"]) == (node, uid)
+            assert (grant["runtimeId"], grant["reservationId"]) == (runtime, reservation)
+            for field in ("accountEpoch", "policySha256", "activationReceiptSha256"):
+                assert grant[field] == initial[field]
+            assert genesis["payload"]["candidateRuntimeId"] == runtime
+            assert genesis["payload"]["challenge"] == grant["nonce"]
+            receipt = lab.wait_for(lambda: read_when_present(
+                main, STATE + f"/calendar-positive-u{uid}-{old['reservationId']}.json"),
+                timeout=45, label=f"Xray generation {generation} IPC receipt")
+            assert receipt["response"]["signedEnvelope"].encode() == bytes(raw_cap)
+            assert receipt["response"]["freshGenesisEnvelope"].encode() == bytes(raw_genesis)
+            assert receipt["xrayReceipt"] == {
+                "runtimeId": runtime, "grantSha256": hashlib.sha256(raw_cap).hexdigest(),
+            }
+            proof = read_when_present(main, STATE + f"/calendar-meter-u{uid}-{old['reservationId']}.json")
+            closure = read_when_present(main, STATE + f"/calendar-fence-u{uid}-{old['reservationId']}.json")
+            assert proof is not None and closure is not None
+            fields = ("predecessorId", "freshRuntimeId", "freshContainerId", "freshStartedAt",
+                      "freshHostPid", "freshExecutableSha256", "freshConfigSha256",
+                      "freshWalInventorySha256", "zeroInitialRawCounters", "isolatedNewWalRoot")
+            request = {
+                "nodeId": node, "userId": uid, "requestChallenge": grant["nonce"],
+                "calendarSuccessorPositive": {
+                    **{key: proof[key] for key in fields},
+                    "oldWalChargeHeadsSha256": closure["oldWalChargeConfirmation"]["chargeHeadsSha256"],
+                },
+            }
+            replay_requests.append((request, receipt["response"]))
+            assert main.request(CAP_PATH, request) == (200, receipt["response"])
+            conflict = {**request, "calendarSuccessorPositive": {
+                **request["calendarSuccessorPositive"],
+                "freshHostPid": request["calendarSuccessorPositive"]["freshHostPid"] + 1,
+            }}
+            assert main.request(CAP_PATH, conflict)[0] == 409
+            pid = ready_route(main, uid, grant)
+            # Each funded successor must run the exact measured Xray ELF,
+            # not merely reuse a valid Docker image ID or signed policy.
+            from quota_v2_release_candidate import verify_running_xray
+            successor_container = (f"xmesh-quota-u{uid}-"
+                                   + old["reservationId"].replace("-", ""))
+            verify_running_xray(
+                main, successor_container, os.environ["XMESH_WAL_XRAY_SHA256"])
+            (artifact / f"generation-{generation}.json").write_text(json.dumps({
+                "predecessorReservation": old["reservationId"], "installation": receipt,
+                "routePid": pid, "routeObservedAtMs": time.time_ns() // 1_000_000,
+                "nexusCommit": os.environ["XMESH_INSTALLED_NEXUS_REF"],
+                "nodeCommit": os.environ["XMESH_INSTALLED_NODE_REF"],
+            }, indent=2))
+            assert ready_route(main, peer["id"], stable) != pid
+            start_echo(main, generation, pid)
+            if crashes and generation == 2:
+                # Arm before releasing client bytes into generation 2.
+                # Otherwise its first WAL charge might commit before the
+                # g3 fault marker is visible, silently skipping a crash.
+                main.exec("sh", "-ec",
+                          'umask 077; printf "%s %s %s\\n" "$1" "$2" "$3" > "$4/armed.next"; mv -f "$4/armed.next" "$4/armed"',
+                          "sh", str(uid), grant["reservationId"], "g3", FAULT_STATE)
+            main.exec("touch", f"{WORK}/ready-{generation}")
+            if crashes and generation == 3:
+                lab.wait_for(lambda: main.exec("sh", "-c", 'test ! -f "$1" || printf ready',
+                                              "sh", f"{WORK}/before-pause-3") == b"ready",
+                             timeout=20, label="live A connection to Xray 3 before admissions pause")
+                restart_nexus_paused(root, lab, stack)
+                # Only an exact late reply may still be delivered. The new
+                # valid request reaches the funding boundary and is refused.
+                assert main.request(CAP_PATH, request) == (200, receipt["response"])
+                peer_pid = ready_route(main, peer["id"], stable)
+                peer_container = main.exec("docker", "inspect", "--format", "{{.Id}}",
+                                           "xmesh-managed-xray").decode().strip()
+                blocked = main.request(CAP_PATH, {
+                    "nodeId": node, "userId": peer["id"], "requestChallenge": secrets.token_hex(32),
+                    "measurement": {"runtimeId": stable["runtimeId"],
+                                    "containerId": peer_container, "hostPid": peer_pid},
+                    "renewal": {"reservationId": stable["reservationId"],
+                                "previousRevision": stable["reservationRevision"]},
+                })
+                assert blocked[0] == 503 and "issuance is paused" in str(blocked[1]), blocked
+                before_pause = db.execute(
+                    "SELECT COALESCE(MAX(stream_bytes),0) FROM quota_v2_wal_charges WHERE reservation_id=%s",
+                    (reservation,)).fetchone()[0]
+                assert before_pause <= 4096, before_pause
+                # A fresh connection must now be refused. The established A
+                # connection still has a bounded permit and must charge the
+                # second half of its bytes through the paused control plane.
+                main.exec("rm", "--", "/etc/xmesh-quota-v2-staging")
+                main.exec("touch", f"{WORK}/issuance-paused-3")
+            completed(generation)
+            chain.append(grant)
+            print(f"PASS: actual Nexus signed and installed generation {generation}: "
+                  f"Node {node}, predecessor {old['reservationId']}, successor {reservation}, "
+                  f"runtime {runtime}", flush=True)
+
+        for field in ("meterEpoch", "runtimeId", "reservationId"):
+            assert len({grant[field] for grant in chain}) == 3
+        charges = {}
+        for grant in chain:
+            reservation = grant["reservationId"]
+
+            def both_wal_directions():
+                charged, streams, largest = db.execute(
+                    "SELECT COALESCE(SUM(stream_bytes),0), COUNT(*), COALESCE(MAX(stream_bytes),0) "
+                    "FROM (SELECT MAX(stream_bytes) AS stream_bytes FROM quota_v2_wal_charges "
+                    "WHERE reservation_id=%s GROUP BY filename) streams",
+                    (reservation,)).fetchone()
+                # The uplink and downlink are separate transactions. One
+                # direction may commit while the worker is retrying the other.
+                assert largest <= 8192 and streams <= 2, (reservation, charged, streams, largest)
+                return int(charged) if (charged, streams) == (16384, 2) else None
+
+            charges[reservation] = lab.wait_for(
+                both_wal_directions, timeout=75, label=f"16384 bytes in both WAL directions {reservation}")
+        if crashes:
+            (artifact / "issuance-paused.json").write_text(json.dumps({
+                "nexusSigkill": True, "newRenewalRefused": True, "exactPermitReplayed": True,
+                "nodeAdmissionOptInRemoved": True,
+                "newConnectionDeniedWhilePaused": True,
+                "sameConnectionTransferred4096BytesEachWayAfterPause": True,
+                "walChargedWhilePaused": charges[chain[-1]["reservationId"]],
+            }, indent=2))
+        def snapshot(connection):
+            return (
+                connection.execute(
+                    "SELECT reservation_id, acknowledged_bytes, conservative_burn_floor_bytes "
+                    "FROM quota_v2_reservations WHERE user_id=%s ORDER BY reservation_id",
+                    (uid,)).fetchall(),
+                connection.execute(
+                    "SELECT settled_bytes, observed_floor_bytes FROM quota_v2_accounts "
+                    "WHERE user_id=%s ORDER BY epoch", (uid,)).fetchall(),
+                connection.execute(
+                    "SELECT reservation_id, signed_envelope, fresh_genesis_envelope "
+                    "FROM quota_v2_calendar_successor_positive_caps WHERE user_id=%s ORDER BY reservation_id",
+                    (uid,)).fetchall(),
+            )
+
+        before = snapshot(db)
+        assert len(before[2]) == 2
+        db = lab.restart_postgres(stack, dsn, db)
+        assert snapshot(db) == before
+        for request, response in replay_requests:
+            assert parallel(lambda body: main.request(CAP_PATH, body), (request, request)) == [
+                (200, response), (200, response),
+            ]
+        assert snapshot(db) == before
+        budget = db.execute("""
+            SELECT a.epoch::text, a.limit_bytes, GREATEST(a.settled_bytes, a.observed_floor_bytes),
+                   COALESCE((
+                       SELECT SUM(GREATEST(r.ceiling_bytes -
+                           GREATEST(r.acknowledged_bytes, r.conservative_burn_floor_bytes), 0))
+                       FROM quota_v2_reservations r WHERE r.user_id=a.user_id AND r.epoch=a.epoch
+                   ), 0)::bigint,
+                   COALESCE((
+                       SELECT SUM(s.refunded_bytes) FROM quota_v2_terminal_settlements s
+                       WHERE s.user_id=a.user_id AND s.epoch=a.epoch
+                   ), 0)::bigint
+            FROM quota_v2_accounts a WHERE a.user_id=%s ORDER BY a.epoch
+        """, (uid,)).fetchall()
+        assert budget and all(refunded == 0 and spent + held + refunded <= limit
+                              for _, limit, spent, held, refunded in budget), budget
+        (artifact / "conservation.json").write_text(json.dumps([
+            {"accountEpoch": epoch, "limit": limit, "spentFloor": spent,
+             "held": held, "refunded": refunded}
+            for epoch, limit, spent, held, refunded in budget
+        ], indent=2))
+        if crashes:
+            # The same production binary must refuse a gate downgrade when
+            # funded signed reservations exist, before serving legacy HTTP.
+            # The disposable runner already proved that gate=0 starts with
+            # an empty ledger; now prove the inverse on the live SQL ledger.
+            funded = db.execute(
+                "SELECT COUNT(*) FROM quota_v2_reservations "
+                "WHERE ceiling_bytes > GREATEST(acknowledged_bytes, conservative_burn_floor_bytes)"
+            ).fetchone()[0]
+            signed_permits = db.execute(
+                "SELECT (SELECT COUNT(*) FROM quota_v2_signed_first_cap_outbox) + "
+                "(SELECT COUNT(*) FROM quota_v2_calendar_successor_positive_caps)"
+            ).fetchone()[0]
+            assert funded > 0 and signed_permits >= 3, (
+                "test lacks funded and historically signed quota evidence",
+                funded, signed_permits,
+            )
+            current_nexus = Path("backend/target/debug/xmesh-api").resolve()
+            assert current_nexus.is_file(), "current Nexus binary absent"
+            downgrade = subprocess.run(
+                [str(current_nexus)],
+                env={**os.environ, "XMESH_QUOTA_V2_ENABLED": "0",
+                     "APP_ADDR": "127.0.0.1:38083",
+                     "CORE_DATA_DIR": str(root / "gate-downgrade-core")},
+                capture_output=True, text=True, timeout=20)
+            diagnostics = downgrade.stdout + downgrade.stderr
+            assert downgrade.returncode != 0 and (
+                "Quota V2 disabled while funded reservations or signed permits remain" in diagnostics
+            ), diagnostics
+            assert snapshot(db) == before
+            (artifact / "gate-downgrade.json").write_text(json.dumps({
+                "fundedReservationCount": funded,
+                "historicalSignedPermitCount": signed_permits,
+                "disabledNexusRefusedStartup": True,
+                "ledgerUnchanged": True,
+            }, indent=2))
+            old_node = "621439f507f708904c1bc3ebad60ad119885276c"
+            result = main.exec(
+                "sh", "-ec",
+                'if output=$(env "XMESH_NODE_RELEASE_REF=$1" '
+                'bash /opt/xmesh-node/bootstrap.sh "$2" "$3" 2>&1); then exit 1; fi; '
+                'printf "%s" "$output"',
+                "sh", old_node, panel, str(node))
+            assert b"Quota V2 spending state exists; cold bootstrap is blocked" in result, result
+            raw = main.exec(
+                "sh", "-ec",
+                'set +e; /usr/local/libexec/xmesh-xray-update.py --version 26.10.31 --command-id 9901; '
+                'status=$?; test "$status" -eq 1')
+            blocked = json.loads(raw)
+            assert blocked["success"] is False and blocked["rollback"] == "unchanged", blocked
+            assert blocked["detail"].startswith("Quota V2 runtime state present."), blocked
+            assert ready_route(main, uid, chain[-1]) == pid
+            assert ready_route(main, peer["id"], stable) != pid
+
+            migrations = db.execute(
+                "SELECT version,checksum FROM _sqlx_migrations ORDER BY version"
+            ).fetchall()
+            result = subprocess.run(
+                [os.environ["XMESH_TEST_OLD_NEXUS"]],
+                env={**os.environ, "APP_ADDR": "127.0.0.1:38082",
+                     "CORE_DATA_DIR": str(root / "downgrade-core"), "XMESH_QUOTA_V2_ENABLED": "0"},
+                capture_output=True, text=True, timeout=20)
+            log = result.stdout + result.stderr
+            assert result.returncode != 0 and re.search(
+                r"migration.*(?:missing|previously applied|mismatch)", log, re.I), log
+            assert db.execute("SELECT version,checksum FROM _sqlx_migrations ORDER BY version").fetchall() == migrations
+            assert snapshot(db) == before
+            (artifact / "downgrade.json").write_text(json.dumps({
+                "nodeRejectedColdBootstrap": True,
+                "nodeRejectedOfficialXrayReplacement": True,
+                "nexusRejectedOlderSchema": True,
+                "ledgerUnchanged": True,
+            }, indent=2))
+        if crashes:
+            active_container = f"xmesh-quota-u{uid}-" + chain[1]["reservationId"].replace("-", "")
+            assert int(main.exec("docker", "inspect", "-f", "{{.State.Pid}}", active_container)) == pid
+            main.exec("docker", "kill", "--signal", "KILL", active_container)
+            assert main.exec("docker", "inspect", "-f", "{{.State.Running}}:{{.State.ExitCode}}",
+                             active_container).strip() == b"false:137"
+            main.exec("touch", WORK + "/xray-killed")
+
+            def kill_checked():
+                assert process.poll() is None, "peer VLESS client disconnected after Xray SIGKILL"
+                return main.exec("sh", "-c", 'test ! -f "$1" || printf done', "sh",
+                                 WORK + "/xray-kill-checked") == b"done"
+
+            lab.wait_for(kill_checked, timeout=20, label="closed A ingress and live B after Xray SIGKILL")
+            main.exec("systemctl", "start", service, timeout=35)
+            assert main.exec("docker", "inspect", "-f", "{{.State.Running}}:{{.State.ExitCode}}",
+                             active_container).strip() == b"false:137"
+            assert snapshot(db) == before
+            (artifact / "xray-sigkill.json").write_text(json.dumps({
+                "generation": 3, "runtimeId": chain[2]["runtimeId"], "exitCode": 137,
+                "existingAndNewAConnectionsDenied": True, "peerReconnected": False,
+            }, indent=2))
+        main.exec("touch", WORK + "/database-restarted")
+        assert process.wait(timeout=20) == 0
+        main.exec("test", "-f", WORK + "/peer-intact")
+        if crashes:
+            observed = {}
+            for stage, predecessor_index in (("g2", 0), ("g3", 1)):
+                for point in FAULT_POINTS:
+                    name = point if stage == "g2" else f"{point}-g3"
+                    observed[name] = main.exec("cat", f"{FAULT_STATE}/{name}").decode().strip()
+                    successor = point in ("successor-ipc-acknowledged", "successor-ingress-published")
+                    assert observed[name] == chain[predecessor_index + int(successor)]["reservationId"]
+            journal = main.exec("journalctl", "-u", service, "--no-pager", "-o", "cat",
+                                "--grep", "Main process exited, code=killed, status=9/KILL")
+            assert len(journal.splitlines()) == len(FAULT_POINTS) * 2, journal
+            (artifact / "agent-sigkill.json").write_text(json.dumps(observed, indent=2))
+        (artifact / "charges.json").write_text(json.dumps(charges, indent=2))
+        print("PASS: installed Agent and Nexus completed VLESS 1 → 2 → 3, "
+              "with three separate WAL charges and no reconnect for user B.", flush=True)
+    except Exception:
+        for guest in pair:
+            print(guest.exec("journalctl", "-u", service, "-u", INGRESS + ".service",
+                             "-n", "70", "--no-pager").decode(errors="replace"), flush=True)
+        raise
+    finally:
+        if process is not None and process.poll() is None:
+            process.terminate()
+            process.wait(timeout=10)

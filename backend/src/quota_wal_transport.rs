@@ -9,15 +9,21 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signature, VerifyingKey};
+use flate2::{Compression, bufread::GzDecoder, write::GzEncoder};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::PgConnection;
+use std::io::{Read, Write};
+
+mod charge;
+pub use charge::committed_charge_totals;
 
 pub const PATH: &str = "/api/v1/node/quota-v2/wal";
 const REQUEST_LIMIT: usize = 544 * 1024;
 // Leave room for the two Base64 layers and the XSP/2 envelope signatures.
-const INDEX_LIMIT: usize = 384 * 1024;
+const WIRE_INDEX_LIMIT: usize = 384 * 1024;
+const INDEX_LIMIT: usize = 4 * 1024 * 1024;
 const WITNESS_LIMIT: usize = 4096;
 const WITNESS_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_OFFHOST_WAL_BIRTH_WITNESS_V1\0";
 const RECEIPT_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_REMOTE_WAL_BIRTH_STORED_V1\0";
@@ -33,13 +39,38 @@ const HEAD_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_REMOTE_WAL_HEAD_V1\0";
 enum Request {
     Store {
         node_id: i64,
+        runtime_id: Option<String>,
         witness: String,
         inventory: String,
+        inventory_encoding: Option<InventoryEncoding>,
+    },
+    Charge {
+        node_id: i64,
+        reservation_id: String,
+        filename: String,
+        journal: String,
     },
     Head {
         node_id: i64,
         challenge: String,
+        runtime_id: Option<String>,
     },
+    PrepareGenesis {
+        node_id: i64,
+        candidate_runtime_id: String,
+        challenge: String,
+    },
+}
+
+struct RuntimeScope<'a> {
+    id: &'a str,
+    activation: &'a str,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum InventoryEncoding {
+    Gzip,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -132,6 +163,40 @@ fn decode(value: &str, max: usize) -> Result<Vec<u8>, ApiError> {
     Ok(data)
 }
 
+fn unpack_index(value: &str, encoding: Option<InventoryEncoding>) -> Result<Vec<u8>, ApiError> {
+    let raw = decode(value, WIRE_INDEX_LIMIT)?;
+    if encoding.is_none() {
+        return Ok(raw);
+    }
+    let mut archive = GzDecoder::new(raw.as_slice());
+    let mut index = Vec::new();
+    (&mut archive)
+        .take((INDEX_LIMIT + 1) as u64)
+        .read_to_end(&mut index)
+        .map_err(|_| invalid())?;
+    if !(WIRE_INDEX_LIMIT + 1..=INDEX_LIMIT).contains(&index.len()) || !archive.get_ref().is_empty()
+    {
+        return Err(invalid());
+    }
+    Ok(index)
+}
+
+fn pack_index(index: &[u8]) -> Result<(Vec<u8>, bool), ApiError> {
+    if index.is_empty() || index.len() > INDEX_LIMIT {
+        return Err(conflict());
+    }
+    if index.len() <= WIRE_INDEX_LIMIT {
+        return Ok((index.to_vec(), false));
+    }
+    let mut archive = GzEncoder::new(Vec::new(), Compression::default());
+    archive.write_all(index).map_err(|_| conflict())?;
+    let compressed = archive.finish().map_err(|_| conflict())?;
+    if compressed.len() > WIRE_INDEX_LIMIT {
+        return Err(conflict());
+    }
+    Ok((compressed, true))
+}
+
 fn valid_email(value: &str) -> bool {
     let Some((id, tag)) = value
         .strip_prefix("xmesh-u")
@@ -147,6 +212,104 @@ fn valid_email(value: &str) -> bool {
         && !tag
             .chars()
             .any(|c| c <= ' ' || matches!(c, '<' | '>' | '&' | '\u{2028}' | '\u{2029}'))
+}
+
+/// The admission transaction holds the same per-node lock as WAL storage.
+pub async fn require_unused_first_cap_user(
+    conn: &mut PgConnection,
+    node_id: i64,
+    user_id: i64,
+    runtime: &str,
+    peer_grant: bool,
+) -> Result<(), ApiError> {
+    let latest: Option<(Vec<u8>, String)> = sqlx::query_as(
+        "SELECT inventory_bytes,inventory_sha256 FROM quota_v2_external_wal_birth_anchors
+         WHERE node_id=$1 ORDER BY inventory_sequence DESC LIMIT 1",
+    )
+    .bind(node_id)
+    .fetch_optional(conn)
+    .await?;
+    if let Some((index, hash)) = latest {
+        if !peer_grant || sha256(&index) != hash {
+            return Err(conflict());
+        }
+        check_first_cap_history(&index, user_id, runtime)?;
+    }
+    Ok(())
+}
+
+fn check_first_cap_history(index: &[u8], user_id: i64, runtime: &str) -> Result<(), ApiError> {
+    if index.len() > INDEX_LIMIT {
+        return Err(conflict());
+    }
+    let lines = index.strip_suffix(b"\n").ok_or_else(conflict)?;
+    let user_prefix = format!("xmesh-u{user_id}--");
+    // The stored anchor was authenticated and its chain was verified before insertion.
+    for line in lines.split(|byte| *byte == b'\n') {
+        let birth: Birth = serde_json::from_slice(line).map_err(|_| conflict())?;
+        if birth.runtime_id != runtime || birth.email.starts_with(&user_prefix) {
+            return Err(conflict());
+        }
+    }
+    Ok(())
+}
+
+pub async fn require_closed_stream_charges(
+    conn: &mut PgConnection,
+    node_id: i64,
+    user_id: i64,
+    runtime: &str,
+    successor: bool,
+    heads: &[(String, i64, String, i64)],
+) -> Result<(), ApiError> {
+    let (index, hash): (Vec<u8>, String) = if successor {
+        sqlx::query_as(
+            "SELECT inventory_bytes,inventory_sha256 FROM quota_v2_runtime_wal_anchors
+             WHERE node_id=$1 AND runtime_id=$2 ORDER BY inventory_sequence DESC LIMIT 1",
+        )
+        .bind(node_id)
+        .bind(runtime)
+        .fetch_optional(conn)
+        .await?
+    } else {
+        sqlx::query_as(
+            "SELECT inventory_bytes,inventory_sha256 FROM quota_v2_external_wal_birth_anchors
+             WHERE node_id=$1 ORDER BY inventory_sequence DESC LIMIT 1",
+        )
+        .bind(node_id)
+        .fetch_optional(conn)
+        .await?
+    }
+    .ok_or_else(conflict)?;
+    if sha256(&index) != hash {
+        return Err(conflict());
+    }
+    check_closed_stream_charges(&index, user_id, runtime, heads)
+}
+
+fn check_closed_stream_charges(
+    index: &[u8],
+    user_id: i64,
+    runtime: &str,
+    heads: &[(String, i64, String, i64)],
+) -> Result<(), ApiError> {
+    let prefix = format!("xmesh-u{user_id}--");
+    let lines = index.strip_suffix(b"\n").ok_or_else(conflict)?;
+    let mut charged: std::collections::HashSet<&str> =
+        heads.iter().map(|(name, _, _, _)| name.as_str()).collect();
+    for line in lines.split(|byte| *byte == b'\n') {
+        let birth: Birth = serde_json::from_slice(line).map_err(|_| conflict())?;
+        if birth.runtime_id == runtime
+            && birth.email.starts_with(&prefix)
+            && !charged.remove(birth.filename.as_str())
+        {
+            return Err(conflict());
+        }
+    }
+    if !charged.is_empty() {
+        return Err(conflict());
+    }
+    Ok(())
 }
 
 fn verify_index(index: &[u8], witness: &Witness) -> Result<(), ApiError> {
@@ -304,21 +467,98 @@ async fn enrolled_key(conn: &mut PgConnection, node_id: i64) -> Result<Verifying
     Ok(key)
 }
 
+async fn verify_successor_birth_scope(
+    conn: &mut PgConnection,
+    node_id: i64,
+    scope: &RuntimeScope<'_>,
+    w: &Witness,
+    index: &[u8],
+) -> Result<(), ApiError> {
+    let aliases: std::collections::HashSet<String> = sqlx::query_scalar(
+        "SELECT DISTINCT alias->>'email'
+           FROM quota_v2_calendar_successor_positive_caps c
+           JOIN quota_v2_calendar_successor_meter_preflights p USING(predecessor_id)
+           CROSS JOIN LATERAL jsonb_array_elements(
+               convert_from(c.signed_envelope,'UTF8')::jsonb->'payload'->'aliasScopes'
+           ) alias
+          WHERE c.node_id=$1 AND c.fresh_runtime_id=$2 AND p.fresh_container_id=$3
+            AND p.fresh_started_at=$4::text::timestamptz
+            AND convert_from(c.signed_envelope,'UTF8')::jsonb
+                ->'payload'->>'activationReceiptSha256'=$5",
+    )
+    .bind(node_id)
+    .bind(scope.id)
+    .bind(&w.old_container_id)
+    .bind(&w.old_started_at)
+    .bind(scope.activation)
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .collect();
+    for line in index[..index.len() - 1].split(|byte| *byte == b'\n') {
+        let birth: Birth = serde_json::from_slice(line).map_err(|_| invalid())?;
+        if birth.runtime_id != scope.id || !aliases.contains(&birth.email) {
+            return Err(conflict());
+        }
+    }
+    Ok(())
+}
+
 async fn store(
     state: &AppState,
     node_id: i64,
     witness: &str,
     inventory: &str,
+    encoding: Option<InventoryEncoding>,
+    scope: Option<RuntimeScope<'_>>,
 ) -> Result<Value, ApiError> {
     let raw = decode(witness, WITNESS_LIMIT)?;
-    let index = decode(inventory, INDEX_LIMIT)?;
+    let index = unpack_index(inventory, encoding)?;
     let mut tx = state.pool.begin().await?;
     let key = enrolled_key(&mut tx, node_id).await?;
     let w = verify_witness(&raw, &index, node_id, &key)?;
+    if let Some(ref scope) = scope {
+        verify_successor_birth_scope(&mut tx, node_id, scope, &w, &index).await?;
+    }
+    // Never commit a large head that Nexus cannot deliver in the fixed envelope.
+    if index.len() > WIRE_INDEX_LIMIT {
+        pack_index(&index)?;
+    }
     let fingerprint = sha256(&raw);
     sqlx::query("SET LOCAL synchronous_commit TO on")
         .execute(&mut *tx)
         .await?;
+    if let Some(scope) = scope {
+        let bootstrap = sqlx::query_scalar(
+            "SELECT quota_v2_store_runtime_wal_anchor($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        )
+        .bind(node_id)
+        .bind(scope.id)
+        .bind(w.inventory_sequence)
+        .bind(&w.inventory_sha256)
+        .bind(&w.inventory_tail_digest)
+        .bind(&fingerprint)
+        .bind(&w.old_container_id)
+        .bind(&w.old_started_at)
+        .bind(&index)
+        .bind(&raw)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| {
+            if e.as_database_error()
+                .and_then(sqlx::error::DatabaseError::code)
+                .as_deref()
+                == Some("22023")
+            {
+                conflict()
+            } else {
+                ApiError::from(e)
+            }
+        })?;
+        tx.commit().await?;
+        let ack = receipt(&state.node_policy_signer, &w, &fingerprint, bootstrap)?;
+        return Ok(json!({"receipt": STANDARD.encode(ack)}));
+    }
     let bootstrap: bool = sqlx::query_scalar(
         "SELECT first_external_witness FROM quota_v2_store_external_wal_birth_anchor($1,$2,$3,$4,$5,$6,$7,$8)",
     ).bind(node_id).bind(w.inventory_sequence).bind(&w.inventory_sha256)
@@ -356,23 +596,42 @@ async fn store(
     Ok(json!({"receipt":STANDARD.encode(ack)}))
 }
 
-async fn head(state: &AppState, node_id: i64, challenge: &str) -> Result<Value, ApiError> {
+async fn head(
+    state: &AppState,
+    node_id: i64,
+    challenge: &str,
+    runtime: Option<&str>,
+) -> Result<Value, ApiError> {
     if !lower_hex(challenge, 64) {
         return Err(invalid());
     }
     let mut tx = state.pool.begin().await?;
     let key = enrolled_key(&mut tx, node_id).await?;
-    let row = sqlx::query_as::<_, Anchor>(
-        "SELECT a.inventory_sequence,a.inventory_sha256,a.inventory_tail_digest,
+    let row = if let Some(runtime) = runtime {
+        sqlx::query_as::<_, Anchor>(
+            "SELECT inventory_sequence,inventory_sha256,inventory_tail_digest,
+                    original_node_witness_sha256,old_container_id,old_started_at,
+                    inventory_bytes,first_external_witness,witness_bytes
+               FROM quota_v2_runtime_wal_anchors
+              WHERE node_id=$1 AND runtime_id=$2 ORDER BY inventory_sequence DESC LIMIT 1",
+        )
+        .bind(node_id)
+        .bind(runtime)
+        .fetch_optional(&mut *tx)
+        .await?
+    } else {
+        sqlx::query_as::<_, Anchor>(
+            "SELECT a.inventory_sequence,a.inventory_sha256,a.inventory_tail_digest,
                 a.original_node_witness_sha256,a.old_container_id,a.old_started_at,
                 a.inventory_bytes,a.first_external_witness,s.witness_bytes
            FROM quota_v2_external_wal_birth_anchors AS a
            LEFT JOIN quota_v2_external_wal_birth_sources AS s USING(node_id,inventory_sequence)
           WHERE a.node_id=$1 ORDER BY a.inventory_sequence DESC LIMIT 1",
-    )
-    .bind(node_id)
-    .fetch_optional(&mut *tx)
-    .await?
+        )
+        .bind(node_id)
+        .fetch_optional(&mut *tx)
+        .await?
+    }
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "No committed WAL checkpoint."))?;
     tx.commit().await?;
     let raw = row.witness_bytes.ok_or_else(conflict)?;
@@ -395,23 +654,46 @@ async fn head(state: &AppState, node_id: i64, challenge: &str) -> Result<Value, 
     )?;
     // This independent proof binds the PostgreSQL snapshot and receipt to
     // the caller's fresh challenge. A reusable stored receipt has no challenge.
-    let proof = signed(
-        &state.node_policy_signer,
-        HEAD_DOMAIN,
-        &json!({
-            "schemaVersion":1, "kind":"xmesh.quota-v2.external-wal-head",
-            "nodeId":node_id, "challenge":challenge, "sequence":row.inventory_sequence,
-            "registrySha256":row.inventory_sha256, "receiptSha256":sha256(&ack),
-        }),
-    )?;
-    Ok(json!({
+    let mut head_claim = json!({
+        "schemaVersion":1, "kind":"xmesh.quota-v2.external-wal-head",
+        "nodeId":node_id, "challenge":challenge, "sequence":row.inventory_sequence,
+        "registrySha256":row.inventory_sha256, "receiptSha256":sha256(&ack),
+    });
+    if let Some(runtime) = runtime {
+        head_claim["runtimeId"] = json!(runtime);
+    }
+    let proof = signed(&state.node_policy_signer, HEAD_DOMAIN, &head_claim)?;
+    let (inventory, compressed) = pack_index(&row.inventory_bytes)?;
+    let mut bundle = json!({
         "head":STANDARD.encode(proof), "receipt":STANDARD.encode(ack),
-        "witness":STANDARD.encode(raw), "inventory":STANDARD.encode(row.inventory_bytes),
-    }))
+        "witness":STANDARD.encode(raw), "inventory":STANDARD.encode(inventory),
+    });
+    if compressed {
+        bundle["inventoryEncoding"] = json!("gzip");
+    }
+    Ok(bundle)
 }
 
 pub fn route() -> MethodRouter<AppState> {
     post(handle).layer(tower_http::limit::RequestBodyLimitLayer::new(REQUEST_LIMIT))
+}
+
+async fn authenticate_runtime<'a>(
+    state: &AppState,
+    headers: &'a HeaderMap,
+    node_id: i64,
+    runtime: &str,
+) -> Result<&'a str, ApiError> {
+    if !lower_hex(runtime, 64) {
+        return Err(invalid());
+    }
+    if !crate::quota_v2::enabled() || !crate::quota_xray_genesis::quarantine_enabled() {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Runtime WAL transport disabled.",
+        ));
+    }
+    node_auth::authenticate_product_activation(state, headers, node_id, PATH).await
 }
 
 async fn handle(
@@ -427,17 +709,200 @@ async fn handle(
     }
     let request: Request = serde_json::from_slice(&raw).map_err(|_| invalid())?;
     let node_id = match &request {
-        Request::Store { node_id, .. } | Request::Head { node_id, .. } => *node_id,
+        Request::Store { node_id, .. }
+        | Request::Charge { node_id, .. }
+        | Request::Head { node_id, .. }
+        | Request::PrepareGenesis { node_id, .. } => *node_id,
     };
     if node_id <= 0 {
         return Err(invalid());
     }
-    node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
     let result = match request {
         Request::Store {
-            witness, inventory, ..
-        } => store(&state, node_id, &witness, &inventory).await?,
-        Request::Head { challenge, .. } => head(&state, node_id, &challenge).await?,
+            runtime_id,
+            witness,
+            inventory,
+            inventory_encoding,
+            ..
+        } => {
+            let activation = if let Some(ref runtime) = runtime_id {
+                Some(authenticate_runtime(&state, &headers, node_id, runtime).await?)
+            } else {
+                node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
+                None
+            };
+            let scope = runtime_id
+                .as_deref()
+                .zip(activation)
+                .map(|(id, activation)| RuntimeScope { id, activation });
+            store(
+                &state,
+                node_id,
+                &witness,
+                &inventory,
+                inventory_encoding,
+                scope,
+            )
+            .await?
+        }
+        Request::Charge {
+            reservation_id,
+            filename,
+            journal,
+            ..
+        } => {
+            if !crate::quota_v2::enabled() || !crate::quota_xray_genesis::quarantine_enabled() {
+                return Err(ApiError::new(
+                    StatusCode::NOT_FOUND,
+                    "WAL charging disabled.",
+                ));
+            }
+            let activation =
+                node_auth::authenticate_product_activation(&state, &headers, node_id, PATH).await?;
+            charge::charge(
+                &state,
+                node_id,
+                activation,
+                &reservation_id,
+                &filename,
+                &journal,
+            )
+            .await?
+        }
+        Request::Head {
+            challenge,
+            runtime_id,
+            ..
+        } => {
+            if let Some(ref runtime) = runtime_id {
+                authenticate_runtime(&state, &headers, node_id, runtime).await?;
+            } else {
+                node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
+            }
+            head(&state, node_id, &challenge, runtime_id.as_deref()).await?
+        }
+        Request::PrepareGenesis {
+            candidate_runtime_id,
+            challenge,
+            ..
+        } => {
+            crate::quota_xray_genesis::prepare(
+                &state,
+                &headers,
+                node_id,
+                &candidate_runtime_id,
+                &challenge,
+            )
+            .await?
+        }
     };
     Ok(([(header::CACHE_CONTROL, "no-store")], Json(result)))
+}
+
+#[cfg(test)]
+mod first_admission_history_tests {
+    use super::*;
+
+    #[test]
+    fn permits_only_peer_wal_from_the_same_runtime() {
+        let mut peer = Birth {
+            schema_version: 1,
+            sequence: 1,
+            filename: "meter-peer.jsonl".into(),
+            runtime_id: "a".repeat(64),
+            email: "xmesh-u102--vless-main".into(),
+            direction: "uplink".into(),
+            first_wal_digest: "b".repeat(64),
+            previous_digest: "0".repeat(64),
+            digest: "c".repeat(64),
+        };
+        let runtime = peer.runtime_id.clone();
+        let encode = |record: &Birth| {
+            let mut line = serde_json::to_vec(record).unwrap();
+            line.push(b'\n');
+            line
+        };
+        assert!(check_first_cap_history(&encode(&peer), 10, &runtime).is_ok());
+        assert!(check_first_cap_history(&encode(&peer), 102, &runtime).is_err());
+        peer.runtime_id = "d".repeat(64);
+        assert!(check_first_cap_history(&encode(&peer), 10, &runtime).is_err());
+        assert!(check_first_cap_history(b"{\n", 10, &runtime).is_err());
+    }
+
+    #[test]
+    fn closed_reservation_requires_every_indexed_user_stream() {
+        let runtime = "a".repeat(64);
+        let mut birth = Birth {
+            schema_version: 1,
+            sequence: 1,
+            filename: "meter-main.jsonl".into(),
+            runtime_id: runtime.clone(),
+            email: "xmesh-u42--vless-main".into(),
+            direction: "uplink".into(),
+            first_wal_digest: "b".repeat(64),
+            previous_digest: "0".repeat(64),
+            digest: "c".repeat(64),
+        };
+        let mut index = serde_json::to_vec(&birth).unwrap();
+        index.push(b'\n');
+        birth.filename = "meter-peer.jsonl".into();
+        birth.email = "xmesh-u99--vless-main".into();
+        serde_json::to_writer(&mut index, &birth).unwrap();
+        index.push(b'\n');
+        assert!(check_closed_stream_charges(&index, 42, &runtime, &[]).is_err());
+        let charged = [("meter-main.jsonl".into(), 5, "d".repeat(64), 256)];
+        assert!(check_closed_stream_charges(&index, 42, &runtime, &charged).is_ok());
+        assert!(check_closed_stream_charges(&index, 99, &runtime, &charged).is_err());
+        assert!(check_closed_stream_charges(&index, 42, &"e".repeat(64), &charged).is_err());
+    }
+
+    #[test]
+    fn large_inventory_keeps_exact_bytes_inside_the_wire_limit() {
+        let mut index = Vec::new();
+        let mut previous_digest = "0".repeat(64);
+        let runtime = "a".repeat(64);
+        for sequence in 1..=1_000 {
+            let email = format!("xmesh-u{}--vless-main", (sequence + 1) / 2);
+            let direction = if sequence % 2 == 1 {
+                "uplink"
+            } else {
+                "downlink"
+            };
+            let source = format!("{runtime}\0{email}\0{direction}");
+            let mut birth = Birth {
+                schema_version: 1,
+                sequence,
+                filename: format!("meter-{}.jsonl", sha256(source.as_bytes())),
+                runtime_id: runtime.clone(),
+                email,
+                direction: direction.into(),
+                first_wal_digest: sha256(&sequence.to_be_bytes()),
+                previous_digest,
+                digest: String::new(),
+            };
+            let mut line = serde_json::to_vec(&birth).unwrap();
+            line.push(b'\n');
+            birth.digest = sha256(&line);
+            previous_digest = birth.digest.clone();
+            index.extend(serde_json::to_vec(&birth).unwrap());
+            index.push(b'\n');
+        }
+        assert!(index.len() > WIRE_INDEX_LIMIT);
+        let (wire, compressed) = pack_index(&index).unwrap();
+        assert!(compressed);
+        assert!(wire.len() <= WIRE_INDEX_LIMIT);
+        let encoding = Some(InventoryEncoding::Gzip);
+        assert_eq!(
+            unpack_index(&STANDARD.encode(&wire), encoding).unwrap(),
+            index
+        );
+        let mut duplicate = wire.clone();
+        duplicate.extend(&wire);
+        assert!(unpack_index(&STANDARD.encode(duplicate), encoding).is_err());
+        assert!(unpack_index(&STANDARD.encode(&wire[..wire.len() - 1]), encoding).is_err());
+        let mut archive = GzEncoder::new(Vec::new(), Compression::fast());
+        archive.write_all(&vec![0; INDEX_LIMIT + 1]).unwrap();
+        let oversize = archive.finish().unwrap();
+        assert!(unpack_index(&STANDARD.encode(oversize), encoding).is_err());
+    }
 }

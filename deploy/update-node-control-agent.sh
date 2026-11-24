@@ -4,6 +4,12 @@ set -Eeuo pipefail
 # Stable marker consumed by the signed control worker before executing a freshly downloaded updater.
 XMESH_TARGET_AWARE_UPDATER=1
 MODE="${1:-manual}"
+# The coordinated branch uses only the trusted installed bridge. It does
+# not download or execute a bootstrap script, or touch the quota journal.
+if [[ "$MODE" == --strict-product ]];then
+ [[ "$#" -eq 1 && "$EUID" -eq 0 ]] || exit 2
+ exec /usr/bin/python3 /usr/local/libexec/xmesh-product-upgrade-coordinator.py run
+fi
 [[ "$MODE" == manual || "$MODE" == --remote ]] || { echo "Unknown update mode" >&2; exit 2; }
 [[ "$EUID" -eq 0 ]] || { echo "Run as root" >&2;exit 1; }
 [[ -r /etc/xmesh-node-metrics/node.key && -f /etc/xmesh-node-metrics.env ]] || { echo "Node enrollment missing" >&2;exit 1; }
@@ -11,6 +17,75 @@ MODE="${1:-manual}"
 # Public release downloads must not resolve through the strict-PQ POST adapter.
 # Do not change PATH: panel requests in child operational workers still need it.
 [[ -f /etc/systemd/system/xmesh-node-control.service ]] || { echo "Control service missing, enroll node first" >&2;exit 1; }
+
+# A legacy updater can neither transfer signed spending rights nor rebind a
+# product activation to another executable. Reject before downloads, unit
+# changes, and router recreation; check again in the isolated router worker.
+refuse_legacy_quota_update() {
+ local state="$1" evidence
+ if [[ -L "$state" || ( -e "$state" && ! -d "$state" ) ]];then
+  echo "Untrusted quota state; coordinated update required" >&2
+  return 2
+ fi
+ for evidence in "$state"/{genesis-quarantine-envelope.json,genesis-reservation-prepared-u*.json,genesis-reservation-confirmed-u*.json,genesis-positive-cap-u*.json,genesis-renewal-u*.json,genesis-renewal-request-u*.json,calendar-*-u*.json,wal-cap-u*.json,wal-charge-*.json,ingress-u*,xmesh-quota-u*};do
+  if [[ -e "$evidence" || -L "$evidence" ]];then
+   echo "Quota V2 state exists; legacy Agent update refused before mutation" >&2
+   return 2
+  fi
+ done
+}
+
+preflight_enrolled_product_revision() {
+ local state="$1" revision="$2" product="$3" entry bound=0
+ [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || return 2
+ [[ ! -L "$state" && ( ! -e "$state" || -d "$state" ) ]] || return 2
+ for entry in config.json activation-request.json activation-receipt.json active.json;do
+  if [[ -e "$state/$entry" || -L "$state/$entry" ]];then bound=1;fi
+ done
+ [[ "$bound" == 1 ]] || { printf '%s\n' unbound; return 0; }
+ [[ -f "$product" && ! -L "$product" && -x "$product" ]] || {
+  echo "Enrolled product executable unavailable; coordinated recovery required" >&2
+  return 2
+ }
+ local owner mode
+ owner="$(stat -c '%u' -- "$product")" || return 2
+ mode="$(stat -c '%a' -- "$product")" || return 2
+ if [[ "$owner" != 0 || ! "$mode" =~ ^[0-7]{3,4}$ ]] || (( (8#$mode & 0022) != 0 ));then
+  echo "Enrolled product executable permissions are unsafe" >&2
+  return 2
+ fi
+ # The config is used only to select a panel/node and compare the target
+ # source. The actual activation proof is reverified by the running product.
+ local -a coordinates
+ readarray -t coordinates < <(python3 - "$state/config.json" "$revision" <<'PY'
+import json,os,re,stat,sys
+path,revision=sys.argv[1:]
+fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+with os.fdopen(fd,'rb') as stream:
+    info=os.fstat(stream.fileno())
+    if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_nlink!=1 or stat.S_IMODE(info.st_mode)!=0o600 or not 0<info.st_size<=65536:
+        raise SystemExit('Unsafe enrolled product configuration')
+    value=json.load(stream)
+identity=value.get('releaseIdentity')
+panel=value.get('panelUrl')
+node=value.get('nodeId')
+if not isinstance(identity,dict) or identity.get('sourceRevision')!=revision:
+    raise SystemExit('Enrolled product source differs; coordinated signed upgrade required')
+if not isinstance(panel,str) or not re.fullmatch(r'https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?',panel) or type(node) is not int or node<=0:
+    raise SystemExit('Invalid enrolled product coordinates')
+print(panel)
+print(node)
+PY
+ )
+ [[ "${#coordinates[@]}" == 2 ]] || return 2
+ "$product" verify-active --panel "${coordinates[0]}" --node-id "${coordinates[1]}" >/dev/null || {
+  echo "Existing product activation failed verification; refusing legacy Agent update" >&2
+  return 2
+ }
+ printf '%s\n' bound
+}
+
+refuse_legacy_quota_update /var/lib/xmesh-xray-sync
 
 RELEASE_IDENTITY_FILE=/run/xmesh-node-control/agent-release-identity.json
 if [[ "$MODE" == --remote && -e "$RELEASE_IDENTITY_FILE" ]];then
@@ -68,6 +143,7 @@ bash -n "$stage_tmp"; grep -q "artifactVersion" "$stage_tmp" && grep -q -- "--id
 grep -Fq 'ExecStart=/usr/local/libexec/xmesh-xsp-v2-agent-staged-apply' "$stage_service_tmp" && grep -Fq 'ReadWritePaths=/run /var/lib/xmesh-agent' "$stage_service_tmp" || { echo "Invalid staged Agent systemd unit" >&2;exit 1; }
 
 update_router() {
+ refuse_legacy_quota_update /var/lib/xmesh-xray-sync || return 1
  command -v docker >/dev/null && command -v git >/dev/null || { echo "Docker/git missing for router upgrade" >&2; return 1; }
  export HOME=/run/xmesh-node-router-upgrade DOCKER_CONFIG=/run/xmesh-node-router-upgrade/.docker BUILDX_CONFIG=/run/xmesh-node-router-upgrade/.buildx XDG_CONFIG_HOME=/run/xmesh-node-router-upgrade/.config XDG_CACHE_HOME=/run/xmesh-node-router-upgrade/.cache TMPDIR=/run/xmesh-node-router-upgrade/tmp
  install -d -m 0700 "$HOME" "$DOCKER_CONFIG" "$BUILDX_CONFIG" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$TMPDIR" || return 1
@@ -82,13 +158,34 @@ update_router() {
  previous="$(git -C "$dir" rev-parse HEAD)" || return 1
  if [[ "$(git -C "$dir" rev-parse --is-shallow-repository)" == true ]];then git -C "$dir" fetch --unshallow origin main || return 1; else git -C "$dir" fetch origin main || return 1; fi
  git -C "$dir" merge-base --is-ancestor "$previous" FETCH_HEAD || { echo "Router repository cannot fast-forward safely" >&2; return 1; }
+ local candidate binding
+ candidate="$(git -C "$dir" rev-parse FETCH_HEAD)" || return 1
+ # The bound product cannot accept a different source revision. Check
+ # before modifying the working tree, recreating the router or installing
+ # any operational workers. A real signed migration will be a new path.
+ binding="$(preflight_enrolled_product_revision /var/lib/xmesh-agent/product "$candidate" /usr/local/bin/xmesh-agent-xspv2-product)" || return 1
+ [[ "$binding" == bound || "$binding" == unbound ]] || return 1
+ # A same-source enrolled product is already the authority. Do not rebuild
+ # it with an older cold installer: even identical source can yield a
+ # different executable digest. Validate the activation helper as well.
+ if [[ "$binding" == bound ]];then
+  identity="$(/usr/local/bin/xmesh-agent-xspv2-activate --identity)" || return 1
+  python3 - "$identity" "$candidate" <<'PY'
+import json,re,sys
+v=json.loads(sys.argv[1])
+if v.get('version')!='control-v6.0.24' or v.get('sourceRevision')!=sys.argv[2] or not re.fullmatch('[0-9a-f]{64}',v.get('artifactSha256','')):
+    raise SystemExit('Existing activation helper requires coordinated upgrade')
+PY
+  [[ $? == 0 ]] || return 1
+ fi
+ refuse_legacy_quota_update /var/lib/xmesh-xray-sync || return 1
  git -C "$dir" merge --ff-only FETCH_HEAD || return 1
  new_revision="$(git -C "$dir" rev-parse HEAD)" || return 1
  [[ "$new_revision" =~ ^[0-9a-f]{40}$ ]] || return 1
  [[ -f "$dir/VERSION" && "$(tr -d '\r\n' < "$dir/VERSION")" == "6.0.0" ]] || { echo "XMesh-Node main is not v6.0.0" >&2; return 1; }
  [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.24" ]] || { echo "XMesh-Node main does not expose Agent control-v6.0.24" >&2; return 1; }
  [[ -f "$dir/deploy/install-xsp-v2-production-agent.sh" && ! -L "$dir/deploy/install-xsp-v2-production-agent.sh" ]] || { echo "v6 PQ Agent installer is missing" >&2; return 1; }
- if (cd "$dir" && docker --config "$DOCKER_CONFIG" compose build xmesh-node && docker --config "$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check -config /etc/xmesh-node/config.json && docker --config "$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node && [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]] && bash deploy/install-xsp-v2-production-agent.sh "$new_revision");then
+ if (cd "$dir" && docker --config "$DOCKER_CONFIG" compose build xmesh-node && docker --config "$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check -config /etc/xmesh-node/config.json && docker --config "$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node && [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]] && { [[ "$binding" == bound ]] || bash deploy/install-xsp-v2-production-agent.sh "$new_revision"; });then
   identity="$(/usr/local/bin/xmesh-agent-xspv2-activate --identity)" || return 1
   python3 - "$identity" "$new_revision" <<'PY'
 import json,sys
@@ -110,7 +207,7 @@ PY
 /usr/bin/curl -4 --retry 2 --retry-delay 2 --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$self_tmp"
 bash -n "$self_tmp"; grep -q 'xmesh-node-agent-upgrade.service' "$self_tmp" || { echo "Invalid agent updater" >&2; exit 1; }
 {
- printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'; declare -f update_router; printf '%s\n' 'update_router'
+ printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'; declare -f refuse_legacy_quota_update preflight_enrolled_product_revision update_router; printf '%s\n' 'update_router'
 } > "$router_helper"
 bash -n "$router_helper"; install -o root -g root -m 0700 "$router_helper" /usr/local/sbin/.xmesh-router-upgrade.new
 if ! systemd-run --quiet --wait --collect --pipe --unit=xmesh-node-router-upgrade --property=Type=oneshot --property=TimeoutStartSec=650s --property=ProtectSystem=strict --property=ProtectHome=true --property=ReadWritePaths=/opt/xmesh-node --property=ReadWritePaths=/run --property=ReadWritePaths=/usr/local/bin --property=ReadWritePaths=/var/lib/xmesh-agent /usr/local/sbin/.xmesh-router-upgrade.new;then

@@ -170,7 +170,7 @@ def main():
         assert_status(code,200,"admin sees confirmed restart")
         assert restart_status["state"]=="succeeded" and restart_status["id"]==restart_id
 
-        # v1 agents cannot self-update. v4 can receive only a fixed signed action.
+        # Historical agents cannot queue an unapproved Agent self-update.
         code,_,_=request("POST",f"/nodes/{node}/agent-update",{},
                          cookie=cookie,origin=BASE)
         assert_status(code,409,"legacy control agent cannot run unknown update action")
@@ -192,24 +192,18 @@ def main():
         code,_,_=request("POST",f"/nodes/{node}/agent-update",
             {"command":"rm -rf /"},cookie=cookie,origin=BASE)
         assert code in (400,422), f"arbitrary updater commands must be rejected: HTTP {code}"
-        code,agent_command,_=request("POST",f"/nodes/{node}/agent-update",{},
-                                    cookie=cookie,origin=BASE)
-        assert_status(code,202,"admin queued a fixed agent self-update")
-        assert agent_command["targetVersion"]==CONTROL_AGENT_VERSION
-        code,_,_=request("POST",f"/nodes/{node}/restart",{},
+        # Ordinary Agent updates must not enqueue a legacy unbound command.
+        # The qualified successor API is separate and defaults to disabled.
+        code,_,_=request("POST",f"/nodes/{node}/agent-update",{},
                          cookie=cookie,origin=BASE)
-        assert_status(code,409,"agent update prevents overlapping restart commands")
+        assert_status(code,409,"unapproved Agent self-update refused")
         code,polled,_=signed_post("/node/restart/poll",{"node_id":node})
-        assert_status(code,200,"signed v4 node receives agent update")
-        assert polled["command"]=={
-            "id":agent_command["id"],"action":"update_agent","targetVersion":CONTROL_AGENT_VERSION}
-        code,_,_=signed_post("/node/restart/ack",{
-            "node_id":node,"command_id":agent_command["id"],
-            "success":True,"detail":f"Agent {CONTROL_AGENT_VERSION} installed and verified"})
-        assert_status(code,200,"signed node confirms agent update")
+        assert_status(code,200,"signed control poll remains healthy")
+        assert polled["command"] is None, polled
         code,last_command,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
-        assert_status(code,200,"admin reads confirmed agent-update status")
-        assert last_command["state"]=="succeeded" and last_command["action"]=="update_agent"
+        assert_status(code,200,"admin reads unchanged control command history")
+        assert last_command["id"]==restart_id
+        assert last_command["state"]=="succeeded" and last_command["action"]=="restart_xray"
 
         # Real fixed-version queue and authenticated progress. No raw logs/config
         # are accepted by the progress endpoint, even from an enrolled node.
@@ -246,7 +240,7 @@ def main():
             # unverified release. Never accept an arbitrary 502 as a pass.
             code, unchanged, _ = request("GET", f"/nodes/{node}/restart", cookie=cookie)
             assert_status(code, 200, "inspect queue after official GitHub release throttling")
-            assert unchanged["state"]=="succeeded" and unchanged["action"]=="update_agent", unchanged
+            assert unchanged["id"]==restart_id and unchanged["state"]=="succeeded" and unchanged["action"]=="restart_xray", unchanged
             code, no_queue, _ = signed_post("/node/restart/poll", {"node_id":node})
             assert_status(code, 200, "signed Node inspects empty update queue after upstream 403")
             assert no_queue["command"] is None, no_queue

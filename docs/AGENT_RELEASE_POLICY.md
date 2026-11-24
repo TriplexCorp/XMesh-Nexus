@@ -29,14 +29,50 @@ For every production Agent release, all of the following must point to the same 
 
 `sourceRevision` and `artifactSha256` remain immutable release-identity fields, but they do **not** replace the version bump requirement.
 
-A rolling upgrade may explicitly accept the immediately previous Agent version so existing nodes keep working while they upgrade. The panel must still advertise only the newest target version.
+Fresh Nexus installs approve a Node build using `XSP_V2_PRODUCT_AGENT_PIN=<source SHA>:<product binary SHA-256>`. Set it on the initial `install.sh` invocation using the reviewed release evidence. Full installation fails before host dependency provisioning when the approved pin is missing, malformed, ambiguous, or does not match the shipped Node bootstrap revision. An existing approved pin is preserved and cannot be silently replaced. New enrollment also fails closed when the binary digest does not match. The panel supplies the exact Node and running Nexus revisions and checks the Node bootstrap hash before dispatch.
 
-Updater self-repair must validate a downloaded bootstrap against the **commanded target Agent version** from the authenticated/signed update request. It must never pin repair validation to a literal version embedded in the older running Agent; otherwise a missing updater unit could deadlock the next release.
-
-The normal signed update path follows the same rule: it must execute a **fresh target-validated updater bootstrap**, not blindly start the updater executable installed by the previous release. The installed static updater service is an emergency/local fallback and must never become the authority that decides whether N can update to N+1. Failure ACKs should carry a bounded sanitized updater reason so operators are not left with only `systemd: exit-code`.
+The first install does not require the bridge package. Unbound Agent update requests are refused. The signed plan, staging, atomic switch, COMMIT and signed ABORT code remain available for future release qualification. A successor release must be tested from the installed first release before enabling its update action.
 
 ## CI requirement
 
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.
 
-Current target: **`control-v6.0.24`**.
+Current target: **`control-v6.0.28`**.
+
+## First-install release record
+
+`deploy/agent-release-pin.conf` binds the exact source revision, both Agent
+artifact digests, and immutable Go builder. The record is parsed as data, never
+sourced as shell. A dedicated CI job independently rebuilds both binaries and
+must match their recorded digests. The exact current 6.0.28 candidate was built in [Node CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45360660315), independently reproduced in [Nexus CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/45366366675), and matched all three installed scenarios in [Nexus CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/45366366448) at Nexus revision `11dff82c870f6dddb0940835d0f3fab3e561fa7d`. The matrix verified the product artifact SHA-256 and exact Node revision recorded in the pin; the isolated clean-install lifecycle also completed signed ABORT, synthetic first-successor COMMIT and activation recovery.
+
+`firstInstallApproved=1` approves only the exact initial Agent identity for a new installation. The full installer automatically imports the canonical pin; it never overwrites an existing different approval. No separate manual pin copy is required. An explicitly supplied matching operator pin is still accepted. The approval does not authorize the synthetic successor, a full runtime-bundle upgrade or production quota activation.
+
+The record does not enable Quota V2, authorize production traffic, or grant
+update/rollback authority. The successor release still needs the signed
+update protocol and installed lifecycle acceptance.
+
+## Local first-release recovery supervisor
+
+The clean install uses `xmesh-product-release-update.timer` and a private,
+digest-checked copy of the enrolled initial product executable. It is
+initialized only from the cryptographically verified original activation;
+the old APT bridge package is not an installation dependency. The control
+worker accepts only an authenticated manifest-bound command and does not send
+a legacy success ACK for that command. The supervisor independently requests
+the signed release plan, stages exact bytes, and waits for a signed COMMIT
+or ABORT. It never treats a transport timeout as rollback authority.
+
+This is the **first successor binary** mechanism; it is not yet qualification
+of an entire Agent/runtime bundle, multiple successive upgrades, or an
+upgrade while production quota spending is active. These gates must not be
+silently bypassed by the fresh installation path.
+
+The owner-only ordinary update action has a gated first-successor queue.
+It requires a recent heartbeat for the exact original enrolled version,
+an immutable approved strictly forward manifest, a nonrevoked keyset, and
+no committed previous successor. `XSP_V2_PRODUCT_FIRST_SUCCESSOR_QUALIFIED`
+defaults to zero and must stay zero until real installed lifecycle testing
+qualifies the successor; planning and commit gates must also be enabled.
+The queue refuses production Quota V2 operation until live-quota update
+and rollback have been qualified. This is not a claim of chained upgrades.

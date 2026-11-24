@@ -3,12 +3,16 @@ on:
   pull_request:
     paths:
       - 'deploy/update-node-control-agent.sh'
+      - 'deploy/xmesh-product-upgrade-coordinator.py'
+      - 'deploy/xmesh-product-agent-upgrade.*'
       - 'scripts/test-node-agent-systemd-upgrade.py'
       - '.github/workflows/node-agent-systemd-upgrade.yml'
   push:
     branches: [main]
     paths:
       - 'deploy/update-node-control-agent.sh'
+      - 'deploy/xmesh-product-upgrade-coordinator.py'
+      - 'deploy/xmesh-product-agent-upgrade.*'
       - 'scripts/test-node-agent-systemd-upgrade.py'
       - '.github/workflows/node-agent-systemd-upgrade.yml'
   workflow_dispatch:

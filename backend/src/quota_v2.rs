@@ -37,6 +37,54 @@ pub fn enabled() -> bool {
     std::env::var("XMESH_QUOTA_V2_ENABLED").is_ok_and(|value| value == "1")
 }
 
+fn issuance_paused() -> bool {
+    match std::env::var("XMESH_QUOTA_V2_PAUSE_ISSUANCE") {
+        Ok(value) => value != "0",
+        Err(std::env::VarError::NotPresent) => false,
+        Err(std::env::VarError::NotUnicode(_)) => true,
+    }
+}
+
+/// Pause new reservations and spending permits while keeping the existing
+/// v2 ledger, WAL endpoints and immutable receipt replay available.
+pub fn require_issuance_open() -> Result<(), ApiError> {
+    if issuance_paused() {
+        return Err(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "New Quota V2 issuance is paused.",
+        ));
+    }
+    Ok(())
+}
+
+/// Refuse an accidental feature-gate downgrade whenever an immutable
+/// spending permit has been issued, even if its SQL hold is fully burnt.
+/// A zero remaining hold cannot prove that remote Xray WAL is final, or
+/// that no old signed permit can be replayed. An explicit, separately
+/// verified migration is needed before returning to legacy admission.
+/// This startup check does NOT enable production Quota V2.
+pub async fn refuse_disabled_with_funded_reservations(pool: &PgPool) -> anyhow::Result<()> {
+    if enabled() {
+        return Ok(());
+    }
+    let unsafe_downgrade: bool = sqlx::query_scalar(
+        "SELECT
+            EXISTS(SELECT 1 FROM quota_v2_reservations
+                   WHERE ceiling_bytes > GREATEST(
+                       acknowledged_bytes, conservative_burn_floor_bytes))
+            OR EXISTS(SELECT 1 FROM quota_v2_signed_first_cap_outbox)
+            OR EXISTS(SELECT 1 FROM quota_v2_calendar_successor_positive_caps)",
+    )
+    .fetch_one(pool)
+    .await?;
+    if unsafe_downgrade {
+        anyhow::bail!(
+            "Quota V2 disabled while funded reservations or signed permits remain; refusing unsafe legacy startup"
+        );
+    }
+    Ok(())
+}
+
 /// Record an authenticated node/gateway protocol claim. The caller must have
 /// completed either registered Node Ed25519 authentication or strict-PQ
 /// product-gateway authorization first.
@@ -415,9 +463,11 @@ pub async fn fleet_protocol_readiness(
     let mut fleet = summarize_fleet_nodes(&entries)?;
     recheck_authoritative_profile_revisions(&state, &mut fleet).await;
     let all_claim_v2 = fleet.serving > 0 && fleet.serving == fleet.compatible;
+    let paused = issuance_paused();
     Ok(Json(json!({
         "protocol":"v2",
         "featureEnabled":enabled(),
+        "issuancePaused":paused,
         "servingNodes":fleet.serving,
         "protocolCompatibleNodes":fleet.compatible,
         "protocolPreflightPassed":all_claim_v2,
@@ -428,7 +478,7 @@ pub async fn fleet_protocol_readiness(
         "applicationCompatibleNodes":fleet.application_compatible,
         "applicationPreflightPassed":fleet.serving>0 && fleet.application_compatible==fleet.serving,
         "activationCandidateNodes":fleet.activation_candidates,
-        "activationCandidatePreflightPassed":fleet.serving>0 && fleet.activation_candidates==fleet.serving,
+        "activationCandidatePreflightPassed":!paused && fleet.serving>0 && fleet.activation_candidates==fleet.serving,
         "runtimeHeartbeatFreshnessSeconds":65,
         "agentHeartbeatFreshnessSeconds":65,
         "legacyAgentQuietPeriodMinutes":15,
@@ -482,6 +532,38 @@ async fn inactive_revocation_preflight(
 /// Read-only operator preflight for coordinated revocation/reset.
 /// Expiration never refunds an offline grant: the outstanding amount remains
 /// held until authenticated node-side spending or a future revocation proof.
+async fn revocation_status_leases(
+    pool: &sqlx::PgPool,
+    user_id: i64,
+    epoch: &str,
+) -> Result<Vec<sqlx::postgres::PgRow>, ApiError> {
+    sqlx::query(
+        "SELECT lease.node_id,lease.acknowledged_bytes,lease.ceiling_bytes,
+                lease.revision,lease.node_confirmed,lease.valid_until<NOW() AS expired,
+                revoke.request_id::text AS revocation_request_id,
+                revoke.applied_at IS NOT NULL AS revocation_applied,
+                revoke.observed_used_bytes,
+                lease.conservative_burn_floor_bytes,lease.conservative_burned_bytes,
+                COALESCE((SELECT SUM(head.stream_bytes) FROM (
+                    SELECT DISTINCT ON (c.filename) c.stream_bytes
+                    FROM quota_v2_wal_charges c WHERE c.reservation_id=lease.reservation_id
+                    ORDER BY c.filename,c.first_sequence DESC
+                ) head),0)::bigint AS conservative_wal_bytes,
+                lease.conservative_burned_at IS NOT NULL AS conservatively_burned
+         FROM quota_v2_reservations AS lease
+         LEFT JOIN quota_v2_revocation_requests AS revoke
+           ON revoke.user_id=lease.user_id AND revoke.epoch=lease.epoch
+          AND revoke.node_id=lease.node_id AND revoke.meter_epoch=lease.meter_epoch
+         WHERE lease.user_id=$1 AND lease.epoch=$2::uuid
+         ORDER BY lease.node_id",
+    )
+    .bind(user_id)
+    .bind(epoch)
+    .fetch_all(pool)
+    .await
+    .map_err(ApiError::from)
+}
+
 pub async fn revocation_status(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
@@ -501,7 +583,7 @@ pub async fn revocation_status(
         return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found."));
     }
     let active = sqlx::query(
-        "SELECT epoch::text AS epoch,limit_bytes,settled_bytes
+        "SELECT epoch::text AS epoch,limit_bytes,settled_bytes,observed_floor_bytes
          FROM quota_v2_accounts WHERE user_id=$1 AND NOT closed",
     )
     .bind(user_id)
@@ -513,25 +595,8 @@ pub async fn revocation_status(
     let epoch: String = active.try_get("epoch")?;
     let limit: i64 = active.try_get("limit_bytes")?;
     let settled: i64 = active.try_get("settled_bytes")?;
-    let leases = sqlx::query(
-        "SELECT lease.node_id,lease.acknowledged_bytes,lease.ceiling_bytes,
-                lease.revision,lease.node_confirmed,lease.valid_until<NOW() AS expired,
-                revoke.request_id::text AS revocation_request_id,
-                revoke.applied_at IS NOT NULL AS revocation_applied,
-                revoke.observed_used_bytes,
-                lease.conservative_burn_floor_bytes,lease.conservative_burned_bytes,
-                lease.conservative_burned_at IS NOT NULL AS conservatively_burned
-         FROM quota_v2_reservations AS lease
-         LEFT JOIN quota_v2_revocation_requests AS revoke
-           ON revoke.user_id=lease.user_id AND revoke.epoch=lease.epoch
-          AND revoke.node_id=lease.node_id AND revoke.meter_epoch=lease.meter_epoch
-         WHERE lease.user_id=$1 AND lease.epoch=$2::uuid
-         ORDER BY lease.node_id",
-    )
-    .bind(user_id)
-    .bind(&epoch)
-    .fetch_all(&state.pool)
-    .await?;
+    let observed_floor: i64 = active.try_get("observed_floor_bytes")?;
+    let leases = revocation_status_leases(&state.pool, user_id, &epoch).await?;
     let mut held: i64 = 0;
     let mut nodes = Vec::with_capacity(leases.len());
     for lease in leases {
@@ -556,6 +621,7 @@ pub async fn revocation_status(
             "ceilingBytes":ceiling,
             "heldBytes":outstanding,
             "conservativeBurnedBytes":burned,
+            "conservativeWalBytes":lease.try_get::<i64,_>("conservative_wal_bytes")?,
             "conservativeBurned":burn_completed,
             "conservativeBurnFloorBytes":charged_floor,
             "revision":lease.try_get::<i64,_>("revision")?,
@@ -579,6 +645,7 @@ pub async fn revocation_status(
         "userId":user_id,"protocol":"v2",
         "state":if historical_held>0 {"awaiting_historical"} else if held == 0 {"drained"} else {"awaiting_nodes"},
         "epoch":epoch,"limitBytes":limit,"settledBytes":settled,
+        "observedFloorBytes":observed_floor,
         "heldBytes":total_held,"historicalHeldBytes":historical_held,
         "canResetNow":total_held == 0,
         "canRefundNow":false,"finalMeterVerified":false,
@@ -1066,6 +1133,48 @@ fn validate_local(
     Ok(reported)
 }
 
+/// Quota V2 always issues finite Xray windows; `i64::MAX` means that
+/// PostgreSQL must not impose a global traffic budget on an otherwise
+/// unlimited subscriber. Independent Node and CDN budgets remain binding.
+/// This sentinel must NEVER be copied into an Xray signed byte ceiling.
+pub fn authoritative_shared_limit(user: &Value) -> Result<i64, ApiError> {
+    let gb = user
+        .get("limit")
+        .and_then(Value::as_f64)
+        .ok_or_else(conflict)?;
+    if !gb.is_finite() || gb < 0.0 || gb > 1_000_000.0 {
+        return Err(conflict());
+    }
+    if gb == 0.0 {
+        return Ok(i64::MAX);
+    }
+    let bytes = crate::gb_to_bytes_i64(gb);
+    if bytes <= 0 || bytes == i64::MAX {
+        return Err(conflict());
+    }
+    Ok(bytes)
+}
+
+/// The signed preview's zero global limit is an explicit unlimited
+/// subscriber, NOT an authorization to install an unbounded Xray cap.
+/// Unknown/unclassified Node policy paths retain their V1 behavior.
+fn policy_shared_limit(user: &Value, inbound_class: &str) -> Result<Option<i64>, ApiError> {
+    let raw = user
+        .get("limitBytes")
+        .and_then(Value::as_i64)
+        .ok_or_else(conflict)?;
+    if raw > 0 {
+        return Ok(Some(raw));
+    }
+    if raw == 0 && matches!(inbound_class, "main" | "cdn" | "mixed") {
+        return Ok(Some(i64::MAX));
+    }
+    if raw == 0 && inbound_class == "unclassified" {
+        return Ok(None);
+    }
+    Err(conflict())
+}
+
 async fn ensure_account(
     conn: &mut sqlx::PgConnection,
     user_id: i64,
@@ -1086,10 +1195,7 @@ async fn ensure_account(
     .fetch_optional(&mut *conn)
     .await?
     .ok_or_else(conflict)?;
-    let current_limit = current_user
-        .get("limit")
-        .and_then(Value::as_f64)
-        .unwrap_or(0.0);
+    let authoritative_limit = authoritative_shared_limit(&current_user)?;
     let base_used_gb = current_user
         .get("used")
         .and_then(Value::as_f64)
@@ -1106,7 +1212,7 @@ async fn ensure_account(
     .fetch_one(&mut *conn)
     .await?;
     let expected_used = crate::gb_to_bytes_i64(base_used_gb).saturating_add(measured_bytes.max(0));
-    if crate::gb_to_bytes_i64(current_limit) != limit || panel_used.abs_diff(expected_used) > 1 {
+    if authoritative_limit != limit || panel_used.abs_diff(expected_used) > 1 {
         return Err(conflict());
     }
 
@@ -1340,28 +1446,51 @@ async fn lease_identity(
     Ok((meter, uuid::Uuid::new_v4().to_string(), false))
 }
 
-async fn issue_user(
+async fn bounded_policy_target(
     conn: &mut sqlx::PgConnection,
-    user: &mut Value,
     user_id: i64,
     node_id: i64,
-    local_record: Option<&LocalQuotaCounter>,
-    now_ms: i64,
-) -> Result<(), ApiError> {
-    let limit = user
-        .get("limitBytes")
-        .and_then(Value::as_i64)
-        .ok_or_else(conflict)?;
-    if limit <= 0 {
-        // Node-only and CDN quotas stay on their independent rule path.
-        // A global shared reservation is meaningful only for global limits.
-        return Ok(());
-    }
-    let panel_used = user
-        .get("panelUsedBytes")
-        .and_then(Value::as_i64)
-        .ok_or_else(conflict)?;
-    let target = if user.get("onHold").and_then(Value::as_bool) == Some(true) {
+    user: &Value,
+    reservation: &str,
+    target: i64,
+    inbound_class: &str,
+) -> Result<i64, ApiError> {
+    crate::quota_v2_cdn_lifetime::require_fundable_mixed(
+        conn,
+        user_id,
+        node_id,
+        user,
+        reservation,
+        inbound_class,
+    )
+    .await?;
+    // Keep the old outstanding amount plus ONLY the independently
+    // unallocated per-Node lifetime headroom. A shared account reservation
+    // must never exceed a configured Node's own remaining lifetime budget.
+    // A missing node-specific rule leaves the existing global limit intact.
+    let node_target = crate::quota_v2_node_lifetime::bounded_target(
+        conn,
+        user_id,
+        node_id,
+        user,
+        reservation,
+        target,
+    )
+    .await?;
+    crate::quota_v2_cdn_lifetime::bounded_target(
+        conn,
+        user_id,
+        node_id,
+        user,
+        reservation,
+        node_target,
+        inbound_class,
+    )
+    .await
+}
+
+fn offline_reservation_target(user: &Value) -> i64 {
+    if user.get("onHold").and_then(Value::as_bool) == Some(true) {
         // Waiting subscriptions must be able to make the first verified
         // online connection. Allocate a small shared bootstrap allowance,
         // never an unreserved offline grant across multiple nodes.
@@ -1371,24 +1500,100 @@ async fn issue_user(
             .and_then(Value::as_i64)
             .unwrap_or(0)
             .clamp(0, 64 * 1024 * 1024)
-    };
-    let local_total = local_record.map_or(0, |item| item.used_bytes);
-    let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
-    let (meter, reservation, confirmed) =
-        lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
-    let revoke_id: Option<String> = sqlx::query_scalar(
+    }
+}
+
+async fn reservation_revocation(
+    conn: &mut sqlx::PgConnection,
+    user_id: i64,
+    node_id: i64,
+    epoch: &str,
+    meter: &str,
+    reservation: &str,
+) -> Result<Option<String>, ApiError> {
+    sqlx::query_scalar(
         "SELECT request_id::text FROM quota_v2_revocation_requests
          WHERE user_id=$1 AND epoch=$2::uuid AND node_id=$3
            AND meter_epoch=$4::uuid AND reservation_id=$5::uuid",
     )
     .bind(user_id)
-    .bind(&epoch)
+    .bind(epoch)
     .bind(node_id)
-    .bind(&meter)
-    .bind(&reservation)
-    .fetch_optional(&mut *conn)
+    .bind(meter)
+    .bind(reservation)
+    .fetch_optional(conn)
+    .await
+    .map_err(ApiError::from)
+}
+
+async fn bind_reservation_deadline(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    user: &Value,
+    reservation: &str,
+    inbound_class: &str,
+) -> Result<i64, ApiError> {
+    let node = crate::quota_v2_node_lifetime::bind_deadline(
+        conn,
+        node_id,
+        user,
+        reservation,
+        inbound_class != "unclassified",
+    )
     .await?;
-    let until = now_ms.saturating_add(24 * 60 * 60 * 1000);
+    let cdn =
+        crate::quota_v2_cdn_lifetime::bind_deadline(conn, user, reservation, inbound_class).await?;
+    Ok(node.into_iter().chain(cdn).min().unwrap_or(i64::MAX))
+}
+
+pub async fn issue_user(
+    conn: &mut sqlx::PgConnection,
+    user: &mut Value,
+    user_id: i64,
+    node_id: i64,
+    local_record: Option<&LocalQuotaCounter>,
+    now_ms: i64,
+    inbound_class: &str,
+) -> Result<(), ApiError> {
+    require_issuance_open()?;
+    let Some(limit) = policy_shared_limit(user, inbound_class)? else {
+        // The generic V1/unknown-inbound policy path cannot manufacture
+        // a positive unsigned V2 lease for an unlimited subscriber.
+        return Ok(());
+    };
+    let panel_used = user
+        .get("panelUsedBytes")
+        .and_then(Value::as_i64)
+        .ok_or_else(conflict)?;
+    let target = offline_reservation_target(user);
+    let local_total = local_record.map_or(0, |item| item.used_bytes);
+    let epoch = ensure_account(conn, user_id, limit, panel_used).await?;
+    let (meter, reservation, confirmed) =
+        lease_identity(conn, user_id, node_id, &epoch, local_record, local_total).await?;
+    let calendar_end =
+        bind_reservation_deadline(conn, node_id, user, &reservation, inbound_class).await?;
+    let revoke_id =
+        reservation_revocation(conn, user_id, node_id, &epoch, &meter, &reservation).await?;
+    let bounded_target = bounded_policy_target(
+        conn,
+        user_id,
+        node_id,
+        user,
+        &reservation,
+        target,
+        inbound_class,
+    )
+    .await?;
+    // A mixed MAIN/CDN Node draws a finite CDN sub-ceiling from its own
+    // pool, independently of its MAIN/shared grant. Snapshot this
+    // headroom BEFORE quota_v2_reserve increases the shared SQL ceiling.
+    // The same user-account lock serializes all competing CDN Nodes.
+    let mixed_cdn_free_before = if inbound_class == "mixed" && confirmed && revoke_id.is_none() {
+        crate::quota_v2_cdn_lifetime::headroom(conn, user_id, user).await?
+    } else {
+        None
+    };
+    let until = now_ms.saturating_add(24 * 60 * 60 * 1000).min(calendar_end);
     let lease = sqlx::query(
         "SELECT acknowledged_bytes,ceiling_bytes,revision,
                     (EXTRACT(EPOCH FROM valid_until)*1000)::BIGINT AS valid_until_ms
@@ -1404,7 +1609,7 @@ async fn issue_user(
     // HTTP response gets exactly this existing unfunded lease back. Only an
     // authenticated echo of its durable identity unlocks the real budget.
     .bind(if confirmed && revoke_id.is_none() {
-        target
+        bounded_target
     } else {
         0
     })
@@ -1413,6 +1618,22 @@ async fn issue_user(
     .fetch_one(&mut *conn)
     .await
     .map_err(|_| conflict())?;
+    // A fresh zero-grant prepare also freezes authoritative class identity.
+    // No later quota edit may silently relabel committed CDN as MAIN.
+    crate::quota_v2_cdn_lifetime::record_class(conn, user_id, node_id, &reservation, inbound_class)
+        .await?;
+    if confirmed && revoke_id.is_none() {
+        crate::quota_v2_cdn_lifetime::fund_mixed(
+            conn,
+            user_id,
+            node_id,
+            user,
+            &reservation,
+            inbound_class,
+            mixed_cdn_free_before,
+        )
+        .await?;
+    }
 
     user["quotaReservation"] = json!({
         "epoch": epoch,
@@ -1461,10 +1682,69 @@ pub async fn issue(
             node_id,
             reported.get(&id).copied(),
             now_ms,
+            "unclassified",
         )
         .await?;
     }
     policy["version"] = json!(2);
     tx.commit().await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod unlimited_shared_account_tests {
+    use super::{authoritative_shared_limit, policy_shared_limit};
+    use serde_json::json;
+
+    #[test]
+    fn zero_global_quota_is_a_database_sentinel_not_a_signed_xray_ceiling() {
+        assert_eq!(
+            authoritative_shared_limit(&json!({"limit": 0})).unwrap(),
+            i64::MAX,
+        );
+        assert_eq!(
+            authoritative_shared_limit(&json!({"limit": 0.001_572_864})).unwrap(),
+            1_572_864,
+        );
+        for invalid in [
+            json!({}),
+            json!({"limit": null}),
+            json!({"limit": "0"}),
+            json!({"limit": -1}),
+            json!({"limit": 1_000_001}),
+        ] {
+            assert!(authoritative_shared_limit(&invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn unlimited_v2_entitlement_requires_a_real_signed_inbound_class() {
+        let signed = json!({"limitBytes": 0});
+        assert_eq!(
+            policy_shared_limit(&signed, "main").unwrap(),
+            Some(i64::MAX),
+        );
+        assert_eq!(policy_shared_limit(&signed, "cdn").unwrap(), Some(i64::MAX),);
+        assert_eq!(policy_shared_limit(&signed, "unclassified").unwrap(), None,);
+        // A signed mixed scope is permitted only with an independently
+        // prefunded immutable CDN hold (checked in the SQL issuer).
+        assert_eq!(
+            policy_shared_limit(&signed, "mixed").unwrap(),
+            Some(i64::MAX),
+        );
+        assert!(policy_shared_limit(&json!({"limitBytes": -1}), "main").is_err());
+        assert_eq!(
+            policy_shared_limit(&json!({"limitBytes": 1024}), "main").unwrap(),
+            Some(1024),
+        );
+    }
+
+    #[test]
+    fn a_finite_operator_limit_is_stricter_than_the_unlimited_account() {
+        let account_limit = authoritative_shared_limit(&json!({"limit": 0})).unwrap();
+        let reduced = authoritative_shared_limit(&json!({"limit": 0.002})).unwrap();
+        assert!(reduced < account_limit);
+        // A signed cap from the unlimited epoch cannot be renewed after
+        // the owner lowers the plan unless an explicit new epoch exists.
+    }
 }

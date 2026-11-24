@@ -22,7 +22,14 @@ mod panel_version;
 
 mod protocol_credentials;
 mod quota_v2;
+mod quota_v2_cap_delivery;
+mod quota_v2_cap_signing;
+mod quota_v2_cdn_lifetime;
+mod quota_v2_genesis_reservation;
+mod quota_v2_node_lifetime;
+mod quota_v2_policy_pin;
 mod quota_wal_transport;
+mod quota_xray_genesis;
 mod security;
 mod sub_server;
 mod subscription_finalmask;
@@ -54,6 +61,8 @@ mod xsp_v2_db_candidate_snapshot;
 mod xsp_v2_enrollment;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_permit_ledger_writer;
+#[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_quota_cap_attestation;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_rotation;
 #[cfg(feature = "xsp-v2-experimental")]
@@ -681,14 +690,7 @@ fn experimental_v2_routes(state: &AppState) -> Router<AppState> {
     router
 }
 
-fn application_router(state: AppState) -> Router {
-    let protected = protected_routes(&state);
-    // Experimental staging heartbeat has no control-plane side effects and is
-    // ABSENT from production builds (default features). It stays 404 until
-    // XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only is explicitly set.
-
-    let public_subscription = get(user_subscriptions::portal_route)
-        .layer(middleware::from_fn(subscription_flood::uri_budget_guard));
+fn public_api_routes() -> Router<AppState> {
     let public = Router::new()
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
@@ -711,6 +713,14 @@ fn application_router(state: AppState) -> Router {
         .route("/node/restart/progress", post(node_xray_update::progress))
         .route("/node/desired-config", post(node_runtime::desired_config))
         .route("/node/quota-v2/wal", quota_wal_transport::route())
+        .route(
+            "/node/quota-v2/policy-pin",
+            post(quota_v2_policy_pin::handle),
+        )
+        .route(
+            "/node/quota-v2/genesis-reservation",
+            post(quota_v2_genesis_reservation::handle).layer(RequestBodyLimitLayer::new(3072)),
+        )
         .route("/node/enroll", post(node_enrollment::claim))
         .route(
             "/sub/{token}",
@@ -729,6 +739,18 @@ fn application_router(state: AppState) -> Router {
         )
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
         .route("/auth/logout", post(auth::logout));
+
+    public.route(
+        "/node/quota-v2/genesis-cap-delivery",
+        post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
+    )
+}
+
+fn application_router(state: AppState) -> Router {
+    let protected = protected_routes(&state);
+    let public = public_api_routes();
+    let public_subscription = get(user_subscriptions::portal_route)
+        .layer(middleware::from_fn(subscription_flood::uri_budget_guard));
 
     let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
     Router::new()
@@ -881,6 +903,10 @@ async fn main() -> anyhow::Result<()> {
     };
 
     sqlx::migrate!("./migrations").run(&pool).await?;
+    // An operator changing the gate back to 0 must never silently expose
+    // legacy, non-v2 admission while any signed reservations still hold
+    // spendable bytes. Check after migrations and before HTTP starts.
+    quota_v2::refuse_disabled_with_funded_reservations(&pool).await?;
     // Preserve an existing custom dashboard path on upgrades. Migrate only the
     // former hardcoded default; the database remains authoritative thereafter.
     if let Ok(from_env) = env::var("DASHBOARD_PATH") {
@@ -1380,6 +1406,12 @@ async fn create_record(
             ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Created user has no ID")
         })?;
         user_subscriptions::provision_new_user(&state, id, &mut tx).await?;
+    }
+    if collection == "nodes" {
+        let id = result.get("id").and_then(Value::as_i64).ok_or_else(|| {
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Created node has no ID")
+        })?;
+        quota_xray_genesis::record_creation(&mut tx, id).await?;
     }
     tx.commit().await?;
     let record_id = result.get("id").and_then(Value::as_i64);

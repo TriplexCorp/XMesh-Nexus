@@ -45,6 +45,13 @@ jobs:
       - uses: actions/checkout@v7
       - name: Verify installer/build-context contract
         run: bash scripts/check-install-host.sh
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: deploy/xsp-v2-product-gateway/go.mod
+          cache-dependency-path: deploy/xsp-v2-product-gateway/go.sum
+      - name: Verify the isolated WAL candidate binary pin
+        working-directory: deploy/xsp-v2-product-gateway
+        run: go test -mod=readonly ./...
       - name: Verify committed gateway module lock
         run: |
           test -s deploy/xsp-v2-product-gateway/go.sum

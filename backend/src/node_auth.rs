@@ -24,6 +24,7 @@ const MAX_CLOCK_SKEW_SECONDS: i64 = 120;
 const PRODUCT_SECRET_HEADER: &str = "x-xsp-product-internal";
 const PRODUCT_NODE_HEADER: &str = "x-xsp-product-node-id";
 const PRODUCT_PATH_HEADER: &str = "x-xsp-product-path";
+const PRODUCT_ACTIVATION_HEADER: &str = "x-xsp-product-activation-sha256";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -124,6 +125,21 @@ async fn authenticate_product_gateway(
         .execute(&state.pool)
         .await?;
     Ok(true)
+}
+
+pub async fn authenticate_product_activation<'a>(
+    state: &AppState,
+    headers: &'a HeaderMap,
+    node_id: i64,
+    path: &str,
+) -> Result<&'a str, ApiError> {
+    if !authenticate_product_gateway(state, headers, node_id, path).await? {
+        return Err(error("Strict-PQ product activation required."));
+    }
+    headers
+        .get(PRODUCT_ACTIVATION_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| error("Strict-PQ product activation binding missing."))
 }
 
 pub fn canonical_for(path: &str, node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {

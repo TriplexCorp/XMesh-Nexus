@@ -3,6 +3,7 @@
 import base64
 import concurrent.futures
 import copy
+import gzip
 import hashlib
 import http.client
 import json
@@ -141,6 +142,9 @@ def read_head(response, node, challenge, panel_pub):
     data = expect(response, 200)
     blob = {name: base64.b64decode(data[name], validate=True)
             for name in ("head", "receipt", "witness", "inventory")}
+    if "inventoryEncoding" in data:
+        assert data["inventoryEncoding"] == "gzip"
+        blob["inventory"] = gzip.decompress(blob["inventory"])
     envelope = signed._decode(blob["head"])
     signed._envelope(envelope, "Nexus WAL head")
     head = envelope["payload"]
@@ -152,6 +156,86 @@ def read_head(response, node, challenge, panel_pub):
     }, head
     signed._verify_ed25519(head, envelope["signature"], b"XMESH_QUOTA_V2_REMOTE_WAL_HEAD_V1\x00", panel_pub)
     return {name: head[name] for name in ("sequence", "registrySha256")}, blob
+
+
+def check_index_capacity(db, panel_pub):
+    fx = StopChainTests("test_unrelated_user_wal_does_not_block_signed_account_stop")
+    fx.setUp()
+    try:
+        node = enroll(db, "wal-index-limit-" + secrets.token_hex(8), pubkey(fx.key))
+        cap = 384 * 1024
+        index = fx.xray / fixture.meter_inventory_audit.NAME
+        cp = copy.deepcopy(fx.cp)
+
+        def row(user_id, tag_length):
+            return {"email": f"xmesh-u{user_id}--" + "x" * tag_length,
+                    "uplinkBytes": 1, "downlinkBytes": 0}
+
+        # All variable-width fields in these rows are the email tag and the
+        # sequence. Measure one canonical row, then distribute the padding
+        # over real tag fields to land exactly on the transfer boundary.
+        before = index.stat().st_size
+        cp["inboundMeters"] = [row(200000, 1)]
+        fixture.write_test_meter_intents(cp, fx.xray)
+        index_bytes = index.read_bytes()
+        sequence = index_bytes.count(b"\n")
+        fixed = len(index_bytes) - before - len(str(sequence))
+        remaining = cap - len(index_bytes)
+        count = 0
+        while fixed + len(str(sequence + count + 1)) <= remaining:
+            count += 1
+            remaining -= fixed + len(str(sequence + count))
+        rows = []
+        for number in range(count):
+            extra = min(127, remaining)
+            rows.append(row(200001 + number, 1 + extra))
+            remaining -= extra
+        assert remaining == 0 and rows
+        cp["inboundMeters"] = rows
+        fixture.write_test_meter_intents(cp, fx.xray)
+        witness, exact = checkpoint(fx, node)
+        assert len(exact) == cap
+        expect(signed_exchange(node, fx.key, store(node, witness, exact)), 200)
+
+        cp["inboundMeters"] = [row(299999, 1)]
+        fixture.write_test_meter_intents(cp, fx.xray)
+        witness, oversized = checkpoint(fx, node)
+        assert len(oversized) > cap and oversized.startswith(exact)
+        expect(signed_exchange(node, fx.key, store(node, witness, oversized)), 400)
+        challenge = secrets.token_hex(32)
+        _, bundle = read_head(signed_exchange(node, fx.key, latest(node, challenge)), node, challenge, panel_pub)
+        assert bundle["inventory"] == exact
+        assert db.execute(
+            "SELECT count(*) FROM quota_v2_external_wal_birth_anchors WHERE node_id=%s", (node,),
+        ).fetchone() == (1,)
+        print("PASS: valid 384 KiB inventory commits in full; signed extension over cap leaves the full prior head intact")
+        cp["inboundMeters"] = [
+            {"email": f"xmesh-u{400000+user}--vless-main", "uplinkBytes": 1, "downlinkBytes": 1}
+            for user in range(500)
+        ]
+        fixture.write_test_meter_intents(cp, fx.xray)
+        witness, large = checkpoint(fx, node)
+        assert large.startswith(oversized)
+        wire = gzip.compress(large, compresslevel=6, mtime=0)
+        assert len(wire) < cap < len(large)
+        request = dict(store(node, witness, wire), inventoryEncoding="gzip")
+        altered = dict(request, inventory=b64(wire[:-1]))
+        expect(signed_exchange(node, fx.key, altered), 400)
+        exact_hash = hashlib.sha256(large).hexdigest()
+        answer = expect(signed_exchange(node, fx.key, request), 200)
+        assert expect(signed_exchange(node, fx.key, request), 200) == answer
+        challenge = secrets.token_hex(32)
+        head, bundle = read_head(signed_exchange(node, fx.key, latest(node, challenge)),
+                                 node, challenge, panel_pub)
+        assert bundle["inventory"] == large and bundle["receipt"] == base64.b64decode(answer["receipt"])
+        assert db.execute(
+            "SELECT inventory_sha256,inventory_bytes FROM quota_v2_external_wal_birth_anchors "
+            "WHERE node_id=%s AND inventory_sequence=%s", (node, head["sequence"]),
+        ).fetchone() == (exact_hash, large)
+        print(f"PASS: 500 additional users' two-direction WAL births commit and replay intact "
+              f"({len(large)} raw bytes, {len(wire)} compressed)")
+    finally:
+        fx.doCleanups()
 
 
 def main():
@@ -254,6 +338,7 @@ def main():
             else:
                 raise AssertionError("missing local WAL history accepted")
             print("PASS: commit failure emits no receipt, current head rejects stale proofs and lost history")
+            check_index_capacity(db, panel_pub)
     finally:
         fx.doCleanups()
 

@@ -21,7 +21,7 @@ use sqlx::Row;
 /// `XMesh` v6 is the first numbered POSTQUANTUM major control-Agent release.
 /// v4/v5 remain accepted only so an already enrolled node can perform the
 /// authenticated transition to v6; they are not the advertised target.
-pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.24";
+pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.28";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -288,9 +288,71 @@ pub async fn request_xray_update(
     ))
 }
 
-/// Existing endpoint, now with a v6 legacy/default target. Manifest-bound
-/// migration requests continue to delegate to the previously reviewed staged
-/// implementation; only the empty `{}` production update target changes.
+/// Only an independently qualified successor of a fresh v6 installation can
+/// be queued here. The initial release has no eligible newer manifest.
+fn first_product_successor_enabled() -> bool {
+    [
+        "XSP_V2_PRODUCT_FIRST_SUCCESSOR_QUALIFIED",
+        "XSP_V2_PRODUCT_RELEASE_PLANNING",
+        "XSP_V2_PRODUCT_RELEASE_COMMIT",
+    ]
+    .iter()
+    .all(|name| std::env::var(name).is_ok_and(|value| value == "1"))
+        && !crate::quota_v2::enabled()
+}
+
+async fn queue_first_product_successor(
+    state: &AppState,
+    actor: &crate::auth::AuthUser,
+    node_id: i64,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    crate::require_owner(actor)?;
+    let id = sqlx::query_scalar::<_, i64>(
+        "SELECT command_id FROM queue_node_xsp_product_first_successor($1,$2,$3)",
+    )
+    .bind(node_id)
+    .bind(CONTROL_AGENT_VERSION)
+    .bind(&actor.username)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|error| {
+        if error
+            .to_string()
+            .contains("node already has an active control command")
+        {
+            ApiError::new(
+                StatusCode::CONFLICT,
+                "Node already has an active control command.",
+            )
+        } else {
+            error.into()
+        }
+    })?
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::CONFLICT,
+            "No approved forward Agent release is available for this activation.",
+        )
+    })?;
+    crate::audit(
+        &state.pool,
+        &actor.username,
+        "node.agent.first_successor.requested",
+        Some("nodes"),
+        Some(node_id),
+        json!({"commandId":id,"targetVersion":CONTROL_AGENT_VERSION}),
+    )
+    .await;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "id":id,"nodeId":node_id,"action":"update_agent",
+            "targetVersion":CONTROL_AGENT_VERSION,"state":"pending"
+        })),
+    ))
+}
+
+/// Immutable manifest requests retain their dedicated verification path.
 pub async fn request_agent_update(
     State(state): State<AppState>,
     Extension(actor): Extension<crate::auth::AuthUser>,
@@ -332,61 +394,12 @@ pub async fn request_agent_update(
             "Отключённая нода не принимает команды. Сначала восстановите работу узла.",
         ));
     }
-    let active = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
-          WHERE node_id=$1 AND received_at>NOW()-INTERVAL '65 seconds'
-            AND (version LIKE 'control-v4.%' OR version LIKE 'control-v5.%' OR version LIKE 'control-v6.%'))",
-    )
-    .bind(node_id)
-    .fetch_one(&state.pool)
-    .await?;
-    if !active {
-        return Err(ApiError::new(
-            StatusCode::CONFLICT,
-            "На ноде нет активного агента с поддержкой самообновления (control-v4+).",
-        ));
+    if first_product_successor_enabled() {
+        return queue_first_product_successor(&state, &actor, node_id).await;
     }
-    sqlx::query(
-        "UPDATE node_restart_commands SET state='failed',
-         result='Command expired before delivery',finished_at=NOW()
-         WHERE node_id=$1 AND state IN ('pending','claimed')
-           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
-                (action='update_xray' AND requested_at<NOW()-INTERVAL '10 minutes') OR
-                (action NOT IN ('update_agent','update_xray') AND requested_at<NOW()-INTERVAL '180 seconds'))",
-    )
-    .bind(node_id)
-    .execute(&state.pool)
-    .await?;
-    let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version)
-         VALUES($1,'update_agent',$2,$3) ON CONFLICT DO NOTHING RETURNING id",
-    )
-    .bind(node_id)
-    .bind(&actor.username)
-    .bind(CONTROL_AGENT_VERSION)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| {
-        ApiError::new(
-            StatusCode::CONFLICT,
-            "Узел уже выполняет другую команду управления.",
-        )
-    })?;
-    crate::audit(
-        &state.pool,
-        &actor.username,
-        "node.agent.update.requested",
-        Some("nodes"),
-        Some(node_id),
-        json!({"commandId":id,"targetVersion":CONTROL_AGENT_VERSION,"major":"postquantum-v6"}),
-    )
-    .await;
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(json!({
-            "id":id,"nodeId":node_id,"action":"update_agent",
-            "targetVersion":CONTROL_AGENT_VERSION,"state":"pending"
-        })),
+    Err(ApiError::new(
+        StatusCode::CONFLICT,
+        "No approved signed Agent update is available.",
     ))
 }
 

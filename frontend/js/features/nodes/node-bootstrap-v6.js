@@ -2,8 +2,9 @@
 
 // v6 product invariant: the panel must never hand a fresh VPS an installer
 // that can enter operational state before strict-PQ activation is verified.
-// Pin the XMesh-Node v6 strict-PQ release with canonical control-v6.0.24.
-const XMESH_V6_NODE_BOOTSTRAP_SHA='d2bf974ecb7b8df5edb237f1c6604d6f697baaae';
+// Pin the XMesh-Node v6 strict-PQ release with canonical control-v6.0.27.
+const XMESH_V6_NODE_BOOTSTRAP_SHA='d2e071e4034f834852d422a41d1150da7eb25f13';
+const XMESH_V6_NODE_BOOTSTRAP_SHA256='9f9b7e517740126fc57a9e38dbf4cfa122e9b4f89015bf8f19b0d225f93b8ba0';
 const XMESH_V6_BOOTSTRAP_MARKER='XMesh Node v6 fresh installer. Security invariant:';
 const XMESH_V6_XSP_IDENTITY_CONFLICT='XSP-v2 identity already enrolled: legacy re-enrollment cannot rotate it.';
 
@@ -22,6 +23,10 @@ async function xmeshV6StrictPqBootstrapClick(event){
 
   button.disabled=true;
   try{
+    const panel=await backendRequest('/api/v1/panel/version');
+    if(typeof panel?.revision!=='string'||!/^[a-f0-9]{40}$/.test(panel.revision)){
+      throw new Error(panelIsEnglish()?'The running Nexus build has no verified revision.':'У запущенной сборки Nexus нет подтверждённой ревизии.');
+    }
     const enrollPath='/api/v1/nodes/'+encodeURIComponent(id)+'/enrollment';
     let issued=null;
     let reuseExistingIdentity=false;
@@ -56,9 +61,12 @@ async function xmeshV6StrictPqBootstrapClick(event){
     // --tlsv1.3 sets the minimum and --tls-max 1.3 the maximum for this public
     // GitHub download. It is distinct from the operational XSP/2 tunnel, which
     // remains hybrid/dual-signature and has no classical HTTP fallback.
-    const command='curl --proto "=https" --tlsv1.3 --tls-max 1.3 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap-v6.sh '+url+
-      ' && grep -Fq "'+XMESH_V6_BOOTSTRAP_MARKER+'" /tmp/xmesh-bootstrap-v6.sh'+
-      ' && sudo env XMESH_NODE_RELEASE_REF='+XMESH_V6_NODE_BOOTSTRAP_SHA+' bash /tmp/xmesh-bootstrap-v6.sh '+location.origin+' '+id+' '+port;
+    const command="(tmp=$(mktemp -d) && trap 'rm -rf -- \"$tmp\"' EXIT && "+
+      'curl --proto "=https" --tlsv1.3 --tls-max 1.3 -H "Cache-Control: no-cache" -fsSLo "$tmp/bootstrap.sh" '+url+
+      ' && printf "%s  %s\\n" '+XMESH_V6_NODE_BOOTSTRAP_SHA256+' "$tmp/bootstrap.sh" | sha256sum --check --status'+
+      ' && grep -Fq "'+XMESH_V6_BOOTSTRAP_MARKER+'" "$tmp/bootstrap.sh"'+
+      ' && sudo env XMESH_NODE_RELEASE_REF='+XMESH_V6_NODE_BOOTSTRAP_SHA+' XMESH_NEXUS_RELEASE_REF='+panel.revision+
+      ' bash "$tmp/bootstrap.sh" '+location.origin+' '+id+' '+port+')';
     const commandTitle=reuseExistingIdentity?'Команда repair для текущей VPS':'Команда для чистой VPS';
     const commandDescription=reuseExistingIdentity
       ?'Запустите только на той же VPS, где сохранена strict-PQ identity. Установщик криптографически проверит durable activation receipt и не запросит новый enrollment token.'

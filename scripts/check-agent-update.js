@@ -23,22 +23,13 @@ new Function(nodeDialogs);
 const versionMatch=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(agentVersionRaw);
 assert.ok(versionMatch,'AGENT_VERSION must use control-vMAJOR.MINOR.PATCH');
 const versionTuple=versionMatch.slice(1).map(Number);
-assert.equal(agentVersionRaw,'control-v6.0.24','Nexus target Agent version must be control-v6.0.24');
+assert.equal(agentVersionRaw,'control-v6.0.28','Nexus target Agent version must be control-v6.0.28');
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
-assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]24"/);
-assert.match(gateway,/recentAgentVersion\s*=\s*"control-v6[.]0[.]13"/,
-  'existing v6.0.13 nodes must remain enrollable');
-assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]12"/,
-  'rolling upgrade must keep v6.0.12 enrollable');
-assert.match(gateway,/transitionalAgentVersion\s*=\s*"control-v6[.]0[.]11"/,
-  'existing v6.0.11 nodes must remain enrollable');
-assert.match(gateway,/rolloutAgentVersion\s*=\s*"control-v6[.]0[.]10"/,
-  'existing v6.0.10 nodes must remain enrollable');
-assert.match(gateway,/olderAgentVersion\s*=\s*"control-v6[.]0[.]7"/,
-  'nodes on v6.0.7 must remain enrollable during recovery');
-assert.match(gateway,/repairAgentVersion\s*=\s*"control-v6[.]0[.]0"/,
-  'v6.0.0 bootstrap-hole nodes remain temporarily repairable');
+assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]28"/);
+assert.match(gateway,/release.Version == targetAgentVersion && matchesReleasePin/);
+assert.match(gateway,/XSP_V2_PRODUCT_AGENT_PIN/);
+assert.doesNotMatch(overlay,/XMESH_PRODUCT_UPGRADE_CANARY_NODE_ID/);
 assert.match(controlAgent,/local expected_version="\$\{1:-\}"/,
   'updater repair must receive the commanded target Agent version');
 assert.match(controlAgent,/grep -Fq "AGENT_VERSION=\\"\$expected_version\\"" "\$bootstrap"/,
