@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from quota_v2_release_candidate import ACTIVATION, PRODUCT, SCENARIOS, verify, verify_measured_xray, verify_running_xray, write_installed_evidence
+from quota_v2_release_candidate import ACTIVATION, PRODUCT, SCENARIOS, verify, verify_installed_matrix, verify_measured_xray, verify_running_xray, write_installed_evidence
 
 
 class CandidateTest(unittest.TestCase):
@@ -52,6 +52,43 @@ class CandidateTest(unittest.TestCase):
         self.assertTrue(result["candidateMatchesInstalledStagingEvidence"])
         self.assertFalse(result["productionActivationAuthorized"])
         self.assertEqual(set(result["stagingScenarios"]), SCENARIOS)
+
+    def test_installed_matrix_is_consistent_but_never_grants_production(self):
+        result = verify_installed_matrix(self.evidence, self.node, self.nexus)
+        self.assertTrue(result["installedMatrixConsistent"])
+        self.assertFalse(result["productionActivationAuthorized"])
+        self.assertEqual(result["nodeRevision"], self.node)
+        self.assertEqual(result["nexusRevision"], self.nexus)
+        self.assertEqual(result["candidateIdentity"], self.identity)
+        self.assertEqual(result["testedXrayArtifactSha256"], ["c" * 64])
+        self.assertEqual(set(result["stagingScenarios"]), SCENARIOS)
+
+    def test_installed_matrix_denies_mixed_commits_binaries_and_scenarios(self):
+        path = self.evidence[0]
+        original = json.loads(path.read_text())
+        for field, replacement, error in (
+            ("nexusRevision", "e" * 40, "Nexus source revision mismatch"),
+            ("xrayArtifactSha256", "f" * 64, "different Xray binaries"),
+            ("productIdentity", {**self.identity, "sourceRevision": "f" * 40},
+             "tested product binary differs"),
+            ("installedNodes", [{"nodeId": 1, "identity": self.identity}] * 2,
+             "not independent"),
+            ("productionActivationAuthorized", True, "not staging qualification"),
+        ):
+            with self.subTest(field=field):
+                altered = dict(original, **{field: replacement})
+                path.write_text(json.dumps(altered))
+                try:
+                    with self.assertRaisesRegex(ValueError, error):
+                        verify_installed_matrix(self.evidence, self.node, self.nexus)
+                finally:
+                    path.write_text(json.dumps(original))
+        with self.assertRaisesRegex(ValueError, "duplicate installed scenario"):
+            verify_installed_matrix([self.evidence[0]] * 3, self.node, self.nexus)
+        with self.assertRaisesRegex(ValueError, "all three successful scenarios"):
+            verify_installed_matrix(self.evidence[:2], self.node, self.nexus)
+        with self.assertRaisesRegex(ValueError, "exact Node and Nexus commit"):
+            verify_installed_matrix(self.evidence, "branch-name", self.nexus)
 
     def test_changed_binary_and_changed_size_rejected(self):
         (self.candidate / PRODUCT).write_bytes(b"unreviewed product")
