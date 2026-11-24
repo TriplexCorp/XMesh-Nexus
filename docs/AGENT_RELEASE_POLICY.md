@@ -29,7 +29,7 @@ For every production Agent release, all of the following must point to the same 
 
 `sourceRevision` and `artifactSha256` remain immutable release-identity fields, but they do **not** replace the version bump requirement.
 
-Fresh Nexus installs approve a Node build using `XSP_V2_PRODUCT_AGENT_PIN=<source SHA>:<product binary SHA-256>`. Set it on the initial `install.sh` invocation using the reviewed release evidence. New enrollment fails closed when the pin is absent or does not match. The panel supplies the exact Node and running Nexus revisions and checks the Node bootstrap hash before dispatch.
+Fresh Nexus installs approve a Node build using `XSP_V2_PRODUCT_AGENT_PIN=<source SHA>:<product binary SHA-256>`. Set it on the initial `install.sh` invocation using the reviewed release evidence. Full installation fails before host dependency provisioning when the approved pin is missing, malformed, ambiguous, or does not match the shipped Node bootstrap revision. An existing approved pin is preserved and cannot be silently replaced. New enrollment also fails closed when the binary digest does not match. The panel supplies the exact Node and running Nexus revisions and checks the Node bootstrap hash before dispatch.
 
 The first install does not require the bridge package. Unbound Agent update requests are refused. The signed plan, staging, atomic switch, COMMIT and signed ABORT code remain available for future release qualification. A successor release must be tested from the installed first release before enabling its update action.
 

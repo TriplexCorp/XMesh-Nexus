@@ -19,3 +19,5 @@ jobs:
         run: python3 scripts/test-agent-bootstrap-transport.py --node-root .node-transport-fixture
       - name: Prevent independent Xray restart and reactivation during signed quota revoke
         run: python3 scripts/test-agent-revocation-control.py
+      - name: Reject missing or inconsistent approved Agent identity before full Nexus install
+        run: python3 scripts/test-panel-agent-install-pin.py
