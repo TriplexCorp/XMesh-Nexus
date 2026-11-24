@@ -16,24 +16,24 @@ import (
 )
 
 const (
-	releaseArtifactPath = "/api/v1/node/agent-release-artifact"
-	releaseChunkBytes = 128 * 1024
+	releaseArtifactPath     = "/api/v1/node/agent-release-artifact"
+	releaseChunkBytes       = 128 * 1024
 	maxReleaseArtifactBytes = 64 * 1024 * 1024
 )
 
 type releaseArtifactRequest struct {
-	CommandID int64 `json:"commandId"`
-	Current releaseIdentity `json:"current"`
-	PlanSHA256 string `json:"planSha256"`
-	Offset int64 `json:"offset"`
+	CommandID  int64           `json:"commandId"`
+	Current    releaseIdentity `json:"current"`
+	PlanSHA256 string          `json:"planSha256"`
+	Offset     int64           `json:"offset"`
 }
 
 type releaseArtifactChunk struct {
-	PlanSHA256 string `json:"planSha256"`
+	PlanSHA256     string `json:"planSha256"`
 	ArtifactSHA256 string `json:"artifactSha256"`
-	Offset int64 `json:"offset"`
-	TotalBytes int64 `json:"totalBytes"`
-	DataB64 string `json:"dataB64"`
+	Offset         int64  `json:"offset"`
+	TotalBytes     int64  `json:"totalBytes"`
+	DataB64        string `json:"dataB64"`
 }
 
 func decodeReleaseArtifactRequest(body []byte) (releaseArtifactRequest, error) {
@@ -114,9 +114,13 @@ func (g *gateway) releaseArtifact(ctx context.Context, parsed parsedEnvelope, n 
 		return http.StatusServiceUnavailable, []byte("{}")
 	}
 	var plan releasePlan
+	activation := sha256.Sum256(n.Receipt)
 	if err := json.Unmarshal(signed.Payload, &plan); err != nil ||
-		plan.NodeID != parsed.Env.NodeID || plan.CommandID != req.CommandID ||
-		plan.Current != n.Release || plan.ExpiresAtMS <= time.Now().UnixMilli() {
+		plan.Schema != "xmesh-product-agent-release-plan-v1" ||
+		plan.NodeID != parsed.Env.NodeID || plan.KeyEpoch != n.KeyEpoch || plan.CommandID != req.CommandID ||
+		plan.ActivationSHA256 != hex.EncodeToString(activation[:]) ||
+		plan.Current != n.Release || plan.Target.SourceRevision != signed.Env.Revision ||
+		plan.Target.Version != "control-v6.0.27" || plan.ExpiresAtMS <= time.Now().UnixMilli() {
 		return http.StatusConflict, []byte("{}")
 	}
 	data, total, err := readReleaseChunk(os.Getenv("XSP_V2_PRODUCT_RELEASE_ARTIFACT_DIR"), plan.Target.ArtifactSHA256, req.Offset)

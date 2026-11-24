@@ -1039,6 +1039,14 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, "strict-PQ tunnel authentication failed")
 		return
 	}
+	// A valid node key authenticates a node, not an arbitrary release.
+	// Require the enrolled source revision before any normal tunnel
+	// request, including WAL and release planning. A future transition
+	// must introduce an explicit, separately authorized recovery path.
+	if parsed.Env.Revision != n.Release.SourceRevision {
+		fail(w, http.StatusConflict, "strict-PQ tunnel release differs from enrollment")
+		return
+	}
 	if err := checkUniqueJSONKeys(parsed.Payload); err != nil {
 		fail(w, http.StatusBadRequest, "invalid strict-PQ tunnel payload")
 		return
