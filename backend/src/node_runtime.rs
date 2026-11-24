@@ -288,6 +288,52 @@ pub async fn request_xray_update(
     ))
 }
 
+async fn expire_update_commands(state: &AppState, node_id: i64) -> Result<(), ApiError> {
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Command expired before delivery',finished_at=NOW()
+         WHERE node_id=$1 AND state IN ('pending','claimed')
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
+                (action='update_xray' AND requested_at<NOW()-INTERVAL '10 minutes') OR
+                (action NOT IN ('update_agent','update_xray') AND requested_at<NOW()-INTERVAL '180 seconds'))",
+    )
+    .bind(node_id)
+    .execute(&state.pool)
+    .await?;
+    Ok(())
+}
+
+async fn request_product_agent_upgrade(
+    state: &AppState,
+    actor: &crate::auth::AuthUser,
+    node_id: i64,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let id = sqlx::query_scalar::<_, i64>(
+        "SELECT command_id FROM queue_node_xsp_product_upgrade($1,$2)",
+    )
+    .bind(node_id)
+    .bind(&actor.username)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Product upgrade canary is not ready"))?;
+    crate::audit(
+        &state.pool,
+        &actor.username,
+        "node.agent.update.requested",
+        Some("nodes"),
+        Some(node_id),
+        json!({"commandId":id,"targetVersion":"control-v6.0.27","major":"postquantum-v6"}),
+    )
+    .await;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "id":id,"nodeId":node_id,"action":"update_agent",
+            "targetVersion":"control-v6.0.27","state":"pending"
+        })),
+    ))
+}
+
 /// Existing endpoint, now with a v6 legacy/default target. Manifest-bound
 /// migration requests continue to delegate to the previously reviewed staged
 /// implementation; only the empty `{}` production update target changes.
@@ -353,46 +399,11 @@ pub async fn request_agent_update(
             "На ноде нет активного агента с поддержкой самообновления (control-v4+).",
         ));
     }
-    sqlx::query(
-        "UPDATE node_restart_commands SET state='failed',
-         result='Command expired before delivery',finished_at=NOW()
-         WHERE node_id=$1 AND state IN ('pending','claimed')
-           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
-                (action='update_xray' AND requested_at<NOW()-INTERVAL '10 minutes') OR
-                (action NOT IN ('update_agent','update_xray') AND requested_at<NOW()-INTERVAL '180 seconds'))",
-    )
-    .bind(node_id)
-    .execute(&state.pool)
-    .await?;
+    expire_update_commands(&state, node_id).await?;
     // Explicitly provisioned rollout canary only. The ordinary updater
     // must remain available to the fleet on its existing release target.
     if product_canary {
-        let id = sqlx::query_scalar::<_, i64>(
-            "SELECT command_id FROM queue_node_xsp_product_upgrade($1,$2)",
-        )
-        .bind(node_id)
-        .bind(&actor.username)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| {
-            ApiError::new(StatusCode::CONFLICT, "Product upgrade canary is not ready")
-        })?;
-        crate::audit(
-            &state.pool,
-            &actor.username,
-            "node.agent.update.requested",
-            Some("nodes"),
-            Some(node_id),
-            json!({"commandId":id,"targetVersion":"control-v6.0.27","major":"postquantum-v6"}),
-        )
-        .await;
-        return Ok((
-            StatusCode::ACCEPTED,
-            Json(json!({
-                "id":id,"nodeId":node_id,"action":"update_agent",
-                "targetVersion":"control-v6.0.27","state":"pending"
-            })),
-        ));
+        return request_product_agent_upgrade(&state, &actor, node_id).await;
     }
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version)

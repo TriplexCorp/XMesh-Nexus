@@ -3,11 +3,15 @@
 # Distribute the resulting package only through the trusted signed package
 # repository. The updater cannot authorize a new package source on its own.
 set -euo pipefail
+umask 022
+export LC_ALL=C
 [[ $# == 3 && "$2" =~ ^[a-f0-9]{64}$ ]] || {
  echo "Usage: $0 BRIDGE_BINARY APPROVED_SHA256 OUTPUT_DEB" >&2; exit 2;
 }
 [[ -f "$1" && ! -L "$1" ]] || exit 2
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# Make archive timestamps depend only on the reviewed source revision.
+export SOURCE_DATE_EPOCH="$(git -C "$root" show -s --format=%ct HEAD)"
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 archive="$work/package"
@@ -39,7 +43,7 @@ set -eu
 # Refuse before dpkg writes any package files if the original active release
 # is absent. The verified product still owns its existing activation state.
 product=/usr/local/bin/xmesh-agent-xspv2-product
-set -- $(python3 - <<'PY'
+set -- $(python3 -I - <<'PY'
 import hashlib,json,os,re,stat
 def read_private(path, mode, maximum):
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -66,7 +70,7 @@ cat > "$archive/DEBIAN/postinst" <<'POSTINST'
 #!/bin/sh
 set -eu
 if [ "$1" = configure ]; then
- /usr/bin/python3 /usr/local/libexec/xmesh-product-upgrade-coordinator.py ready
+ /usr/bin/python3 -I /usr/local/libexec/xmesh-product-upgrade-coordinator.py ready
  systemctl daemon-reload
  systemctl enable --now xmesh-product-agent-upgrade.timer
 fi
