@@ -1,0 +1,11 @@
+[Unit]
+Description=Recover pending first-release Agent updates
+
+[Timer]
+OnBootSec=20s
+OnCalendar=*-*-* *:*:00
+Persistent=true
+Unit=xmesh-product-release-update.service
+
+[Install]
+WantedBy=timers.target

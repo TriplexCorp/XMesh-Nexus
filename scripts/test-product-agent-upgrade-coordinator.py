@@ -31,7 +31,8 @@ class CoordinatorTest(unittest.TestCase):
         self.write(self.bridge, b"trusted helper")
         self.write(self.bridge_digest, hashlib.sha256(b"trusted helper").hexdigest().encode(), 0o600)
         self.write(root / "config.json", json.dumps({
-            "releaseIdentity": {"artifactSha256": hashlib.sha256(b"old").hexdigest()},
+            "releaseIdentity": {"artifactSha256": hashlib.sha256(b"old").hexdigest(),
+                                "version": "control-v6.0.24", "sourceRevision": "b" * 40},
             "panelUrl": "https://nexus.test", "nodeId": 12,
         }).encode(), 0o600)
         self.release = {
@@ -126,6 +127,94 @@ class CoordinatorTest(unittest.TestCase):
             invoke.assert_not_called()
         self.assertEqual(self.product.read_bytes(), b"old")
 
+
+
+class FreshCoordinatorTest(CoordinatorTest):
+    def setUp(self):
+        super().setUp()
+        self.release["version"] = "control-v6.0.28"
+        self.command["targetVersion"] = self.release["version"]
+        config = json.loads((COORDINATOR.PRODUCT_STATE / "config.json").read_bytes())
+        config["releaseIdentity"]["version"] = "control-v6.0.27"
+        self.write(COORDINATOR.PRODUCT_STATE / "config.json", json.dumps(config).encode(), 0o600)
+        self.fresh = patch.object(COORDINATOR, "FRESH", True)
+        self.fresh.start()
+        self.addCleanup(self.fresh.stop)
+        self.bridge.unlink()
+        self.bridge_digest.unlink()
+        with patch.object(COORDINATOR, "invoke", side_effect=self.invoke):
+            COORDINATOR.main("initialize")
+        self.calls.clear()
+
+    def test_initialize_uses_original_enrollment_and_is_idempotent(self):
+        self.assertEqual(self.bridge.read_bytes(), b"old")
+        self.assertEqual(self.bridge_digest.read_text().strip(), hashlib.sha256(b"old").hexdigest())
+        with patch.object(COORDINATOR, "invoke") as invoke:
+            COORDINATOR.main("initialize")
+            invoke.assert_not_called()
+        self.bridge.unlink()
+        with self.assertRaises(OSError):
+            COORDINATOR.main("initialize")
+
+    def test_interrupted_initialization_recovers_only_exact_original(self):
+        self.bridge_digest.unlink()
+        with patch.object(COORDINATOR, "invoke", side_effect=self.invoke):
+            COORDINATOR.main("initialize")
+        self.assertEqual(self.bridge_digest.read_text().strip(), hashlib.sha256(b"old").hexdigest())
+        self.bridge_digest.unlink()
+        self.write(self.bridge, b"tampered")
+        with patch.object(COORDINATOR, "invoke", side_effect=self.invoke):
+            with self.assertRaises(ValueError):
+                COORDINATOR.main("initialize")
+        self.assertFalse(self.bridge_digest.exists())
+
+    def test_recovery_pin_is_bound_to_original_enrollment(self):
+        self.write(self.bridge, b"tampered")
+        self.write(self.bridge_digest, hashlib.sha256(b"tampered").hexdigest().encode(), 0o600)
+        with self.assertRaises(ValueError):
+            COORDINATOR.main("ready")
+
+    def test_future_command_requires_strict_forward_version_and_new_identity(self):
+        self.assertEqual(COORDINATOR.normalized_command(self.command), self.command)
+        for version in ("control-v6.0.27", "control-v6.0.26", "control-v6.0.028",
+                        "control-v7.0.0", "control-v6.0.4294967296"):
+            wrong = {**self.command, "targetVersion": version,
+                     "releaseIdentity": {**self.release, "version": version}}
+            with self.assertRaises(ValueError):
+                COORDINATOR.normalized_command(wrong)
+        for key, value in (("sourceRevision", "b" * 40),
+                           ("artifactSha256", hashlib.sha256(b"old").hexdigest())):
+            wrong = {**self.command, "releaseIdentity": {**self.release, key: value}}
+            with self.assertRaises(ValueError):
+                COORDINATOR.normalized_command(wrong)
+
+    def test_completed_transition_cannot_start_second_unqualified_upgrade(self):
+        self.write(self.product, b"new")
+        with self.assertRaises(ValueError):
+            COORDINATOR.store_command(self.command)
+
+    def test_signed_abort_is_retried_after_failure_before_local_cleanup(self):
+        # Fresh path additionally verifies original operational activation
+        # after the signed ABORT and before discarding the recovery command.
+        COORDINATOR.store_command(self.command)
+        self.write(self.product, b"new")
+        def interrupted_abort(binary, phase, *args):
+            if phase == "--identity":
+                raise OSError("candidate failed")
+            if phase == "rollback-release":
+                self.invoke(binary, phase, *args)
+                raise OSError("interrupted after restore")
+            self.fail(phase)
+        with patch.object(COORDINATOR, "invoke", side_effect=interrupted_abort):
+            with self.assertRaises(OSError):
+                COORDINATOR.main("run")
+        self.assertEqual(self.product.read_bytes(), b"old")
+        self.assertTrue((self.state / "abort-5").is_file())
+        self.calls.clear()
+        with patch.object(COORDINATOR, "invoke", side_effect=self.invoke):
+            COORDINATOR.main("run")
+        self.assertEqual(self.calls, ["rollback-release", "verify-active"])
+        self.assertFalse((self.state / "command.json").exists())
 
 if __name__ == "__main__":
     unittest.main()

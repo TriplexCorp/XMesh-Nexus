@@ -56,3 +56,19 @@ matching operator pin is still accepted for reviewed testing.
 The record does not enable Quota V2, authorize production traffic, or grant
 update/rollback authority. The successor release still needs the signed
 update protocol and installed lifecycle acceptance.
+
+## Local first-release recovery supervisor
+
+The clean install uses `xmesh-product-release-update.timer` and a private,
+digest-checked copy of the enrolled initial product executable. It is
+initialized only from the cryptographically verified original activation;
+the old APT bridge package is not an installation dependency. The control
+worker accepts only an authenticated manifest-bound command and does not send
+a legacy success ACK for that command. The supervisor independently requests
+the signed release plan, stages exact bytes, and waits for a signed COMMIT
+or ABORT. It never treats a transport timeout as rollback authority.
+
+This is the **first successor binary** mechanism; it is not yet qualification
+of an entire Agent/runtime bundle, multiple successive upgrades, or an
+upgrade while production quota spending is active. These gates must not be
+silently bypassed by the fresh installation path.

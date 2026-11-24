@@ -437,6 +437,14 @@ if [[ "$action" == update_xray ]];then
 elif [[ "$action" == update_agent ]];then
  clear_agent_release_identity
  if [[ "${XMESH_STRICT_PQ_REQUIRED:-0}" == 1 ]];then
+  # The authenticated poll supplies only an immutable manifest identity.
+  # The installed recovery supervisor obtains and verifies a signed XSP/2
+  # plan itself. Never acknowledge a queued strict update through legacy ACK.
+  coordinator=/usr/local/libexec/xmesh-product-upgrade-coordinator.py
+  if [[ "$release_version" != - && -f "$coordinator" && ! -L "$coordinator" ]];then
+   printf '%s' "$reply" | /usr/bin/python3 -c 'import json,sys;print(json.dumps(json.load(sys.stdin)["command"],separators=(",",":")))' | /usr/bin/python3 -I "$coordinator" --fresh receive
+   exit 0
+  fi
   detail='An approved signed product update is required'
  elif [[ "$release_version" != - ]];then
   if ! stage_agent_release_identity "$release_version" "$source_revision" "$artifact_sha256";then

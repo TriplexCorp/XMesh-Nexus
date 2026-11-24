@@ -22,7 +22,8 @@ BRIDGE = Path("/usr/local/libexec/xmesh-agent-release-bridge")
 BRIDGE_DIGEST = Path("/etc/xmesh-agent-release-bridge.sha256")
 PRODUCT_STATE = Path("/var/lib/xmesh-agent/product")
 STATE = Path("/var/lib/xmesh-node-control/product-upgrade")
-TARGET = "control-v6.0.27"
+TARGET = "control-v6.0.27"  # legacy transition package only
+FRESH = False
 HEX = re.compile(r"[0-9a-f]{64}")
 REVISION = re.compile(r"[0-9a-f]{40}")
 
@@ -47,21 +48,93 @@ def digest_image(path):
 def require_bridge():
     expected = private_file(BRIDGE_DIGEST, 0o600, 128).decode().strip()
     if not HEX.fullmatch(expected) or digest_image(BRIDGE) != expected:
-        raise ValueError("trusted Agent update bridge is missing or altered")
+        raise ValueError("trusted Agent update recovery image is missing or altered")
+    if FRESH and expected != enrollment()[1]:
+        raise ValueError("recovery image does not match original enrollment")
+
+
+def version_order(value):
+    if not isinstance(value, str):
+        raise ValueError("invalid Agent version")
+    match = re.fullmatch(r"control-v6\.(0|[1-9][0-9]{0,9})\.(0|[1-9][0-9]{0,9})", value)
+    if not match:
+        raise ValueError("invalid canonical Agent version")
+    result = tuple(int(part) for part in match.groups())
+    if any(part > 2**32 - 1 for part in result):
+        raise ValueError("invalid Agent version component")
+    return result
+
+
+def atomic_install(path, contents, mode):
+    # The caller holds the root-owned supervisor lock. Publish only complete,
+    # fsynced bytes. Never replace an existing trusted recovery image/pin.
+    with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".xmesh-release-", delete=False) as file:
+        pending = Path(file.name)
+        try:
+            os.fchmod(file.fileno(), mode)
+            file.write(contents)
+            file.flush()
+            os.fsync(file.fileno())
+            if path.exists() or path.is_symlink():
+                raise ValueError("existing recovery file cannot be replaced")
+            os.replace(pending, path)
+            fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        finally:
+            pending.unlink(missing_ok=True)
+
+
+def initialize_recovery():
+    config, expected = enrollment()
+    identity = config["releaseIdentity"]
+    if version_order(identity["version"]) < (0, 27):
+        raise ValueError("fresh recovery requires a forward-compatible first Agent")
+    if (not isinstance(identity["sourceRevision"], str)
+            or not REVISION.fullmatch(identity["sourceRevision"])):
+        raise ValueError("invalid original release revision")
+    if BRIDGE_DIGEST.exists() or BRIDGE_DIGEST.is_symlink():
+        require_bridge()
+        return
+    if (PRODUCT_STATE / "release-commit.json").exists() or (PRODUCT_STATE / "release-commit.json").is_symlink():
+        raise ValueError("cannot initialize recovery after a committed upgrade")
+    image = private_file(PRODUCT, 0o755, 64 << 20)
+    if hashlib.sha256(image).hexdigest() != expected:
+        raise ValueError("installed image does not match original enrollment")
+    invoke(PRODUCT, "verify-active", "--panel", config["panelUrl"], "--node-id", str(config["nodeId"]))
+    if BRIDGE.exists() or BRIDGE.is_symlink():
+        # Interrupted initialization may have published only the executable.
+        if digest_image(BRIDGE) != expected:
+            raise ValueError("existing recovery image differs from enrollment")
+    else:
+        atomic_install(BRIDGE, image, 0o755)
+    atomic_install(BRIDGE_DIGEST, (expected + "\n").encode(), 0o600)
+    require_bridge()
 
 
 def normalized_command(command):
     if (not isinstance(command, dict) or type(command.get("id")) is not int
             or not 0 < command["id"] <= 2**63 - 1 or command.get("action") != "update_agent"
-            or command.get("targetVersion") != TARGET):
+            or not isinstance(command.get("targetVersion"), str)):
+        raise ValueError("invalid product update command")
+    target = command["targetVersion"]
+    if not FRESH and target != TARGET:
         raise ValueError("invalid product update command")
     release = command.get("releaseIdentity")
     if (not isinstance(release, dict) or set(release) != {"version", "sourceRevision", "artifactSha256"}
-            or release["version"] != TARGET
+            or release["version"] != target
             or not isinstance(release["sourceRevision"], str) or not REVISION.fullmatch(release["sourceRevision"])
             or not isinstance(release["artifactSha256"], str) or not HEX.fullmatch(release["artifactSha256"])):
         raise ValueError("product update command lacks exact release identity")
-    return {"id": command["id"], "action": "update_agent", "targetVersion": TARGET, "releaseIdentity": release}
+    if FRESH:
+        original = enrollment()[0]["releaseIdentity"]
+        if (version_order(target) <= version_order(original["version"])
+                or release["sourceRevision"] == original["sourceRevision"]
+                or release["artifactSha256"] == original["artifactSha256"]):
+            raise ValueError("only a new forward release is eligible")
+    return {"id": command["id"], "action": "update_agent", "targetVersion": target, "releaseIdentity": release}
 
 
 def sync_directory():
@@ -92,6 +165,10 @@ def store_command(command):
         # original executable is still installed, under the same lock.
         if command["id"] <= existing["id"] or digest_image(PRODUCT) != enrollment()[1]:
             raise ValueError("another product update requires recovery")
+    if FRESH and digest_image(PRODUCT) != enrollment()[1]:
+        # This first-release protocol has exactly one successful successor
+        # per activation. Do not claim support for a second transition.
+        raise ValueError("a successor is already installed; no fresh transition")
     store_bytes(path, json.dumps(command, sort_keys=True).encode())
 
 
@@ -122,6 +199,8 @@ def run_update(command):
     if abort.exists():
         private_file(abort, 0o600, 32)
         invoke(BRIDGE, "rollback-release", *args)
+        if FRESH:
+            invoke(PRODUCT, "verify-active", "--panel", config["panelUrl"], "--node-id", str(config["nodeId"]))
         return
     measured = digest_image(PRODUCT)
     if measured == previous:
@@ -147,6 +226,8 @@ def run_update(command):
         # terminal decision can permit the original image to be restored.
         store_bytes(abort, b"abort\n")
         invoke(BRIDGE, "rollback-release", *args)
+        if FRESH:
+            invoke(PRODUCT, "verify-active", "--panel", config["panelUrl"], "--node-id", str(config["nodeId"]))
         return
     # Transport failure here is ambiguous. Leave the target in place and
     # retry through the timer; Nexus replays its original signed COMMIT.
@@ -157,7 +238,10 @@ def run_update(command):
 def main(action):
     if os.geteuid() != 0:
         raise ValueError("product update requires root")
-    require_bridge()
+    if action != "initialize":
+        require_bridge()
+    elif not FRESH:
+        raise ValueError("legacy transition helper cannot initialize fresh recovery")
     if action == "ready":
         return
     STATE.mkdir(mode=0o700, exist_ok=True)
@@ -168,8 +252,13 @@ def main(action):
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         path = STATE / "command.json"
-        if action == "receive":
-            store_command(normalized_command(json.loads(sys.stdin.buffer.read(4097))))
+        if action == "initialize":
+            initialize_recovery()
+        elif action == "receive":
+            raw = sys.stdin.buffer.read(4097)
+            if len(raw) > 4096:
+                raise ValueError("product update command too large")
+            store_command(normalized_command(json.loads(raw)))
         elif action == "run":
             try:
                 command = normalized_command(json.loads(private_file(path, 0o600, 4096)))
@@ -189,9 +278,15 @@ def main(action):
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) != 2:
+        args = sys.argv[1:]
+        if args and args[0] == "--fresh":
+            FRESH = True
+            BRIDGE = Path("/usr/local/libexec/xmesh-agent-release-recovery")
+            BRIDGE_DIGEST = Path("/etc/xmesh-agent-release-recovery.sha256")
+            args = args[1:]
+        if len(args) != 1:
             raise ValueError("provide one product update coordinator action")
-        main(sys.argv[1])
+        main(args[0])
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         # Never include credentials, commands or remote response bytes in logs.
         print(f"Agent update deferred or refused ({type(error).__name__})", file=sys.stderr)

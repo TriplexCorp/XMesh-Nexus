@@ -21,6 +21,8 @@ jobs:
         run: python3 scripts/test-agent-revocation-control.py
       - name: Reject missing or inconsistent approved Agent identity before full Nexus install
         run: python3 scripts/test-panel-agent-install-pin.py
+      - name: Verify first-release recovery supervisor with root-owned files and crash retries
+        run: sudo python3 scripts/test-product-agent-upgrade-coordinator.py
   immutable-release-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
