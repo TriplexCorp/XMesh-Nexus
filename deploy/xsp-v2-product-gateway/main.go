@@ -975,6 +975,9 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 }
 
 var allowedTunnelPaths = map[string]bool{
+	releaseAbortPath:                             true,
+	releaseInstallPath:                           true,
+	releaseCommitPath:                            true,
 	releasePlanPath:                              true,
 	releaseArtifactPath:                          true,
 	activationRecoveryPath:                       true,
@@ -1040,14 +1043,6 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, "strict-PQ tunnel authentication failed")
 		return
 	}
-	// A valid node key authenticates a node, not an arbitrary release.
-	// Require the enrolled source revision before any normal tunnel
-	// request, including WAL and release planning. A future transition
-	// must introduce an explicit, separately authorized recovery path.
-	if parsed.Env.Revision != n.Release.SourceRevision {
-		fail(w, http.StatusConflict, "strict-PQ tunnel release differs from enrollment")
-		return
-	}
 	if err := checkUniqueJSONKeys(parsed.Payload); err != nil {
 		fail(w, http.StatusBadRequest, "invalid strict-PQ tunnel payload")
 		return
@@ -1062,6 +1057,19 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		fail(w, http.StatusBadRequest, "trailing strict-PQ tunnel payload")
 		return
+	}
+	// Only the dedicated commit handler may receive a target revision
+	// before it is effective. Every normal operation uses the durable revision.
+	if inner.Path != releaseCommitPath {
+		revision, err := g.effectiveReleaseRevision(ctx, n, parsed.Env.NodeID)
+		if err != nil {
+			fail(w, http.StatusServiceUnavailable, "strict-PQ release state unavailable")
+			return
+		}
+		if parsed.Env.Revision != revision {
+			fail(w, http.StatusConflict, "strict-PQ tunnel release differs from enrollment")
+			return
+		}
 	}
 	body, err := decodeCanonicalB64(inner.BodyB64, -1, maxPayloadBytes)
 	if err != nil {
@@ -1096,7 +1104,13 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responseStatus, responseBody := 0, []byte(nil)
-	if inner.Path == releasePlanPath {
+	if inner.Path == releaseCommitPath {
+		responseStatus, responseBody = g.commitRelease(ctx, parsed, n, body)
+	} else if inner.Path == releaseAbortPath {
+		responseStatus, responseBody = g.finishRelease(ctx, parsed, n, body, true)
+	} else if inner.Path == releaseInstallPath {
+		responseStatus, responseBody = g.authorizeReleaseInstall(ctx, parsed, n, body)
+	} else if inner.Path == releasePlanPath {
 		responseStatus, responseBody = g.planRelease(ctx, parsed, n, body)
 	} else if inner.Path == releaseArtifactPath {
 		responseStatus, responseBody = g.releaseArtifact(ctx, parsed, n, body)
@@ -1138,7 +1152,7 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "cannot encode strict-PQ panel response")
 		return
 	}
-	wrapped, err := g.signResponse(parsed.Env.NodeID, parsed.Env.KeyEpoch, "panel.product.tunnel-response", "/api/v2/product/tunnel", parsed.Env.RequestID, n.Release.SourceRevision, wrappedPayload)
+	wrapped, err := g.signResponse(parsed.Env.NodeID, parsed.Env.KeyEpoch, "panel.product.tunnel-response", "/api/v2/product/tunnel", parsed.Env.RequestID, parsed.Env.Revision, wrappedPayload)
 	if err != nil {
 		fail(w, http.StatusServiceUnavailable, "cannot dual-sign strict-PQ response")
 		return

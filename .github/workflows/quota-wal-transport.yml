@@ -12,6 +12,8 @@ on:
       - 'compose.yaml'
       - 'deploy/xsp-v2-product-gateway/main.go'
       - 'deploy/xsp-v2-product-gateway/release_plan*.go'
+      - 'deploy/xsp-v2-product-gateway/release_commit.go'
+      - 'backend/migrations/0164_product_agent_release_commit_outbox.sql'
       - 'backend/migrations/0163_product_agent_release_plan_outbox.sql'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'

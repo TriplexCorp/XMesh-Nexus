@@ -7,9 +7,14 @@ import (
 	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -60,7 +65,7 @@ func TestReleasePlanPostgres(t *testing.T) {
 		_, err := db.Exec(ctx, sql, args...)
 		requireFixture(t, err)
 	}
-	for _, prefix := range []string{"0001", "0012", "0019", "0020", "0023", "0024", "0099", "0107", "0108", "0109", "0110", "0163"} {
+	for _, prefix := range []string{"0001", "0012", "0019", "0020", "0023", "0024", "0099", "0107", "0108", "0109", "0110", "0163", "0164"} {
 		paths, err := filepath.Glob("../../backend/migrations/" + prefix + "_*.sql")
 		requireFixture(t, err)
 		if len(paths) != 1 {
@@ -85,6 +90,14 @@ func TestReleasePlanPostgres(t *testing.T) {
 	requireFixture(t, os.WriteFile(filepath.Join(artifactDir, target.ArtifactSHA256+".bin"), artifact, 0600))
 	receipt := []byte("existing activation envelope")
 	digest := sha256.Sum256(receipt)
+	identityCertificate := &x509.Certificate{SerialNumber: big.NewInt(1),
+		Subject:   pkix.Name{CommonName: "xmesh-node-1"},
+		NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(time.Minute)}
+	certDER, err := x509.CreateCertificate(rand.Reader, identityCertificate, identityCertificate, pq.PublicKey(), pq)
+	requireFixture(t, err)
+	cert, err := x509.ParseCertificate(certDER)
+	requireFixture(t, err)
+	spki := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
 	exec("INSERT INTO panel_records(collection,data) VALUES('nodes','{}')")
 	exec("INSERT INTO node_metric_keys(node_id,public_key) VALUES(1,$1)", strings.Repeat("e", 64))
 	exec(`INSERT INTO node_xsp_public_keysets
@@ -94,7 +107,7 @@ func TestReleasePlanPostgres(t *testing.T) {
 		tls_spki_sha256,release_version,release_source_revision,release_artifact_sha256,
 		receipt_sha256,receipt_envelope,activated_at)
 		VALUES(1,'active',1,'ed-test','pq-test',$1,$2,$3,$4,$5,$6,now())`,
-		make([]byte, 32), current.Version, current.SourceRevision, current.ArtifactSHA256, digest[:], receipt)
+		spki[:], current.Version, current.SourceRevision, current.ArtifactSHA256, digest[:], receipt)
 	exec(`INSERT INTO node_xsp_agent_release_manifests(version,source_revision,artifact_sha256,created_by)
 		VALUES($1,$2,$3,'test-owner')`, target.Version, target.SourceRevision, target.ArtifactSHA256)
 	exec("SELECT * FROM stage_node_xsp_agent_migration(1,$1,'test-owner')", target.Version)
@@ -189,9 +202,6 @@ func TestReleasePlanPostgres(t *testing.T) {
 	exec("UPDATE node_restart_commands SET claimed_at=now(),requested_at=now() - interval '16 minutes' WHERE id=1")
 	assertReleaseRevoked("expired owner request with a fresh claim")
 	exec("UPDATE node_restart_commands SET requested_at=now() WHERE id=1")
-	exec("UPDATE node_restart_commands SET state='failed',finished_at=now() WHERE id=1")
-	assertReleaseRevoked("failed update command")
-	exec("UPDATE node_restart_commands SET state='claimed',finished_at=NULL WHERE id=1")
 	exec("UPDATE panel_records SET data=jsonb_set(data, '{disabled}', 'true'::jsonb, true) WHERE id=1")
 	assertReleaseRevoked("disabled Node")
 	exec("UPDATE panel_records SET data='{}'::jsonb WHERE id=1")
@@ -225,4 +235,192 @@ func TestReleasePlanPostgres(t *testing.T) {
 	exec("UPDATE node_xsp_product_nodes SET receipt_sha256=$1,receipt_envelope=$2", digest[:], receipt)
 	exec("UPDATE node_xsp_public_keysets SET revoked_at=now() WHERE node_id=1 AND purpose='node_request'")
 	assertReleaseRevoked("revoked enrolled Node keys")
+	exec("UPDATE node_xsp_public_keysets SET revoked_at=NULL WHERE node_id=1")
+	aborted, err := json.Marshal(releaseCommitRequest{CommandID: 1, PlanSHA256: planSHA, Installed: target})
+	requireFixture(t, err)
+	abortStatus, rawAbort := g.finishRelease(ctx, request, node, aborted, true)
+	if abortStatus != http.StatusOK {
+		t.Fatalf("abort returned %d", abortStatus)
+	}
+	abortReceipt, err := parseEnvelope(rawAbort, "panel.product.release-abort", releaseAbortPath, 2)
+	requireFixture(t, err)
+	if !ed25519.Verify(pub, abortReceipt.SigningInput, abortReceipt.EdSig) {
+		t.Fatal("invalid abort Ed25519 signature")
+	}
+	requireFixture(t, mldsa.Verify(pq.PublicKey(), abortReceipt.SigningInput, abortReceipt.PQSig, nil))
+	assertReleaseRevoked("terminal aborted command")
+	if _, err := db.Exec(ctx, "UPDATE node_restart_commands SET state='claimed' WHERE id=1"); err == nil {
+		t.Fatal("an aborted command was reopened")
+	}
+	targetRequest := request
+	targetRequest.Env.Revision = target.SourceRevision
+	t.Setenv("XSP_V2_PRODUCT_RELEASE_COMMIT", "1")
+	if status, _ := g.commitRelease(ctx, targetRequest, node, aborted); status != http.StatusConflict {
+		t.Fatal("aborted command acquired the new revision")
+	}
+	if status, _ := g.finishRelease(ctx, request, node, aborted, true); status != http.StatusOK {
+		t.Fatal("aborted command did not recover its rollback decision")
+	}
+	exec("SELECT * FROM stage_node_xsp_agent_migration(1,$1,'test-owner')", target.Version)
+	exec("UPDATE node_restart_commands SET state='claimed',claimed_at=now() WHERE id=2")
+	body, err = json.Marshal(releasePlanRequest{CommandID: 2, Current: current})
+	requireFixture(t, err)
+	planStatus, nextPlan := g.authorizeReleaseInstall(ctx, request, node, body)
+	if planStatus != http.StatusConflict {
+		t.Fatal("install authorization created a missing plan")
+	}
+	planStatus, nextPlan = g.planRelease(ctx, request, node, body)
+	if planStatus != http.StatusOK {
+		t.Fatal("cannot plan a new owner command after abort")
+	}
+	planHash = sha256.Sum256(nextPlan)
+	planSHA = fmt.Sprintf("%x", planHash)
+	if status, approved := g.authorizeReleaseInstall(ctx, request, node, body); status != http.StatusOK ||
+		!bytes.Equal(approved, nextPlan) {
+		t.Fatal("installation did not receive the exact live authorized plan")
+	}
+	t.Setenv("XSP_V2_PRODUCT_RELEASE_COMMIT", "0")
+	commitBody, err := json.Marshal(releaseCommitRequest{CommandID: 2, PlanSHA256: planSHA, Installed: target})
+	requireFixture(t, err)
+	commitRequest := request
+	commitRequest.Env.Revision = target.SourceRevision
+	status, _ := g.commitRelease(ctx, commitRequest, node, commitBody)
+	if status != http.StatusConflict {
+		t.Fatalf("disabled release commit returned %d", status)
+	}
+	t.Setenv("XSP_V2_PRODUCT_RELEASE_COMMIT", "1")
+	if _, err := db.Exec(ctx, `UPDATE node_restart_commands SET state='succeeded',finished_at=now(),
+        release_ack_version=$1,release_ack_source_revision=$2,release_ack_artifact_sha256=$3,
+        release_ack_success=true,release_ack_received_at=now() WHERE id=2`,
+		target.Version, target.SourceRevision, target.ArtifactSHA256); err == nil ||
+		!strings.Contains(err.Error(), "strict-PQ release commit required") {
+		t.Fatalf("legacy ACK crossed the authenticated commit boundary: %v", err)
+	}
+	wrong, err := json.Marshal(releaseCommitRequest{CommandID: 2, PlanSHA256: strings.Repeat("0", 64), Installed: target})
+	requireFixture(t, err)
+	for _, bad := range []struct {
+		request parsedEnvelope
+		body    []byte
+	}{{request, commitBody}, {commitRequest, wrong}} {
+		if got, _ := g.commitRelease(ctx, bad.request, node, bad.body); got != http.StatusConflict {
+			t.Fatalf("unapproved commit returned %d", got)
+		}
+	}
+	exec("UPDATE node_restart_commands SET requested_at=now() - interval '16 minutes' WHERE id=2")
+	if status, _ := g.commitRelease(ctx, commitRequest, node, commitBody); status != http.StatusConflict {
+		t.Fatalf("expired update committed: %d", status)
+	}
+	exec("UPDATE node_restart_commands SET requested_at=now() WHERE id=2")
+	for i := range results {
+		wg.Go(func() {
+			code, raw := g.commitRelease(ctx, commitRequest, node, commitBody)
+			if code != http.StatusOK {
+				t.Errorf("commit request %d: HTTP %d", i, code)
+			}
+			results[i] = raw
+		})
+	}
+	wg.Wait()
+	if t.Failed() {
+		t.FailNow()
+	}
+	for _, actual := range results[1:] {
+		if !bytes.Equal(actual, results[0]) {
+			t.Fatal("concurrent commit returned different signed bytes")
+		}
+	}
+	applied, err := parseEnvelope(results[0], "panel.product.release-commit", releaseCommitPath, 2)
+	requireFixture(t, err)
+	if !ed25519.Verify(pub, applied.SigningInput, applied.EdSig) {
+		t.Fatal("invalid commit Ed25519 signature")
+	}
+	requireFixture(t, mldsa.Verify(pq.PublicKey(), applied.SigningInput, applied.PQSig, nil))
+	var commit releaseCommitReceipt
+	requireFixture(t, json.Unmarshal(applied.Payload, &commit))
+	if commit.Installed != target || commit.CommandID != 2 || commit.PlanSHA256 != planSHA ||
+		commit.ActivationSHA256 != fmt.Sprintf("%x", digest) {
+		t.Fatalf("wrong signed commit: %+v", commit)
+	}
+	t.Setenv("XSP_V2_PRODUCT_RELEASE_COMMIT", "0")
+	if status, again := g.commitRelease(ctx, commitRequest, node, commitBody); status != http.StatusOK ||
+		!bytes.Equal(again, results[0]) {
+		t.Fatal("post-commit retry did not recover the original response")
+	}
+	revision, err := g.effectiveReleaseRevision(ctx, node, 1)
+	requireFixture(t, err)
+	if revision != target.SourceRevision {
+		t.Fatal("normal control does not use the committed target revision")
+	}
+	tunnelEnvelope := func(path, revision string, body []byte) []byte {
+		t.Helper()
+		inner, err := json.Marshal(tunnelPayload{Path: path, BodyB64: b64.EncodeToString(body)})
+		requireFixture(t, err)
+		nonce := make([]byte, 16)
+		_, err = rand.Read(nonce)
+		requireFixture(t, err)
+		now := time.Now().UnixMilli()
+		env := envelope{
+			Protocol: "XSP/2", Suite: suite, Direction: 1, MessageType: "node.product.tunnel",
+			IssuerID: "xmesh-node-1", NodeID: 1, Method: http.MethodPost, Path: "/api/v2/product/tunnel",
+			Ed25519KeyID: "ed-test", MLDSA65KeyID: "pq-test", KeyEpoch: 1, IssuedAtMS: now,
+			ExpiresAtMS: now + 120000, NonceHex: fmt.Sprintf("%x", nonce), RequestID: "tunnel-test",
+			Revision: revision, PayloadB64: b64.EncodeToString(inner),
+		}
+		signing, err := signingInput(env, inner)
+		requireFixture(t, err)
+		pqSignature, err := pq.Sign(nil, signing, nil)
+		requireFixture(t, err)
+		env.Signatures = signatures{Ed25519: b64.EncodeToString(ed25519.Sign(ed, signing)),
+			MLDSA65: b64.EncodeToString(pqSignature)}
+		raw, err := json.Marshal(env)
+		requireFixture(t, err)
+		return raw
+	}
+	invokeTunnel := func(raw []byte) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/product/tunnel", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-XSP-V2-Client-Verify", "SUCCESS")
+		req.Header.Set("X-XSP-V2-Client-Cert", url.QueryEscape(string(pem.EncodeToMemory(
+			&pem.Block{Type: "CERTIFICATE", Bytes: certDER}))))
+		res := httptest.NewRecorder()
+		g.tunnel(res, req)
+		return res
+	}
+	if res := invokeTunnel(tunnelEnvelope(releasePlanPath, current.SourceRevision, body)); res.Code != http.StatusConflict {
+		t.Fatalf("superseded revision reached the tunnel: HTTP %d", res.Code)
+	}
+	packet := tunnelEnvelope(releaseCommitPath, target.SourceRevision, commitBody)
+	res := invokeTunnel(packet)
+	if res.Code != http.StatusOK {
+		t.Fatalf("signed commit retry over the tunnel: HTTP %d %s", res.Code, res.Body)
+	}
+	wrapped, err := parseEnvelope(res.Body.Bytes(), "panel.product.tunnel-response", "/api/v2/product/tunnel", 2)
+	requireFixture(t, err)
+	var reply struct {
+		Status  int    `json:"status"`
+		BodyB64 string `json:"bodyB64"`
+	}
+	requireFixture(t, json.Unmarshal(wrapped.Payload, &reply))
+	if wrapped.Env.Revision != target.SourceRevision || reply.Status != http.StatusOK ||
+		reply.BodyB64 != b64.EncodeToString(results[0]) {
+		t.Fatal("authenticated tunnel did not replay the same receipt")
+	}
+	if replay := invokeTunnel(packet); replay.Code != http.StatusConflict {
+		t.Fatalf("byte-identical outer envelope passed the nonce gate: HTTP %d", replay.Code)
+	}
+	if status, _ := g.finishRelease(ctx, request, node, commitBody, true); status != http.StatusConflict {
+		t.Fatal("an already committed release could be aborted")
+	}
+	var original, state, artifactSHA string
+	requireFixture(t, db.QueryRow(ctx, `SELECT p.release_source_revision,c.state,c.release_ack_artifact_sha256
+        FROM node_restart_commands c JOIN node_xsp_product_nodes p USING (node_id) WHERE c.id=2`).
+		Scan(&original, &state, &artifactSHA))
+	if original != current.SourceRevision || state != "succeeded" || artifactSHA != target.ArtifactSHA256 {
+		t.Fatal("commit did not preserve enrollment and publish the matching ACK atomically")
+	}
+	exec("UPDATE node_xsp_public_keysets SET revoked_at=now() WHERE node_id=1 AND purpose='node_request'")
+	if status, _ := g.commitRelease(ctx, commitRequest, node, commitBody); status != http.StatusConflict {
+		t.Fatal("revoked enrollment recovered the receipt")
+	}
+
 }
