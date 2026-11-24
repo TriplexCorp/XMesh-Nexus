@@ -6,6 +6,10 @@ on:
       - 'scripts/check-agent-update.js'
       - '.github/workflows/gateway-dependency-security.yml'
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:
