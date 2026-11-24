@@ -122,9 +122,10 @@ type nodeIdentity struct {
 	EdPublic            []byte
 	PQPublic            []byte
 	TLSSPKI             []byte
-	ReleaseRev          string
+	Release             releaseIdentity
 	Receipt             []byte
 	ActivationRequestID string
+	ActivationDigest    []byte
 }
 
 type gateway struct {
@@ -727,14 +728,18 @@ func (g *gateway) enroll(w http.ResponseWriter, r *http.Request) {
 func (g *gateway) loadNode(ctx context.Context, nodeID int64) (nodeIdentity, error) {
 	var n nodeIdentity
 	err := g.db.QueryRow(ctx,
-		`SELECT p.state,p.key_epoch,p.ed25519_key_id,p.mldsa65_key_id,p.tls_spki_sha256,p.release_source_revision,
-		        COALESCE(p.receipt_envelope,''::bytea),COALESCE(p.activation_request_id,''),k.ed25519_public,k.mldsa65_public
+		`SELECT p.state,p.key_epoch,p.ed25519_key_id,p.mldsa65_key_id,p.tls_spki_sha256,
+		        p.release_version,p.release_source_revision,p.release_artifact_sha256,
+		        COALESCE(p.receipt_envelope,''::bytea),COALESCE(p.activation_request_id,''),
+		        p.activation_request_sha256,k.ed25519_public,k.mldsa65_public
 		   FROM node_xsp_product_nodes p JOIN node_xsp_public_keysets k
 		     ON k.node_id=p.node_id AND k.purpose='node_request' AND k.key_epoch=p.key_epoch
 		    AND k.ed25519_key_id=p.ed25519_key_id AND k.mldsa65_key_id=p.mldsa65_key_id
 		    AND k.revoked_at IS NULL
 		  WHERE p.node_id=$1`, nodeID).
-		Scan(&n.State, &n.KeyEpoch, &n.EdKeyID, &n.PQKeyID, &n.TLSSPKI, &n.ReleaseRev, &n.Receipt, &n.ActivationRequestID, &n.EdPublic, &n.PQPublic)
+		Scan(&n.State, &n.KeyEpoch, &n.EdKeyID, &n.PQKeyID, &n.TLSSPKI,
+			&n.Release.Version, &n.Release.SourceRevision, &n.Release.ArtifactSHA256,
+			&n.Receipt, &n.ActivationRequestID, &n.ActivationDigest, &n.EdPublic, &n.PQPublic)
 	return n, err
 }
 
@@ -818,6 +823,31 @@ func (g *gateway) signResponse(nodeID, epoch int64, messageType, path, requestID
 	return json.Marshal(env)
 }
 
+func verifyActivationRelease(parsed parsedEnvelope, enrolled releaseIdentity) error {
+	var request struct {
+		Schema                     string          `json:"schema"`
+		NodeID                     int64           `json:"nodeId"`
+		ReleaseIdentity            releaseIdentity `json:"releaseIdentity"`
+		AutomaticClassicalFallback *bool           `json:"automaticClassicalFallback"`
+	}
+	if err := checkUniqueJSONKeys(parsed.Payload); err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(parsed.Payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil {
+		return err
+	}
+	if decoder.Decode(new(any)) != io.EOF ||
+		request.Schema != "xmesh-v6-strict-pq-activation-request-1" ||
+		request.NodeID != parsed.Env.NodeID || parsed.Env.Revision != enrolled.SourceRevision ||
+		request.ReleaseIdentity != enrolled ||
+		request.AutomaticClassicalFallback == nil || *request.AutomaticClassicalFallback {
+		return errors.New("activation release differs from enrollment")
+	}
+	return nil
+}
+
 func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
 		fail(w, http.StatusUnsupportedMediaType, "POST application/json required")
@@ -849,9 +879,14 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, "strict-PQ activation authentication failed")
 		return
 	}
+	if err := verifyActivationRelease(parsed, n.Release); err != nil {
+		fail(w, http.StatusConflict, "strict-PQ activation release does not match enrollment")
+		return
+	}
 	requestHash := sha256.Sum256(raw)
 	if n.State == "active" {
-		if n.ActivationRequestID == parsed.Env.RequestID && len(n.Receipt) > 0 {
+		if n.ActivationRequestID == parsed.Env.RequestID &&
+			bytes.Equal(n.ActivationDigest, requestHash[:]) && len(n.Receipt) > 0 {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.WriteHeader(http.StatusOK)
@@ -875,7 +910,7 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "cannot encode strict-PQ activation receipt")
 		return
 	}
-	receipt, err := g.signResponse(parsed.Env.NodeID, parsed.Env.KeyEpoch, "panel.product.activation-receipt", "/api/v2/product/activate", parsed.Env.RequestID, n.ReleaseRev, receiptPayload)
+	receipt, err := g.signResponse(parsed.Env.NodeID, parsed.Env.KeyEpoch, "panel.product.activation-receipt", "/api/v2/product/activate", parsed.Env.RequestID, n.Release.SourceRevision, receiptPayload)
 	if err != nil {
 		fail(w, http.StatusServiceUnavailable, "cannot sign strict-PQ activation receipt")
 		return
@@ -890,13 +925,20 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 	var state string
 	var requestID string
 	var existingReceipt []byte
-	if err := tx.QueryRow(ctx, "SELECT state,COALESCE(activation_request_id,''),COALESCE(receipt_envelope,''::bytea) FROM node_xsp_product_nodes WHERE node_id=$1 FOR UPDATE", parsed.Env.NodeID).
-		Scan(&state, &requestID, &existingReceipt); err != nil {
+	var existingDigest []byte
+	if err := tx.QueryRow(ctx, `SELECT state, COALESCE(activation_request_id,''),
+		  COALESCE(receipt_envelope,''::bytea), activation_request_sha256
+		FROM node_xsp_product_nodes WHERE node_id=$1 AND release_version=$2
+		  AND release_source_revision=$3 AND release_artifact_sha256=$4 AND tls_spki_sha256=$5
+		FOR UPDATE`, parsed.Env.NodeID, n.Release.Version, n.Release.SourceRevision,
+		n.Release.ArtifactSHA256, n.TLSSPKI).
+		Scan(&state, &requestID, &existingReceipt, &existingDigest); err != nil {
 		fail(w, http.StatusServiceUnavailable, "activation state unavailable")
 		return
 	}
 	if state == "active" {
-		if requestID == parsed.Env.RequestID && len(existingReceipt) > 0 {
+		if requestID == parsed.Env.RequestID && bytes.Equal(existingDigest, requestHash[:]) &&
+			len(existingReceipt) > 0 {
 			_ = tx.Commit(ctx)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -1075,7 +1117,7 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "cannot encode strict-PQ panel response")
 		return
 	}
-	wrapped, err := g.signResponse(parsed.Env.NodeID, parsed.Env.KeyEpoch, "panel.product.tunnel-response", "/api/v2/product/tunnel", parsed.Env.RequestID, n.ReleaseRev, wrappedPayload)
+	wrapped, err := g.signResponse(parsed.Env.NodeID, parsed.Env.KeyEpoch, "panel.product.tunnel-response", "/api/v2/product/tunnel", parsed.Env.RequestID, n.Release.SourceRevision, wrappedPayload)
 	if err != nil {
 		fail(w, http.StatusServiceUnavailable, "cannot dual-sign strict-PQ response")
 		return
