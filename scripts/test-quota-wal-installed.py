@@ -598,6 +598,33 @@ def main():
                     )
                 guest.exec(PRODUCT, "verify-active", "--panel", panel,
                            "--node-id", str(guest.node))
+                if index == 1:
+                    # Fail-closed reboot test: a present but corrupted
+                    # active.json must block even an already installed
+                    # metrics worker. Preserve the original signed receipt
+                    # and restore the exact active marker after the test.
+                    active_path = f"{state}/active.json"
+                    saved_path = f"{state}/active.json.recovery-fixture"
+                    guest.exec("mv", active_path, saved_path)
+                    try:
+                        guest.exec("cp", f"{state}/config.json", active_path)
+                        rejected = subprocess.run(
+                            ["docker", "exec", guest.name, "systemctl",
+                             "restart", f"{METRICS}.service"],
+                            capture_output=True, timeout=45,
+                        )
+                        assert rejected.returncode != 0, (
+                            f"Node {guest.node} served metrics with a corrupted PQ activation"
+                        )
+                    finally:
+                        guest.exec("mv", saved_path, active_path)
+                        guest.exec(
+                            "systemctl", "reset-failed",
+                            "xmesh-pq-activation-recovery.service",
+                            f"{METRICS}.service",
+                        )
+                    guest.exec(PRODUCT, "verify-active", "--panel", panel,
+                               "--node-id", str(guest.node))
                 for name, digest in original.items():
                     actual = guest.exec("sha256sum", f"{state}/{name}").split()[0].decode()
                     assert actual == digest, (
