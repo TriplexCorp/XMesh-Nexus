@@ -43,14 +43,14 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: d2e071e4034f834852d422a41d1150da7eb25f13
+          ref: 8f968e5215ca8cf84ed42f75c9faf3885824c4dd
           path: node-agent
       - name: Pin compatible Agent and guard for quota-v2 rehearsal
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$(git -C node-agent rev-parse HEAD)" = "d2e071e4034f834852d422a41d1150da7eb25f13"
-          test "$(tr -d '\r\n' < node-agent/AGENT_VERSION)" = "control-v6.0.28"
+          test "$(git -C node-agent rev-parse HEAD)" = "8f968e5215ca8cf84ed42f75c9faf3885824c4dd"
+          test "$(tr -d '\r\n' < node-agent/AGENT_VERSION)" = "control-v6.0.30"
           test -f node-agent/deploy/xmesh-policy-guard.py
           test -f node-agent/deploy/xmesh-policy-guard-base.py
           test -f node-agent/experiments/xray-dataplane-fence/durable_fence.go.txt
@@ -71,7 +71,7 @@ jobs:
           python3 node-agent/tests/test_quota_v2_offline_policy_cutoff.py
           # Node 6.0.24 also rejects any stale user rollback after an early failure.
           python3 node-agent/tests/test_quota_v2_prestop_capture.py
-          echo 'Pinned reviewed Node control-v6.0.28: strict nonfinal meter invariants; refunds remain disabled'
+          echo 'Pinned reviewed Node control-v6.0.30: strict nonfinal meter invariants; refunds remain disabled'
       - name: Generate disposable secrets and feature-gated service
         shell: bash
         run: |

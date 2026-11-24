@@ -107,7 +107,7 @@ func TestServeWALTunnelFixture(t *testing.T) {
 		}
 		// The test binary alone supplies a synthetic successor. Enrollment
 		// still uses the real initial release and its production pin.
-		g.releaseTargetVersion = "control-v6.0.29"
+		g.releaseTargetVersion = "control-v6.0.31"
 		t.Setenv("XSP_V2_PRODUCT_RELEASE_PLANNING", "1")
 		t.Setenv("XSP_V2_PRODUCT_RELEASE_COMMIT", "1")
 		t.Setenv("XSP_V2_PRODUCT_RELEASE_ARTIFACT_DIR", filepath.Join(dir, "successor-artifacts"))
