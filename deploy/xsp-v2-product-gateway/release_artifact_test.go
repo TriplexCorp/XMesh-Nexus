@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestReadReleaseChunkRejectsUnsafeArtifactSources(t *testing.T) {
@@ -139,5 +138,4 @@ func TestReadReleaseChunkSerializesConcurrentFirstHash(t *testing.T) {
 	if len(releaseVerifiedArtifacts.entries) > 32 {
 		t.Fatal("unbounded artifact digest cache")
 	}
-	_ = time.Now // keep time package imported only when needed for test setup
 }
