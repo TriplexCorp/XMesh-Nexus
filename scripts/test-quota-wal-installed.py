@@ -135,7 +135,21 @@ systemctl stop docker.socket docker.service containerd.service
             docker("rm", "-fv", self.name, timeout=120)
 
     def exec(self, *command, timeout=30):
-        return docker("exec", self.name, *command, timeout=timeout)
+        try:
+            return docker("exec", self.name, *command, timeout=timeout)
+        except subprocess.CalledProcessError:
+            # Capture unit state before the disposable guest is destroyed.
+            # Do not retry or reset failed units: the security gate must pass.
+            if command[:2] in (("systemctl", "start"), ("systemctl", "restart")):
+                units = tuple(unit for unit in command[2:] if unit.endswith(".service"))
+                units = tuple(dict.fromkeys((*units, "xmesh-pq-activation-recovery.service")))
+                subprocess.run(["docker", "exec", self.name, "systemctl", "show",
+                                "--no-pager", "-p", "Id,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,StartLimitIntervalUSec,StartLimitBurst,Requires,After",
+                                *units], timeout=15, check=False)
+                subprocess.run(["docker", "exec", self.name, "journalctl", "--no-pager",
+                                "-n", "80", *[arg for unit in units for arg in ("-u", unit)]],
+                               timeout=15, check=False)
+            raise
 
     def ready(self):
         command = ["docker", "exec", self.name, "systemctl", "is-active", "--quiet", "docker.service"]
