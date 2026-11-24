@@ -62,7 +62,7 @@ jobs:
         with:
           persist-credentials: false
           repository: TriplexCorp/XMesh-Node
-          ref: 8f968e5215ca8cf84ed42f75c9faf3885824c4dd
+          ref: 74c966c35c62a0e7c3b85089790f1bc9670671f6
           path: .ci-reviewed-node
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
@@ -74,8 +74,8 @@ jobs:
           set -euo pipefail
           revision="$(git rev-parse HEAD)"
           version="$(tr -d '\r\n' < ../../AGENT_VERSION)"
-          test "$revision" = '8f968e5215ca8cf84ed42f75c9faf3885824c4dd'
-          test "$version" = 'control-v6.0.30'
+          test "$revision" = '74c966c35c62a0e7c3b85089790f1bc9670671f6'
+          test "$version" = 'control-v6.0.31'
           test "$version" = "$(tr -d '\r\n' < ../../../AGENT_VERSION)"
           grep -Fxq "sourceRevision=$revision" ../../../deploy/agent-release-pin.conf
           go build -trimpath -ldflags "-X main.version=$version -X main.sourceRevision=$revision" \

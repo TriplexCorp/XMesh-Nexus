@@ -46,7 +46,7 @@ jobs:
       XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario != 'lease-recovery' && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
       XMESH_TEST_INSTALLED_REBOOT: ${{ matrix.scenario == 'lease-recovery' && '1' || '0' }}
-      XMESH_INSTALLED_NODE_REF: 8f968e5215ca8cf84ed42f75c9faf3885824c4dd
+      XMESH_INSTALLED_NODE_REF: 74c966c35c62a0e7c3b85089790f1bc9670671f6
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -71,13 +71,13 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 8f968e5215ca8cf84ed42f75c9faf3885824c4dd
+          ref: 74c966c35c62a0e7c3b85089790f1bc9670671f6
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '8f968e5215ca8cf84ed42f75c9faf3885824c4dd'
-          test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.30'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '74c966c35c62a0e7c3b85089790f1bc9670671f6'
+          test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.31'
           python3 scripts/test-quota-v2-release-candidate.py
           python3 -m py_compile scripts/quota_v2_installed_agent_successor.py scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py
       - uses: dtolnay/rust-toolchain@stable
@@ -220,7 +220,7 @@ jobs:
       - name: Refuse mixed revisions, mixed binaries and incomplete matrix
         env:
           XMESH_INSTALLED_NEXUS_REF: ${{ github.event.pull_request.head.sha }}
-          XMESH_INSTALLED_NODE_REF: 8f968e5215ca8cf84ed42f75c9faf3885824c4dd
+          XMESH_INSTALLED_NODE_REF: 74c966c35c62a0e7c3b85089790f1bc9670671f6
           XMESH_INSTALLED_MATRIX_PATH: ${{ runner.temp }}/quota-v2-installed-matrix
         run: |
           set -euo pipefail
