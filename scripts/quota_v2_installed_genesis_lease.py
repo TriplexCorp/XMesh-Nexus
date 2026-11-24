@@ -314,7 +314,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             "POST", f"/nodes/{guest.node}/xray-update", {"version": "26.10.31"},
             expected_status=409,
         )
-        assert "Standard Xray updates are blocked for nodes with Quota V2 state." in refusal["error"]
+        assert refusal["error"] == "Обычное обновление Xray недоступно для ноды с состоянием Quota V2."
         assert db.execute(
             "SELECT NOT EXISTS (SELECT 1 FROM node_restart_commands "
             "WHERE node_id=%s AND action='update_xray')", (guest.node,),

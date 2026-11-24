@@ -4482,6 +4482,7 @@ window.XMeshI18n=(()=>{
   "У ноды нет подключённого управляющего агента.": "No control agent is connected to the node.",
   "Узел уже выполняет команду управления.": "The node is already executing a control command.",
   "Некорректная версия Xray": "Invalid Xray version",
+  "Обычное обновление Xray недоступно для ноды с состоянием Quota V2.": "Standard Xray updates are blocked for nodes with Quota V2 state.",
   "Выбранная версия отсутствует среди официальных релизов Xray": "The selected version is not an official Xray release",
   "Для выбора версии требуется активный управляющий агент control-v3+.": "Version selection requires an active control-v3+ agent.",
   "Отключённая нода не принимает команды. Сначала восстановите работу узла.": "A disabled node does not accept commands. Restore the node first.",

@@ -835,10 +835,7 @@ pub async fn request_verified_xray_update(
     if metered {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
-            concat!(
-                "Обычное обновление Xray недоступно для ноды с состоянием Quota V2. ",
-                "Standard Xray updates are blocked for nodes with Quota V2 state."
-            ),
+            "Обычное обновление Xray недоступно для ноды с состоянием Quota V2.",
         ));
     }
     let releases = state
