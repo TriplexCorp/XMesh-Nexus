@@ -295,6 +295,13 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
             }}
             assert main.request(CAP_PATH, conflict)[0] == 409
             pid = ready_route(main, uid, grant)
+            # Each funded successor must run the exact measured Xray ELF,
+            # not merely reuse a valid Docker image ID or signed policy.
+            from quota_v2_release_candidate import verify_running_xray
+            successor_container = (f"xmesh-quota-u{uid}-"
+                                   + old["reservationId"].replace("-", ""))
+            verify_running_xray(
+                main, successor_container, os.environ["XMESH_WAL_XRAY_SHA256"])
             (artifact / f"generation-{generation}.json").write_text(json.dumps({
                 "predecessorReservation": old["reservationId"], "installation": receipt,
                 "routePid": pid, "routeObservedAtMs": time.time_ns() // 1_000_000,
