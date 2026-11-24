@@ -4,6 +4,12 @@ set -Eeuo pipefail
 # Stable marker consumed by the signed control worker before executing a freshly downloaded updater.
 XMESH_TARGET_AWARE_UPDATER=1
 MODE="${1:-manual}"
+# The coordinated branch uses only the trusted installed bridge. It does
+# not download or execute a bootstrap script, or touch the quota journal.
+if [[ "$MODE" == --strict-product ]];then
+ [[ "$#" -eq 1 && "$EUID" -eq 0 ]] || exit 2
+ exec /usr/bin/python3 /usr/local/libexec/xmesh-product-upgrade-coordinator.py run
+fi
 [[ "$MODE" == manual || "$MODE" == --remote ]] || { echo "Unknown update mode" >&2; exit 2; }
 [[ "$EUID" -eq 0 ]] || { echo "Run as root" >&2;exit 1; }
 [[ -r /etc/xmesh-node-metrics/node.key && -f /etc/xmesh-node-metrics.env ]] || { echo "Node enrollment missing" >&2;exit 1; }

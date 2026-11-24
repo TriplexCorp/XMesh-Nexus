@@ -65,7 +65,7 @@ func TestReleasePlanPostgres(t *testing.T) {
 		_, err := db.Exec(ctx, sql, args...)
 		requireFixture(t, err)
 	}
-	for _, prefix := range []string{"0001", "0012", "0019", "0020", "0023", "0024", "0099", "0107", "0108", "0109", "0110", "0163", "0164"} {
+	for _, prefix := range []string{"0001", "0012", "0015", "0019", "0020", "0023", "0024", "0099", "0107", "0108", "0109", "0110", "0163", "0164", "0165"} {
 		paths, err := filepath.Glob("../../backend/migrations/" + prefix + "_*.sql")
 		requireFixture(t, err)
 		if len(paths) != 1 {
@@ -110,7 +110,15 @@ func TestReleasePlanPostgres(t *testing.T) {
 		spki[:], current.Version, current.SourceRevision, current.ArtifactSHA256, digest[:], receipt)
 	exec(`INSERT INTO node_xsp_agent_release_manifests(version,source_revision,artifact_sha256,created_by)
 		VALUES($1,$2,$3,'test-owner')`, target.Version, target.SourceRevision, target.ArtifactSHA256)
-	exec("SELECT * FROM stage_node_xsp_agent_migration(1,$1,'test-owner')", target.Version)
+	var command int64
+	if err := db.QueryRow(ctx, "SELECT command_id FROM queue_node_xsp_product_upgrade(1,'test-owner')").Scan(&command); err == nil {
+		t.Fatal("bridge command queued without a live 6.0.24 heartbeat")
+	}
+	exec("INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,received_at) VALUES(1,'control-v6.0.24',true,true,now())")
+	requireFixture(t, db.QueryRow(ctx, "SELECT command_id FROM queue_node_xsp_product_upgrade(1,'test-owner')").Scan(&command))
+	if command != 1 {
+		t.Fatalf("unexpected first product command %d", command)
+	}
 	exec("UPDATE node_restart_commands SET state='claimed',claimed_at=now() WHERE id=1")
 
 	body, err := json.Marshal(releasePlanRequest{CommandID: 1, Current: current})
@@ -407,6 +415,27 @@ func TestReleasePlanPostgres(t *testing.T) {
 	}
 	if replay := invokeTunnel(packet); replay.Code != http.StatusConflict {
 		t.Fatalf("byte-identical outer envelope passed the nonce gate: HTTP %d", replay.Code)
+	}
+	panel := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/node/heartbeat" {
+			t.Errorf("unexpected forwarded path: %s", r.URL.Path)
+		}
+		var report struct {
+			NodeID  int64  `json:"node_id"`
+			Version string `json:"version"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&report); err != nil || report.NodeID != 1 ||
+			report.Version != target.Version {
+			t.Errorf("heartbeat disagrees with the committed image: %+v, %v", report, err)
+		}
+		_, _ = w.Write([]byte(`{"accepted":true}`))
+	}))
+	defer panel.Close()
+	g.panelURL, g.httpClient = panel.URL, panel.Client()
+	heartbeat := []byte(`{"node_id":1,"version":"control-v6.0.24"}`)
+	hb := invokeTunnel(tunnelEnvelope("/api/v1/node/heartbeat", target.SourceRevision, heartbeat))
+	if hb.Code != http.StatusOK {
+		t.Fatalf("committed heartbeat refused: HTTP %d", hb.Code)
 	}
 	if status, _ := g.finishRelease(ctx, request, node, commitBody, true); status != http.StatusConflict {
 		t.Fatal("an already committed release could be aborted")

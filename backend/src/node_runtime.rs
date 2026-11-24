@@ -319,6 +319,13 @@ pub async fn request_agent_update(
     if node_id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
     }
+    let product_canary = std::env::var("XMESH_PRODUCT_UPGRADE_CANARY_NODE_ID")
+        .ok()
+        .and_then(|id| id.parse::<i64>().ok())
+        == Some(node_id);
+    if product_canary {
+        crate::require_owner(&actor)?;
+    }
     let node = sqlx::query_scalar::<_, Value>(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
     )
@@ -357,6 +364,36 @@ pub async fn request_agent_update(
     .bind(node_id)
     .execute(&state.pool)
     .await?;
+    // Explicitly provisioned rollout canary only. The ordinary updater
+    // must remain available to the fleet on its existing release target.
+    if product_canary {
+        let id = sqlx::query_scalar::<_, i64>(
+            "SELECT command_id FROM queue_node_xsp_product_upgrade($1,$2)",
+        )
+        .bind(node_id)
+        .bind(&actor.username)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| {
+            ApiError::new(StatusCode::CONFLICT, "Product upgrade canary is not ready")
+        })?;
+        crate::audit(
+            &state.pool,
+            &actor.username,
+            "node.agent.update.requested",
+            Some("nodes"),
+            Some(node_id),
+            json!({"commandId":id,"targetVersion":"control-v6.0.27","major":"postquantum-v6"}),
+        )
+        .await;
+        return Ok((
+            StatusCode::ACCEPTED,
+            Json(json!({
+                "id":id,"nodeId":node_id,"action":"update_agent",
+                "targetVersion":"control-v6.0.27","state":"pending"
+            })),
+        ));
+    }
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version)
          VALUES($1,'update_agent',$2,$3) ON CONFLICT DO NOTHING RETURNING id",

@@ -1,0 +1,25 @@
+[Unit]
+Description=XMesh authenticated product Agent update
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/var/lib/xmesh-node-control/product-upgrade/command.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/xmesh-update-agent-bridge --strict-product
+User=root
+Group=root
+UMask=0077
+TimeoutStartSec=650s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+ReadWritePaths=/usr/local/bin /var/lib/xmesh-agent/product /var/lib/xmesh-node-control

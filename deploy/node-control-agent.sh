@@ -430,6 +430,16 @@ print(" ".join((str(value),action,version,release_version,source_revision,artifa
 [[ -n "$command_info" ]] || exit 0
 read -r command_id action target_version release_version source_revision artifact_sha256 <<< "$command_info"
 [[ "$command_id" =~ ^[1-9][0-9]*$ ]] || exit 2
+# A product-bound update is owned by the systemd coordinator and Nexus's
+# signed COMMIT/ABORT. The legacy updater and ACK must never handle it.
+if [[ "$action" == update_agent && "$target_version" == control-v6.0.27 ]];then
+ [[ "$release_version" == "$target_version" && "${XMESH_STRICT_PQ_REQUIRED:-0}" == 1 ]] || exit 2
+ coordinator=/usr/local/libexec/xmesh-product-upgrade-coordinator.py
+ printf '%s' "$reply" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["command"]))' |
+  /usr/bin/python3 "$coordinator" receive
+ systemctl start --no-block xmesh-product-agent-upgrade.service
+ exit 0
+fi
 success=false
 detail='Command failed'
 if [[ "$action" == update_xray ]];then

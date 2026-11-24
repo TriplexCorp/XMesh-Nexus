@@ -1117,6 +1117,21 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 	} else if inner.Path == activationRecoveryPath {
 		responseStatus, responseBody = recoverActivationReceipt(n, body)
 	} else {
+		// The operational shell can still have the predecessor's version
+		// constant. A committed, authenticated revision is the authority.
+		if inner.Path == "/api/v1/node/heartbeat" && parsed.Env.Revision != n.Release.SourceRevision {
+			var report map[string]json.RawMessage
+			if checkUniqueJSONKeys(body) != nil || json.Unmarshal(body, &report) != nil || report == nil {
+				fail(w, http.StatusBadRequest, "invalid committed product heartbeat")
+				return
+			}
+			report["version"] = json.RawMessage(`"control-v6.0.27"`)
+			body, err = json.Marshal(report)
+			if err != nil {
+				fail(w, http.StatusInternalServerError, "cannot encode committed product heartbeat")
+				return
+			}
+		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.panelURL+inner.Path, bytes.NewReader(body))
 		if err != nil {
 			fail(w, http.StatusInternalServerError, "cannot build internal request")

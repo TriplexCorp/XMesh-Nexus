@@ -1,0 +1,11 @@
+[Unit]
+Description=Resume pending XMesh product Agent updates
+
+[Timer]
+OnBootSec=20s
+OnCalendar=*-*-* *:*:00
+Persistent=true
+Unit=xmesh-product-agent-upgrade.service
+
+[Install]
+WantedBy=timers.target
