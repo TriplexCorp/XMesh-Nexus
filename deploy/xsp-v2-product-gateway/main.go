@@ -977,6 +977,7 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 var allowedTunnelPaths = map[string]bool{
 	releasePlanPath:                              true,
 	releaseArtifactPath:                          true,
+	activationRecoveryPath:                       true,
 	"/api/v1/metrics/ingest":                     true,
 	"/api/v1/node/heartbeat":                     true,
 	"/api/v1/node/restart/poll":                  true,
@@ -1099,6 +1100,8 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		responseStatus, responseBody = g.planRelease(ctx, parsed, n, body)
 	} else if inner.Path == releaseArtifactPath {
 		responseStatus, responseBody = g.releaseArtifact(ctx, parsed, n, body)
+	} else if inner.Path == activationRecoveryPath {
+		responseStatus, responseBody = recoverActivationReceipt(n, body)
 	} else {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.panelURL+inner.Path, bytes.NewReader(body))
 		if err != nil {
