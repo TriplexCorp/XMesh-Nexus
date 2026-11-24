@@ -84,12 +84,13 @@ class Owner:
         self.headers["Cookie"] = next(value.split(";", 1)[0] for name, value in response.getheaders()
                                       if name.lower() == "set-cookie" and value.startswith("xmesh_session="))
 
-    def request(self, method, path, payload):
+    def request(self, method, path, payload, *, expected_status=None):
         self.http.request(method, "/api/v1" + path, json.dumps(payload), self.headers)
         response = self.http.getresponse()
         body = json.loads(response.read())
-        assert response.status == (201 if path.startswith("/collections/") and method == "POST" else 200), (
-            path, response.status, body)
+        if expected_status is None:
+            expected_status = 201 if path.startswith("/collections/") and method == "POST" else 200
+        assert response.status == expected_status, (path, response.status, body)
         return response, body
 
     def assign_profile(self, node):
