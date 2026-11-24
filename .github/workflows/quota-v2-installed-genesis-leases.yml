@@ -171,10 +171,16 @@ jobs:
   qualify-installed-matrix:
     name: Cross-scenario immutable Agent and Xray consistency (staging only)
     needs: installed-leases
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # GitHub treats a skipped required check as passing. Never skip the gate
+    # when one of the three real two-Node scenarios fails.
+    if: always() && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: All three installed scenarios must have passed
+        env:
+          INSTALLED_RESULT: ${{ needs.installed-leases.result }}
+        run: test "$INSTALLED_RESULT" = success
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha }}
