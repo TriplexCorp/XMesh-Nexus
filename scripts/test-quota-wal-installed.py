@@ -569,16 +569,33 @@ def main():
                 # production install entrypoints, not just its underlying
                 # product CLI. It runs before any service shutdown and
                 # must never request a second enrollment token.
-                result = guest.exec(
-                    "bash", "-ec",
-                    'source /opt/xmesh-node/deploy/xmesh-pq-install-guard.sh; '
-                    'xmesh_verify_or_resume_enrolled_product "$@"',
-                    "bash", state, PRODUCT, panel, str(guest.node),
-                    timeout=60,
-                )
-                assert result.strip() == b"resumed", (
-                    f"Node {guest.node} did not recover from installer preflight: {result!r}"
-                )
+                assert guest.exec(
+                    "systemctl", "is-enabled", "xmesh-pq-activation-recovery.service"
+                ).strip() == b"enabled"
+                units = guest.exec("systemctl", "cat", f"{METRICS}.service")
+                assert b"Requires=xmesh-pq-activation-recovery.service" in units
+                assert b"After=xmesh-pq-activation-recovery.service" in units
+                if index == 0:
+                    # Lost response: the installer preflight first attempts
+                    # the original signed request and then the strict tunnel.
+                    result = guest.exec(
+                        "bash", "-ec",
+                        'source /opt/xmesh-node/deploy/xmesh-pq-install-guard.sh; '
+                        'xmesh_verify_or_resume_enrolled_product "$@"',
+                        "bash", state, PRODUCT, panel, str(guest.node),
+                        timeout=60,
+                    )
+                    assert result.strip() == b"resumed", (
+                        f"Node {guest.node} installer re-enrollment guard failed: {result!r}"
+                    )
+                else:
+                    # Power cut after receipt fsync: systemd must reconstruct
+                    # active.json from local signed evidence without Nexus
+                    # access or a new enrollment token.
+                    guest.exec(
+                        "systemctl", "restart",
+                        "xmesh-pq-activation-recovery.service", timeout=60,
+                    )
                 guest.exec(PRODUCT, "verify-active", "--panel", panel,
                            "--node-id", str(guest.node))
                 for name, digest in original.items():
