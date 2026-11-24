@@ -56,6 +56,47 @@ def verify_measured_xray(path, expected_sha):
     return actual_sha
 
 
+def verify_running_xray(guest, container, expected_sha):
+    """Measure the executable of the actual nested-Docker Xray process.
+
+    The image tag, saved image digest and build-host binary hash do not prove
+    the executable running inside a Node guest. Pin Docker container ID, PID
+    and start time across a SHA-256 read from that process's /proc/PID/exe.
+    This is runtime consistency evidence, not remote hardware attestation.
+    """
+    require(hex_field(expected_sha, 64), "invalid expected live Xray digest")
+    require(container == "xmesh-managed-xray" or re.fullmatch(
+        r"xmesh-quota-u[1-9][0-9]{0,18}-[0-9a-f]{32}", container) is not None,
+        "untrusted Docker Xray container identity")
+
+    def live():
+        raw = guest.exec(
+            "docker", "inspect", "--type", "container", "-f",
+            "{{.Id}} {{.State.Pid}} {{.State.StartedAt}}", container)
+        try:
+            parts = raw.decode("ascii").split()
+        except (UnicodeDecodeError, AttributeError):
+            raise ValueError("invalid nested Xray Docker inspection") from None
+        require(len(parts) == 3 and hex_field(parts[0], 64)
+                and re.fullmatch(r"[1-9][0-9]{0,9}", parts[1]) is not None
+                and "T" in parts[2] and not parts[2].startswith("0001-"),
+                "untrusted live Xray Docker process")
+        return tuple(parts)
+
+    before = live()
+    raw = guest.exec("sha256sum", "/proc/" + before[1] + "/exe")
+    try:
+        fields = raw.decode("ascii").split()
+    except (UnicodeDecodeError, AttributeError):
+        raise ValueError("invalid live Xray executable measurement") from None
+    require(len(fields) == 2 and hex_field(fields[0], 64)
+            and fields[1] == "/proc/" + before[1] + "/exe",
+            "untrusted live Xray executable measurement")
+    require(fields[0] == expected_sha, "running Xray executable differs from pinned binary")
+    require(live() == before, "running Xray changed during executable measurement")
+    return fields[0]
+
+
 def read_json(path):
     def unique(pairs):
         doc = {}
