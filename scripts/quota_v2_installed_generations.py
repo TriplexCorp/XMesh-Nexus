@@ -328,6 +328,10 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                 assert blocked[0] == 503 and "issuance is paused" in str(blocked[1]), blocked
                 assert db.execute("SELECT COUNT(*) FROM quota_v2_wal_charges WHERE reservation_id=%s",
                                   (reservation,)).fetchone()[0] == 0
+                # The already-installed permit stays bounded even when the
+                # Node also stops admissions. The disposable frontend is
+                # already running; the worker must charge the signed tip.
+                main.exec("rm", "--", "/etc/xmesh-quota-v2-staging")
             main.exec("touch", f"{WORK}/ready-{generation}")
             completed(generation)
             chain.append(grant)
@@ -357,6 +361,7 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         if crashes:
             (artifact / "issuance-paused.json").write_text(json.dumps({
                 "nexusSigkill": True, "newRenewalRefused": True, "exactPermitReplayed": True,
+                "nodeAdmissionOptInRemoved": True,
                 "walChargedWhilePaused": charges[chain[-1]["reservationId"]],
             }, indent=2))
         def snapshot(connection):
