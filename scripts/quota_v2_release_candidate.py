@@ -159,6 +159,42 @@ def write_installed_evidence(path, scenario, nexus_revision, identity, nodes, xr
         stream.write("\n")
 
 
+def verify_installed_matrix(evidence, node_revision, nexus_revision):
+    """Prove all three independent installed scenarios tested one exact pair.
+
+    All inputs must come from artifacts of the SAME successful GitHub run.
+    This checks content consistency only, never production provenance,
+    operator approval or cryptographic hardware attestation.
+    """
+    require(hex_field(node_revision, 40) and hex_field(nexus_revision, 40),
+            "exact Node and Nexus commit SHAs required")
+    require(len(evidence) == len(SCENARIOS), "all three successful scenarios required")
+    records = [read_json(path) for path in evidence]
+    first = records[0]
+    require(isinstance(first, dict), "invalid installed evidence")
+    identity = first.get("productIdentity")
+    check_identity(identity, "control-v6.0.27", node_revision)
+    seen = set()
+    xray_digests = set()
+    for doc in records:
+        require(isinstance(doc, dict), "invalid installed evidence")
+        scenario = doc.get("scenario")
+        require(isinstance(scenario, str) and scenario in SCENARIOS and scenario not in seen,
+                "unknown or duplicate installed scenario")
+        check_evidence(doc, scenario, nexus_revision, identity)
+        seen.add(scenario)
+        xray_digests.add(doc["xrayArtifactSha256"])
+    require(seen == SCENARIOS, "missing installed scenario")
+    require(len(xray_digests) == 1, "installed scenarios tested different Xray binaries")
+    return {
+        "candidateIdentity": identity, "nexusRevision": nexus_revision,
+        "nodeRevision": node_revision,
+        "stagingScenarios": sorted(seen), "testedXrayArtifactSha256": sorted(xray_digests),
+        "installedMatrixConsistent": True,
+        "productionActivationAuthorized": False,
+    }
+
+
 def verify(candidate, evidence, node_revision, nexus_revision):
     require(hex_field(node_revision, 40) and hex_field(nexus_revision, 40),
             "exact Node and Nexus commit SHAs required")
@@ -183,40 +219,35 @@ def verify(candidate, evidence, node_revision, nexus_revision):
                 and hashlib.sha256(raw).hexdigest() == record["identity"]["artifactSha256"],
                 "candidate artifact bytes mismatch: " + name)
     identity = manifest["artifacts"][PRODUCT]["identity"]
-    require(len(evidence) == len(SCENARIOS), "all three successful scenarios required")
-    seen = set()
-    xray_digests = set()
-    for path in evidence:
-        doc = read_json(path)
-        require(isinstance(doc, dict), "invalid installed evidence")
-        scenario = doc.get("scenario")
-        require(isinstance(scenario, str) and scenario in SCENARIOS and scenario not in seen,
-                "unknown or duplicate installed scenario")
-        check_evidence(doc, scenario, nexus_revision, identity)
-        seen.add(scenario)
-        xray_digests.add(doc["xrayArtifactSha256"])
-    require(seen == SCENARIOS, "missing installed scenario")
-    # A passing suite must exercise ONE reproducible, exactly measured Xray
-    # binary. Otherwise three unrelated binaries could falsely qualify the
-    # same Agent+dataplane release across the independent installed runs.
-    require(len(xray_digests) == 1, "installed scenarios tested different Xray binaries")
+    matrix = verify_installed_matrix(evidence, node_revision, nexus_revision)
+    require(matrix["candidateIdentity"] == identity,
+            "tested product binary differs from candidate")
     return {
-        "candidateIdentity": identity, "nexusRevision": nexus_revision,
-        "stagingScenarios": sorted(seen), "testedXrayArtifactSha256": sorted(xray_digests),
+        "candidateIdentity": identity,
+        "nexusRevision": matrix["nexusRevision"],
+        "stagingScenarios": matrix["stagingScenarios"],
+        "testedXrayArtifactSha256": matrix["testedXrayArtifactSha256"],
         "candidateMatchesInstalledStagingEvidence": True,
         "productionActivationAuthorized": False,
     }
 
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--candidate", required=True, type=Path)
+    parser.add_argument("--candidate", type=Path)
+    parser.add_argument("--matrix-only", action="store_true")
     parser.add_argument("--node-revision", required=True)
     parser.add_argument("--nexus-revision", required=True)
     parser.add_argument("--evidence", required=True, nargs=3, type=Path)
     args = parser.parse_args()
     try:
-        result = verify(args.candidate, args.evidence, args.node_revision, args.nexus_revision)
+        if args.matrix_only:
+            require(args.candidate is None, "matrix-only cannot accept a candidate")
+            result = verify_installed_matrix(
+                args.evidence, args.node_revision, args.nexus_revision)
+        else:
+            require(args.candidate is not None, "candidate directory required")
+            result = verify(
+                args.candidate, args.evidence, args.node_revision, args.nexus_revision)
     except (ValueError, OSError) as error:
         parser.exit(1, "Candidate qualification rejected: " + str(error) + "\n")
     print(json.dumps(result, sort_keys=True, indent=2))
