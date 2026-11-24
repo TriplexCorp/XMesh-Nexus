@@ -23,3 +23,22 @@ func TestPinnedWALCandidateRequiresEnabledTransportAndExactBinary(t *testing.T) 
 		}
 	}
 }
+
+func TestFreshProductEnrollmentRequiresExactReleasePin(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	artifact := strings.Repeat("b", 64)
+	pin := revision + ":" + artifact
+	release := releaseIdentity{targetAgentVersion, revision, artifact}
+	if !releaseAllowedForEnrollment(release, pin, "", "") {
+		t.Fatal("reviewed release requires no WAL rehearsal flags")
+	}
+	for _, invalid := range []string{"", revision, revision + ":" + strings.Repeat("c", 64), strings.ToUpper(pin)} {
+		if releaseAllowedForEnrollment(release, invalid, "", pin) {
+			t.Fatal("accepted a missing or incorrect fresh-install pin")
+		}
+	}
+	release.Version = "control-v6.0.24"
+	if releaseAllowedForEnrollment(release, pin, "1", pin) {
+		t.Fatal("legacy bootstrap accepted for a fresh enrollment")
+	}
+}

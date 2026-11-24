@@ -24,13 +24,12 @@ const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const css=panelStyles();
 
 assert.equal(fs.readFileSync('VERSION','utf8').trim(),'6.0.0');
-assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.24');
+assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.27');
 assert.match(api,/\/nodes\/\{id\}\/agent-update/);
-assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]24";/);
+assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]27";/);
 assert.match(runtimeEntry,/control_v6_transition_active/);
 for(const v of ['control-v4','control-v5','control-v6']) assert.ok(runtimeEntry.includes(v),`v6 transition must accept ${v}`);
-assert.match(runtimeEntry,/VALUES\(\$1,'update_agent',\$2,\$3\)/);
-assert.match(runtimeEntry,/\.bind\(CONTROL_AGENT_VERSION\)/);
+assert.match(runtimeEntry,/No approved signed Agent update is available/);
 assert.match(runtimeEntry,/AgentUpdateRequest::Migration/,'Manifest-bound migration path must remain available');
 assert.match(runtimeEntry,/staged::request_agent_update/,'Non-empty immutable release migration stays on reviewed staged path');
 assert.doesNotMatch(runtimeEntry,/\b(url|uri|script|shell|command_text)\s*:/i,'v6 API must not accept executable remote input');
@@ -59,7 +58,7 @@ assert.match(releaseAck,/XSP-v2 Agent release ACK identity mismatch/);
 assert.match(releaseAck,/NEW[.]release_ack_success IS DISTINCT FROM TRUE/);
 
 // v6 shell control worker remains the authority for the fixed command surface.
-assert.match(agent,/AGENT_VERSION="control-v6[.]0[.]24"/);
+assert.match(agent,/AGENT_VERSION="control-v6[.]0[.]27"/);
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
 assert.match(agent,/router_running\(\)/);
 assert.match(agent,/releaseIdentity/);
@@ -72,8 +71,7 @@ assert.match(agent,/signed_post '\/api\/v1\/node\/restart\/ack'/);
 assert.match(agent,/verify_agent_install "\$target_version"/);
 assert.doesNotMatch(agent,/eval\s|bash -c.*\$|sh -c.*\$/,'Control worker must not execute remote shell input');
 
-// A legacy v4/v5/v6.0.0 node upgrades to the current v6 patch using the same
-// authenticated fixed action, with a real PQ production binary and exact identity.
+// Historical fixed-version tooling is separate from fresh strict product enrollment.
 assert.match(updater,/MODE="\$\{1:-manual\}"/);
 assert.match(updater,/XMESH_TARGET_AWARE_UPDATER=1/,'Updater must expose stable target-aware marker');
 assert.match(agent,/sanitize_updater_error/,'Control Agent must preserve safe updater failure context');
@@ -100,7 +98,7 @@ const boundDispatch=updater.indexOf('if [[ "$MODE" == --remote && -e "$RELEASE_I
 const movingMainFetch=updater.indexOf('https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/node-control-agent.sh');
 assert.ok(boundDispatch>=0 && movingMainFetch>boundDispatch,'Manifest-bound apply must dispatch locally before moving-main fetch');
 
-// Fresh enrollment must also install a real v6 PQ runtime, not merely a badge.
+// Retained legacy installer still requires an actual PQ runtime.
 assert.match(installer,/AGENT_VERSION=\\?"control-v6[.]0[.]24/);
 assert.match(installer,/install_v6_pq_runtime\(\)/);
 assert.match(installer,/install-xsp-v2-production-agent[.]sh/);
@@ -150,4 +148,4 @@ const preflight=spawnSync('python3',['scripts/test-legacy-agent-upgrade-prefligh
 assert.equal(preflight.status,0,'Legacy Agent quota/identity preflight failed:\n'+(preflight.stdout||'')+'\n'+(preflight.stderr||''));
 const syntax=spawnSync(process.execPath,['--check','frontend/js/core/app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('XMesh control-v6.0.24 POSTQUANTUM Agent upgrade/install and immutable staged migration contract: OK');
+console.log('XMesh control-v6.0.27 POSTQUANTUM Agent upgrade/install and immutable staged migration contract: OK');

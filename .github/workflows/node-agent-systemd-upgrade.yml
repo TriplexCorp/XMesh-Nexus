@@ -5,9 +5,6 @@ on:
       - 'deploy/update-node-control-agent.sh'
       - 'deploy/xmesh-product-upgrade-coordinator.py'
       - 'deploy/xmesh-product-agent-upgrade.*'
-      - 'scripts/test-product-agent-upgrade-coordinator.py'
-      - 'scripts/build-product-agent-bridge-package.sh'
-      - 'scripts/test-product-agent-bridge-apt.sh'
       - 'scripts/test-node-agent-systemd-upgrade.py'
       - '.github/workflows/node-agent-systemd-upgrade.yml'
   push:
@@ -16,9 +13,6 @@ on:
       - 'deploy/update-node-control-agent.sh'
       - 'deploy/xmesh-product-upgrade-coordinator.py'
       - 'deploy/xmesh-product-agent-upgrade.*'
-      - 'scripts/test-product-agent-upgrade-coordinator.py'
-      - 'scripts/build-product-agent-bridge-package.sh'
-      - 'scripts/test-product-agent-bridge-apt.sh'
       - 'scripts/test-node-agent-systemd-upgrade.py'
       - '.github/workflows/node-agent-systemd-upgrade.yml'
   workflow_dispatch:
@@ -50,36 +44,6 @@ jobs:
           ref: 6c1bafa8433003a9bfed15986d83dba4d8cb5f1a
           path: .ci-new-node
           persist-credentials: false
-      - name: Check out the reviewed product bridge source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: TriplexCorp/XMesh-Node
-          ref: 7af520cdd1254d25a08a52d6b1f0a4c596b46be0
-          path: .ci-product-bridge
-          persist-credentials: false
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
-        with:
-          go-version-file: .ci-product-bridge/agent/xspv2/go.mod
-          cache: false
-      - name: Verify reproducible bridge package and independently pinned APT trust
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          revision="$(git -C .ci-product-bridge rev-parse HEAD)"
-          test "$revision" = '7af520cdd1254d25a08a52d6b1f0a4c596b46be0'
-          bridge="$RUNNER_TEMP/xmesh-product-bridge"
-          (cd .ci-product-bridge/agent/xspv2 &&
-            CGO_ENABLED=0 go build -trimpath \
-              -ldflags "-X main.version=control-v6.0.27 -X main.sourceRevision=$revision" \
-              -o "$bridge" ./cmd/xmesh-agent-xspv2-product)
-          read -r digest _ < <(sha256sum "$bridge")
-          scripts/build-product-agent-bridge-package.sh "$bridge" "$digest" "$RUNNER_TEMP/bridge-a.deb"
-          scripts/build-product-agent-bridge-package.sh "$bridge" "$digest" "$RUNNER_TEMP/bridge-b.deb"
-          cmp "$RUNNER_TEMP/bridge-a.deb" "$RUNNER_TEMP/bridge-b.deb"
-          sha256sum "$bridge" "$RUNNER_TEMP/bridge-a.deb"
-          scripts/test-product-agent-bridge-apt.sh "$RUNNER_TEMP/bridge-a.deb"
-      - name: Verify product bridge orchestration and recovery boundaries
-        run: sudo /usr/bin/python3 scripts/test-product-agent-upgrade-coordinator.py -v
       - name: Prove installed helper migration under real Ubuntu systemd
         shell: bash
         run: |

@@ -29,14 +29,12 @@ For every production Agent release, all of the following must point to the same 
 
 `sourceRevision` and `artifactSha256` remain immutable release-identity fields, but they do **not** replace the version bump requirement.
 
-A rolling upgrade may explicitly accept the immediately previous Agent version so existing nodes keep working while they upgrade. The panel must still advertise only the newest target version.
+Fresh Nexus installs approve a Node build using `XSP_V2_PRODUCT_AGENT_PIN=<source SHA>:<product binary SHA-256>`. Set it on the initial `install.sh` invocation using the reviewed release evidence. New enrollment fails closed when the pin is absent or does not match. The panel supplies the exact Node and running Nexus revisions and checks the Node bootstrap hash before dispatch.
 
-Updater self-repair must validate a downloaded bootstrap against the **commanded target Agent version** from the authenticated/signed update request. It must never pin repair validation to a literal version embedded in the older running Agent; otherwise a missing updater unit could deadlock the next release.
-
-The normal signed update path follows the same rule: it must execute a **fresh target-validated updater bootstrap**, not blindly start the updater executable installed by the previous release. The installed static updater service is an emergency/local fallback and must never become the authority that decides whether N can update to N+1. Failure ACKs should carry a bounded sanitized updater reason so operators are not left with only `systemd: exit-code`.
+The first install does not require the bridge package. Unbound Agent update requests are refused. The signed plan, staging, atomic switch, COMMIT and signed ABORT code remain available for future release qualification. A successor release must be tested from the installed first release before enabling its update action.
 
 ## CI requirement
 
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.
 
-Current target: **`control-v6.0.24`**.
+Current target: **`control-v6.0.27`**.

@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.24"
+AGENT_VERSION="control-v6.0.27"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -161,7 +161,7 @@ update_managed_xray(){
   detail='Xray update denied: signed quota revocation pending'
   return 1
  fi
- [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.24"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
+ [[ -f "$worker" && ! -L "$worker" ]] && grep -Fxq 'AGENT_VERSION = "control-v6.0.27"' "$worker" || { detail='Xray transaction worker missing; update Agent';return 1; }
  # Only fixed JSON stages and a sanitized final result cross the signed channel.
  # The worker preserves the exact old container until preflight succeeds and
  # validates all actual TLS/GeoData mounts with run -test before switching.
@@ -430,23 +430,15 @@ print(" ".join((str(value),action,version,release_version,source_revision,artifa
 [[ -n "$command_info" ]] || exit 0
 read -r command_id action target_version release_version source_revision artifact_sha256 <<< "$command_info"
 [[ "$command_id" =~ ^[1-9][0-9]*$ ]] || exit 2
-# A product-bound update is owned by the systemd coordinator and Nexus's
-# signed COMMIT/ABORT. The legacy updater and ACK must never handle it.
-if [[ "$action" == update_agent && "$target_version" == control-v6.0.27 ]];then
- [[ "$release_version" == "$target_version" && "${XMESH_STRICT_PQ_REQUIRED:-0}" == 1 ]] || exit 2
- coordinator=/usr/local/libexec/xmesh-product-upgrade-coordinator.py
- printf '%s' "$reply" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["command"]))' |
-  /usr/bin/python3 "$coordinator" receive
- systemctl start --no-block xmesh-product-agent-upgrade.service
- exit 0
-fi
 success=false
 detail='Command failed'
 if [[ "$action" == update_xray ]];then
  if update_managed_xray "$target_version";then success=true;fi
 elif [[ "$action" == update_agent ]];then
  clear_agent_release_identity
- if [[ "$release_version" != - ]];then
+ if [[ "${XMESH_STRICT_PQ_REQUIRED:-0}" == 1 ]];then
+  detail='An approved signed product update is required'
+ elif [[ "$release_version" != - ]];then
   if ! stage_agent_release_identity "$release_version" "$source_revision" "$artifact_sha256";then
    detail='Invalid or unstorable Agent release identity'
   elif run_agent_updater "$release_version" && verify_staged_agent_package "$release_version" "$source_revision" "$artifact_sha256";then

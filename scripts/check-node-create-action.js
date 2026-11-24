@@ -62,16 +62,18 @@ assert.match(html,/<script src="\/js\/features\/nodes\/node-bootstrap-v6\.js\?v=
  'Panel must cache-bust the strict-PQ bootstrap after changing the reviewed Node release pin');
 assert.ok(html.indexOf('app.js?v=')<html.indexOf('/js/features/nodes/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
-assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='d2bf974ecb7b8df5edb237f1c6604d6f697baaae'/,
- 'Fresh Node installation must pin the strict-PQ Node release compatible with control-v6.0.24');
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='ebea9cf7900f6e318657236b403c2d42b877a5d1'/,
+ 'Fresh Node installation must pin the strict-PQ Node release compatible with control-v6.0.27');
 assert.match(strictBootstrap,/curl --proto "=https" --tlsv1\.3 --tls-max 1\.3/,
  'Public bootstrap download must negotiate TLS 1.3 only rather than advertising a TLS 1.2 minimum');
 assert.doesNotMatch(strictBootstrap,/--tlsv1\.2/,
  'Generated bootstrap command must not retain the misleading TLS 1.2 floor');
 assert.match(strictBootstrap,/XMesh Node v6 fresh installer\. Security invariant:/,
  'The downloaded installer must be marker-checked as the v6 fail-closed bootstrap');
-assert.match(strictBootstrap,/sudo env XMESH_NODE_RELEASE_REF='\+XMESH_V6_NODE_BOOTSTRAP_SHA\+' bash \/tmp\/xmesh-bootstrap-v6\.sh/,
- 'Panel command must make the reviewed release SHA authoritative inside bootstrap checkout');
+assert.match(strictBootstrap,/XMESH_NODE_RELEASE_REF=.*XMESH_NEXUS_RELEASE_REF=.*panel.revision/,
+ 'Panel command must pin both the reviewed Node release and running Nexus revision');
+assert.match(strictBootstrap,/sha256sum --check --status/,
+ 'Panel command must check the pinned Node installer digest before launching it');
 assert.match(strictBootstrap,/document\.addEventListener\('click',xmeshV6StrictPqBootstrapClick,true\)/,
  'Strict-PQ handler must capture the bootstrap click before the historical handler');
 assert.match(strictBootstrap,/\/api\/v1\/nodes\/'\+encodeURIComponent\(id\)\+'\/enrollment'/,

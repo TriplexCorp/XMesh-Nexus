@@ -77,10 +77,8 @@ services:
       SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
       # Enable only after all legacy integration tokens are reissued with a proof key.
       XMESH_INTEGRATION_REQUIRE_PROOF: ${XMESH_INTEGRATION_REQUIRE_PROOF:-false}
-      # Staged distributed quota-v2: never activate before every Node agent is
-      # on control-v6.0.24, verified offline guard, and the durable quota cutover has been rehearsed.
+      # Distributed quotas require an independently qualified Xray and Node rollout.
       XMESH_QUOTA_V2_ENABLED: ${XMESH_QUOTA_V2_ENABLED:-0}
-      XMESH_PRODUCT_UPGRADE_CANARY_NODE_ID: ${XMESH_PRODUCT_UPGRADE_CANARY_NODE_ID:-}
       XMESH_QUOTA_V2_PAUSE_ISSUANCE: ${XMESH_QUOTA_V2_PAUSE_ISSUANCE:-0}
       XMESH_QUOTA_V2_WAL_TRANSPORT: ${XMESH_QUOTA_V2_WAL_TRANSPORT:-0}
       XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
@@ -126,6 +124,7 @@ services:
       XSP_V2_PRODUCT_RELEASE_COMMIT: ${XSP_V2_PRODUCT_RELEASE_COMMIT:-0}
       XSP_V2_PRODUCT_RELEASE_PLANNING: ${XSP_V2_PRODUCT_RELEASE_PLANNING:-0}
       XSP_V2_PRODUCT_RELEASE_ARTIFACT_DIR: /run/xmesh-agent-artifacts
+      XSP_V2_PRODUCT_AGENT_PIN: ${XSP_V2_PRODUCT_AGENT_PIN:-}
       XSP_V2_PRODUCT_WAL_CANDIDATE_PIN: ${XSP_V2_PRODUCT_WAL_CANDIDATE_PIN:-}
     depends_on:
       db:
