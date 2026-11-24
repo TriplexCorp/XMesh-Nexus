@@ -86,6 +86,21 @@ def verify_qualified_xray(binary, qualification, upstream_revision, patch_tree, 
     return verify_measured_xray(binary, qualification["artifactSha256"])
 
 
+def verify_qualified_xray_manifest(path, qualification):
+    manifest = read_json(path)
+    exact_keys(manifest, ("schemaVersion", "kind", "nodeSourceRevision",
+                          "upstreamSourceRevision", "goVersion", "buildFlags",
+                          "artifactSha256", "independentRebuildMatched", "candidateOnly",
+                          "productionActivationAuthorized"), "signed Xray manifest")
+    require(manifest["buildFlags"] == [
+        "GOOS=linux", "GOARCH=amd64", "GOAMD64=v1", "CGO_ENABLED=0", "-trimpath",
+    ], "unexpected signed Xray build flags")
+    for field, value in manifest.items():
+        if field != "buildFlags":
+            require(type(value) is type(qualification[field]) and value == qualification[field],
+                    "signed Xray manifest differs from reviewed qualification: " + field)
+
+
 def verify_matrix_xray(matrix, qualification):
     require(matrix["testedXrayArtifactSha256"] == [qualification["artifactSha256"]],
             "installed matrix used a different Xray than the independently qualified candidate")
@@ -271,6 +286,7 @@ def main():
     parser.add_argument("--candidate", type=Path)
     parser.add_argument("--xray-qualification", type=Path)
     parser.add_argument("--check-xray", type=Path)
+    parser.add_argument("--xray-manifest", type=Path)
     parser.add_argument("--upstream-revision")
     parser.add_argument("--patch-tree")
     parser.add_argument("--go-version")
@@ -283,7 +299,9 @@ def main():
         qualification = (read_xray_qualification(args.xray_qualification)
                          if args.xray_qualification else None)
         if args.check_xray:
-            require(qualification is not None, "independent Xray qualification required")
+            require(qualification is not None and args.xray_manifest is not None,
+                    "independent Xray qualification and signed manifest required")
+            verify_qualified_xray_manifest(args.xray_manifest, qualification)
             require(not (args.matrix_only or args.candidate or args.evidence
                          or args.node_revision or args.nexus_revision),
                     "Xray verification cannot also qualify an installed matrix")

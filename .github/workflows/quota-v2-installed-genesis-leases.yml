@@ -22,7 +22,7 @@ on:
       - 'scripts/quota_v2_installed_live_vless.py'
       - 'scripts/quota_v2_installed_generations*.py'
       - 'scripts/quota_v2_release_candidate.py'
-      - 'scripts/metered-xray-qualification.json'
+      - 'scripts/metered-xray-*.json'
       - 'scripts/test-quota-v2-release-candidate.py'
       - 'scripts/quota-wal-systemd.Dockerfile'
       - '.github/workflows/quota-v2-installed-genesis-leases.yml'
@@ -109,9 +109,10 @@ jobs:
         with:
           go-version-file: .ci-reviewed-node/agent/xspv2/go.mod
           cache: false
-      - name: Build and match the independently qualified metered Xray
+      - name: Verify the provenance of the independently qualified metered Xray
         env:
           GOTOOLCHAIN: go1.27.4
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           source="$RUNNER_TEMP/xray-source"
@@ -127,9 +128,18 @@ jobs:
               go build -trimpath -o "$bundle/xray" ./main)
           hash="$(python3 scripts/quota_v2_release_candidate.py --check-xray "$bundle/xray" \
             --xray-qualification scripts/metered-xray-qualification.json \
+            --xray-manifest scripts/metered-xray-candidate-manifest.json \
             --upstream-revision "$(git -C "$source" rev-parse HEAD)" \
             --patch-tree "$(git -C .ci-reviewed-node rev-parse HEAD:experiments/xray-dataplane-fence)" \
             --go-version "$(go version)")"
+          reviewed_node="$(jq -er .nodeSourceRevision scripts/metered-xray-qualification.json)"
+          for subject in "$bundle/xray" scripts/metered-xray-candidate-manifest.json; do
+            gh attestation verify "$subject" --bundle scripts/metered-xray-provenance.json \
+              --repo TriplexCorp/XMesh-Node \
+              --signer-workflow TriplexCorp/XMesh-Node/.github/workflows/xray-dataplane-fence-experiment.yml \
+              --source-ref refs/heads/main --source-digest "$reviewed_node" \
+              --deny-self-hosted-runners
+          done
           printf 'FROM scratch\nCOPY xray /xray\nENTRYPOINT ["/xray"]\n' > "$bundle/Dockerfile"
           docker build --iidfile "$bundle/image-id" "$bundle"
           echo "Instrumented Xray SHA-256 $hash"

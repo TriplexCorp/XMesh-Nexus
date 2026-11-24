@@ -8,7 +8,8 @@ import unittest
 from quota_v2_release_candidate import (
     ACTIVATION, PRODUCT, SCENARIOS, read_xray_qualification, verify,
     verify_installed_matrix, verify_matrix_xray, verify_measured_xray,
-    verify_qualified_xray, verify_running_xray, write_installed_evidence,
+    verify_qualified_xray, verify_qualified_xray_manifest, verify_running_xray,
+    write_installed_evidence,
 )
 
 
@@ -163,6 +164,20 @@ class CandidateTest(unittest.TestCase):
         binary.write_bytes(b"unmetered substitution")
         with self.assertRaisesRegex(ValueError, "executable changed"):
             verify_qualified_xray(binary, qualification, upstream, patch_tree, go)
+
+    def test_signed_xray_manifest_must_match_reviewed_fields(self):
+        source = Path(__file__).resolve().parents[1] / "scripts"
+        qualification = read_xray_qualification(source / "metered-xray-qualification.json")
+        manifest = source / "metered-xray-candidate-manifest.json"
+        verify_qualified_xray_manifest(manifest, qualification)
+        altered = self.root / "manifest.json"
+        values = json.loads(manifest.read_bytes())
+        for key, value in (("artifactSha256", "0" * 64),
+                           ("productionActivationAuthorized", True),
+                           ("buildFlags", ["CGO_ENABLED=1"])):
+            altered.write_text(json.dumps({**values, key: value}))
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                verify_qualified_xray_manifest(altered, qualification)
 
     def test_xray_binary_rechecked_at_installed_evidence_export(self):
         binary = self.root / "xray"
