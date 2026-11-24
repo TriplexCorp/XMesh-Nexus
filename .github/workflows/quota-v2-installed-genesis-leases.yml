@@ -44,7 +44,7 @@ jobs:
       XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario != 'lease-recovery' && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
       XMESH_TEST_INSTALLED_REBOOT: ${{ matrix.scenario == 'lease-recovery' && '1' || '0' }}
-      XMESH_INSTALLED_NODE_REF: b2aeffad4c09bdd3176faa827657b04bab353f9a
+      XMESH_INSTALLED_NODE_REF: 54f53d4e304f6fb15ff41e6b9aed529fe5d4a781
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -69,12 +69,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: b2aeffad4c09bdd3176faa827657b04bab353f9a
+          ref: 54f53d4e304f6fb15ff41e6b9aed529fe5d4a781
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Verify exact draft Agent source
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 'b2aeffad4c09bdd3176faa827657b04bab353f9a'
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '54f53d4e304f6fb15ff41e6b9aed529fe5d4a781'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
           python3 scripts/test-quota-v2-release-candidate.py
           python3 -m py_compile scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py
@@ -197,7 +197,7 @@ jobs:
       - name: Refuse mixed revisions, mixed binaries and incomplete matrix
         env:
           XMESH_INSTALLED_NEXUS_REF: ${{ github.event.pull_request.head.sha }}
-          XMESH_INSTALLED_NODE_REF: b2aeffad4c09bdd3176faa827657b04bab353f9a
+          XMESH_INSTALLED_NODE_REF: 54f53d4e304f6fb15ff41e6b9aed529fe5d4a781
           XMESH_INSTALLED_MATRIX_PATH: ${{ runner.temp }}/quota-v2-installed-matrix
         run: |
           set -euo pipefail
