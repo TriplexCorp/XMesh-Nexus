@@ -65,7 +65,7 @@ func TestReleasePlanPostgres(t *testing.T) {
 		_, err := db.Exec(ctx, sql, args...)
 		requireFixture(t, err)
 	}
-	for _, prefix := range []string{"0001", "0012", "0015", "0019", "0020", "0023", "0024", "0099", "0107", "0108", "0109", "0110", "0163", "0164", "0165"} {
+	for _, prefix := range []string{"0001", "0012", "0015", "0019", "0020", "0023", "0024", "0099", "0107", "0108", "0109", "0110", "0163", "0164", "0165", "0166"} {
 		paths, err := filepath.Glob("../../backend/migrations/" + prefix + "_*.sql")
 		requireFixture(t, err)
 		if len(paths) != 1 {
@@ -450,6 +450,71 @@ func TestReleasePlanPostgres(t *testing.T) {
 	exec("UPDATE node_xsp_public_keysets SET revoked_at=now() WHERE node_id=1 AND purpose='node_request'")
 	if status, _ := g.commitRelease(ctx, commitRequest, node, commitBody); status != http.StatusConflict {
 		t.Fatal("revoked enrollment recovered the receipt")
+	}
+
+	// The fresh release queue uses an exact approved newer manifest and
+	// the original activation, not the legacy 6.0.24 bridge eligibility.
+	var freshID int64
+	requireFixture(t, db.QueryRow(ctx, "INSERT INTO panel_records(collection,data) VALUES('nodes','{}') RETURNING id").Scan(&freshID))
+	exec("INSERT INTO node_metric_keys(node_id,public_key) VALUES($1,$2)", freshID, strings.Repeat("f", 64))
+	freshPub, _, err := ed25519.GenerateKey(rand.Reader)
+	requireFixture(t, err)
+	freshPQ, err := mldsa.GenerateKey(mldsa.MLDSA65())
+	requireFixture(t, err)
+	exec(`INSERT INTO node_xsp_public_keysets
+		(node_id,purpose,key_epoch,ed25519_key_id,mldsa65_key_id,ed25519_public,mldsa65_public)
+		VALUES($1,'node_request',1,'ed-fresh','pq-fresh',$2,$3)`, freshID, []byte(freshPub), freshPQ.PublicKey().Bytes())
+	freshReceipt := []byte("fresh activation envelope")
+	freshDigest := sha256.Sum256(freshReceipt)
+	freshSPKI := sha256.Sum256([]byte("fresh test TLS SPKI"))
+	exec(`INSERT INTO node_xsp_product_nodes
+		(node_id,state,key_epoch,ed25519_key_id,mldsa65_key_id,tls_spki_sha256,
+		 release_version,release_source_revision,release_artifact_sha256,
+		 receipt_sha256,receipt_envelope,activated_at)
+		VALUES($1,'active',1,'ed-fresh','pq-fresh',$2,$3,$4,$5,$6,$7,now())`,
+		freshID, freshSPKI[:], target.Version, target.SourceRevision, target.ArtifactSHA256, freshDigest[:], freshReceipt)
+	successor := releaseIdentity{"control-v6.0.28", strings.Repeat("8", 40), strings.Repeat("9", 64)}
+	exec(`INSERT INTO node_xsp_agent_release_manifests(version,source_revision,artifact_sha256,created_by)
+		VALUES($1,$2,$3,'test-owner')`, successor.Version, successor.SourceRevision, successor.ArtifactSHA256)
+	queue := func(version string) error {
+		return db.QueryRow(ctx, "SELECT command_id FROM queue_node_xsp_product_first_successor($1,$2,'test-owner')",
+			freshID, version).Scan(&command)
+	}
+	if err := queue(successor.Version); err == nil {
+		t.Fatal("fresh successor queued without an authenticated heartbeat")
+	}
+	exec("INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,received_at) VALUES($1,$2,true,true,now())",
+		freshID, target.Version)
+	for _, version := range []string{target.Version, "control-v6.0.26", "control-v6.0.29", "control-v6.0.028"} {
+		if err := queue(version); err == nil {
+			t.Fatalf("unapproved, identical or backward release queued: %s", version)
+		}
+	}
+	exec("UPDATE panel_records SET data='{\"disabled\":true}' WHERE id=$1", freshID)
+	if err := queue(successor.Version); err == nil {
+		t.Fatal("disabled node received an update command")
+	}
+	exec("UPDATE panel_records SET data='{}' WHERE id=$1", freshID)
+	exec("UPDATE node_runtime_heartbeats SET received_at=now()-interval '66 seconds' WHERE node_id=$1", freshID)
+	if err := queue(successor.Version); err == nil {
+		t.Fatal("stale heartbeat authorized an update")
+	}
+	exec("UPDATE node_runtime_heartbeats SET received_at=now(),version=$2 WHERE node_id=$1", freshID, "control-v6.0.26")
+	if err := queue(successor.Version); err == nil {
+		t.Fatal("mismatched heartbeat authorized an update")
+	}
+	exec("UPDATE node_runtime_heartbeats SET version=$2 WHERE node_id=$1", freshID, target.Version)
+	requireFixture(t, queue(successor.Version))
+	var queuedVersion, queuedRevision, queuedSHA string
+	requireFixture(t, db.QueryRow(ctx, `SELECT c.target_version,m.source_revision,m.artifact_sha256
+		FROM node_restart_commands c JOIN node_xsp_agent_release_manifests m ON m.id=c.release_manifest_id
+		WHERE c.id=$1 AND c.node_id=$2 AND c.state='pending'`, command, freshID).
+		Scan(&queuedVersion, &queuedRevision, &queuedSHA))
+	if queuedVersion != successor.Version || queuedRevision != successor.SourceRevision || queuedSHA != successor.ArtifactSHA256 {
+		t.Fatal("successor queue did not bind the immutable approved manifest")
+	}
+	if err := queue(successor.Version); err == nil {
+		t.Fatal("duplicate active successor command accepted")
 	}
 
 }

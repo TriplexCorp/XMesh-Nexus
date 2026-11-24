@@ -72,3 +72,12 @@ This is the **first successor binary** mechanism; it is not yet qualification
 of an entire Agent/runtime bundle, multiple successive upgrades, or an
 upgrade while production quota spending is active. These gates must not be
 silently bypassed by the fresh installation path.
+
+The owner-only ordinary update action has a gated first-successor queue.
+It requires a recent heartbeat for the exact original enrolled version,
+an immutable approved strictly forward manifest, a nonrevoked keyset, and
+no committed previous successor. `XSP_V2_PRODUCT_FIRST_SUCCESSOR_QUALIFIED`
+defaults to zero and must stay zero until real installed lifecycle testing
+qualifies the successor; planning and commit gates must also be enabled.
+The queue refuses production Quota V2 operation until live-quota update
+and rollback have been qualified. This is not a claim of chained upgrades.

@@ -288,6 +288,64 @@ pub async fn request_xray_update(
     ))
 }
 
+/// Only an independently qualified successor of a fresh v6 installation can
+/// be queued here. The initial release has no eligible newer manifest.
+fn first_product_successor_enabled() -> bool {
+    [
+        "XSP_V2_PRODUCT_FIRST_SUCCESSOR_QUALIFIED",
+        "XSP_V2_PRODUCT_RELEASE_PLANNING",
+        "XSP_V2_PRODUCT_RELEASE_COMMIT",
+    ]
+    .iter()
+    .all(|name| std::env::var(name).is_ok_and(|value| value == "1"))
+        && !crate::quota_v2::enabled()
+}
+
+async fn queue_first_product_successor(
+    state: &AppState,
+    actor: &crate::auth::AuthUser,
+    node_id: i64,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    crate::require_owner(actor)?;
+    let id = sqlx::query_scalar::<_, i64>(
+        "SELECT command_id FROM queue_node_xsp_product_first_successor($1,$2,$3)",
+    )
+    .bind(node_id)
+    .bind(CONTROL_AGENT_VERSION)
+    .bind(&actor.username)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|error| {
+        if error.to_string().contains("node already has an active control command") {
+            ApiError::new(StatusCode::CONFLICT, "Node already has an active control command.")
+        } else {
+            error.into()
+        }
+    })?
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::CONFLICT,
+            "No approved forward Agent release is available for this activation.",
+        )
+    })?;
+    crate::audit(
+        &state.pool,
+        &actor.username,
+        "node.agent.first_successor.requested",
+        Some("nodes"),
+        Some(node_id),
+        json!({"commandId":id,"targetVersion":CONTROL_AGENT_VERSION}),
+    )
+    .await;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "id":id,"nodeId":node_id,"action":"update_agent",
+            "targetVersion":CONTROL_AGENT_VERSION,"state":"pending"
+        })),
+    ))
+}
+
 /// Immutable manifest requests retain their dedicated verification path.
 pub async fn request_agent_update(
     State(state): State<AppState>,
@@ -329,6 +387,9 @@ pub async fn request_agent_update(
             StatusCode::CONFLICT,
             "Отключённая нода не принимает команды. Сначала восстановите работу узла.",
         ));
+    }
+    if first_product_successor_enabled() {
+        return queue_first_product_successor(&state, &actor, node_id).await;
     }
     Err(ApiError::new(
         StatusCode::CONFLICT,
