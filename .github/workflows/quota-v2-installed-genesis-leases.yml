@@ -39,6 +39,7 @@ jobs:
       XMESH_AUDIT_DISPOSABLE: '1'
       XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario != 'lease-recovery' && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
+      XMESH_TEST_INSTALLED_REBOOT: ${{ matrix.scenario == 'lease-recovery' && '1' || '0' }}
       XMESH_INSTALLED_NODE_REF: 26ab12f606868d9d2fe9ab24cbd39c121b443681
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed

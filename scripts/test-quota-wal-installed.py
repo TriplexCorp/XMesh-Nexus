@@ -640,6 +640,36 @@ def main():
             print("Two installed Agents recovered lost activation files with unchanged "
                   "original signed requests, receipts, database identity and keys.")
 
+        if os.environ.get("XMESH_TEST_INSTALLED_REBOOT") == "1":
+            # Recreate systemd PID 1 and all guest services on the SAME
+            # persistent Docker guest rootfs. This is a disposable
+            # systemd-container reboot qualification, not a kernel reboot.
+            for guest, _ in guests:
+                rootkey = "/var/lib/xmesh-agent/xsp-v2/keys/node-request.vault"
+                state = "/var/lib/xmesh-agent/product"
+                originals = {
+                    name: guest.exec("sha256sum", f"{state}/{name}").split()[0]
+                    for name in ("activation-request.json",
+                                 "activation-receipt.json", "active.json")
+                }
+                original_key = guest.exec("sha256sum", rootkey).split()[0]
+                docker("restart", "--time", "20", guest.name, timeout=140)
+                wait_for(guest.ready, timeout=130,
+                         label=f"rebooted systemd and nested Docker Node {guest.node}")
+                assert guest.exec("readlink", "/proc/1/exe").strip().endswith(b"/systemd")
+                guest.exec(PRODUCT, "verify-active", "--panel", panel,
+                           "--node-id", str(guest.node))
+                assert guest.exec("systemctl", "is-enabled",
+                                  "xmesh-pq-activation-recovery.service").strip() == b"enabled"
+                assert guest.exec("sha256sum", rootkey).split()[0] == original_key
+                for name, digest in originals.items():
+                    assert guest.exec("sha256sum", f"{state}/{name}").split()[0] == digest, (
+                        f"systemd guest restart changed original PQ {name}"
+                    )
+                guest.exec("systemctl", "start", f"{METRICS}.service", timeout=60)
+            print("Both systemd guest PID 1 instances rebooted with unchanged "
+                  "encrypted keyring and original strict-PQ activation receipts.")
+
         def samples(node):
             return db.execute("SELECT count(*) FROM server_metric_samples WHERE node_id=%s", (str(node),)).fetchone()[0]
 
