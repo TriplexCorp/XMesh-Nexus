@@ -19,7 +19,7 @@ class CandidateTest(unittest.TestCase):
         self.nexus = "b" * 40
         self.manifest = {
             "schema": "xmesh-agent-release-candidate-v1", "candidateOnly": True,
-            "productionActivationAuthorized": False, "version": "control-v6.0.27",
+            "productionActivationAuthorized": False, "version": "control-v6.0.28",
             "sourceRevision": self.node, "platform": "linux/amd64",
             "builder": "golang:1.27.3-trixie", "artifacts": {},
         }
@@ -27,7 +27,7 @@ class CandidateTest(unittest.TestCase):
             raw = name.encode()
             (self.candidate / name).write_bytes(raw)
             self.manifest["artifacts"][name] = {
-                "identity": {"version": "control-v6.0.27", "sourceRevision": self.node,
+                "identity": {"version": "control-v6.0.28", "sourceRevision": self.node,
                              "artifactSha256": hashlib.sha256(raw).hexdigest()},
                 "sizeBytes": len(raw),
             }

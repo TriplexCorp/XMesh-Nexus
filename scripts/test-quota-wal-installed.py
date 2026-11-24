@@ -56,7 +56,7 @@ def reference_identity(root, revision):
     output = root / "build"
     output.mkdir()
     version = (NODE / "AGENT_VERSION").read_text().strip()
-    assert version in ("control-v6.0.25", "control-v6.0.27")
+    assert version in ("control-v6.0.25", "control-v6.0.28")
     subprocess.run(["git", "clone", "--no-hardlinks", "--no-checkout", NODE, source],
                    check=True, timeout=30)
     subprocess.run(["git", "-C", source, "checkout", "--detach", revision], check=True, timeout=30)
@@ -520,7 +520,7 @@ def main():
                                         "XMESH_QUOTA_V2_WAL_TRANSPORT": "1",
                                         "XMESH_WAL_TUNNEL_FIXTURE_DIR": directory,
                                         "XSP_V2_PRODUCT_AGENT_PIN": (
-                                            f"{revision}:{identity['artifactSha256']}" if identity["version"] == "control-v6.0.27" else ""
+                                            f"{revision}:{identity['artifactSha256']}" if identity["version"] == "control-v6.0.28" else ""
                                         ),
                                         "XSP_V2_PRODUCT_WAL_CANDIDATE_PIN": (
                                             f"{revision}:{identity['artifactSha256']}" if identity["version"] == "control-v6.0.25" else ""
@@ -594,6 +594,17 @@ def main():
             clean.exec("test", "!", "-e", "/etc/xmesh-agent-release-bridge.sha256")
             clean.exec("test", "!", "-e", "/var/lib/xmesh-node-control/product-upgrade/command.json")
             clean.exec("test", "!", "-e", "/etc/xmesh-quota-v2-staging")
+            recovery_service = "xmesh-pq-activation-recovery.service"
+            assert clean.exec("systemctl", "show", "-p", "StartLimitBurst", "--value",
+                              recovery_service).strip() == b"32"
+            assert clean.exec("systemctl", "show", "-p", "StartLimitIntervalUSec", "--value",
+                              recovery_service).strip() == b"10s"
+            # Six successful one-shot verifications must not exhaust the shared
+            # activation prerequisite during normal bootstrap fan-out.
+            for _ in range(6):
+                clean.exec("systemctl", "start", recovery_service, timeout=65)
+                assert clean.exec("systemctl", "show", "-p", "Result", "--value",
+                                  recovery_service).strip() == b"success"
             clean.exec("systemctl", "start", "xmesh-node-control.service", timeout=65)
             registered = db.execute(
                 "SELECT state,release_version,release_source_revision,release_artifact_sha256 "
@@ -756,7 +767,7 @@ def main():
 
         if os.environ.get("XMESH_INSTALLED_GENESIS_LEASE") == "1":
             from quota_v2_installed_genesis_lease import try_signed_lease_pair
-            assert identity["version"] == "control-v6.0.27"
+            assert identity["version"] == "control-v6.0.28"
             try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, sys.modules[__name__])
             # Only emit qualification evidence after the full scenario
             # succeeds, never from setup or a partially completed test.

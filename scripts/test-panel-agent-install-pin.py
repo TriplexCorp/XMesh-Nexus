@@ -25,7 +25,7 @@ class FreshAgentPinTest(unittest.TestCase):
         self.bootstrap.write_text(f"const XMESH_V6_NODE_BOOTSTRAP_SHA='{REV}';\n")
         shutil.copyfile(ROOT / "scripts/read-agent-release-pin.sh",
                         self.root / "scripts/read-agent-release-pin.sh")
-        (self.root / "AGENT_VERSION").write_text("control-v6.0.27\n")
+        (self.root / "AGENT_VERSION").write_text("control-v6.0.28\n")
         (self.root / "deploy").mkdir()
         self.env = os.environ.copy()
         self.env.pop("XSP_V2_PRODUCT_AGENT_PIN", None)
@@ -40,7 +40,7 @@ class FreshAgentPinTest(unittest.TestCase):
 
     def release_record(self, approved=0, revision=REV):
         (self.root / "deploy/agent-release-pin.conf").write_text(
-            f"version=control-v6.0.27\nsourceRevision={revision}\n"
+            f"version=control-v6.0.28\nsourceRevision={revision}\n"
             f"productSha256={'b' * 64}\nactivationSha256={'c' * 64}\n"
             f"builder=golang:1.27.3-trixie@sha256:{'d' * 64}\n"
             f"firstInstallApproved={approved}\n")

@@ -37,7 +37,7 @@ The first install does not require the bridge package. Unbound Agent update requ
 
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.
 
-Current target: **`control-v6.0.27`**.
+Current target: **`control-v6.0.28`**.
 
 ## First-install release record
 

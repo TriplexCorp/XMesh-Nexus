@@ -80,7 +80,8 @@ func TestReleasePlanPostgres(t *testing.T) {
 	pq, err := mldsa.GenerateKey(mldsa.MLDSA65())
 	requireFixture(t, err)
 	g := &gateway{db: db, panelEd: ed, panelPQ: pq,
-		panelEdID: fingerprint("ed-", pub), panelPQID: fingerprint("pq-", pq.PublicKey().Bytes())}
+		panelEdID: fingerprint("ed-", pub), panelPQID: fingerprint("pq-", pq.PublicKey().Bytes()),
+		releaseTargetVersion: "control-v6.0.27"}
 	current := releaseIdentity{"control-v6.0.24", strings.Repeat("a", 40), strings.Repeat("b", 64)}
 	artifact := bytes.Repeat([]byte("a"), releaseChunkBytes+17)
 	artifactDigest := sha256.Sum256(artifact)
