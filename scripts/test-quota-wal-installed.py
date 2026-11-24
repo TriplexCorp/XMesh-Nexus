@@ -565,7 +565,20 @@ def main():
                 guest.exec("rm", f"{state}/active.json")
                 if index == 0:
                     guest.exec("rm", f"{state}/activation-receipt.json")
-                guest.exec(PRODUCT, "resume-activation", timeout=60)
+                # Exercise the exact common preflight invoked by BOTH
+                # production install entrypoints, not just its underlying
+                # product CLI. It runs before any service shutdown and
+                # must never request a second enrollment token.
+                result = guest.exec(
+                    "bash", "-ec",
+                    'source /opt/xmesh-node/deploy/xmesh-pq-install-guard.sh; '
+                    'xmesh_verify_or_resume_enrolled_product "$@"',
+                    "bash", state, PRODUCT, panel, str(guest.node),
+                    timeout=60,
+                )
+                assert result.strip() == b"resumed", (
+                    f"Node {guest.node} did not recover from installer preflight: {result!r}"
+                )
                 guest.exec(PRODUCT, "verify-active", "--panel", panel,
                            "--node-id", str(guest.node))
                 for name, digest in original.items():
