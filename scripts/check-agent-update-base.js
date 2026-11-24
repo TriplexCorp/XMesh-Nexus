@@ -146,6 +146,8 @@ for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-ag
 const staged=spawnSync('bash',['scripts/test-xsp-agent-staged-apply.sh'],{encoding:'utf8',timeout:60000});
 assert.equal(staged.status,0,'Staged Agent lifecycle test failed:\n'+(staged.stdout||'')+'\n'+(staged.stderr||''));
 assert.match(staged.stdout,/staged Agent package apply\/rollback lifecycle: OK/);
+const preflight=spawnSync('python3',['scripts/test-legacy-agent-upgrade-preflight.py'],{encoding:'utf8',timeout:30000});
+assert.equal(preflight.status,0,'Legacy Agent quota/identity preflight failed:\n'+(preflight.stdout||'')+'\n'+(preflight.stderr||''));
 const syntax=spawnSync(process.execPath,['--check','frontend/js/core/app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
 console.log('XMesh control-v6.0.24 POSTQUANTUM Agent upgrade/install and immutable staged migration contract: OK');
