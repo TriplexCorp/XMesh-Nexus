@@ -975,6 +975,7 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 }
 
 var allowedTunnelPaths = map[string]bool{
+	releasePlanPath:                              true,
 	"/api/v1/metrics/ingest":                     true,
 	"/api/v1/node/heartbeat":                     true,
 	"/api/v1/node/restart/poll":                  true,
@@ -1084,35 +1085,41 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.panelURL+inner.Path, bytes.NewReader(body))
-	if err != nil {
-		fail(w, http.StatusInternalServerError, "cannot build internal request")
-		return
+	responseStatus, responseBody := 0, []byte(nil)
+	if inner.Path == releasePlanPath {
+		responseStatus, responseBody = g.planRelease(ctx, parsed, n, body)
+	} else {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.panelURL+inner.Path, bytes.NewReader(body))
+		if err != nil {
+			fail(w, http.StatusInternalServerError, "cannot build internal request")
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", g.panelURL)
+		req.Header.Set("X-XSP-Product-Internal", g.internalToken)
+		req.Header.Set("X-XSP-Product-Node-Id", strconv.FormatInt(parsed.Env.NodeID, 10))
+		req.Header.Set("X-XSP-Product-Path", inner.Path)
+		// The quarantined FIRST desired-config needs the same original
+		// product activation binding as the one-shot Genesis preparation.
+		// Only the cryptographically enrolled gateway supplies this header.
+		if needsGenesisActivationBinding(inner.Path) {
+			activation := sha256.Sum256(n.Receipt)
+			req.Header.Set("X-XSP-Product-Activation-SHA256", hex.EncodeToString(activation[:]))
+		}
+		resp, err := g.httpClient.Do(req)
+		if err != nil {
+			fail(w, http.StatusBadGateway, "internal panel operation unavailable")
+			return
+		}
+		defer resp.Body.Close()
+		responseBody, err = io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024+1))
+		if err != nil || len(responseBody) > 2*1024*1024 {
+			fail(w, http.StatusBadGateway, "internal panel response invalid")
+			return
+		}
+		responseStatus = resp.StatusCode
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", g.panelURL)
-	req.Header.Set("X-XSP-Product-Internal", g.internalToken)
-	req.Header.Set("X-XSP-Product-Node-Id", strconv.FormatInt(parsed.Env.NodeID, 10))
-	req.Header.Set("X-XSP-Product-Path", inner.Path)
-	// The quarantined FIRST desired-config needs the same original
-	// product activation binding as the one-shot Genesis preparation.
-	// Only the cryptographically enrolled gateway supplies this header.
-	if needsGenesisActivationBinding(inner.Path) {
-		activation := sha256.Sum256(n.Receipt)
-		req.Header.Set("X-XSP-Product-Activation-SHA256", hex.EncodeToString(activation[:]))
-	}
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		fail(w, http.StatusBadGateway, "internal panel operation unavailable")
-		return
-	}
-	defer resp.Body.Close()
-	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024+1))
-	if err != nil || len(responseBody) > 2*1024*1024 {
-		fail(w, http.StatusBadGateway, "internal panel response invalid")
-		return
-	}
-	wrappedPayload, err := json.Marshal(map[string]any{"status": resp.StatusCode, "bodyB64": b64.EncodeToString(responseBody)})
+	wrappedPayload, err := json.Marshal(map[string]any{"status": responseStatus, "bodyB64": b64.EncodeToString(responseBody)})
 	if err != nil {
 		fail(w, http.StatusInternalServerError, "cannot encode strict-PQ panel response")
 		return

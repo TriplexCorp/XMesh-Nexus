@@ -11,6 +11,8 @@ on:
       - 'backend/src/main.rs'
       - 'compose.yaml'
       - 'deploy/xsp-v2-product-gateway/main.go'
+      - 'deploy/xsp-v2-product-gateway/release_plan*.go'
+      - 'backend/migrations/0163_product_agent_release_plan_outbox.sql'
       - 'backend/migrations/0135_quota_v2_external_wal_birth_anchors.sql'
       - 'backend/migrations/0136_quota_v2_external_wal_birth_sources.sql'
       - 'backend/migrations/0137_quota_v2_xray_genesis.sql'
@@ -89,6 +91,9 @@ jobs:
           source "$RUNNER_TEMP/quota-wal/bin/activate"
           python -m pip install 'psycopg[binary]==3.2.3'
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-reconcile
+      - name: Verify signed update-plan replay on PostgreSQL
+        working-directory: deploy/xsp-v2-product-gateway
+        run: go test -mod=readonly -count=1 -v -run '^TestReleasePlanPostgres$'
       - name: Build disposable strict XSP/2 gateway fixture
         working-directory: deploy/xsp-v2-product-gateway
         run: go test -mod=readonly -c -o "$RUNNER_TEMP/wal-tunnel-fixture"
