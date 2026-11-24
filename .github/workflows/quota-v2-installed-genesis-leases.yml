@@ -121,7 +121,13 @@ jobs:
           git -C "$source" fetch --depth=1 https://github.com/XTLS/Xray-core.git a4a3dff5b20c2faae567b742c172c7b95e75c083
           git -C "$source" checkout --detach FETCH_HEAD
           test "$(git -C "$source" rev-parse HEAD)" = a4a3dff5b20c2faae567b742c172c7b95e75c083
-          python3 .ci-reviewed-node/experiments/xray-dataplane-fence/apply-experiment.py "$source"
+          reviewed_node="$(jq -er .nodeSourceRevision scripts/metered-xray-qualification.json)"
+          [[ "$reviewed_node" =~ ^[0-9a-f]{40}$ ]]
+          patch_source="$RUNNER_TEMP/qualified-node"
+          git -C .ci-reviewed-node fetch --no-tags --depth=1 origin "$reviewed_node"
+          git -C .ci-reviewed-node worktree add --detach "$patch_source" "$reviewed_node"
+          test "$(git -C "$patch_source" rev-parse HEAD:experiments/xray-dataplane-fence)" = "$(jq -er .patchSourceTree scripts/metered-xray-qualification.json)"
+          python3 "$patch_source/experiments/xray-dataplane-fence/apply-experiment.py" "$source"
           mkdir "$bundle"
           (cd "$source" &&
             env GOFLAGS= GOOS=linux GOARCH=amd64 GOAMD64=v1 CGO_ENABLED=0 \
@@ -130,9 +136,8 @@ jobs:
             --xray-qualification scripts/metered-xray-qualification.json \
             --xray-manifest scripts/metered-xray-candidate-manifest.json \
             --upstream-revision "$(git -C "$source" rev-parse HEAD)" \
-            --patch-tree "$(git -C .ci-reviewed-node rev-parse HEAD:experiments/xray-dataplane-fence)" \
+            --patch-tree "$(git -C "$patch_source" rev-parse HEAD:experiments/xray-dataplane-fence)" \
             --go-version "$(go version)")"
-          reviewed_node="$(jq -er .nodeSourceRevision scripts/metered-xray-qualification.json)"
           for subject in "$bundle/xray" scripts/metered-xray-candidate-manifest.json; do
             gh attestation verify "$subject" --bundle scripts/metered-xray-provenance.json \
               --repo TriplexCorp/XMesh-Node \
