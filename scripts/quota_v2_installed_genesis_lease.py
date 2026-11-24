@@ -358,6 +358,9 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert before==[{"uplink":0,"downlink":0}]*2
     assert parallel(lambda job:probe(job[0],0,job[1],job[2],subscriber=peer),
                     zip(stages,measurements,tags))==before
+    for guest in pair:
+        guest.exec("install", "-o", "root", "-g", "root", "-m", "0600",
+                   "/dev/null", "/etc/xmesh-quota-v2-staging")
     # The CI host owns the disposable guest/root. It directly reads the
     # measured kernel process and private WAL directory, not a Node claim.
     # Verify both original isolated processes have no historic WAL or cap.
@@ -399,11 +402,19 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         # duplicating the exact request below.
         guest.exec("test","!","-e",STATE+f"/genesis-positive-cap-u{uid}.json")
         guest.exec("systemctl","start","xmesh-quota-v2-renewal.service",timeout=95)
+        local_path = STATE + f"/genesis-positive-cap-u{uid}.json"
+        try:
+            local_grant = json.loads(guest.exec("cat", local_path))
+        except subprocess.CalledProcessError as exc:
+            logs = guest.exec("journalctl", "-u", "xmesh-quota-v2-renewal.service",
+                              "-n", "40", "--no-pager", "-o", "cat")
+            raise AssertionError(f"installed Agent did not issue first cap: {logs.decode()}") from exc
         issued=parallel(lambda _: guest.request(CAP_PATH,cap_request),range(2))
         code,signed=issued[0]
         assert code==200,(code,signed)
         assert issued[1]==issued[0]
         assert signed["status"]=="committed_first_cap"
+        assert local_grant == signed
         grant=signed["signedEnvelope"].encode()
         assert guest.request(CAP_PATH,lookup)==(200,signed)
         assert guest.request(CAP_PATH,dict(cap_request,measurement={
