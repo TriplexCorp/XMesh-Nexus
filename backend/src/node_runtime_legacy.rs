@@ -2205,6 +2205,16 @@ fn validate_metered_first_genesis_profile(
     Ok(())
 }
 
+fn compiled_profile_revision(config: &Value) -> Result<String, ApiError> {
+    let bytes = serde_json::to_vec(config).map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to encode node profile.",
+        )
+    })?;
+    Ok(hex::encode(sha2::Sha256::digest(bytes)))
+}
+
 async fn compile_node_profile(
     state: &AppState,
     node_id: i64,
@@ -2289,14 +2299,7 @@ async fn compile_node_profile(
             geo_data.is_some(),
         )?;
     }
-    let digest = hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).map_err(
-        |_| {
-            ApiError::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to encode node profile.",
-            )
-        },
-    )?));
+    let digest = compiled_profile_revision(&config)?;
 
     // Conserve offline allowances across all currently enabled nodes. Large
     // deployments should replace this bound with server-side reserved leases.
