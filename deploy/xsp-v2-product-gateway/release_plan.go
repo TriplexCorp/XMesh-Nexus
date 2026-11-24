@@ -77,7 +77,7 @@ func (g *gateway) loadReleasePlan(ctx context.Context, parsed parsedEnvelope, n 
 	var target releaseIdentity
 	var expiry int64
 	err = tx.QueryRow(ctx, `SELECT m.version, m.source_revision, m.artifact_sha256,
-          (EXTRACT(EPOCH FROM c.claimed_at + interval '15 minutes') * 1000)::BIGINT
+          (EXTRACT(EPOCH FROM LEAST(c.requested_at,c.claimed_at) + interval '15 minutes') * 1000)::BIGINT
         FROM node_restart_commands c
         JOIN node_xsp_agent_release_manifests m ON m.id=c.release_manifest_id
         JOIN node_xsp_product_nodes p ON p.node_id=c.node_id
@@ -86,7 +86,8 @@ func (g *gateway) loadReleasePlan(ctx context.Context, parsed parsedEnvelope, n 
           AND k.mldsa65_key_id=p.mldsa65_key_id AND k.revoked_at IS NULL
         JOIN panel_records d ON d.id=p.node_id AND d.collection='nodes'
         WHERE c.id=$1 AND p.node_id=$2 AND c.state='claimed' AND c.action='update_agent'
-          AND c.claimed_at > clock_timestamp() - interval '15 minutes'
+          AND c.claimed_at IS NOT NULL
+          AND LEAST(c.requested_at,c.claimed_at) > clock_timestamp() - interval '15 minutes'
           AND c.target_version=m.version AND m.version='control-v6.0.27'
           AND p.state='active' AND p.key_epoch=$3 AND p.receipt_sha256=$4
           AND p.release_version=$5 AND p.release_source_revision=$6 AND p.release_artifact_sha256=$7

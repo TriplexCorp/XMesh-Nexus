@@ -186,7 +186,9 @@ func TestReleasePlanPostgres(t *testing.T) {
 	}
 	exec("UPDATE node_restart_commands SET claimed_at=now() - interval '16 minutes' WHERE id=1")
 	assertReleaseRevoked("expired update claim")
-	exec("UPDATE node_restart_commands SET claimed_at=now() WHERE id=1")
+	exec("UPDATE node_restart_commands SET claimed_at=now(),requested_at=now() - interval '16 minutes' WHERE id=1")
+	assertReleaseRevoked("expired owner request with a fresh claim")
+	exec("UPDATE node_restart_commands SET requested_at=now() WHERE id=1")
 	exec("UPDATE node_restart_commands SET state='failed',finished_at=now() WHERE id=1")
 	assertReleaseRevoked("failed update command")
 	exec("UPDATE node_restart_commands SET state='claimed',finished_at=NULL WHERE id=1")
