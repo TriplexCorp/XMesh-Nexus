@@ -20,6 +20,8 @@ on:
       - 'scripts/quota_v2_installed_genesis_lease.py'
       - 'scripts/quota_v2_installed_live_vless.py'
       - 'scripts/quota_v2_installed_generations*.py'
+      - 'scripts/quota_v2_release_candidate.py'
+      - 'scripts/test-quota-v2-release-candidate.py'
       - 'scripts/quota-wal-systemd.Dockerfile'
       - '.github/workflows/quota-v2-installed-genesis-leases.yml'
 permissions:
@@ -69,7 +71,8 @@ jobs:
         run: |
           test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '3a6334d68f813023b7fa6dc31a77e49e815f18e1'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.27'
-          python3 -m py_compile scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py
+          python3 scripts/test-quota-v2-release-candidate.py
+          python3 -m py_compile scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
         env:
@@ -140,6 +143,8 @@ jobs:
         env:
           XMESH_WAL_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
           XMESH_INSTALLED_NEXUS_REF: ${{ github.event.pull_request.head.sha }}
+          XMESH_RELEASE_QUALIFICATION_SCENARIO: ${{ matrix.scenario }}
+          XMESH_RELEASE_QUALIFICATION_EVIDENCE: ${{ runner.temp }}/quota-v2-release-qualification/installed-evidence.json
           XMESH_QUOTA_V2_NODE_CALENDAR_STAGING: '1'
           XMESH_QUOTA_V2_CDN_CALENDAR_STAGING: '1'
         run: |
@@ -147,6 +152,14 @@ jobs:
           source "$RUNNER_TEMP/quota-wal/bin/activate"
           export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-installed
+      - name: Save exact installed Agent identity after successful scenario
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: quota-v2-release-qualification-${{ matrix.scenario }}
+          path: ${{ runner.temp }}/quota-v2-release-qualification/installed-evidence.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Save verified public quota evidence
         if: always() && matrix.scenario != 'lease-recovery'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

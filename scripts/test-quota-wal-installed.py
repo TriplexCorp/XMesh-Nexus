@@ -556,6 +556,36 @@ def main():
             from quota_v2_installed_genesis_lease import try_signed_lease_pair
             assert identity["version"] == "control-v6.0.27"
             try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, sys.modules[__name__])
+            # Only emit qualification evidence after the full scenario
+            # succeeds, never from setup or a partially completed test.
+            qualification = os.environ.get("XMESH_RELEASE_QUALIFICATION_EVIDENCE")
+            if qualification:
+                from quota_v2_release_candidate import write_installed_evidence
+                scenario = os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"]
+                expected_scenario = (
+                    "agent-sigkill" if os.environ.get("XMESH_TEST_INSTALLED_CRASHES") == "1"
+                    else "managed-generations" if os.environ.get("XMESH_TEST_INSTALLED_GENERATIONS") == "1"
+                    else "lease-recovery"
+                )
+                assert scenario == expected_scenario
+                measured = []
+                # The scenario may have replaced the original DB connection.
+                with psycopg.connect(dsn, autocommit=True) as final_db:
+                    for guest, _ in guests:
+                        actual = json.loads(guest.exec(PRODUCT, "--identity"))
+                        assert actual == identity
+                        assert guest.exec("sha256sum", PRODUCT).split()[0].decode() == identity["artifactSha256"]
+                        guest.exec(PRODUCT, "verify-active", "--panel", panel, "--node-id", str(guest.node))
+                        enrolled = final_db.execute(
+                            "SELECT state,release_version,release_source_revision,release_artifact_sha256 "
+                            "FROM node_xsp_product_nodes WHERE node_id=%s", (guest.node,),
+                        ).fetchone()
+                        assert enrolled == ("active", identity["version"], identity["sourceRevision"], identity["artifactSha256"])
+                        measured.append({"nodeId": guest.node, "identity": actual})
+                write_installed_evidence(
+                    Path(qualification), scenario, nexus_revision, identity,
+                    measured, os.environ["XMESH_WAL_XRAY_SHA256"],
+                )
             return
 
         fresh, original, receipt = try_genesis(guests, db, root, panel)

@@ -104,3 +104,22 @@ sudo python3 /opt/xmesh-node/scripts/quota-v2-local-audit.py --json --phase appl
 Для аварийной остановки выдачи на уже активированном стенде сохраните `XMESH_QUOTA_V2_ENABLED=1` и `XMESH_QUOTA_V2_WAL_TRANSPORT=1`. Задайте `XMESH_QUOTA_V2_PAUSE_ISSUANCE=1` и пересоздайте сервис Nexus командой `docker compose up -d --no-deps --force-recreate panel`. Если экземпляров Nexus несколько, остановите выдачу на каждом из них и проверьте `issuancePaused=true` в авторизованном отчёте готовности. Изменение файла окружения действует после пересоздания процесса.
 
 В этом режиме Nexus отклоняет новые резервы и подписанные прибавки к лимитам кодом HTTP 503. Списания по WAL и проверенные повторы ранее сохранённых ответов продолжаются. Уже установленные разрешения действуют в пределах собственных лимитов и сроков. Для возобновления выдачи после сверки WAL и резервов задайте `XMESH_QUOTA_V2_PAUSE_ISSUANCE=0`, пересоздайте сервис и проверьте отчёт ещё раз.
+
+
+## Сопоставление релизного кандидата с установленным E2E
+
+Node CI сохраняет два Linux amd64 PQ-бинарника и `candidate-manifest.json` с точным исходным SHA, версией и SHA-256 каждого файла. Nexus CI сохраняет отдельный `installed-evidence.json` после каждого **успешного** сценария (`lease-recovery`, `managed-generations`, `agent-sigkill`), повторно проверив бинарник product-клиента, квитанцию активации и запись PostgreSQL на обеих нодах.
+
+На машине подготовки релиза распакуйте артефакты только из доверенных успешных запусков CI проверяемых PR. Сопоставьте все три результата с фактическими байтами кандидата:
+
+```bash
+python3 scripts/quota_v2_release_candidate.py \
+  --candidate ./agent-candidate \
+  --node-revision "$REVIEWED_NODE_SHA" \
+  --nexus-revision "$REVIEWED_NEXUS_SHA" \
+  --evidence ./lease-recovery/installed-evidence.json \
+             ./managed-generations/installed-evidence.json \
+             ./agent-sigkill/installed-evidence.json
+```
+
+Проверка отклоняет заменённые файлы, чужие SHA, повтор одного сценария вместо трёх и несовпадение установленного product-бинарника с кандидатом. SHA-256 проверенных Xray также сохраняются для последующей квалификации dataplane. Сама утилита не удостоверяет происхождение скачанных артефактов и не выдаёт криптографическую подпись или полномочие на установку. Результат всегда содержит `productionActivationAuthorized=false`: это доказательство соответствия **стендовым** испытаниям, а не готовности штатного обновления/отката или production-активации. Утилита не запускается на рабочих VPS.
