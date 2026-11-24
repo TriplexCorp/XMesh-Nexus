@@ -47,7 +47,7 @@ fn issuance_paused() -> bool {
 
 /// Pause new reservations and spending permits while keeping the existing
 /// v2 ledger, WAL endpoints and immutable receipt replay available.
-pub(crate) fn require_issuance_open() -> Result<(), ApiError> {
+pub fn require_issuance_open() -> Result<(), ApiError> {
     if issuance_paused() {
         return Err(ApiError::new(
             StatusCode::SERVICE_UNAVAILABLE,
