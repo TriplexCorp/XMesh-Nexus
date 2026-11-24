@@ -59,6 +59,14 @@ class FreshAgentPinTest(unittest.TestCase):
         line = f"XSP_V2_PRODUCT_AGENT_PIN={PIN}\n"
         self.assertNotEqual(self.run_check(stored=line * 2).returncode, 0)
 
+    def test_empty_stored_pin_is_not_duplicated(self):
+        self.assertNotEqual(self.run_check(PIN, "XSP_V2_PRODUCT_AGENT_PIN=\n").returncode, 0)
+
+    def test_noncanonical_pin_cannot_override(self):
+        line = f"XSP_V2_PRODUCT_AGENT_PIN={PIN}\n"
+        self.assertNotEqual(self.run_check(stored=line + "export " + line).returncode, 0)
+        self.assertNotEqual(self.run_check(stored=line + " " + line).returncode, 0)
+
     def test_missing_bootstrap_revision(self):
         self.bootstrap.write_text("// no canonical revision\n")
         self.assertNotEqual(self.run_check(PIN).returncode, 0)

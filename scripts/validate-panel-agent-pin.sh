@@ -10,6 +10,13 @@ stored=""
 if [[ -f .env ]]; then
   mapfile -t pins < <(sed -n 's/^XSP_V2_PRODUCT_AGENT_PIN=//p' .env)
   (( ${#pins[@]} <= 1 )) || fail 'Multiple approved Agent pins in .env; refusing ambiguous release identity.'
+  # Compose accepts whitespace and export syntax too. Do not allow another
+  # assignment to override the canonical line that install.sh preserves.
+  mapfile -t assignments < <(grep -E '^[[:space:]]*(export[[:space:]]+)?XSP_V2_PRODUCT_AGENT_PIN[[:space:]]*=' .env || true)
+  (( ${#assignments[@]} == ${#pins[@]} )) || fail 'Noncanonical approved Agent pin assignment in .env.'
+  if (( ${#pins[@]} == 1 )) && [[ -z "${pins[0]}" ]]; then
+    fail 'Empty approved Agent pin in .env; remove the empty assignment before installation.'
+  fi
   stored="${pins[0]:-}"
 fi
 for pin in "$supplied" "$stored"; do
