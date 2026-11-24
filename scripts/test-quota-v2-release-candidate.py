@@ -5,7 +5,12 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from quota_v2_release_candidate import ACTIVATION, PRODUCT, SCENARIOS, verify, verify_installed_matrix, verify_measured_xray, verify_running_xray, write_installed_evidence
+from quota_v2_release_candidate import (
+    ACTIVATION, PRODUCT, SCENARIOS, read_xray_qualification, verify,
+    verify_installed_matrix, verify_matrix_xray, verify_measured_xray,
+    verify_qualified_xray, verify_qualified_xray_manifest, verify_running_xray,
+    write_installed_evidence,
+)
 
 
 class CandidateTest(unittest.TestCase):
@@ -136,6 +141,43 @@ class CandidateTest(unittest.TestCase):
         path.write_text(json.dumps(doc))
         with self.assertRaisesRegex(ValueError, "different Xray binaries"):
             self.verify()
+
+    def test_independently_qualified_xray_is_required_for_the_whole_matrix(self):
+        source = Path(__file__).resolve().parents[1]
+        qualification = read_xray_qualification(source / "scripts/metered-xray-qualification.json")
+        binary = self.root / "xray"
+        raw = b"reviewed candidate"
+        binary.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        qualification["artifactSha256"] = digest
+        upstream = qualification["upstreamSourceRevision"]
+        patch_tree = qualification["patchSourceTree"]
+        go = qualification["goVersion"]
+        self.assertEqual(verify_qualified_xray(binary, qualification, upstream, patch_tree, go), digest)
+        verify_matrix_xray({"testedXrayArtifactSha256": [digest]}, qualification)
+        with self.assertRaisesRegex(ValueError, "build inputs differ"):
+            verify_qualified_xray(binary, qualification, "0" * 40, patch_tree, go)
+        with self.assertRaisesRegex(ValueError, "build inputs differ"):
+            verify_qualified_xray(binary, qualification, upstream, "0" * 40, go)
+        with self.assertRaisesRegex(ValueError, "different Xray"):
+            verify_matrix_xray({"testedXrayArtifactSha256": ["f" * 64]}, qualification)
+        binary.write_bytes(b"unmetered substitution")
+        with self.assertRaisesRegex(ValueError, "executable changed"):
+            verify_qualified_xray(binary, qualification, upstream, patch_tree, go)
+
+    def test_signed_xray_manifest_must_match_reviewed_fields(self):
+        source = Path(__file__).resolve().parents[1] / "scripts"
+        qualification = read_xray_qualification(source / "metered-xray-qualification.json")
+        manifest = source / "metered-xray-candidate-manifest.json"
+        verify_qualified_xray_manifest(manifest, qualification)
+        altered = self.root / "manifest.json"
+        values = json.loads(manifest.read_bytes())
+        for key, value in (("artifactSha256", "0" * 64),
+                           ("productionActivationAuthorized", True),
+                           ("buildFlags", ["CGO_ENABLED=1"])):
+            altered.write_text(json.dumps({**values, key: value}))
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                verify_qualified_xray_manifest(altered, qualification)
 
     def test_xray_binary_rechecked_at_installed_evidence_export(self):
         binary = self.root / "xray"
