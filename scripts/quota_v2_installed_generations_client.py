@@ -53,13 +53,28 @@ def run(binary, user, peer, state):
                     time.sleep(2)
                 data = bytes([generation]) * 8192
                 with socks_stream() as active:
-                    exchange(active, data)
+                    crash_case = generation == 3 and (directory / "check-xray-kill").exists()
+                    if crash_case:
+                        # Establish A on generation 3 while admissions are still enabled.
+                        # Keep that exact connection across the pause and charge new bytes.
+                        midpoint = len(data) // 2
+                        exchange(active, data[:midpoint])
+                        (directory / "before-pause-3").touch()
+                        deadline = time.monotonic() + 60
+                        while not (directory / "issuance-paused-3").exists():
+                            assert time.monotonic() < deadline, "issuance pause was never activated"
+                            exchange(peer_stream, b"peer")
+                            time.sleep(2)
+                        denied()
+                        exchange(active, data[midpoint:])
+                    else:
+                        exchange(active, data)
                     (directory / f"done-{generation}").touch()
                     while generation < 3 and not (directory / f"ready-{generation + 1}").exists():
                         assert time.monotonic() < deadline, "successor never opened"
                         exchange(peer_stream, b"peer")
                         time.sleep(2)
-                    if generation == 3 and (directory / "check-xray-kill").exists():
+                    if crash_case:
                         deadline = time.monotonic() + 180
                         while not (directory / "xray-killed").exists():
                             assert time.monotonic() < deadline, "active Xray was never killed"

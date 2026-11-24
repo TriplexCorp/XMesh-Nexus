@@ -310,7 +310,11 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                 main.exec("sh", "-ec",
                           'umask 077; printf "%s %s %s\\n" "$1" "$2" "$3" > "$4/armed.next"; mv -f "$4/armed.next" "$4/armed"',
                           "sh", str(uid), grant["reservationId"], "g3", FAULT_STATE)
+            main.exec("touch", f"{WORK}/ready-{generation}")
             if crashes and generation == 3:
+                lab.wait_for(lambda: main.exec("sh", "-c", 'test ! -f "$1" || printf ready',
+                                              "sh", f"{WORK}/before-pause-3") == b"ready",
+                             timeout=20, label="live A connection to Xray 3 before admissions pause")
                 restart_nexus_paused(root, lab, stack)
                 # Only an exact late reply may still be delivered. The new
                 # valid request reaches the funding boundary and is refused.
@@ -326,13 +330,15 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
                                 "previousRevision": stable["reservationRevision"]},
                 })
                 assert blocked[0] == 503 and "issuance is paused" in str(blocked[1]), blocked
-                assert db.execute("SELECT COUNT(*) FROM quota_v2_wal_charges WHERE reservation_id=%s",
-                                  (reservation,)).fetchone()[0] == 0
-                # The already-installed permit stays bounded even when the
-                # Node also stops admissions. The disposable frontend is
-                # already running; the worker must charge the signed tip.
+                before_pause = db.execute(
+                    "SELECT COALESCE(MAX(stream_bytes),0) FROM quota_v2_wal_charges WHERE reservation_id=%s",
+                    (reservation,)).fetchone()[0]
+                assert before_pause <= 4096, before_pause
+                # A fresh connection must now be refused. The established A
+                # connection still has a bounded permit and must charge the
+                # second half of its bytes through the paused control plane.
                 main.exec("rm", "--", "/etc/xmesh-quota-v2-staging")
-            main.exec("touch", f"{WORK}/ready-{generation}")
+                main.exec("touch", f"{WORK}/issuance-paused-3")
             completed(generation)
             chain.append(grant)
             print(f"PASS: actual Nexus signed and installed generation {generation}: "
@@ -362,6 +368,8 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
             (artifact / "issuance-paused.json").write_text(json.dumps({
                 "nexusSigkill": True, "newRenewalRefused": True, "exactPermitReplayed": True,
                 "nodeAdmissionOptInRemoved": True,
+                "newConnectionDeniedWhilePaused": True,
+                "sameConnectionTransferred4096BytesEachWayAfterPause": True,
                 "walChargedWhilePaused": charges[chain[-1]["reservationId"]],
             }, indent=2))
         def snapshot(connection):
