@@ -562,6 +562,10 @@ def main():
             clean = Guest(stack, image, network, node)
             install((clean, enrollment["token"]), wal_staging=False)
             assert clean.exec("systemctl", "is-enabled", "xmesh-node-control.timer").strip() == b"enabled"
+            clean.exec("grep", "-Fx",
+                       f'AGENT_VERSION = "{identity["version"]}"', "/usr/local/libexec/xmesh-xray-update.py")
+            clean.exec("test", "!", "-e", "/usr/local/libexec/xmesh-product-upgrade-coordinator.py")
+            clean.exec("test", "!", "-e", "/etc/xmesh-quota-v2-staging")
             clean.exec("systemctl", "start", "xmesh-node-control.service", timeout=65)
             registered = db.execute(
                 "SELECT state,release_version,release_source_revision,release_artifact_sha256 "
