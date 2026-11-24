@@ -44,7 +44,7 @@ Current target: **`control-v6.0.27`**.
 `deploy/agent-release-pin.conf` binds the exact source revision, both Agent
 artifact digests, and immutable Go builder. The record is parsed as data, never
 sourced as shell. A dedicated CI job independently rebuilds both binaries and
-must match their recorded digests. The previous candidate and its installed matrix matched exactly ([Node](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45346121399), [Nexus](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/45346249796)). The current candidate includes forward-release and activation-recovery fixes ([Node build](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45350538248)); it requires a fresh installed matrix and reproducible-build check before approval.
+must match their recorded digests. The previous candidate and its installed matrix matched exactly ([Node](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45346121399), [Nexus](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/45346249796)). The current candidate includes forward-release, activation-recovery, V1 local grant conservation, and V2 reservation downgrade fixes ([Node build](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45351241471)); it requires a fresh installed matrix and reproducible-build check before approval.
 
 `firstInstallApproved=0` is deliberately retained while the release remains
 a candidate. Only a reviewed first-install promotion may change this to 1.
