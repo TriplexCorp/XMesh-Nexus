@@ -167,3 +167,37 @@ jobs:
         with:
           name: quota-v2-generations-evidence-${{ matrix.scenario }}
           path: ${{ runner.temp }}/quota-v2-generations-evidence
+
+  qualify-installed-matrix:
+    name: Cross-scenario immutable Agent and Xray consistency (staging only)
+    needs: installed-leases
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: quota-v2-release-qualification-*
+          path: ${{ runner.temp }}/quota-v2-installed-matrix
+          merge-multiple: false
+      - name: Refuse mixed revisions, mixed binaries and incomplete matrix
+        env:
+          XMESH_INSTALLED_NEXUS_REF: ${{ github.event.pull_request.head.sha }}
+          XMESH_INSTALLED_NODE_REF: 2ad399821e25e7e78da4330670a6dc9026072757
+          XMESH_INSTALLED_MATRIX_PATH: ${{ runner.temp }}/quota-v2-installed-matrix
+        run: |
+          set -euo pipefail
+          python3 scripts/test-quota-v2-release-candidate.py
+          python3 scripts/quota_v2_release_candidate.py \
+            --matrix-only \
+            --node-revision "$XMESH_INSTALLED_NODE_REF" \
+            --nexus-revision "$XMESH_INSTALLED_NEXUS_REF" \
+            --evidence \
+              "$XMESH_INSTALLED_MATRIX_PATH/quota-v2-release-qualification-lease-recovery/installed-evidence.json" \
+              "$XMESH_INSTALLED_MATRIX_PATH/quota-v2-release-qualification-managed-generations/installed-evidence.json" \
+              "$XMESH_INSTALLED_MATRIX_PATH/quota-v2-release-qualification-agent-sigkill/installed-evidence.json"
+          # Matrix consistency is not a signed release or production authority.
