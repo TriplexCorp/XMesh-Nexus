@@ -2283,7 +2283,11 @@ async fn compile_node_profile(
     let geo_data = crate::node_geodata::apply(&node, &mut config)?;
     crate::node_routing::apply(&node, &mut config, &nodes, &hosts)?;
     if matches!(mode, NodeProfileMode::FirstGenesis) {
-        validate_metered_first_genesis_profile(&config, tls_provision.is_some(), geo_data.is_some())?;
+        validate_metered_first_genesis_profile(
+            &config,
+            tls_provision.is_some(),
+            geo_data.is_some(),
+        )?;
     }
     let digest = hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).map_err(
         |_| {
@@ -3184,20 +3188,37 @@ mod provision_tests {
             ("/streamSettings/network", json!("xhttp")),
             ("/streamSettings/security", json!("tls")),
             ("/streamSettings/security", json!("reality")),
-            ("/streamSettings", json!({"network":"tcp","tcpSettings":{"header":{"type":"http"}}})),
+            (
+                "/streamSettings",
+                json!({"network":"tcp","tcpSettings":{"header":{"type":"http"}}}),
+            ),
             ("/protocol", json!("hysteria")),
             ("/listen", json!("0.0.0.0")),
-            ("/settings", json!({"decryption":"none","clients":[],"fallbacks":[{"dest":443}]})),
-            ("/settings/clients/0", json!({"id":"client","flow":"xtls-rprx-vision"})),
-            ("/settings/clients/0", json!({"id":"client","reverse":{"tag":"tunnel"}})),
+            (
+                "/settings",
+                json!({"decryption":"none","clients":[],"fallbacks":[{"dest":443}]}),
+            ),
+            (
+                "/settings/clients/0",
+                json!({"id":"client","flow":"xtls-rprx-vision"}),
+            ),
+            (
+                "/settings/clients/0",
+                json!({"id":"client","reverse":{"tag":"tunnel"}}),
+            ),
         ] {
             let mut unqualified = profile.clone();
             *unqualified["inbounds"][0].pointer_mut(pointer).unwrap() = value;
-            assert!(validate_metered_first_genesis_profile(&unqualified, false, false).is_err(), "{pointer}");
+            assert!(
+                validate_metered_first_genesis_profile(&unqualified, false, false).is_err(),
+                "{pointer}"
+            );
         }
         assert!(validate_metered_first_genesis_profile(&profile, true, false).is_err());
         assert!(validate_metered_first_genesis_profile(&profile, false, true).is_err());
-        assert!(validate_metered_first_genesis_profile(&json!({"inbounds":[]}), false, false).is_err());
+        assert!(
+            validate_metered_first_genesis_profile(&json!({"inbounds":[]}), false, false).is_err()
+        );
         mixed["inbounds"][1]["tag"] = json!("vless-main");
         assert!(validate_metered_first_genesis_profile(&mixed, false, false).is_err());
     }
