@@ -7,8 +7,9 @@ mod node_policy;
 mod quota_v2_public_tls_authority;
 
 use anyhow::{Result, ensure};
-use quota_v2_public_tls_authority::{GenesisBinding, PublicListener, sign};
-use serde_json::json;
+use quota_v2_public_tls_authority::{
+    GenesisBinding, PublicListener, RevocationBinding, sign, sign_revocation_witness,
+};
 use sha2::{Digest, Sha256};
 use std::{
     env, fs,
@@ -87,36 +88,18 @@ fn run() -> Result<()> {
         .as_millis()
         .try_into()?;
     let public_tls_hash = hex::encode(Sha256::digest(&signed));
-    let witness = json!({
-        "schemaVersion": 1,
-        "kind": "xmesh.quota-v2.public-tls-revocation-witness",
-        "nodeId": source.node_id,
-        "activationReceiptSha256": source.activation_receipt_sha256,
-        "genesisPolicySha256": source.genesis_policy_sha256,
-        "runtimeId": source.runtime_id,
-        "profileRevision": source.profile_revision,
-        "authoritySha256": public_tls_hash,
-        "capRosterSha256": "f".repeat(64),
-        "challenge": "7".repeat(64),
-        "issuedAtMs": now_ms,
-        "validUntilMs": now_ms + 7_000,
-        "revoked": false,
-        "canServePublic": false,
-        "canStart": false,
-        "canResume": false,
-    });
-    let signed_witness = serde_json::to_vec(&json!({
-        "algorithm": "Ed25519",
-        "payload": witness,
-        "signature": key.sign(&witness)?,
-    }))?;
-    ensure!(
-        signed_witness.len() < 4096,
-        "disposable revocation fixture exceeds Node wire limit"
-    );
-    let mut revocation_file = opts.open(output.join("public-tls-revocation.json"))?;
-    revocation_file.write_all(&signed_witness)?;
-    revocation_file.write_all(b"\n")?;
+    let binding = RevocationBinding {
+        genesis: &source,
+        authority_sha256: &public_tls_hash,
+        cap_roster_sha256: &"f".repeat(64),
+        challenge: &"7".repeat(64),
+    };
+    let signed_witness = sign_revocation_witness(&key, &binding, now_ms, now_ms + 7_000, false)?;
+    opts.open(output.join("public-tls-revocation.json"))?
+        .write_all(&signed_witness)?;
+    let revoked = sign_revocation_witness(&key, &binding, now_ms, now_ms + 7_000, true)?;
+    opts.open(output.join("public-tls-revoked.json"))?
+        .write_all(&revoked)?;
     println!(
         "Signed isolated TLS authority for CI: {} bytes",
         signed.len()
