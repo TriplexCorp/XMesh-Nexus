@@ -23,7 +23,10 @@ RETURNS TABLE (
     valid_until_ms BIGINT,
     remaining_signed_bytes BIGINT
 )
-LANGUAGE plpgsql STABLE AS $$
+-- Freshness uses clock_timestamp() and mutable revocation/lease tables: do not
+-- advertise STABLE to the planner or allow untrusted temporary-table shadowing.
+LANGUAGE plpgsql VOLATILE SECURITY INVOKER
+SET search_path = pg_catalog, public, pg_temp AS $
 DECLARE
     now_ms BIGINT;
 BEGIN
