@@ -28,6 +28,10 @@ mod quota_v2_cdn_lifetime;
 mod quota_v2_genesis_reservation;
 mod quota_v2_node_lifetime;
 mod quota_v2_policy_pin;
+// Read-only Ed25519 outbox verification for a future serialized TLS issuer.
+// Neither this module nor a roster hash can grant public ingress.
+#[allow(dead_code)]
+mod quota_v2_public_tls_cap_roster;
 mod quota_v2_public_tls_preflight;
 // No production backend build may link the positive public-TLS policy signer.
 // The dormant byte contract is available ONLY to isolated tests and the
