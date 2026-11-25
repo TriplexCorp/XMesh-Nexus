@@ -11,7 +11,9 @@ use quota_v2_public_tls_authority::{GenesisBinding, PublicListener, sign};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{
-    env, fs, io::Write, path::PathBuf,
+    env, fs,
+    io::Write,
+    path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 
