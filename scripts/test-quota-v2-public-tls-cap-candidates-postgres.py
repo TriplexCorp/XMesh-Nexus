@@ -25,6 +25,8 @@ QUERY = """SELECT user_id, account_epoch, reservation_id, meter_epoch,
                   reservation_revision, valid_until_ms, remaining_signed_bytes
            FROM quota_v2_public_tls_first_cap_candidates(
                %s,%s,%s,%s,%s,%s,%s)"""
+ROSTER_QUERY = """SELECT quota_v2_public_tls_exact_first_roster(
+                  %s,%s,%s,%s,%s,%s,%s)"""
 
 
 def canonical(value):
@@ -37,6 +39,9 @@ def hex64(letter):
 
 class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
     def setUp(self):
+        self.seed()
+
+    def seed(self, *, extra_user=None, duplicate_user=False):
         self.node = uuid.uuid4().int % (2**42) + 100
         self.user = uuid.uuid4().int % (2**50) + 100
         self.epoch = uuid.uuid4()
@@ -62,13 +67,19 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                 "prepared_ms,receipt_signature) VALUES (%s,%s,%s,%s,%s,%s)",
                 (self.node,self.activation,self.runtime,self.challenge,
                  self.prepared,"0"*128))
+            roster = [{"userId":self.user,"offlineBudgetBytes":0,
+                       "onHold":True}]
+            if extra_user is not None:
+                roster.append({"userId":extra_user,"offlineBudgetBytes":0,
+                               "onHold":True})
+            if duplicate_user:
+                roster.append(dict(roster[0]))
             quarantine = canonical({
                 "version":1, "kind":"xmesh.quota-v2.genesis-quarantine-policy",
                 "nodeId":self.node, "configSha256":self.profile,
                 "issuedAtMs":self.prepared,
                 "validUntilMs":self.prepared+120000,
-                "users":[{"userId":self.user,"offlineBudgetBytes":0,
-                          "onHold":True}],
+                "users":roster,
                 "quotaV2Genesis":{
                     "mode":"quarantined", "runtimeId":self.runtime,
                     "challenge":self.challenge,
@@ -163,9 +174,53 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                 "node","activation","runtime","profile","policy","signer","ttl"
             ))).fetchall()
 
+    def exact_roster(self, **fields):
+        args = {
+            "node":self.node, "activation":self.activation,
+            "runtime":self.runtime, "profile":self.profile,
+            "policy":self.policy, "signer":self.signer, "ttl":1000,
+        }
+        args.update(fields)
+        with psycopg.connect(DSN) as c:
+            return c.execute(ROSTER_QUERY,tuple(args[k] for k in (
+                "node","activation","runtime","profile","policy","signer","ttl"
+            ))).fetchone()[0]
+
     def armed(self):
         self.prep_confirm()
         self.store_cap()
+
+    def test_exact_roster_is_non_authorizing_and_requires_all_signed_caps(self):
+        self.assertIs(self.exact_roster(), False)
+        self.store_cap()
+        self.assertIs(self.exact_roster(), False)
+        self.prep_confirm()
+        self.assertIs(self.exact_roster(), True)
+        self.assertIs(self.exact_roster(runtime=hex64("9")), False)
+        self.assertIs(self.exact_roster(ttl=120000), False)
+
+    def test_missing_second_genesis_user_denies_complete_roster(self):
+        ghost = uuid.uuid4().int % (2**48) + 100
+        self.seed(extra_user=ghost)
+        self.armed()
+        self.assertEqual([row[0] for row in self.candidates()], [self.user])
+        self.assertIs(self.exact_roster(), False,
+                      "one eligible client cannot authorize a shared TLS roster")
+
+    def test_duplicate_original_genesis_user_denies_complete_roster(self):
+        self.seed(duplicate_user=True)
+        self.armed()
+        self.assertEqual([row[0] for row in self.candidates()], [self.user])
+        self.assertIs(self.exact_roster(), False,
+                      "duplicate signed user identity is not a complete roster")
+
+    def test_revocation_exhaustion_and_node_deactivation_deny_full_roster(self):
+        self.armed()
+        self.assertIs(self.exact_roster(), True)
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_reservations SET acknowledged_bytes=700 "
+                      "WHERE reservation_id=%s",(self.reservation,))
+        self.assertIs(self.exact_roster(), False)
 
     def test_no_signed_cap_or_two_zero_authority_lease_replies_cannot_qualify(self):
         self.assertEqual(self.candidates(),[])
