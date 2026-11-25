@@ -63,6 +63,16 @@ BEGIN
       AND o.runtime_id=p_runtime AND pf.prepared_runtime_id=p_runtime
       AND g.runtime_id=p_runtime AND q.runtime_id=p_runtime
       AND q.profile_revision=p_profile
+      -- Even a legacy 0138 preflight or an owner-inserted outbox row must
+      -- never turn an unlisted user into a valid first-Genesis candidate.
+      AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements(
+              (convert_from(q.signed_policy_bytes,'UTF8')::JSONB)->'users'
+          ) AS listed
+          WHERE listed->>'userId'=o.user_id::TEXT
+            AND listed->>'offlineBudgetBytes'='0'
+            AND listed->>'onHold'='true'
+      )
       AND o.policy_sha256=p_genesis_policy AND q.policy_sha256=p_genesis_policy
       AND pf.reported_policy_sha256=p_genesis_policy
       AND o.signer_public_key=p_signer AND q.signer_public_key=p_signer
