@@ -745,15 +745,17 @@ fn public_api_routes() -> Router<AppState> {
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
         .route("/auth/logout", post(auth::logout));
 
-    public.route(
-        "/node/quota-v2/genesis-cap-delivery",
-        post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
-    );
-    // Read-only candidate evidence; no signed TLS authority or public port.
-    public.route(
-        "/node/quota-v2/public-tls-preflight",
-        post(quota_v2_public_tls_preflight::handle).layer(RequestBodyLimitLayer::new(1536)),
-    );
+    // Two independent paths return a Router; the TLS diagnostic cannot
+    // change the older authenticated spending-cap delivery route.
+    public
+        .route(
+            "/node/quota-v2/genesis-cap-delivery",
+            post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
+        )
+        .route(
+            "/node/quota-v2/public-tls-preflight",
+            post(quota_v2_public_tls_preflight::handle).layer(RequestBodyLimitLayer::new(1536)),
+        )
 }
 
 fn application_router(state: AppState) -> Router {
