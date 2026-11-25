@@ -748,7 +748,7 @@ fn public_api_routes() -> Router<AppState> {
     public.route(
         "/node/quota-v2/genesis-cap-delivery",
         post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
-    )
+    );
     // Read-only candidate evidence; no signed TLS authority or public port.
     public.route(
         "/node/quota-v2/public-tls-preflight",
