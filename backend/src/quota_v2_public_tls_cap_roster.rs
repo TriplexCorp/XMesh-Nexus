@@ -270,10 +270,7 @@ mod tests {
             (vec![15, 21], vec![row.clone()]),
             (vec![15], vec![row.clone(), (21, cap(&signer, 21, |_| {}))]),
             (vec![15, 15], vec![row.clone(), row.clone()]),
-            (
-                vec![21, 15],
-                vec![(21, cap(&signer, 21, |_| {})), row],
-            ),
+            (vec![21, 15], vec![(21, cap(&signer, 21, |_| {})), row]),
             (vec![15], vec![(99, cap(&signer, 99, |_| {}))]),
         ] {
             assert!(compute(&signer, &ids, &rows).is_err());
