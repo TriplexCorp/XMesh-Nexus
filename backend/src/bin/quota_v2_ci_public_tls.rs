@@ -1,4 +1,4 @@
-//! Ephemeral GitHub-hosted CI bridge: real Nexus PolicySigner -> strict Node TLS.
+//! Ephemeral GitHub-hosted CI bridge: real Nexus `PolicySigner` -> strict Node TLS.
 //! This target does not belong to the production Docker image. It cannot read
 //! production PostgreSQL, install a certificate or enable an ingress.
 #[path = "../node_policy.rs"]
@@ -8,7 +8,7 @@ mod quota_v2_public_tls_authority;
 
 use anyhow::{Result, ensure};
 use quota_v2_public_tls_authority::{GenesisBinding, PublicListener, sign};
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, io::Write, path::PathBuf};
 
 fn run() -> Result<()> {
     ensure!(
@@ -67,7 +67,6 @@ fn run() -> Result<()> {
     let public_key = output.join("policy-public-key.txt");
     let mut opts = fs::OpenOptions::new();
     opts.write(true).create_new(true);
-    use std::io::Write;
     opts.open(&result)?.write_all(&signed)?;
     opts.open(&public_key)?
         .write_all(key.public_key().as_bytes())?;
