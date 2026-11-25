@@ -147,9 +147,15 @@ pub(super) async fn authenticated_digest(
         return Ok(None);
     };
 
-    let checked =
-        verify_locked_plan(&mut tx, request, activation, &signer_key, &original, &grants)
-            .await;
+    let checked = verify_locked_plan(
+        &mut tx,
+        request,
+        activation,
+        &signer_key,
+        &original,
+        &grants,
+    )
+    .await;
     // The diagnostic must never commit newly created lifetime baselines or
     // other allocator helper writes. A real issuer has its own transaction.
     tx.rollback().await?;
