@@ -226,7 +226,7 @@ mod tests {
         for domain in [
             "*.example.com", "../example.com", "UPPER.example.com",
             "127.0.0.1", "localhost", "bad..example.com",
-            "bad-.example.com", "a".repeat(64).as_str(),
+            "bad-.example.com", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         ] {
             let mut invalid = bindings.clone();
             invalid[0].domain = domain.to_string();
@@ -244,6 +244,6 @@ mod tests {
             assert!(policy(&good, &invalid, issued, issued + 60_000).is_err());
         }
         assert!(policy(&good, &[], issued, issued + 60_000).is_err());
-        assert!(policy(&good, &[bindings[0].clone(); 3], issued, issued + 60_000).is_err());
+        assert!(policy(&good, &vec![bindings[0].clone(); 3], issued, issued + 60_000).is_err());
     }
 }
