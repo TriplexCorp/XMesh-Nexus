@@ -4,6 +4,11 @@ on:
     branches: [main]
     paths:
       - 'backend/src/quota_v2_public_tls_authority.rs'
+      # Keep the live strict-PQ SQL-to-Xray roster diagnostic covered
+      # whenever either side's signature or original-policy checker changes.
+      - 'backend/src/quota_v2_public_tls_cap_roster.rs'
+      - 'backend/src/quota_v2_public_tls_preflight.rs'
+      - 'backend/src/quota_v2_public_tls_preflight/**'
       - 'backend/src/bin/quota_v2_ci_public_tls.rs'
       - 'backend/Cargo.toml'
       - '.github/workflows/quota-v2-public-tls-contract.yml'
@@ -11,6 +16,11 @@ on:
     branches: ['**']
     paths:
       - 'backend/src/quota_v2_public_tls_authority.rs'
+      # Keep the live strict-PQ SQL-to-Xray roster diagnostic covered
+      # whenever either side's signature or original-policy checker changes.
+      - 'backend/src/quota_v2_public_tls_cap_roster.rs'
+      - 'backend/src/quota_v2_public_tls_preflight.rs'
+      - 'backend/src/quota_v2_public_tls_preflight/**'
       - 'backend/src/bin/quota_v2_ci_public_tls.rs'
       - 'backend/Cargo.toml'
       - '.github/workflows/quota-v2-public-tls-contract.yml'
