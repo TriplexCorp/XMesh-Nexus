@@ -331,6 +331,103 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
         self.prep_confirm()
         self.store_cap()
 
+    def authority_fixture(self, conn, *, challenge="7"*64, roster=None,
+                          change=None, issued_offset=0):
+        # The SQL guard is NOT a cryptographic verifier. Use only syntactic
+        # signatures in this disposable test, never in any real issuer.
+        rows = conn.execute(
+            "SELECT user_id,signed_envelope FROM quota_v2_signed_first_cap_outbox "
+            "WHERE node_id=%s ORDER BY user_id",(self.node,)
+        ).fetchall()
+        expected = [
+            {"userId":uid,"grantSha256":hashlib.sha256(raw).hexdigest(),
+             "aliases":json.loads(raw)["payload"]["aliasScopes"]}
+            for uid,raw in rows
+        ]
+        digest = hashlib.sha256(canonical(expected)).hexdigest()
+        if rows:
+            self.assertEqual(conn.execute(
+                "SELECT quota_v2_public_tls_sql_roster_digest(%s)",(self.node,)
+            ).fetchone()[0],digest)
+        now = conn.execute(
+            "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT"
+        ).fetchone()[0]+issued_offset
+        payload = {
+            "schemaVersion":1,"kind":"xmesh.quota-v2.public-tls-ingress",
+            "nodeId":self.node,"activationReceiptSha256":self.activation,
+            "runtimeId":self.runtime,"profileRevision":self.profile,
+            "genesisPolicySha256":self.policy,"issuedAtMs":now,
+            "validUntilMs":now+7000,"canServePublic":True,
+            "bindings":[{"tag":"vless-main","port":443,"domain":"vpn.example.com"}],
+        }
+        payload.update(change or {})
+        wire=canonical({"algorithm":"Ed25519","payload":payload,"signature":"3"*128})
+        args=(self.node,challenge,self.activation,self.runtime,self.profile,
+              self.policy,self.signer,digest if roster is None else roster,
+              hashlib.sha256(wire).hexdigest(),now,now+7000,wire)
+        return args
+
+    def insert_authority(self, conn, args):
+        return conn.execute(
+            "INSERT INTO quota_v2_public_tls_authority_outbox("
+            "node_id,request_challenge,activation_sha256,runtime_id,profile_revision,"
+            "genesis_policy_sha256,signer_public_key,cap_roster_sha256,authority_sha256,"
+            "issued_at_ms,valid_until_ms,signed_envelope)"
+            " VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            " RETURNING signed_envelope",args
+        ).fetchone()[0]
+
+    def test_authority_storage_requires_locked_complete_roster_and_exact_bytes(self):
+        with psycopg.connect(DSN) as conn:
+            with self.assertRaises(psycopg.errors.InvalidParameterValue):
+                self.insert_authority(conn,self.authority_fixture(conn))
+            conn.rollback()
+        self.armed()
+        with psycopg.connect(DSN) as conn:
+            for fields in (
+                {"roster":"0"*64},
+                {"change":{"runtimeId":"9"*64}},
+                {"change":{"canServePublic":False}},
+                {"issued_offset":-9000},
+            ):
+                args=self.authority_fixture(conn,**fields)
+                with self.assertRaises(psycopg.errors.InvalidParameterValue):
+                    self.insert_authority(conn,args)
+                conn.rollback()
+            args=self.authority_fixture(conn)
+            self.assertEqual(self.insert_authority(conn,args),args[-1])
+            conn.commit()
+            self.assertEqual(conn.execute(
+                "SELECT signed_envelope FROM quota_v2_public_tls_authority_outbox"
+                " WHERE node_id=%s AND request_challenge=%s",args[:2]
+            ).fetchone()[0],args[-1])
+            for sql in (
+                "UPDATE quota_v2_public_tls_authority_outbox SET cap_roster_sha256='0' "
+                "WHERE node_id=%s",
+                "DELETE FROM quota_v2_public_tls_authority_outbox WHERE node_id=%s",
+            ):
+                with self.assertRaises(psycopg.Error):
+                    conn.execute(sql,(self.node,))
+                conn.rollback()
+            with self.assertRaises(psycopg.errors.InvalidParameterValue):
+                self.insert_authority(conn,self.authority_fixture(conn,challenge="8"*64))
+            conn.rollback()
+            # Revocation cannot erase the immutable stored bytes, but it
+            # prevents every subsequent write, including replay attempts.
+            conn.execute("INSERT INTO quota_v2_revocation_requests("
+                         "user_id,epoch,node_id,meter_epoch,reservation_id,request_id)"
+                         "VALUES(%s,%s,%s,%s,%s,%s)",
+                         (self.user,self.epoch,self.node,self.meter,
+                          self.reservation,uuid.uuid4()))
+            conn.commit()
+            with self.assertRaises(psycopg.errors.InvalidParameterValue):
+                self.insert_authority(conn,args)
+            conn.rollback()
+            self.assertEqual(conn.execute(
+                "SELECT count(*) FROM quota_v2_public_tls_authority_outbox WHERE node_id=%s",
+                (self.node,)
+            ).fetchone()[0],1)
+
     def test_exact_roster_is_non_authorizing_and_requires_all_signed_caps(self):
         self.assertIs(self.exact_roster(), False)
         self.store_cap()
