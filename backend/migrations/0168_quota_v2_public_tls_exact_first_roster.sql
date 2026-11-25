@@ -39,16 +39,16 @@ BEGIN
     IF EXISTS (
         SELECT 1
           FROM jsonb_array_elements(roster) AS entry(user_record)
-         WHERE jsonb_typeof(entry.user_record)<>'object'
-            OR jsonb_typeof(entry.user_record->'userId')<>'number'
+         WHERE jsonb_typeof(entry.user_record) IS DISTINCT FROM 'object'
+            OR jsonb_typeof(entry.user_record->'userId') IS DISTINCT FROM 'number'
             OR entry.user_record->>'userId' !~ '^[1-9][0-9]{0,18}$'
             OR CASE WHEN entry.user_record->>'userId' ~ '^[1-9][0-9]{0,18}$'
                     THEN (entry.user_record->>'userId')::NUMERIC > 9223372036854775807
                     ELSE TRUE END
-            OR jsonb_typeof(entry.user_record->'offlineBudgetBytes')<>'number'
-            OR entry.user_record->>'offlineBudgetBytes'<>'0'
-            OR jsonb_typeof(entry.user_record->'onHold')<>'boolean'
-            OR entry.user_record->>'onHold'<>'true'
+            OR jsonb_typeof(entry.user_record->'offlineBudgetBytes') IS DISTINCT FROM 'number'
+            OR entry.user_record->>'offlineBudgetBytes' IS DISTINCT FROM '0'
+            OR jsonb_typeof(entry.user_record->'onHold') IS DISTINCT FROM 'boolean'
+            OR entry.user_record->>'onHold' IS DISTINCT FROM 'true'
     ) THEN
         RETURN FALSE;
     END IF;
