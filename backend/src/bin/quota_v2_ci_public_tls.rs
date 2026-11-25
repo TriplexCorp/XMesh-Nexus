@@ -111,7 +111,7 @@ fn run() -> Result<()> {
         "signature": key.sign(&witness)?,
     }))?;
     ensure!(
-        signed_witness.len() + 1 <= 4096,
+        signed_witness.len() < 4096,
         "disposable revocation fixture exceeds Node wire limit"
     );
     let mut revocation_file = opts.open(output.join("public-tls-revocation.json"))?;
