@@ -28,12 +28,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 829087a38fd6acd1570a78b27b7a203d4399f4d9
+          ref: 20ff04e95717989409e238ee29a085f5fefc0143
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Require exact reviewed Node and absent public TLS deployment
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 829087a38fd6acd1570a78b27b7a203d4399f4d9
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 20ff04e95717989409e238ee29a085f5fefc0143
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.35
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_frontend.py
           ! grep -E '^ExecStart=.*public_tls_frontend' .ci-reviewed-node/deploy/install-metered-services.sh
@@ -42,6 +42,7 @@ jobs:
           set -euo pipefail
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_frontend.py -v
           sudo python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_certificates.py -v
+          python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_revocation_watch.py -v
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_stop_monitor.py -v
           # No signed VLESS alias may outlive its actual installed Xray cap.
           # The watcher and its stop-only monitor cannot issue TLS authority.
@@ -53,6 +54,7 @@ jobs:
           python3 .ci-reviewed-node/tests/test_quota_v2_cap_observation.py -v
           test -f .ci-reviewed-node/experiments/xray-dataplane-fence/experimental_cap_socket.go.txt
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/cap_install.py
+          test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_revocation_watch.py
           # This independent compatibility test must never install a public
           # service. Positive ingress still needs runtime cap/WAL admission,
           # a root-owned supervisor and continuous authenticated revocation.
@@ -127,5 +129,42 @@ jobs:
               pass
           else:
               raise AssertionError("unsigned public port change accepted")
-          print("PASS: real Nexus Ed25519 -> Node runtime/profile-bound TLS authority; no listener started")
+          # The same ephemeral Nexus PolicySigner emits a strictly scoped
+          # *non-authorizing* short-lived revocation fixture. The Node must
+          # reject an old nonce, foreign roster/policy, or altered signature.
+          import public_tls_revocation_watch as rev
+          from unittest import mock
+          signed_revocation = (root / "public-tls-revocation.json").read_bytes()
+          watch_args = dict(
+              fetch=lambda nonce: signed_revocation,
+              node=47, activation="a"*64, genesis_sha="b"*64,
+              runtime_id="c"*64,
+              profile_sha256=__import__("hashlib").sha256(
+                  wal_transport.observed.canonical(profile())).hexdigest(),
+              authority_sha256=__import__("hashlib").sha256(raw).hexdigest(),
+              roster_sha256="f"*64,
+              pinned=key,
+          )
+          with mock.patch.object(rev.secrets, "token_hex", return_value="7"*64):
+              witnessed = rev.SignedTlsRevocationWatch(**watch_args)
+              assert witnessed.check() is None
+              assert witnessed.ensure_fresh() is None
+              try:
+                  witnessed.check()
+              except ValueError:
+                  pass
+              else:
+                  raise AssertionError("old signed revocation nonce accepted")
+              for changed in (
+                  dict(watch_args, genesis_sha="e"*64),
+                  dict(watch_args, roster_sha256="e"*64),
+                  dict(watch_args, authority_sha256="e"*64),
+                  dict(watch_args, pinned="e"*64),
+              ):
+                  try:
+                      rev.SignedTlsRevocationWatch(**changed).check()
+                  except ValueError:
+                      continue
+                  raise AssertionError("signed revocation witness accepted foreign TLS scope")
+          print("PASS: real Nexus Ed25519 -> Node TLS + replay-resistant revocation contract; no listener started")
           PY
