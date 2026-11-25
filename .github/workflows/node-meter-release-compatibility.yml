@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 0e48aadf2462e97656f9955e9a4e85476266b971
+          ref: e6d833162c6d34513469902bf331d09969b82149
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Fail on Agent version, bootstrap identity or source mismatch
@@ -38,9 +38,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           node_sha="$(git -C .ci-reviewed-node rev-parse HEAD)"
-          test "$node_sha" = '0e48aadf2462e97656f9955e9a4e85476266b971'
-          test "$(tr -d '\r\n' < AGENT_VERSION)" = 'control-v6.0.34'
-          test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.34'
+          test "$node_sha" = 'e6d833162c6d34513469902bf331d09969b82149'
+          test "$(tr -d '\r\n' < AGENT_VERSION)" = 'control-v6.0.35'
+          test "$(tr -d '\r\n' < .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.35'
           python3 - <<'PY'
           from pathlib import Path
           ui = Path('frontend/js/features/nodes/node-bootstrap-v6.js').read_text()
@@ -53,7 +53,7 @@ jobs:
               section = metered.split('cat > /etc/systemd/system/' + name, 1)[1].split('[Unit]', 1)[1].split('EOF', 1)[0]
               assert 'Requires=' in section and 'After=' in section
               assert 'xmesh-pq-activation-recovery.service' in section
-          assert "XMESH_V6_NODE_BOOTSTRAP_SHA='0e48aadf2462e97656f9955e9a4e85476266b971'" in ui
+          assert "XMESH_V6_NODE_BOOTSTRAP_SHA='e6d833162c6d34513469902bf331d09969b82149'" in ui
           assert "def verified_snapshot_scope(" in node
           assert "def committed_snapshot_scope(" in node
           assert "store_metrics_snapshot(ledger, args.node_id, now_ms, scope)" in node
