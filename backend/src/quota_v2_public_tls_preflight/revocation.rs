@@ -100,7 +100,11 @@ async fn profile_matches(state: &AppState, scope: &Request) -> bool {
         .is_ok_and(|preview| preview["configSha256"] == scope.profile_revision)
 }
 
-async fn signed_reply(state: &AppState, poll: &Poll, activation: &str) -> Result<Vec<u8>, ApiError> {
+async fn signed_reply(
+    state: &AppState,
+    poll: &Poll,
+    activation: &str,
+) -> Result<Vec<u8>, ApiError> {
     // Immutable, exact-hash lookup before expensive profile compilation.
     let stored = load_authority(poll, state).await?;
     let profile_before = profile_matches(state, &poll.scope).await;
@@ -148,7 +152,10 @@ pub async fn handle(
     raw: Bytes,
 ) -> Result<([(header::HeaderName, &'static str); 2], Vec<u8>), ApiError> {
     if !crate::quota_v2::enabled() || !crate::quota_xray_genesis::quarantine_enabled() {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "TLS polling is disabled."));
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "TLS polling is disabled.",
+        ));
     }
     if raw.is_empty() || raw.len() > 2048 {
         return Err(deny());
