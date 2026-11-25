@@ -531,6 +531,8 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                 # entitlement. The other node's MAIN permit stays valid.
                 assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==409
                 assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==200
+                assert_tls_diagnostic(guest_b,tls_requests[1],False)
+                assert_tls_diagnostic(guest_a,tls_requests[0],True)
         finally:
             owner.request("PATCH", "/settings", {"cdnResetPeriod": "monthly"})
 
@@ -546,6 +548,8 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     try:
         assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==409
         assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==409
+        assert_tls_diagnostic(guest_a,tls_requests[0],False)
+        assert_tls_diagnostic(guest_b,tls_requests[1],False)
         assert db.execute("SELECT node_id,request_challenge,signed_envelope "
                           "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge").fetchall()==original_caps
     finally:
@@ -564,6 +568,8 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     try:
         assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==409
         assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==200
+        assert_tls_diagnostic(guest_a,tls_requests[0],False)
+        assert_tls_diagnostic(guest_b,tls_requests[1],True)
         assert db.execute("SELECT node_id,request_challenge,signed_envelope "
             "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge").fetchall()==original_caps
     finally:
@@ -583,6 +589,8 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     try:
         assert guest_a.request(CAP_PATH,cap_jobs[0][2])[0]==200
         assert guest_b.request(CAP_PATH,cap_jobs[1][2])[0]==409
+        assert_tls_diagnostic(guest_a,tls_requests[0],True)
+        assert_tls_diagnostic(guest_b,tls_requests[1],False)
         assert db.execute(
             "SELECT node_id,request_challenge,signed_envelope "
             "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge"
@@ -603,11 +611,15 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     try:
         for item,_,request,_,_ in cap_jobs:
             assert item[0].request(CAP_PATH,request)[0]==409
+        for guest, request in zip(pair,tls_requests):
+            assert_tls_diagnostic(guest,request,False)
         assert db.execute("SELECT node_id,request_challenge,signed_envelope "
                           "FROM quota_v2_signed_first_cap_outbox ORDER BY node_id,request_challenge").fetchall()==original_caps
     finally:
         owner.request("PATCH",user_path,{"expireAt":original_expiry})
-    print("Shortened subscription cannot reuse an already signed longer-lived cap.")
+    for guest, request in zip(pair,tls_requests):
+        assert_tls_diagnostic(guest,request,True)
+    print("PASS: signed TLS roster refuses changed node/CDN quota or shortened subscription, and unaffected node stays eligible; no public authority.")
 
     def install(job):
         item,measurement,request,grant,ceiling=job
