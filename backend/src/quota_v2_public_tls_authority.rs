@@ -12,19 +12,19 @@ use serde_json::{Value, json};
 use std::collections::HashSet;
 
 #[derive(Clone)]
-pub(super) struct GenesisBinding {
-    pub(super) node_id: i64,
-    pub(super) activation_receipt_sha256: String,
-    pub(super) genesis_policy_sha256: String,
-    pub(super) runtime_id: String,
-    pub(super) profile_revision: String,
+pub struct GenesisBinding {
+    pub node_id: i64,
+    pub activation_receipt_sha256: String,
+    pub genesis_policy_sha256: String,
+    pub runtime_id: String,
+    pub profile_revision: String,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct PublicListener {
-    pub(super) tag: String,
-    pub(super) domain: String,
-    pub(super) port: u16,
+pub struct PublicListener {
+    pub tag: String,
+    pub domain: String,
+    pub port: u16,
 }
 
 fn hex64(value: &str) -> bool {
@@ -129,7 +129,7 @@ fn policy(
 /// the measured Node's strict `public_tls_frontend.verify_signed_public_tls`.
 /// Deliberately private: this creates *only* signature bytes; it proves neither
 /// that a cap was installed nor that the public TLS port may yet be opened.
-pub(super) fn sign(
+pub fn sign(
     signer: &PolicySigner,
     source: &GenesisBinding,
     bindings: &[PublicListener],
