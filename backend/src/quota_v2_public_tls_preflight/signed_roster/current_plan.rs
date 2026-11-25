@@ -80,7 +80,7 @@ pub(super) async fn check_users(
         let Ok(doc) = serde_json::from_slice::<Value>(raw) else {
             return Ok(false);
         };
-        if !check_one(conn, node, user, &doc["payload"]).await? {
+        if !check_one(conn, node, user, &doc["payload"], raw).await? {
             return Ok(false);
         }
     }
@@ -92,6 +92,7 @@ async fn check_one(
     node: i64,
     user: &LockedUser,
     payload: &Value,
+    raw: &[u8],
 ) -> Result<bool, ApiError> {
     let (Some(class), Some(reservation), Some(epoch), Some(expires), Some(ceiling)) = (
         class(payload),
@@ -106,15 +107,30 @@ async fn check_one(
         sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT")
             .fetch_one(&mut *conn)
             .await?;
+    // The exact signed wire bytes must belong to the SQL row we locked.
+    // Do not let an otherwise genuine historical cap stand in for another
+    // account epoch, reservation revision, meter or ceiling.
     let account: Option<i64> = sqlx::query_scalar(
-        "SELECT limit_bytes FROM quota_v2_accounts
-         WHERE user_id=$1 AND epoch=$2::uuid AND NOT closed",
+        "SELECT a.limit_bytes FROM quota_v2_accounts a
+         JOIN quota_v2_signed_first_cap_outbox o ON o.user_id=a.user_id AND o.epoch=a.epoch
+         WHERE a.user_id=$1 AND a.epoch=$2::uuid AND NOT a.closed
+           AND o.node_id=$3 AND o.reservation_id=$4::uuid AND o.grant_bytes=$5
+           AND o.revision=$6 AND o.valid_until_ms=$7 AND o.meter_epoch=$8::uuid
+           AND o.signed_envelope=$9",
     )
     .bind(user.id)
     .bind(epoch)
+    .bind(node)
+    .bind(reservation)
+    .bind(ceiling)
+    .bind(payload["reservationRevision"].as_i64())
+    .bind(expires)
+    .bind(payload["meterEpoch"].as_str())
+    .bind(raw)
     .fetch_optional(&mut *conn)
     .await?;
-    if account.is_none()
+    if payload["nodeCeilingBytes"].as_i64() != Some(ceiling)
+        || account.is_none()
         || quota_v2::authoritative_shared_limit(&user.record).ok() != account
         || !node_runtime::first_genesis_active_until(&user.record, now, expires)
         || !node_runtime::first_genesis_rehearsal_limits_supported(
