@@ -108,40 +108,9 @@ pub(super) async fn authenticated_digest(
     if !candidate {
         return Ok(None);
     }
-    // The original, immutable Genesis source, not a Node-supplied roster,
-    // defines the complete exact set of users. Recheck actual signed bytes.
-    let policy: Option<(Vec<u8>, String)> = sqlx::query_as(
-        "SELECT signed_policy_bytes,policy_signature
-            FROM quota_v2_genesis_quarantine_policies
-           WHERE node_id=$1 AND first_activation_sha256=$2
-             AND runtime_id=$3 AND profile_revision=$4
-             AND policy_sha256=$5 AND signer_public_key=$6",
-    )
-    .bind(request.node_id)
-    .bind(activation)
-    .bind(&request.runtime_id)
-    .bind(&request.profile_revision)
-    .bind(&request.genesis_policy_sha256)
-    .bind(&signer_key)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let Some((policy_bytes, original_signature)) = policy else {
-        return Ok(None);
-    };
-    if hex::encode(Sha256::digest(&policy_bytes)) != request.genesis_policy_sha256 {
-        return Ok(None);
-    }
-    let Ok(original) = serde_json::from_slice::<Value>(&policy_bytes) else {
-        return Ok(None);
-    };
-    let canonical = serde_json::to_vec(&original).ok();
-    let signature = state.node_policy_signer.sign(&original).ok();
-    if canonical.as_deref() != Some(policy_bytes.as_slice())
-        || signature.as_deref() != Some(original_signature.as_str())
-    {
-        return Ok(None);
-    }
-    let Some(expected_users) = original_users(&original, request) else {
+    let Some(expected_users) =
+        verified_original_users(&mut tx, state, request, activation, &signer_key).await?
+    else {
         return Ok(None);
     };
     // Read EVERY existing signed first-cap row of this enrolled Node. Never
@@ -182,20 +151,7 @@ pub(super) async fn authenticated_digest(
     // Genesis, rejects any additional outbox rows, and rechecks all
     // eligibility and expiry conditions. Only a matching cryptographic
     // roster may acquire these locks. No positive authority is created.
-    let locked = sqlx::query_scalar::<_, bool>(
-        "SELECT quota_v2_public_tls_lock_exact_first_roster(
-             $1,$2,$3,$4,$5,$6,$7
-         )",
-    )
-    .bind(request.node_id)
-    .bind(activation)
-    .bind(&request.runtime_id)
-    .bind(&request.profile_revision)
-    .bind(&request.genesis_policy_sha256)
-    .bind(&signer_key)
-    .bind(request.required_lifetime_ms)
-    .fetch_one(&mut *tx)
-    .await;
+    let locked = lock_exact_roster(&mut tx, request, activation, &signer_key).await;
     match locked {
         Ok(true) => {
             // A future issuer must sign and durably store its authority
@@ -214,6 +170,74 @@ pub(super) async fn authenticated_digest(
         }
         Err(error) => Err(error.into()),
     }
+}
+async fn lock_exact_roster(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    request: &Request,
+    activation: &str,
+    signer_key: &str,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar::<_, bool>(
+        "SELECT quota_v2_public_tls_lock_exact_first_roster(
+             $1,$2,$3,$4,$5,$6,$7
+         )",
+    )
+    .bind(request.node_id)
+    .bind(activation)
+    .bind(&request.runtime_id)
+    .bind(&request.profile_revision)
+    .bind(&request.genesis_policy_sha256)
+    .bind(signer_key)
+    .bind(request.required_lifetime_ms)
+    .fetch_one(&mut **tx)
+    .await
+}
+ 
+
+async fn verified_original_users(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    state: &AppState,
+    request: &Request,
+    activation: &str,
+    signer_key: &str,
+) -> Result<Option<Vec<i64>>, ApiError> {
+    // The original, immutable Genesis source, not a Node-supplied roster,
+    // defines the complete exact set of users. Recheck actual signed bytes.
+    let policy: Option<(Vec<u8>, String)> = sqlx::query_as(
+        "SELECT signed_policy_bytes,policy_signature
+            FROM quota_v2_genesis_quarantine_policies
+           WHERE node_id=$1 AND first_activation_sha256=$2
+             AND runtime_id=$3 AND profile_revision=$4
+             AND policy_sha256=$5 AND signer_public_key=$6",
+    )
+    .bind(request.node_id)
+    .bind(activation)
+    .bind(&request.runtime_id)
+    .bind(&request.profile_revision)
+    .bind(&request.genesis_policy_sha256)
+    .bind(signer_key)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some((policy_bytes, original_signature)) = policy else {
+        return Ok(None);
+    };
+    if hex::encode(Sha256::digest(&policy_bytes)) != request.genesis_policy_sha256 {
+        return Ok(None);
+    }
+    let Ok(original) = serde_json::from_slice::<Value>(&policy_bytes) else {
+        return Ok(None);
+    };
+    let canonical = serde_json::to_vec(&original).ok();
+    let signature = state.node_policy_signer.sign(&original).ok();
+    if canonical.as_deref() != Some(policy_bytes.as_slice())
+        || signature.as_deref() != Some(original_signature.as_str())
+    {
+        return Ok(None);
+    }
+    let Some(expected_users) = original_users(&original, request) else {
+        return Ok(None);
+    };
+    Ok(Some(expected_users))
 }
 
 #[cfg(test)]
