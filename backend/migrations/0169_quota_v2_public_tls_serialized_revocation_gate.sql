@@ -177,6 +177,28 @@ $$;
 CREATE TRIGGER quota_v2_revocation_intent_serialized
 BEFORE INSERT ON quota_v2_revocation_requests
 FOR EACH ROW EXECUTE FUNCTION quota_v2_revocation_intent_serialization_guard();
+-- The accepted intent's immutable identity may never be relabelled into
+-- another reservation after a signed cap was issued. Preserve the existing
+-- legitimate applied_at / applied_revision / used-byte updates.
+CREATE FUNCTION quota_v2_revocation_intent_identity_immutable()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER
+SET search_path=pg_catalog,public,pg_temp AS $
+BEGIN
+    IF ROW(NEW.user_id,NEW.epoch,NEW.node_id,NEW.meter_epoch,
+           NEW.reservation_id,NEW.request_id,NEW.requested_at)
+       IS DISTINCT FROM
+       ROW(OLD.user_id,OLD.epoch,OLD.node_id,OLD.meter_epoch,
+           OLD.reservation_id,OLD.request_id,OLD.requested_at) THEN
+        RAISE EXCEPTION 'revocation lease, request and timestamp cannot be relabelled'
+            USING ERRCODE='22023';
+    END IF;
+    RETURN NEW;
+END;
+$;
+CREATE TRIGGER quota_v2_revocation_intent_identity_immutable
+BEFORE UPDATE ON quota_v2_revocation_requests
+FOR EACH ROW EXECUTE FUNCTION quota_v2_revocation_intent_identity_immutable();
+REVOKE ALL ON FUNCTION quota_v2_revocation_intent_identity_immutable() FROM PUBLIC;
 CREATE TRIGGER quota_v2_revocation_intent_no_delete
 BEFORE DELETE ON quota_v2_revocation_requests
 FOR EACH ROW EXECUTE FUNCTION quota_v2_runtime_preflight_immutable();
