@@ -1,0 +1,46 @@
+name: Quota V2 reviewed Sigstore transfer (temporary)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/quota-v2-signed-bundle-transfer.yml'
+  push:
+    branches: [release/control-v6.0.33-meter-reboot]
+    paths:
+      - '.github/workflows/quota-v2-signed-bundle-transfer.yml'
+permissions:
+  contents: read
+jobs:
+  reviewed-provenance-transfer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read exact previously signed Node main artifact and verify source binding
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/reviewed-provenance"
+          gh run download 45548531312 --repo TriplexCorp/XMesh-Node \
+            --name metered-xray-linux-amd64-provenance-5a5e63c34ad2499c7124d783c76d501728bf5d24 \
+            --dir "$RUNNER_TEMP/reviewed-provenance"
+          bundle="$RUNNER_TEMP/reviewed-provenance/attestation.json"
+          test -s "$bundle"
+          gh attestation verify scripts/metered-xray-candidate-manifest.json \
+            --bundle "$bundle" --repo TriplexCorp/XMesh-Node \
+            --signer-workflow TriplexCorp/XMesh-Node/.github/workflows/xray-dataplane-fence-experiment.yml \
+            --source-ref refs/heads/main \
+            --source-digest 5a5e63c34ad2499c7124d783c76d501728bf5d24 \
+            --deny-self-hosted-runners
+          python3 - "$bundle" <<'PY'
+          from pathlib import Path
+          import hashlib,json,sys
+          data = Path(sys.argv[1]).read_bytes()
+          doc=json.loads(data)
+          assert doc['mediaType']=='application/vnd.dev.sigstore.bundle.v0.3+json'
+          assert 10000 < len(data) < 20000
+          print('XMESH_REVIEWED_ATTESTATION_SHA256='+hashlib.sha256(data).hexdigest())
+          print('XMESH_REVIEWED_ATTESTATION_BEGIN'+data.decode('utf-8')+'XMESH_REVIEWED_ATTESTATION_END')
+          PY
