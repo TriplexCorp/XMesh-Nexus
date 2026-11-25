@@ -990,7 +990,8 @@ var allowedTunnelPaths = map[string]bool{
 	"/api/v1/node/quota-v2/policy-pin":           true,
 	"/api/v1/node/quota-v2/genesis-reservation":  true,
 	"/api/v1/node/quota-v2/genesis-cap-delivery": true,
-	"/api/v1/node/quota-v2/public-tls-preflight": true,
+	"/api/v1/node/quota-v2/public-tls-preflight":  true,
+	"/api/v1/node/quota-v2/public-tls-revocation": true,
 }
 
 // Original activation binding is forwarded ONLY on explicitly registered
@@ -1002,7 +1003,8 @@ func needsGenesisActivationBinding(path string) bool {
 		"/api/v1/node/quota-v2/policy-pin",
 		"/api/v1/node/quota-v2/genesis-reservation",
 		"/api/v1/node/quota-v2/genesis-cap-delivery",
-		"/api/v1/node/quota-v2/public-tls-preflight":
+		"/api/v1/node/quota-v2/public-tls-preflight",
+		"/api/v1/node/quota-v2/public-tls-revocation":
 		return true
 	default:
 		return false
