@@ -6,6 +6,8 @@
 //! The future issuer must recheck *all* of these conditions under the
 //! correct account/lease/revocation locks and verify live Node evidence.
 //! Returning a candidate NEVER permits traffic.
+mod signed_roster;
+
 use crate::{ApiError, AppState, node_auth};
 use axum::{
     Json,
@@ -28,6 +30,7 @@ struct Request {
     genesis_policy_sha256: String,
     runtime_id: String,
     profile_revision: String,
+    cap_roster_sha256: String,
     required_lifetime_ms: i64,
 }
 
@@ -46,6 +49,7 @@ fn valid(request: &Request) -> bool {
             &request.genesis_policy_sha256,
             &request.runtime_id,
             &request.profile_revision,
+            &request.cap_roster_sha256,
         ]
         .into_iter()
         .all(|digest| hex64(digest))
@@ -59,12 +63,13 @@ fn deny() -> ApiError {
     )
 }
 
-fn reply(node_id: i64, user_id: i64, evidence_matched: bool) -> Value {
+fn reply(node_id: i64, user_id: i64, verified_digest: Option<&str>) -> Value {
     json!({
         "status": "candidate_only_not_authorized",
         "nodeId": node_id,
         "userId": user_id,
-        "evidenceMatched": evidence_matched,
+        "evidenceMatched": verified_digest.is_some(),
+        "capRosterSha256": verified_digest,
         "canServePublic": false,
         "canStart": false,
         "canResume": false,
@@ -108,38 +113,18 @@ pub async fn handle(
         return Err(deny());
     }
 
-    // The pinned signer is taken ONLY from Nexus AppState: Node-provided
-    // alternate keys must never make a foreign signed cap look authentic.
-    let signer = state.node_policy_signer.public_key();
-    // A single valid user cap is NOT sufficient to serve the shared
-    // public TLS socket. Require the complete, unique original signed
-    // Genesis user roster to match the current SQL candidate roster as
-    // well as the specifically requested user. Both predicates are still
-    // read-only and grant ZERO authority over real Xray or public traffic.
-    let evidence_matched: bool = sqlx::query_scalar(
-        "SELECT quota_v2_public_tls_exact_first_roster(
-             $1,$2,$3,$4,$5,$6,$7
-         ) AND EXISTS(
-             SELECT 1 FROM quota_v2_public_tls_first_cap_candidates(
-                 $1,$2,$3,$4,$5,$6,$7
-             ) AS candidate
-             WHERE candidate.user_id=$8
-         )",
-    )
-    .bind(request.node_id)
-    .bind(activation)
-    .bind(&request.runtime_id)
-    .bind(&request.profile_revision)
-    .bind(&request.genesis_policy_sha256)
-    .bind(&signer)
-    .bind(request.required_lifetime_ms)
-    .bind(request.user_id)
-    .fetch_one(&state.pool)
-    .await?;
-
+    // Strict-PQ identity is only the first gate. Independently verify
+    // the ORIGINAL signed Genesis policy and EVERY immutable first cap
+    // against one PostgreSQL snapshot and the pinned actual Nexus signer.
+    // A user-supplied roster digest never qualifies by itself.
+    let verified_digest = signed_roster::authenticated_digest(&state, &request, activation).await?;
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
-        Json(reply(request.node_id, request.user_id, evidence_matched)),
+        Json(reply(
+            request.node_id,
+            request.user_id,
+            verified_digest.as_deref(),
+        )),
     ))
 }
 
@@ -155,6 +140,7 @@ mod tests {
             genesis_policy_sha256: "b".repeat(64),
             runtime_id: "c".repeat(64),
             profile_revision: "d".repeat(64),
+            cap_roster_sha256: "e".repeat(64),
             required_lifetime_ms: 30_000,
         }
     }
@@ -190,10 +176,14 @@ mod tests {
 
     #[test]
     fn matching_database_evidence_still_never_authorizes_public_tls() {
-        for candidate in [true, false] {
-            let result = reply(47, 91, candidate);
+        for candidate in [Some("e".repeat(64)), None] {
+            let result = reply(47, 91, candidate.as_deref());
             assert_eq!(result["status"], "candidate_only_not_authorized");
-            assert_eq!(result["evidenceMatched"], candidate);
+            assert_eq!(result["evidenceMatched"], candidate.is_some());
+            assert_eq!(
+                result["capRosterSha256"],
+                candidate.map_or(Value::Null, Value::String)
+            );
             assert_eq!(result["canServePublic"], false);
             assert_eq!(result["canStart"], false);
             assert_eq!(result["canResume"], false);
@@ -215,16 +205,27 @@ mod tests {
             "genesisPolicySha256": "b".repeat(64),
             "runtimeId": "c".repeat(64),
             "profileRevision": "d".repeat(64),
+            "capRosterSha256": "e".repeat(64),
             "requiredLifetimeMs": 30_000,
         });
         let req: Request = serde_json::from_value(base.clone()).expect("valid request");
         assert!(valid(&req));
-        for field in ["activationReceiptSha256", "runtimeId", "nodeId"] {
+        for field in [
+            "activationReceiptSha256",
+            "runtimeId",
+            "nodeId",
+            "capRosterSha256",
+        ] {
             let mut modified = base.clone();
             modified.as_object_mut().expect("object").remove(field);
             assert!(serde_json::from_value::<Request>(modified).is_err());
         }
-        for change in ["activationReceiptSha256", "runtimeId", "profileRevision"] {
+        for change in [
+            "activationReceiptSha256",
+            "runtimeId",
+            "profileRevision",
+            "capRosterSha256",
+        ] {
             let mut modified = base.clone();
             modified[change] = json!("e".repeat(63));
             let request: Request = serde_json::from_value(modified).expect("string still parses");
