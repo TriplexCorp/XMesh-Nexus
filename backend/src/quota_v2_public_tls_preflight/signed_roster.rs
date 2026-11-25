@@ -22,8 +22,8 @@ fn original_users(policy: &Value, request: &Request) -> Option<Vec<i64>> {
         || genesis.get("firstActivationReceiptSha256")?.as_str()?
             != request.activation_receipt_sha256
         || genesis.get("authorizedBytes")?.as_i64()? != 0
-        || genesis.get("canStart")?.as_bool()? != false
-        || genesis.get("canResume")?.as_bool()? != false
+        || genesis.get("canStart")?.as_bool()?
+        || genesis.get("canResume")?.as_bool()?
         || genesis.get("refundableBytes")?.as_i64()? != 0
     {
         return None;
@@ -37,7 +37,7 @@ fn original_users(policy: &Value, request: &Request) -> Option<Vec<i64>> {
         let id = user.get("userId")?.as_i64()?;
         if id <= 0
             || user.get("offlineBudgetBytes")?.as_i64()? != 0
-            || user.get("onHold")?.as_bool()? != true
+            || !user.get("onHold")?.as_bool()?
         {
             return None;
         }
