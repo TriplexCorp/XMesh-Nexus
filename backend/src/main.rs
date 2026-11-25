@@ -28,6 +28,10 @@ mod quota_v2_cdn_lifetime;
 mod quota_v2_genesis_reservation;
 mod quota_v2_node_lifetime;
 mod quota_v2_policy_pin;
+// Not a live endpoint: checks the future Node/Nexus public TLS Ed25519 wire
+// contract until independently measured quota admission and revocation exist.
+#[allow(dead_code)]
+mod quota_v2_public_tls_authority;
 mod quota_wal_transport;
 mod quota_xray_genesis;
 mod security;
