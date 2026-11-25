@@ -33,12 +33,8 @@ mod quota_v2_policy_pin;
 #[allow(dead_code)]
 mod quota_v2_public_tls_cap_roster;
 mod quota_v2_public_tls_preflight;
-// No production backend build may link the positive public-TLS policy signer.
-// The dormant byte contract is available ONLY to isolated tests and the
-// explicitly opted-in disposable CI feature, until live cap/WAL proof and
-// revocation-supervised ingress are independently qualified.
-#[cfg(any(test, feature = "quota-v2-disposable-cap-issuer"))]
-#[allow(dead_code)]
+// Production may verify committed authority and issue revocation witnesses.
+// Positive public TLS signing remains individually gated to disposable CI.
 mod quota_v2_public_tls_authority;
 mod quota_wal_transport;
 mod quota_xray_genesis;
@@ -762,6 +758,11 @@ fn public_api_routes() -> Router<AppState> {
         .route(
             "/node/quota-v2/public-tls-preflight",
             post(quota_v2_public_tls_preflight::handle).layer(RequestBodyLimitLayer::new(1536)),
+        )
+        .route(
+            "/node/quota-v2/public-tls-revocation",
+            post(quota_v2_public_tls_preflight::revocation_handle)
+                .layer(RequestBodyLimitLayer::new(2048)),
         )
 }
 
