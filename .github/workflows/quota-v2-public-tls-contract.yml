@@ -182,6 +182,14 @@ jobs:
                   pass
               else:
                   raise AssertionError("old signed revocation nonce accepted")
+              revoked = (root / "public-tls-revoked.json").read_bytes()
+              try:
+                  rev.SignedTlsRevocationWatch(
+                      **dict(watch_args, fetch=lambda nonce: revoked)).check()
+              except ValueError:
+                  pass
+              else:
+                  raise AssertionError("valid Nexus signature on revoked witness accepted")
               for changed in (
                   dict(watch_args, genesis_sha="e"*64),
                   dict(watch_args, roster_sha256="e"*64),
