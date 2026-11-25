@@ -182,7 +182,7 @@ FOR EACH ROW EXECUTE FUNCTION quota_v2_revocation_intent_serialization_guard();
 -- legitimate applied_at / applied_revision / used-byte updates.
 CREATE FUNCTION quota_v2_revocation_intent_identity_immutable()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER
-SET search_path=pg_catalog,public,pg_temp AS $
+SET search_path=pg_catalog,public,pg_temp AS $$
 BEGIN
     IF ROW(NEW.user_id,NEW.epoch,NEW.node_id,NEW.meter_epoch,
            NEW.reservation_id,NEW.request_id,NEW.requested_at)
@@ -194,7 +194,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$;
+$$;
 CREATE TRIGGER quota_v2_revocation_intent_identity_immutable
 BEFORE UPDATE ON quota_v2_revocation_requests
 FOR EACH ROW EXECUTE FUNCTION quota_v2_revocation_intent_identity_immutable();
