@@ -190,7 +190,10 @@ mod tests {
     fn current_credential_must_match_the_original_canonical_uuid() {
         let id = "12345678-1234-4234-8234-123456789abc";
         assert!(current_credential(&json!({"xrayId":id}), id));
-        assert!(!current_credential(&json!({"xrayId":id}), &id.to_uppercase()));
+        assert!(!current_credential(
+            &json!({"xrayId":id}),
+            &id.to_uppercase()
+        ));
         assert!(!current_credential(&json!({"xrayId":"other"}), id));
         assert!(!current_credential(&json!({}), id));
     }
