@@ -36,7 +36,7 @@ const (
 	maxPayloadBytes    = 768 * 1024
 	suite              = "Ed25519+ML-DSA-65"
 	issuerID           = "xmesh-nexus-panel"
-	targetAgentVersion = "control-v6.0.33"
+	targetAgentVersion = "control-v6.0.34"
 )
 
 var b64 = base64.StdEncoding
@@ -552,7 +552,7 @@ func (g *gateway) issueClientCertificate(nodeID int64, publicDER []byte) (string
 
 // The isolated WAL rehearsal pins the exact proposed product binary.
 func pinnedWALCandidate(release releaseIdentity, enabled, pin string) bool {
-	if enabled != "1" || (release.Version != "control-v6.0.25" && release.Version != "control-v6.0.33") {
+	if enabled != "1" || (release.Version != "control-v6.0.25" && release.Version != "control-v6.0.33" && release.Version != "control-v6.0.34") {
 		return false
 	}
 	return matchesReleasePin(release, pin)
