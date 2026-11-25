@@ -4,6 +4,11 @@ on:
     branches: [main]
     paths:
       - 'backend/src/quota_v2_public_tls_authority.rs'
+      # Keep the live strict-PQ SQL-to-Xray roster diagnostic covered
+      # whenever either side's signature or original-policy checker changes.
+      - 'backend/src/quota_v2_public_tls_cap_roster.rs'
+      - 'backend/src/quota_v2_public_tls_preflight.rs'
+      - 'backend/src/quota_v2_public_tls_preflight/**'
       - 'backend/src/bin/quota_v2_ci_public_tls.rs'
       - 'backend/Cargo.toml'
       - '.github/workflows/quota-v2-public-tls-contract.yml'
@@ -11,6 +16,11 @@ on:
     branches: ['**']
     paths:
       - 'backend/src/quota_v2_public_tls_authority.rs'
+      # Keep the live strict-PQ SQL-to-Xray roster diagnostic covered
+      # whenever either side's signature or original-policy checker changes.
+      - 'backend/src/quota_v2_public_tls_cap_roster.rs'
+      - 'backend/src/quota_v2_public_tls_preflight.rs'
+      - 'backend/src/quota_v2_public_tls_preflight/**'
       - 'backend/src/bin/quota_v2_ci_public_tls.rs'
       - 'backend/Cargo.toml'
       - '.github/workflows/quota-v2-public-tls-contract.yml'
@@ -28,12 +38,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 937a283c2eeb61a49ffa45fe827f2d90699e4c57
+          ref: c91c2ce57d259f8cb222e51d17205cca98d5adb2
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Require exact reviewed Node and absent public TLS deployment
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 937a283c2eeb61a49ffa45fe827f2d90699e4c57
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = c91c2ce57d259f8cb222e51d17205cca98d5adb2
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.35
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_frontend.py
           ! grep -E '^ExecStart=.*public_tls_frontend' .ci-reviewed-node/deploy/install-metered-services.sh
