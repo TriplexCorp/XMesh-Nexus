@@ -216,6 +216,83 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                       "WHERE reservation_id=%s",(self.reservation,))
         self.assertEqual(self.candidates(),[])
 
+    def test_original_signed_roster_cannot_be_bypassed_by_legacy_preflight(self):
+        self.armed()
+        outsider = uuid.uuid4().int % (2**49) + 100
+        epoch, meter, reservation = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        challenge = hex64("3")
+        with psycopg.connect(DSN) as conn:
+            conn.execute("INSERT INTO quota_v2_accounts(user_id,epoch,limit_bytes)"
+                         " VALUES(%s,%s,1000)", (outsider,epoch))
+            revision=conn.execute(
+                "SELECT revision FROM quota_v2_reserve("
+                "%s,%s,%s,%s,%s,500,0,NOW()+INTERVAL '1 hour')",
+                (outsider,epoch,self.node,meter,reservation)
+            ).fetchone()[0]
+            conn.execute(
+                "UPDATE quota_v2_reservations SET node_confirmed=TRUE "
+                "WHERE reservation_id=%s",(reservation,))
+            # Bypass ONLY the older 0138 SQL preflight in this controlled
+            # negative test; real API uses 0142 with signed-roster checks.
+            conn.execute(
+                "SELECT user_id FROM quota_v2_record_runtime_admission_preflight("
+                "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0)",
+                (outsider,epoch,self.node,meter,reservation,revision,
+                 challenge,self.runtime,hex64("1"),3345,self.policy,
+                 self.activation))
+            for stage in ("prepare","confirm"):
+                conn.execute(
+                    "INSERT INTO quota_v2_genesis_lease_replies("
+                    "node_id,user_id,stage,policy_sha256,signer_public_key,"
+                    "signed_reply) VALUES(%s,%s,%s,%s,%s,%s)",
+                    (self.node,outsider,stage,self.policy,self.signer,
+                     b"disposable non-signature" * 12))
+            now=int(time.time()*1000)
+            # Direct owner insert of syntactic bytes is not reachable from
+            # the signed runtime issuer, but proves the SQL read filter
+            # cannot treat such an outbox entry as roster authorization.
+            conn.execute(
+                "INSERT INTO quota_v2_signed_first_cap_outbox("
+                "node_id,request_challenge,user_id,epoch,meter_epoch,"
+                "reservation_id,revision,policy_sha256,runtime_id,"
+                "signer_public_key,grant_bytes,issued_at_ms,"
+                "install_before_ms,valid_until_ms,signed_envelope)"
+                " VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (self.node,challenge,outsider,epoch,meter,reservation,revision,
+                 self.policy,self.runtime,self.signer,500,now-1000,
+                 now+60000,now+3000000,b"not a real signature" * 14))
+        self.assertEqual(
+            [row[0] for row in self.candidates()], [self.user],
+            "User absent from original signed Genesis roster acquired TLS candidate")
+
+    def test_strict_node_revocation_and_consumed_genesis_block_candidates(self):
+        self.armed()
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE node_xsp_product_nodes SET state='revoked' "
+                      "WHERE node_id=%s",(self.node,))
+        self.assertEqual(self.candidates(),[])
+
+    def test_legacy_desired_policy_consumption_blocks_candidates(self):
+        self.armed()
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_xray_genesis SET policy_path_used=TRUE "
+                      "WHERE node_id=%s",(self.node,))
+        self.assertEqual(self.candidates(),[])
+
+    def test_unconfirmed_lease_and_global_oversubscription_block_candidates(self):
+        self.armed()
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_reservations SET node_confirmed=FALSE "
+                      "WHERE reservation_id=%s",(self.reservation,))
+        self.assertEqual(self.candidates(),[])
+
+    def test_observed_global_debt_blocks_candidates(self):
+        self.armed()
+        with psycopg.connect(DSN) as c:
+            c.execute("UPDATE quota_v2_accounts SET observed_floor_bytes=700 "
+                      "WHERE user_id=%s AND epoch=%s",(self.user,self.epoch))
+        self.assertEqual(self.candidates(),[])
+
     def test_untrusted_argument_types_and_oversized_ttl_raise(self):
         for fields in (
             {"node":0},{"activation":"A"*64},{"signer":"../key"},
