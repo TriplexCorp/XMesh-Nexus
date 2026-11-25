@@ -1,8 +1,9 @@
-//! Zero-authority, READ-ONLY SQL + Ed25519 proof of the complete first-Genesis roster.
+//! Zero-authority SQL + Ed25519 proof of the complete first-Genesis roster.
 //!
-//! Read all evidence in one REPEATABLE READ PostgreSQL snapshot. A matching
-//! digest is still NOT an ingress permission: no Linux PID, installed Xray
-//! caps, certificate, durable WAL or serialized revocation is proved here.
+//! Verify immutable signed evidence, then acquire the serialized SQL gate
+//! in the SAME READ COMMITTED transaction. No persistent state is changed.
+//! A matching digest is still NOT an ingress permission: no Linux PID,
+//! installed Xray caps, certificate or durable WAL is proved here.
 use super::Request;
 use crate::{
     ApiError, AppState,
@@ -50,8 +51,18 @@ fn original_users(policy: &Value, request: &Request) -> Option<Vec<i64>> {
     Some(ids)
 }
 
-/// Returns a digest ONLY for a consistent, exact, currently SQL-eligible
-/// original roster. It cannot authorize or enable any public listener.
+fn gate_contention(error: &sqlx::Error) -> bool {
+    error.as_database_error().is_some_and(|database| {
+        matches!(
+            database.code().as_deref(),
+            Some("55P03" | "57014" | "40P01" | "40001")
+        )
+    })
+}
+
+/// Returns a digest ONLY for a cryptographically exact original roster
+/// which passed the serialized SQL gate. It cannot authorize or enable
+/// any public listener.
 pub(super) async fn authenticated_digest(
     state: &AppState,
     request: &Request,
@@ -59,12 +70,22 @@ pub(super) async fn authenticated_digest(
 ) -> Result<Option<String>, ApiError> {
     let signer_key = state.node_policy_signer.public_key();
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+    // 0169 requires READ COMMITTED so its final check observes writers
+    // that committed before the gate acquired all of its row locks.
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE")
         .execute(&mut *tx)
         .await?;
-    // One PostgreSQL snapshot prevents combining user/lease/policy generations
-    // across consecutive read queries. It does NOT serialize a future grant
-    // against a revocation or prove that the remote Node applied the caps.
+    sqlx::query("SET LOCAL lock_timeout = '250ms'")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout = '3s'")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SET LOCAL idle_in_transaction_session_timeout = '5s'")
+        .execute(&mut *tx)
+        .await?;
+    // Cheap advisory rejection before doing any Ed25519 work or taking
+    // row locks. This is NOT the final eligibility decision.
     let candidate: bool = sqlx::query_scalar(
         "SELECT quota_v2_public_tls_exact_first_roster(
               $1,$2,$3,$4,$5,$6,$7
@@ -152,10 +173,47 @@ pub(super) async fn authenticated_digest(
     )
     .ok()
     .filter(|digest| *digest == request.cap_roster_sha256);
-    // Closing the read-only transaction deliberately grants no lease, no
-    // signed TLS authorization, and no revocation continuity guarantee.
-    tx.commit().await?;
-    Ok(result)
+    let Some(digest) = result else {
+        return Ok(None);
+    };
+
+    // The already authenticated immutable policy/outbox cannot be replaced
+    // or erased. 0169 locks the current activation, accounts, leases and
+    // Genesis, rejects any additional outbox rows, and rechecks all
+    // eligibility and expiry conditions. Only a matching cryptographic
+    // roster may acquire these locks. No positive authority is created.
+    let locked = sqlx::query_scalar::<_, bool>(
+        "SELECT quota_v2_public_tls_lock_exact_first_roster(
+             $1,$2,$3,$4,$5,$6,$7
+         )",
+    )
+    .bind(request.node_id)
+    .bind(activation)
+    .bind(&request.runtime_id)
+    .bind(&request.profile_revision)
+    .bind(&request.genesis_policy_sha256)
+    .bind(&signer_key)
+    .bind(request.required_lifetime_ms)
+    .fetch_one(&mut *tx)
+    .await;
+    match locked {
+        Ok(true) => {
+            // A future issuer must sign and durably store its authority
+            // BEFORE releasing these locks. This diagnostic deliberately
+            // does neither and conveys no continuing revocation guarantee.
+            tx.commit().await?;
+            Ok(Some(digest))
+        }
+        Ok(false) => {
+            tx.rollback().await?;
+            Ok(None)
+        }
+        Err(error) if gate_contention(&error) => {
+            tx.rollback().await?;
+            Ok(None)
+        }
+        Err(error) => Err(error.into()),
+    }
 }
 
 #[cfg(test)]
