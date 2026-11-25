@@ -26,7 +26,7 @@ const versionTuple=versionMatch.slice(1).map(Number);
 assert.equal(agentVersionRaw,'control-v6.0.33','Nexus target Agent version must be control-v6.0.33');
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
-assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]32"/);
+assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]33"/);
 assert.match(gateway,/release.Version == targetAgentVersion && matchesReleasePin/);
 assert.match(gateway,/XSP_V2_PRODUCT_AGENT_PIN/);
 assert.doesNotMatch(overlay,/XMESH_PRODUCT_UPGRADE_CANARY_NODE_ID/);
