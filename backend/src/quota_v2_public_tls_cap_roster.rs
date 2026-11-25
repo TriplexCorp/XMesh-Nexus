@@ -35,7 +35,40 @@ fn canonical_uuid(value: &Value) -> bool {
         .is_some_and(|raw| uuid::Uuid::parse_str(raw).is_ok_and(|parsed| parsed.to_string() == raw))
 }
 
-/// Computes exactly the SHA-256 of Node SignedCapRosterWatch's canonical
+fn verified_aliases(cap: &Value, user_id: i64) -> Result<&Vec<Value>> {
+    let aliases = cap["aliasScopes"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("signed cap aliases are missing"))?;
+    ensure!(
+        (1..=2).contains(&aliases.len()),
+        "invalid signed VLESS MAIN/CDN alias count"
+    );
+    let mut previous_alias = "";
+    for alias in aliases {
+        ensure!(
+            alias.as_object().is_some_and(|a| {
+                a.len() == 2 && a.contains_key("email") && a.contains_key("class")
+            }),
+            "malformed signed VLESS class alias"
+        );
+        let class = alias["class"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("missing signed alias class"))?;
+        let email = alias["email"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("missing signed alias email"))?;
+        ensure!(
+            matches!(class, "main" | "cdn")
+                && email == format!("xmesh-u{user_id}--vless-{class}")
+                && email > previous_alias,
+            "duplicate, unordered or cross-user signed VLESS alias"
+        );
+        previous_alias = email;
+    }
+    Ok(aliases)
+}
+
+/// Computes exactly the SHA-256 of Node `SignedCapRosterWatch`'s canonical
 /// list of {userId, grantSha256, aliases}; no trusting Node-provided digest.
 ///
 /// All inputs must be obtained from the SAME database transaction/snapshot.
@@ -125,35 +158,7 @@ pub fn verified_signed_first_cap_roster_sha256(
                      if e > latest && e - i <= MAX_CAP_LIFETIME_MS),
             "expired, foreign or authorizing Xray cap cannot enter TLS roster"
         );
-        let aliases = cap["aliasScopes"]
-            .as_array()
-            .ok_or_else(|| anyhow::anyhow!("signed cap aliases are missing"))?;
-        ensure!(
-            (1..=2).contains(&aliases.len()),
-            "invalid signed VLESS MAIN/CDN alias count"
-        );
-        let mut previous_alias = String::new();
-        for alias in aliases {
-            ensure!(
-                alias.as_object().is_some_and(|a| {
-                    a.len() == 2 && a.contains_key("email") && a.contains_key("class")
-                }),
-                "malformed signed VLESS class alias"
-            );
-            let class = alias["class"]
-                .as_str()
-                .ok_or_else(|| anyhow::anyhow!("missing signed alias class"))?;
-            let email = alias["email"]
-                .as_str()
-                .ok_or_else(|| anyhow::anyhow!("missing signed alias email"))?;
-            ensure!(
-                matches!(class, "main" | "cdn")
-                    && email == format!("xmesh-u{user_id}--vless-{class}")
-                    && email > previous_alias.as_str(),
-                "duplicate, unordered or cross-user signed VLESS alias"
-            );
-            previous_alias = email.to_owned();
-        }
+        let aliases = verified_aliases(cap, *user_id)?;
         // Do not hash reserialized grant JSON: Node hashes the EXACT stored
         // Ed25519 wire bytes, including the canonical trailing newline.
         result.push(json!({
@@ -267,7 +272,7 @@ mod tests {
             (vec![15, 15], vec![row.clone(), row.clone()]),
             (
                 vec![21, 15],
-                vec![(21, cap(&signer, 21, |_| {})), row.clone()],
+                vec![(21, cap(&signer, 21, |_| {})), row],
             ),
             (vec![15], vec![(99, cap(&signer, 99, |_| {}))]),
         ] {
