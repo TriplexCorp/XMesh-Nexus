@@ -28,6 +28,7 @@ mod quota_v2_cdn_lifetime;
 mod quota_v2_genesis_reservation;
 mod quota_v2_node_lifetime;
 mod quota_v2_policy_pin;
+mod quota_v2_public_tls_preflight;
 // Not a live endpoint: checks the future Node/Nexus public TLS Ed25519 wire
 // contract until independently measured quota admission and revocation exist.
 #[allow(dead_code)]
@@ -744,10 +745,17 @@ fn public_api_routes() -> Router<AppState> {
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
         .route("/auth/logout", post(auth::logout));
 
-    public.route(
-        "/node/quota-v2/genesis-cap-delivery",
-        post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
-    )
+    // Two independent paths return a Router; the TLS diagnostic cannot
+    // change the older authenticated spending-cap delivery route.
+    public
+        .route(
+            "/node/quota-v2/genesis-cap-delivery",
+            post(quota_v2_cap_delivery::handle).layer(RequestBodyLimitLayer::new(2048)),
+        )
+        .route(
+            "/node/quota-v2/public-tls-preflight",
+            post(quota_v2_public_tls_preflight::handle).layer(RequestBodyLimitLayer::new(1536)),
+        )
 }
 
 fn application_router(state: AppState) -> Router {
