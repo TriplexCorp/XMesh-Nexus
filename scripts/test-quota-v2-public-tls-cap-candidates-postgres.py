@@ -336,6 +336,9 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
         self.assertEqual(
             [row[0] for row in self.candidates()], [self.user],
             "User absent from original signed Genesis roster acquired TLS candidate")
+        self.assertIs(
+            self.exact_roster(), False,
+            "A foreign signed outbox entry hidden from candidates still blocks the entire TLS socket")
 
     def test_strict_node_revocation_and_consumed_genesis_block_candidates(self):
         self.armed()
