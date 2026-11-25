@@ -26,7 +26,7 @@ RETURNS TABLE (
 -- Freshness uses clock_timestamp() and mutable revocation/lease tables: do not
 -- advertise STABLE to the planner or allow untrusted temporary-table shadowing.
 LANGUAGE plpgsql VOLATILE SECURITY INVOKER
-SET search_path = 'pg_catalog, public, pg_temp' AS $$
+SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
     now_ms BIGINT;
 BEGIN
