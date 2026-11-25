@@ -186,9 +186,7 @@ pub fn sign_revocation_witness(
         "unbound TLS revocation witness"
     );
     ensure!(
-        issued_at_ms > 0
-            && valid_until_ms > issued_at_ms
-            && valid_until_ms - issued_at_ms <= 8_000,
+        issued_at_ms > 0 && valid_until_ms > issued_at_ms && valid_until_ms - issued_at_ms <= 8_000,
         "invalid TLS revocation witness lifetime"
     );
     let payload = json!({
