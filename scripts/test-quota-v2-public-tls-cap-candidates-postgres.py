@@ -27,6 +27,8 @@ QUERY = """SELECT user_id, account_epoch, reservation_id, meter_epoch,
                %s,%s,%s,%s,%s,%s,%s)"""
 ROSTER_QUERY = """SELECT quota_v2_public_tls_exact_first_roster(
                   %s,%s,%s,%s,%s,%s,%s)"""
+LOCKED_ROSTER_QUERY = """SELECT quota_v2_public_tls_lock_exact_first_roster(
+                         %s,%s,%s,%s,%s,%s,%s)"""
 
 
 def canonical(value):
@@ -193,6 +195,92 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
             return c.execute(ROSTER_QUERY,tuple(args[k] for k in (
                 "node","activation","runtime","profile","policy","signer","ttl"
             ))).fetchone()[0]
+
+    def locked_roster(self, conn=None, **fields):
+        args = {
+            "node":self.node, "activation":self.activation,
+            "runtime":self.runtime, "profile":self.profile,
+            "policy":self.policy, "signer":self.signer, "ttl":1000,
+        }
+        args.update(fields)
+        values = tuple(args[k] for k in (
+            "node", "activation", "runtime", "profile", "policy", "signer", "ttl"
+        ))
+        if conn is not None:
+            return conn.execute(LOCKED_ROSTER_QUERY,values).fetchone()[0]
+        with psycopg.connect(DSN) as con:
+            return con.execute(LOCKED_ROSTER_QUERY,values).fetchone()[0]
+
+    def test_serialized_gate_requires_every_original_signed_first_cap(self):
+        self.assertIs(self.locked_roster(), False)
+        self.armed()
+        self.assertIs(self.locked_roster(), True)
+        self.assertIs(self.locked_roster(signer=hex64("9")), False)
+        self.assertIs(self.locked_roster(runtime=hex64("9")), False)
+        self.assertIs(self.locked_roster(ttl=120000), False)
+        with self.assertRaises(psycopg.Error):
+            self.locked_roster(ttl=0)
+
+    def test_serialized_gate_holds_account_lease_and_activation_until_commit(self):
+        self.armed()
+        # Real database locks, two independent connections. The future
+        # signer must keep the SAME issuing transaction open while signing.
+        with psycopg.connect(DSN) as issuing:
+            self.assertIs(self.locked_roster(issuing), True)
+            with psycopg.connect(DSN) as competing:
+                competing.execute("SET LOCAL lock_timeout='250ms'")
+                with self.assertRaises(psycopg.errors.LockNotAvailable):
+                    competing.execute(
+                        "SELECT user_id FROM quota_v2_accounts"
+                        " WHERE user_id=%s AND epoch=%s FOR UPDATE",
+                        (self.user, self.epoch))
+                competing.rollback()
+                competing.execute("SET LOCAL lock_timeout='250ms'")
+                with self.assertRaises(psycopg.errors.LockNotAvailable):
+                    competing.execute(
+                        "SELECT reservation_id FROM quota_v2_reservations"
+                        " WHERE reservation_id=%s FOR UPDATE",
+                        (self.reservation,))
+                competing.rollback()
+                competing.execute("SET LOCAL lock_timeout='250ms'")
+                with self.assertRaises(psycopg.errors.LockNotAvailable):
+                    competing.execute(
+                        "UPDATE node_xsp_product_nodes SET state='revoked'"
+                        " WHERE node_id=%s",
+                        (self.node,))
+                competing.rollback()
+            issuing.commit()
+
+        # Once the locks release the real revocation path can progress,
+        # and no subsequent SQL eligibility result remains positive.
+        with psycopg.connect(DSN) as competing:
+            competing.execute(
+                "SELECT user_id FROM quota_v2_accounts"
+                " WHERE user_id=%s AND epoch=%s FOR UPDATE",
+                (self.user,self.epoch))
+            competing.execute(
+                "SELECT reservation_id FROM quota_v2_reservations"
+                " WHERE reservation_id=%s FOR UPDATE",
+                (self.reservation,))
+            competing.execute(
+                "INSERT INTO quota_v2_revocation_requests("
+                "user_id,epoch,node_id,meter_epoch,reservation_id,request_id)"
+                "VALUES(%s,%s,%s,%s,%s,%s)",
+                (self.user,self.epoch,self.node,self.meter,
+                 self.reservation,uuid.uuid4()))
+        self.assertIs(self.locked_roster(), False)
+
+    def test_serialized_gate_denies_partial_duplicate_and_textual_originals(self):
+        for flavor in ("missing_second","duplicate","textual"):
+            with self.subTest(flavor=flavor):
+                if flavor == "missing_second":
+                    self.seed(extra_user=uuid.uuid4().int % (2**48)+100)
+                elif flavor == "duplicate":
+                    self.seed(duplicate_user=True)
+                else:
+                    self.seed(textual_user_fields=True)
+                self.armed()
+                self.assertIs(self.locked_roster(), False)
 
     def armed(self):
         self.prep_confirm()
