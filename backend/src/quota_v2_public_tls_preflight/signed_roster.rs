@@ -192,7 +192,6 @@ async fn lock_exact_roster(
     .fetch_one(&mut **tx)
     .await
 }
- 
 
 async fn verified_original_users(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
