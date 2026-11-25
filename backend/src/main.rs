@@ -29,8 +29,11 @@ mod quota_v2_genesis_reservation;
 mod quota_v2_node_lifetime;
 mod quota_v2_policy_pin;
 mod quota_v2_public_tls_preflight;
-// Not a live endpoint: checks the future Node/Nexus public TLS Ed25519 wire
-// contract until independently measured quota admission and revocation exist.
+// No production backend build may link the positive public-TLS policy signer.
+// The dormant byte contract is available ONLY to isolated tests and the
+// explicitly opted-in disposable CI feature, until live cap/WAL proof and
+// revocation-supervised ingress are independently qualified.
+#[cfg(any(test, feature = "quota-v2-disposable-cap-issuer"))]
 #[allow(dead_code)]
 mod quota_v2_public_tls_authority;
 mod quota_wal_transport;
