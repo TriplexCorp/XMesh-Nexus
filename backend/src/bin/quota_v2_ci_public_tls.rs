@@ -8,7 +8,7 @@ mod quota_v2_public_tls_authority;
 
 use anyhow::{Result, ensure};
 use quota_v2_public_tls_authority::{
-    GenesisBinding, PublicListener, RevocationBinding, sign, sign_revocation_witness,
+    GenesisBinding, PublicListener, RevocationBinding, sign, sign_revocation_witness, verify_existing,
 };
 use sha2::{Digest, Sha256};
 use std::{
@@ -70,6 +70,13 @@ fn run() -> Result<()> {
         &listeners,
         1_800_000_000_000,
         1_800_000_060_000,
+    )?;
+    verify_existing(
+        &key,
+        &source,
+        1_800_000_000_000,
+        1_800_000_060_000,
+        &signed,
     )?;
     let result = output.join("public-tls-authority.json");
     let public_key = output.join("policy-public-key.txt");
