@@ -28,12 +28,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: d2a819e65f3e11a7f8ac8a47ecb2769c3478bf2e
+          ref: 5eda1d62a6a03099ffd0090e98b8e32341ea427c
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Require exact reviewed Node and absent public TLS deployment
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = d2a819e65f3e11a7f8ac8a47ecb2769c3478bf2e
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 5eda1d62a6a03099ffd0090e98b8e32341ea427c
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.35
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_frontend.py
           ! grep -E '^ExecStart=.*public_tls_frontend' .ci-reviewed-node/deploy/install-metered-services.sh
@@ -44,6 +44,12 @@ jobs:
           sudo python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_certificates.py -v
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_stop_monitor.py -v
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_preflight.py -v
+          # Agent must read the real signed-cap state from the measured Xray
+          # through a PID-bound, root-private Unix socket. It is never
+          # evidence of positive public TLS authorization or off-host WAL.
+          python3 .ci-reviewed-node/tests/test_quota_v2_cap_observation.py -v
+          test -f .ci-reviewed-node/experiments/xray-dataplane-fence/experimental_cap_socket.go.txt
+          test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/cap_install.py
           # This independent compatibility test must never install a public
           # service. Positive ingress still needs runtime cap/WAL admission,
           # a root-owned supervisor and continuous authenticated revocation.
