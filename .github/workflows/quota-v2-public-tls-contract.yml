@@ -28,12 +28,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 5eda1d62a6a03099ffd0090e98b8e32341ea427c
+          ref: 829087a38fd6acd1570a78b27b7a203d4399f4d9
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Require exact reviewed Node and absent public TLS deployment
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 5eda1d62a6a03099ffd0090e98b8e32341ea427c
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 829087a38fd6acd1570a78b27b7a203d4399f4d9
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.35
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_frontend.py
           ! grep -E '^ExecStart=.*public_tls_frontend' .ci-reviewed-node/deploy/install-metered-services.sh
@@ -43,6 +43,9 @@ jobs:
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_frontend.py -v
           sudo python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_certificates.py -v
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_stop_monitor.py -v
+          # No signed VLESS alias may outlive its actual installed Xray cap.
+          # The watcher and its stop-only monitor cannot issue TLS authority.
+          python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_cap_watch.py -v
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_preflight.py -v
           # Agent must read the real signed-cap state from the measured Xray
           # through a PID-bound, root-private Unix socket. It is never
