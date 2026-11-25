@@ -102,13 +102,8 @@ pub async fn handle(
         return Err(deny());
     }
 
-    let activation = node_auth::authenticate_product_activation(
-        &state,
-        &headers,
-        request.node_id,
-        PATH,
-    )
-    .await?;
+    let activation =
+        node_auth::authenticate_product_activation(&state, &headers, request.node_id, PATH).await?;
     if activation != request.activation_receipt_sha256 {
         return Err(deny());
     }
@@ -137,11 +132,7 @@ pub async fn handle(
 
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
-        Json(reply(
-            request.node_id,
-            request.user_id,
-            evidence_matched,
-        )),
+        Json(reply(request.node_id, request.user_id, evidence_matched)),
     ))
 }
 
