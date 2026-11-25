@@ -752,8 +752,7 @@ fn public_api_routes() -> Router<AppState> {
     // Read-only candidate evidence; no signed TLS authority or public port.
     public.route(
         "/node/quota-v2/public-tls-preflight",
-        post(quota_v2_public_tls_preflight::handle)
-            .layer(RequestBodyLimitLayer::new(1536)),
+        post(quota_v2_public_tls_preflight::handle).layer(RequestBodyLimitLayer::new(1536)),
     );
 }
 
