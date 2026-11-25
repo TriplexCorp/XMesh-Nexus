@@ -13,13 +13,13 @@ use axum::{
     extract::State,
     http::{HeaderMap, StatusCode, header},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const PATH: &str = "/api/v1/node/quota-v2/public-tls-preflight";
 const MAX_BODY: usize = 1536;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Request {
     node_id: i64,
