@@ -62,9 +62,9 @@ assert.match(html,/<script src="\/js\/features\/nodes\/node-bootstrap-v6\.js\?v=
  'Panel must cache-bust the strict-PQ bootstrap after changing the reviewed Node release pin');
 assert.ok(html.indexOf('app.js?v=')<html.indexOf('/js/features/nodes/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
-assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='74c966c35c62a0e7c3b85089790f1bc9670671f6'/,
- 'Fresh Node installation must pin the strict-PQ Node release compatible with control-v6.0.31');
-assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA256='bfdd658388ff776a254a57ce08bf4dcf172fc633a79f4adcb7b51fa7934e5d72'/,
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='15ecd5b63ea63125f2dd119c3e905ff57414fe8e'/,
+ 'Fresh Node installation must pin the strict-PQ Node release compatible with control-v6.0.32');
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA256='9f16ac4cdcde4705c9e267e195080857edad5bdcdc37e9f6fb7cd7d7c867373b'/,
  'Fresh Node installation must pin the verified bootstrap content digest');
 assert.match(strictBootstrap,/curl --proto "=https" --tlsv1\.3 --tls-max 1\.3/,
  'Public bootstrap download must negotiate TLS 1.3 only rather than advertising a TLS 1.2 minimum');

@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 74c966c35c62a0e7c3b85089790f1bc9670671f6
+          ref: 15ecd5b63ea63125f2dd119c3e905ff57414fe8e
           path: .node-release-source
           persist-credentials: false
       - name: Reproduce both exact reviewed Agent binaries with digest-pinned Go builder
