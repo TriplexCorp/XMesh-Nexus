@@ -147,6 +147,77 @@ pub fn sign(
     Ok(bytes)
 }
 
+/// Exact identity of one existing public TLS authority and its installed cap
+/// roster. These hashes must be independently derived from committed evidence,
+/// never accepted as proof merely because an authenticated Node supplied them.
+pub struct RevocationBinding<'a> {
+    pub genesis: &'a GenesisBinding,
+    pub authority_sha256: &'a str,
+    pub cap_roster_sha256: &'a str,
+    pub challenge: &'a str,
+}
+
+/// Build the short-lived stop-monitor witness wire contract. This does NOT
+/// grant ingress, spending, start or resume authority. The production caller
+/// must hold the current serialized SQL/plan/identity gate and verify the
+/// committed authority, current meter and WAL before signing a clear witness.
+/// Until then, only the disposable contract fixture calls this function.
+pub fn sign_revocation_witness(
+    signer: &PolicySigner,
+    binding: &RevocationBinding<'_>,
+    issued_at_ms: i64,
+    valid_until_ms: i64,
+    revoked: bool,
+) -> Result<Vec<u8>> {
+    let source = binding.genesis;
+    ensure!(
+        source.node_id > 0
+            && [
+                source.activation_receipt_sha256.as_str(),
+                source.genesis_policy_sha256.as_str(),
+                source.runtime_id.as_str(),
+                source.profile_revision.as_str(),
+                binding.authority_sha256,
+                binding.cap_roster_sha256,
+                binding.challenge,
+            ]
+            .into_iter()
+            .all(hex64),
+        "unbound TLS revocation witness"
+    );
+    ensure!(
+        issued_at_ms > 0 && valid_until_ms > issued_at_ms && valid_until_ms - issued_at_ms <= 8_000,
+        "invalid TLS revocation witness lifetime"
+    );
+    let payload = json!({
+        "schemaVersion": 1,
+        "kind": "xmesh.quota-v2.public-tls-revocation-witness",
+        "nodeId": source.node_id,
+        "activationReceiptSha256": source.activation_receipt_sha256,
+        "genesisPolicySha256": source.genesis_policy_sha256,
+        "runtimeId": source.runtime_id,
+        "profileRevision": source.profile_revision,
+        "authoritySha256": binding.authority_sha256,
+        "capRosterSha256": binding.cap_roster_sha256,
+        "challenge": binding.challenge,
+        "issuedAtMs": issued_at_ms,
+        "validUntilMs": valid_until_ms,
+        "revoked": revoked,
+        "canServePublic": false,
+        "canStart": false,
+        "canResume": false,
+    });
+    let signature = signer.sign(&payload)?;
+    let mut bytes = serde_json::to_vec(&json!({
+        "algorithm": "Ed25519",
+        "payload": payload,
+        "signature": signature,
+    }))?;
+    bytes.push(b'\n');
+    ensure!(bytes.len() <= 4096, "TLS revocation witness too large");
+    Ok(bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,6 +296,52 @@ mod tests {
         );
         assert_eq!(serde_json::to_vec(&envelope).unwrap(), raw);
     }
+    #[test]
+    fn witness_is_short_lived_nonce_bound_and_never_authorizes_traffic() {
+        let key_path = std::env::temp_dir().join(format!(
+            "xmesh-ephemeral-tls-revocation-key-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let signer = PolicySigner::load(&key_path).unwrap();
+        std::fs::remove_file(key_path).unwrap();
+        let source = source();
+        let authority = "e".repeat(64);
+        let roster = "f".repeat(64);
+        let challenge = "7".repeat(64);
+        let binding = RevocationBinding {
+            genesis: &source,
+            authority_sha256: &authority,
+            cap_roster_sha256: &roster,
+            challenge: &challenge,
+        };
+        let now = 1_800_000_000_000;
+        for revoked in [false, true] {
+            let raw =
+                sign_revocation_witness(&signer, &binding, now, now + 7_000, revoked).unwrap();
+            let doc: Value = serde_json::from_slice(&raw).unwrap();
+            let payload = &doc["payload"];
+            assert_eq!(payload["revoked"], revoked);
+            assert_eq!(payload["challenge"], challenge);
+            assert_eq!(payload["authoritySha256"], authority);
+            assert_eq!(payload["capRosterSha256"], roster);
+            for field in ["canServePublic", "canStart", "canResume"] {
+                assert_eq!(payload[field], false);
+            }
+            assert_eq!(doc["signature"], signer.sign(payload).unwrap());
+            let mut canonical = serde_json::to_vec(&doc).unwrap();
+            canonical.push(b'\n');
+            assert_eq!(raw, canonical);
+        }
+        for end in [now - 1, now, now + 8_001] {
+            assert!(sign_revocation_witness(&signer, &binding, now, end, false).is_err());
+        }
+        let invalid = RevocationBinding {
+            challenge: "invalid",
+            ..binding
+        };
+        assert!(sign_revocation_witness(&signer, &invalid, now, now + 7_000, false).is_err());
+    }
+
     #[test]
     fn deny_malformed_source_aliases_hosts_and_oversize_lifetime() {
         let good = source();
