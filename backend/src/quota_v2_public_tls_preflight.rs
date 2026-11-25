@@ -111,8 +111,15 @@ pub async fn handle(
     // The pinned signer is taken ONLY from Nexus AppState: Node-provided
     // alternate keys must never make a foreign signed cap look authentic.
     let signer = state.node_policy_signer.public_key();
+    // A single valid user cap is NOT sufficient to serve the shared
+    // public TLS socket. Require the complete, unique original signed
+    // Genesis user roster to match the current SQL candidate roster as
+    // well as the specifically requested user. Both predicates are still
+    // read-only and grant ZERO authority over real Xray or public traffic.
     let evidence_matched: bool = sqlx::query_scalar(
-        "SELECT EXISTS(
+        "SELECT quota_v2_public_tls_exact_first_roster(
+             $1,$2,$3,$4,$5,$6,$7
+         ) AND EXISTS(
              SELECT 1 FROM quota_v2_public_tls_first_cap_candidates(
                  $1,$2,$3,$4,$5,$6,$7
              ) AS candidate
