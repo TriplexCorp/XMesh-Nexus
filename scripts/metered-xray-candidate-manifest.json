@@ -11,7 +11,7 @@
   "goVersion": "go version go1.27.4 linux/amd64",
   "independentRebuildMatched": true,
   "kind": "xmesh.metered-xray-candidate",
-  "nodeSourceRevision": "15ecd5b63ea63125f2dd119c3e905ff57414fe8e",
+  "nodeSourceRevision": "5a5e63c34ad2499c7124d783c76d501728bf5d24",
   "productionActivationAuthorized": false,
   "schemaVersion": 1,
   "upstreamSourceRevision": "a4a3dff5b20c2faae567b742c172c7b95e75c083"

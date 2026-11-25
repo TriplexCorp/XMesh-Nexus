@@ -288,7 +288,7 @@ def main():
         assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
     binary = os.environ["XMESH_WAL_PRODUCT_AGENT"]
     identity = json.loads(subprocess.check_output([binary, "--identity"], timeout=10))
-    assert identity["version"] == "control-v6.0.32"
+    assert identity["version"] == "control-v6.0.33"
     pin = identity["sourceRevision"] + ":" + identity["artifactSha256"]
     with tempfile.TemporaryDirectory(prefix="xmesh-xsp-wal-") as directory:
         root = Path(directory)
