@@ -4,6 +4,7 @@
 //! in the SAME READ COMMITTED transaction. No persistent state is changed.
 //! A matching digest is still NOT an ingress permission: no Linux PID,
 //! installed Xray caps, certificate or durable WAL is proved here.
+mod current_plan;
 use super::Request;
 use crate::{
     ApiError, AppState,
@@ -108,7 +109,7 @@ pub(super) async fn authenticated_digest(
     if !candidate {
         return Ok(None);
     }
-    let Some(expected_users) =
+    let Some(original) =
         verified_original_users(&mut tx, state, request, activation, &signer_key).await?
     else {
         return Ok(None);
@@ -135,7 +136,7 @@ pub(super) async fn authenticated_digest(
             genesis_policy_sha256: &request.genesis_policy_sha256,
             runtime_id: &request.runtime_id,
         },
-        &expected_users,
+        &original.users,
         &grants,
         now_ms,
         request.required_lifetime_ms,
@@ -146,31 +147,56 @@ pub(super) async fn authenticated_digest(
         return Ok(None);
     };
 
-    // The already authenticated immutable policy/outbox cannot be replaced
-    // or erased. 0169 locks the current activation, accounts, leases and
-    // Genesis, rejects any additional outbox rows, and rechecks all
-    // eligibility and expiry conditions. Only a matching cryptographic
-    // roster may acquire these locks. No positive authority is created.
-    let locked = lock_exact_roster(&mut tx, request, activation, &signer_key).await;
-    match locked {
-        Ok(true) => {
-            // A future issuer must sign and durably store its authority
-            // BEFORE releasing these locks. This diagnostic deliberately
-            // does neither and conveys no continuing revocation guarantee.
-            tx.commit().await?;
-            Ok(Some(digest))
-        }
-        Ok(false) => {
-            tx.rollback().await?;
-            Ok(None)
-        }
-        Err(error) if gate_contention(&error) => {
-            tx.rollback().await?;
-            Ok(None)
-        }
-        Err(error) => Err(error.into()),
+    let checked = verify_locked_plan(
+        &mut tx,
+        request,
+        activation,
+        &signer_key,
+        &original,
+        &grants,
+    )
+    .await;
+    // The diagnostic must never commit newly created lifetime baselines or
+    // other allocator helper writes. A real issuer has its own transaction.
+    tx.rollback().await?;
+    match checked {
+        Ok(true) => Ok(Some(digest)),
+        Ok(false) => Ok(None),
+        Err(error) if error.status.is_client_error() => Ok(None),
+        Err(error) => Err(error),
     }
 }
+
+struct VerifiedOriginal {
+    users: Vec<i64>,
+    credentials: Vec<String>,
+}
+
+async fn verify_locked_plan(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    request: &Request,
+    activation: &str,
+    signer_key: &str,
+    original: &VerifiedOriginal,
+    grants: &[(i64, Vec<u8>)],
+) -> Result<bool, ApiError> {
+    // The normal allocator locks each user before its account/lease.
+    // Do not reverse that order by acquiring 0169's account locks first.
+    let users = match current_plan::lock_users(tx, &original.users).await {
+        Ok(Some(users)) => users,
+        Ok(None) => return Ok(false),
+        Err(error) if gate_contention(&error) => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    match lock_exact_roster(tx, request, activation, signer_key).await {
+        Ok(true) => {}
+        Ok(false) => return Ok(false),
+        Err(error) if gate_contention(&error) => return Ok(false),
+        Err(error) => return Err(error.into()),
+    }
+    current_plan::check_users(tx, request.node_id, &users, &original.credentials, grants).await
+}
+
 async fn lock_exact_roster(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     request: &Request,
@@ -199,7 +225,7 @@ async fn verified_original_users(
     request: &Request,
     activation: &str,
     signer_key: &str,
-) -> Result<Option<Vec<i64>>, ApiError> {
+) -> Result<Option<VerifiedOriginal>, ApiError> {
     // The original, immutable Genesis source, not a Node-supplied roster,
     // defines the complete exact set of users. Recheck actual signed bytes.
     let policy: Option<(Vec<u8>, String)> = sqlx::query_as(
@@ -236,7 +262,30 @@ async fn verified_original_users(
     let Some(expected_users) = original_users(&original, request) else {
         return Ok(None);
     };
-    Ok(Some(expected_users))
+    let Some(credentials) = original_credentials(&original, &expected_users) else {
+        return Ok(None);
+    };
+    Ok(Some(VerifiedOriginal {
+        users: expected_users,
+        credentials,
+    }))
+}
+
+fn original_credentials(policy: &Value, ids: &[i64]) -> Option<Vec<String>> {
+    let mut credentials = std::collections::BTreeMap::new();
+    for user in policy.get("users")?.as_array()? {
+        let id = user.get("userId")?.as_i64()?;
+        let raw = user.get("xrayId")?.as_str()?;
+        if !uuid::Uuid::parse_str(raw).is_ok_and(|value| value.to_string() == raw)
+            || credentials.insert(id, raw.to_owned()).is_some()
+        {
+            return None;
+        }
+    }
+    if credentials.len() != ids.len() {
+        return None;
+    }
+    ids.iter().map(|id| credentials.remove(id)).collect()
 }
 
 #[cfg(test)]
