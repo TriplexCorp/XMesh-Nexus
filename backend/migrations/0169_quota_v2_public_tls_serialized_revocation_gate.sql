@@ -143,3 +143,46 @@ REVOKE ALL ON FUNCTION quota_v2_public_tls_lock_exact_first_roster(
 COMMENT ON FUNCTION quota_v2_public_tls_lock_exact_first_roster(
     BIGINT,TEXT,TEXT,TEXT,TEXT,TEXT,BIGINT
 ) IS 'Non-authorizing SQL serialization gate for a future TLS issuer. Caller must retain all row locks until its signed outbox transaction commits. Never permission to serve traffic.';
+
+-- Revocation can be written by legacy SQL helpers as well as HTTP handlers.
+-- Locking only the issuer is insufficient if even one writer bypasses the
+-- account -> lease lock order. Enforce it at the database boundary for EVERY
+-- new revocation intent (including direct INSERT and ON CONFLICT paths).
+-- The intent itself remains forever a stop signal; DELETE and TRUNCATE are
+-- forbidden, while the existing applied_at / signed-stop columns may update.
+CREATE FUNCTION quota_v2_revocation_intent_serialization_guard()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER
+SET search_path=pg_catalog,public,pg_temp AS $$
+DECLARE
+    account_owner BIGINT;
+    current_reservation UUID;
+BEGIN
+    SELECT a.user_id INTO account_owner FROM quota_v2_accounts a
+     WHERE a.user_id=NEW.user_id AND a.epoch=NEW.epoch FOR UPDATE;
+    IF account_owner IS DISTINCT FROM NEW.user_id THEN
+        RAISE EXCEPTION 'revocation must bind an existing account'
+          USING ERRCODE='22023';
+    END IF;
+    SELECT r.reservation_id INTO current_reservation FROM quota_v2_reservations r
+     WHERE r.user_id=NEW.user_id AND r.epoch=NEW.epoch
+       AND r.node_id=NEW.node_id AND r.meter_epoch=NEW.meter_epoch
+     FOR UPDATE;
+    IF current_reservation IS DISTINCT FROM NEW.reservation_id THEN
+        RAISE EXCEPTION 'revocation must bind the currently locked reservation'
+          USING ERRCODE='22023';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+CREATE TRIGGER quota_v2_revocation_intent_serialized
+BEFORE INSERT ON quota_v2_revocation_requests
+FOR EACH ROW EXECUTE FUNCTION quota_v2_revocation_intent_serialization_guard();
+CREATE TRIGGER quota_v2_revocation_intent_no_delete
+BEFORE DELETE ON quota_v2_revocation_requests
+FOR EACH ROW EXECUTE FUNCTION quota_v2_runtime_preflight_immutable();
+CREATE TRIGGER quota_v2_revocation_intent_no_truncate
+BEFORE TRUNCATE ON quota_v2_revocation_requests
+FOR EACH STATEMENT EXECUTE FUNCTION quota_v2_runtime_preflight_immutable();
+REVOKE ALL ON FUNCTION quota_v2_revocation_intent_serialization_guard() FROM PUBLIC;
+COMMENT ON FUNCTION quota_v2_revocation_intent_serialization_guard()
+IS 'Every new immutable revocation intent must lock account then exact lease; serializes with a pending public TLS issuer transaction.';
