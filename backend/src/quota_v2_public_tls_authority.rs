@@ -12,19 +12,19 @@ use serde_json::{Value, json};
 use std::collections::HashSet;
 
 #[derive(Clone)]
-pub(crate) struct GenesisBinding {
-    pub(crate) node_id: i64,
-    pub(crate) activation_receipt_sha256: String,
-    pub(crate) genesis_policy_sha256: String,
-    pub(crate) runtime_id: String,
-    pub(crate) profile_revision: String,
+pub(super) struct GenesisBinding {
+    pub(super) node_id: i64,
+    pub(super) activation_receipt_sha256: String,
+    pub(super) genesis_policy_sha256: String,
+    pub(super) runtime_id: String,
+    pub(super) profile_revision: String,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PublicListener {
-    pub(crate) tag: String,
-    pub(crate) domain: String,
-    pub(crate) port: u16,
+pub(super) struct PublicListener {
+    pub(super) tag: String,
+    pub(super) domain: String,
+    pub(super) port: u16,
 }
 
 fn hex64(value: &str) -> bool {
@@ -126,10 +126,10 @@ fn policy(
 }
 
 /// Generate canonical JSON/Ed25519 envelope bytes for interoperability with
-/// the measured Node's strict \`public_tls_frontend.verify_signed_public_tls\`.
+/// the measured Node's strict `public_tls_frontend.verify_signed_public_tls`.
 /// Deliberately private: this creates *only* signature bytes; it proves neither
 /// that a cap was installed nor that the public TLS port may yet be opened.
-pub(crate) fn sign(
+pub(super) fn sign(
     signer: &PolicySigner,
     source: &GenesisBinding,
     bindings: &[PublicListener],
