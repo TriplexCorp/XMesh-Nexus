@@ -290,6 +290,20 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                     (self.user,self.epoch,self.node))
             competing.rollback()
         self.assertIs(self.locked_roster(), False)
+        with psycopg.connect(DSN) as competing:
+            with self.assertRaises(psycopg.Error):
+                competing.execute(
+                    "UPDATE quota_v2_revocation_requests"
+                    " SET request_id=%s WHERE user_id=%s AND node_id=%s",
+                    (uuid.uuid4(),self.user,self.node))
+            competing.rollback()
+            # Ordinary signed-stop reporting may still advance the proof.
+            competing.execute(
+                "UPDATE quota_v2_revocation_requests"
+                " SET applied_at=NOW(),applied_revision=1,observed_used_bytes=0"
+                " WHERE user_id=%s AND epoch=%s AND node_id=%s",
+                (self.user,self.epoch,self.node))
+        self.assertIs(self.locked_roster(), False)
 
     def test_serialized_gate_denies_partial_duplicate_and_textual_originals(self):
         for flavor in ("missing_second","duplicate","textual"):
