@@ -19,6 +19,7 @@ FILES = tuple(
         ("0160", "successor_fresh_meter_staging"),
         ("0161", "calendar_successor_positive_outbox"),
         ("0162", "runtime_wal_anchors"),
+        ("0167", "public_tls_cap_candidates"),
     )
 )
 for path in FILES:
@@ -31,4 +32,4 @@ for path in FILES:
         raise AssertionError(f"{path.name}: unbalanced $$ function delimiter")
     if not content.strip().endswith(";"):
         raise AssertionError(f"{path.name}: incomplete trailing SQL statement")
-print(f"PASS: {len(FILES)} staged calendar migration delimiter checks")
+print(f"PASS: {len(FILES)} staged Quota V2 migration delimiter checks")
