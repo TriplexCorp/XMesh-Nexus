@@ -55,11 +55,7 @@ impl Poll {
     }
 }
 
-async fn load_authority(
-    conn: &mut sqlx::PgConnection,
-    poll: &Poll,
-    state: &AppState,
-) -> Result<Authority, ApiError> {
+async fn load_authority(poll: &Poll, state: &AppState) -> Result<Authority, ApiError> {
     let scope = &poll.scope;
     let stored: Authority = sqlx::query_as(
         "SELECT signed_envelope,issued_at_ms,valid_until_ms
@@ -76,7 +72,7 @@ async fn load_authority(
     .bind(&scope.genesis_policy_sha256)
     .bind(state.node_policy_signer.public_key())
     .bind(&scope.cap_roster_sha256)
-    .fetch_optional(conn)
+    .fetch_optional(&state.pool)
     .await?
     .ok_or_else(deny)?;
 
@@ -104,15 +100,12 @@ async fn profile_matches(state: &AppState, scope: &Request) -> bool {
         .is_ok_and(|preview| preview["configSha256"] == scope.profile_revision)
 }
 
-async fn signed_reply(
-    state: &AppState,
-    poll: &Poll,
-    activation: &str,
-) -> Result<Vec<u8>, ApiError> {
+async fn signed_reply(state: &AppState, poll: &Poll, activation: &str) -> Result<Vec<u8>, ApiError> {
+    // Immutable, exact-hash lookup before expensive profile compilation.
+    let stored = load_authority(poll, state).await?;
     let profile_before = profile_matches(state, &poll.scope).await;
     let mut tx = state.pool.begin().await?;
     signed_roster::configure_transaction(&mut tx).await?;
-    let stored = load_authority(&mut tx, poll, state).await?;
     let matched = if profile_before {
         signed_roster::locked_digest(&mut tx, state, &poll.scope, activation)
             .await?
