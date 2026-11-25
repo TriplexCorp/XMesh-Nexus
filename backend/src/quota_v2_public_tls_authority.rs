@@ -43,7 +43,9 @@ fn domain(value: &str) -> bool {
     if labels.len() < 2 {
         return false;
     }
-    let Some(last) = labels.last() else { return false };
+    let Some(last) = labels.last() else {
+        return false;
+    };
     if !last.as_bytes().first().is_some_and(u8::is_ascii_lowercase) {
         return false;
     }
@@ -182,26 +184,44 @@ mod tests {
         ));
         let signer = PolicySigner::load(&key_path).unwrap();
         std::fs::remove_file(key_path).unwrap();
-        let raw = sign(&signer, &source(), &listeners(), 1_800_000_000_000, 1_800_000_060_000)
-            .unwrap();
+        let raw = sign(
+            &signer,
+            &source(),
+            &listeners(),
+            1_800_000_000_000,
+            1_800_000_060_000,
+        )
+        .unwrap();
         let envelope: Value = serde_json::from_slice(&raw).unwrap();
         assert_eq!(envelope["algorithm"], "Ed25519");
-        assert_eq!(envelope["payload"]["kind"], "xmesh.quota-v2.public-tls-ingress");
+        assert_eq!(
+            envelope["payload"]["kind"],
+            "xmesh.quota-v2.public-tls-ingress"
+        );
         assert_eq!(envelope["payload"]["runtimeId"], "c".repeat(64));
         assert_eq!(envelope["payload"]["profileRevision"], "d".repeat(64));
         assert_eq!(envelope["payload"]["canServePublic"], true);
         assert_eq!(envelope["payload"]["bindings"][0]["port"], 443);
         let signature: [u8; 64] = hex::decode(envelope["signature"].as_str().unwrap())
-            .unwrap().try_into().unwrap();
-        let public: [u8; 32] = hex::decode(signer.public_key()).unwrap().try_into().unwrap();
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let public: [u8; 32] = hex::decode(signer.public_key())
+            .unwrap()
+            .try_into()
+            .unwrap();
         let key = VerifyingKey::from_bytes(&public).unwrap();
         let payload = serde_json::to_vec(&envelope["payload"]).unwrap();
-        key.verify(&payload, &Signature::from_bytes(&signature)).unwrap();
+        key.verify(&payload, &Signature::from_bytes(&signature))
+            .unwrap();
         let mut replaced = envelope["payload"].clone();
         replaced["runtimeId"] = json!("f".repeat(64));
         assert!(
-            key.verify(&serde_json::to_vec(&replaced).unwrap(),
-                       &Signature::from_bytes(&signature)).is_err()
+            key.verify(
+                &serde_json::to_vec(&replaced).unwrap(),
+                &Signature::from_bytes(&signature)
+            )
+            .is_err()
         );
         assert_eq!(serde_json::to_vec(&envelope).unwrap(), raw);
     }
@@ -224,9 +244,14 @@ mod tests {
             assert!(policy(&good, &bindings, issued, expiry).is_err());
         }
         for domain in [
-            "*.example.com", "../example.com", "UPPER.example.com",
-            "127.0.0.1", "localhost", "bad..example.com",
-            "bad-.example.com", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "*.example.com",
+            "../example.com",
+            "UPPER.example.com",
+            "127.0.0.1",
+            "localhost",
+            "bad..example.com",
+            "bad-.example.com",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         ] {
             let mut invalid = bindings.clone();
             invalid[0].domain = domain.to_string();
@@ -244,6 +269,14 @@ mod tests {
             assert!(policy(&good, &invalid, issued, issued + 60_000).is_err());
         }
         assert!(policy(&good, &[], issued, issued + 60_000).is_err());
-        assert!(policy(&good, &vec![bindings[0].clone(); 3], issued, issued + 60_000).is_err());
+        assert!(
+            policy(
+                &good,
+                &vec![bindings[0].clone(); 3],
+                issued,
+                issued + 60_000
+            )
+            .is_err()
+        );
     }
 }
