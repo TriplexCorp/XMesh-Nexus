@@ -57,6 +57,8 @@ jobs:
           # diagnostic only; matching SQL evidence cannot open public TLS.
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_preflight.py -v
           grep -Fq 'capRosterSha256' .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_preflight.py
+          # Regression guard: enrollment transport cannot itself return spend authority.
+          grep -Fq 'signedEnvelope' .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_preflight.py
           # Node #197 bounds all live per-user cap observations to 5s total;
           # the real AF_UNIX hung-peer regression must fail closed before
           # the independent TLS stop monitor's 10s watchdog deadline.
