@@ -46,6 +46,13 @@ jobs:
           ui = Path('frontend/js/features/nodes/node-bootstrap-v6.js').read_text()
           node = Path('.ci-reviewed-node/deploy/xmesh-policy-guard-base.py').read_text()
           sender = Path('deploy/node-metrics-agent.sh').read_text()
+          metered = Path('.ci-reviewed-node/deploy/install-metered-services.sh').read_text()
+          assert 'ExecStart=/usr/local/bin/xmesh-agent-xspv2-product resume-activation' in metered
+          for name in ('xmesh-quota-v2-egress.service', 'xmesh-quota-v2-meter.service',
+                       'xmesh-quota-v2-ingress.service', 'xmesh-quota-v2-renewal.service'):
+              section = metered.split('cat > /etc/systemd/system/' + name, 1)[1].split('[Unit]', 1)[1].split('\\nEOF', 1)[0]
+              assert 'Requires=' in section and 'After=' in section
+              assert 'xmesh-pq-activation-recovery.service' in section
           assert "XMESH_V6_NODE_BOOTSTRAP_SHA='5a5e63c34ad2499c7124d783c76d501728bf5d24'" in ui
           assert "def verified_snapshot_scope(" in node
           assert "def committed_snapshot_scope(" in node
