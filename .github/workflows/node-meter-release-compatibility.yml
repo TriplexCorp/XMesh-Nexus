@@ -50,7 +50,7 @@ jobs:
           assert 'ExecStart=/usr/local/bin/xmesh-agent-xspv2-product resume-activation' in metered
           for name in ('xmesh-quota-v2-egress.service', 'xmesh-quota-v2-meter.service',
                        'xmesh-quota-v2-ingress.service', 'xmesh-quota-v2-renewal.service'):
-              section = metered.split('cat > /etc/systemd/system/' + name, 1)[1].split('[Unit]', 1)[1].split('\\nEOF', 1)[0]
+              section = metered.split('cat > /etc/systemd/system/' + name, 1)[1].split('[Unit]', 1)[1].split('EOF', 1)[0]
               assert 'Requires=' in section and 'After=' in section
               assert 'xmesh-pq-activation-recovery.service' in section
           assert "XMESH_V6_NODE_BOOTSTRAP_SHA='5a5e63c34ad2499c7124d783c76d501728bf5d24'" in ui
