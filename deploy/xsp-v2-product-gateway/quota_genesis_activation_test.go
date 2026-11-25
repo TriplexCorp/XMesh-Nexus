@@ -12,6 +12,7 @@ func TestFirstGenesisActivationHeaderRestrictedToExactTunnelPaths(t *testing.T) 
 		"/api/v1/node/quota-v2/policy-pin",
 		"/api/v1/node/quota-v2/genesis-reservation",
 		"/api/v1/node/quota-v2/genesis-cap-delivery",
+		"/api/v1/node/quota-v2/public-tls-preflight",
 	}
 	for _, path := range valid {
 		if !allowedTunnelPaths[path] {
@@ -29,6 +30,9 @@ func TestFirstGenesisActivationHeaderRestrictedToExactTunnelPaths(t *testing.T) 
 		"/api/v1/node/quota-v2/genesis-reservation?nodeId=1",
 		"/api/v1/node/quota-v2/genesis-reservation/../grant",
 		"/api/v1/node/quota-v2/grant",
+		"/api/v1/node/quota-v2/public-tls-preflight/",
+		"/api/v1/node/quota-v2/public-tls-preflight?nodeId=1",
+		"/api/v1/node/quota-v2/public-tls-preflight/../grant",
 		"/api/v1/node/desired-config/extra",
 		"/api/v1/metrics/ingest",
 		"/api/v1/node/heartbeat",
