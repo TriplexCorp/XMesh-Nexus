@@ -249,6 +249,16 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                         " WHERE node_id=%s",
                         (self.node,))
                 competing.rollback()
+                # A new signed-cap outbox issuance locks Genesis FOR SHARE
+                # after its account/lease locks. The issuer MUST block it:
+                # an extra foreign user cannot appear after roster sampling.
+                competing.execute("SET LOCAL lock_timeout='250ms'")
+                with self.assertRaises(psycopg.errors.LockNotAvailable):
+                    competing.execute(
+                        "SELECT node_id FROM quota_v2_xray_genesis"
+                        " WHERE node_id=%s FOR SHARE",
+                        (self.node,))
+                competing.rollback()
                 # A direct SQL writer may bypass the reviewed HTTP code.
                 # The NEW database trigger must enforce the same locks.
                 competing.execute("SET LOCAL lock_timeout='250ms'")
