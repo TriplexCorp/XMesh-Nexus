@@ -12,7 +12,7 @@
 --   enrolled Node activation FOR SHARE
 --   ALL original signed-grant accounts, increasing (user_id, epoch)
 --   ALL original signed-grant leases, increasing (user_id, epoch, meter_epoch)
---   Genesis runtime FOR SHARE
+--   Genesis runtime FOR UPDATE (blocks concurrent new signed-cap outbox rows)
 -- This preserves the account -> reservation -> genesis order of 0139's
 -- signed-cap outbox. A Node revoke must wait on the enrolled Node lock.
 -- The only recognized first-Genesis caps are those in immutable 0139.
@@ -117,8 +117,11 @@ BEGIN
         END IF;
     END LOOP;
 
+    -- 0139 outbox issuance locks this SAME Genesis row FOR SHARE only
+    -- after its account and reservation locks. FOR UPDATE here excludes
+    -- a newly signed foreign cap from appearing after roster validation.
     SELECT * INTO genesis FROM quota_v2_xray_genesis
-     WHERE node_id=p_node FOR SHARE;
+     WHERE node_id=p_node FOR UPDATE;
     IF NOT FOUND OR genesis.runtime_id IS DISTINCT FROM p_runtime
        OR genesis.first_activation_sha256 IS DISTINCT FROM p_activation
        OR genesis.policy_path_used THEN
