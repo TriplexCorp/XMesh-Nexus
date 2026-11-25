@@ -1,10 +1,11 @@
-//! Strict-PQ authenticated, READ-ONLY public TLS candidate diagnostic.
+//! Strict-PQ authenticated, non-authorizing public TLS candidate diagnostic.
 //!
 //! This handler does not sign a public TLS authority, open a socket,
 //! install a cap or assert that Xray is running. In particular, a matching
 //! SQL record cannot attest the Linux process or a fully fsynced meter WAL.
-//! The future issuer must recheck *all* of these conditions under the
-//! correct account/lease/revocation locks and verify live Node evidence.
+//! The SQL roster is checked under account/lease/revocation locks, which
+//! are released before replying. A future issuer must retain them through
+//! signing and durable commit, and verify live Node evidence.
 //! Returning a candidate NEVER permits traffic.
 mod signed_roster;
 
@@ -115,7 +116,7 @@ pub async fn handle(
 
     // Strict-PQ identity is only the first gate. Independently verify
     // the ORIGINAL signed Genesis policy and EVERY immutable first cap
-    // against one PostgreSQL snapshot and the pinned actual Nexus signer.
+    // against the pinned actual Nexus signer and the serialized SQL gate.
     // A user-supplied roster digest never qualifies by itself.
     let verified_digest = signed_roster::authenticated_digest(&state, &request, activation).await?;
     Ok((
