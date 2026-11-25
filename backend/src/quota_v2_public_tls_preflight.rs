@@ -210,12 +210,22 @@ mod tests {
         });
         let req: Request = serde_json::from_value(base.clone()).expect("valid request");
         assert!(valid(&req));
-        for field in ["activationReceiptSha256", "runtimeId", "nodeId", "capRosterSha256"] {
+        for field in [
+            "activationReceiptSha256",
+            "runtimeId",
+            "nodeId",
+            "capRosterSha256",
+        ] {
             let mut modified = base.clone();
             modified.as_object_mut().expect("object").remove(field);
             assert!(serde_json::from_value::<Request>(modified).is_err());
         }
-        for change in ["activationReceiptSha256", "runtimeId", "profileRevision", "capRosterSha256"] {
+        for change in [
+            "activationReceiptSha256",
+            "runtimeId",
+            "profileRevision",
+            "capRosterSha256",
+        ] {
             let mut modified = base.clone();
             modified[change] = json!("e".repeat(63));
             let request: Request = serde_json::from_value(modified).expect("string still parses");
