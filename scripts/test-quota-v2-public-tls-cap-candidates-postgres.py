@@ -249,6 +249,17 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                         " WHERE node_id=%s",
                         (self.node,))
                 competing.rollback()
+                # A direct SQL writer may bypass the reviewed HTTP code.
+                # The NEW database trigger must enforce the same locks.
+                competing.execute("SET LOCAL lock_timeout='250ms'")
+                with self.assertRaises(psycopg.errors.LockNotAvailable):
+                    competing.execute(
+                        "INSERT INTO quota_v2_revocation_requests("
+                        "user_id,epoch,node_id,meter_epoch,reservation_id,request_id)"
+                        " VALUES(%s,%s,%s,%s,%s,%s)",
+                        (self.user,self.epoch,self.node,self.meter,
+                         self.reservation,uuid.uuid4()))
+                competing.rollback()
             issuing.commit()
 
         # Once the locks release the real revocation path can progress,
@@ -268,6 +279,16 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                 "VALUES(%s,%s,%s,%s,%s,%s)",
                 (self.user,self.epoch,self.node,self.meter,
                  self.reservation,uuid.uuid4()))
+        self.assertIs(self.locked_roster(), False)
+        # A revoked reservation is a permanent stop: an accidental
+        # database-owner deletion cannot resurrect an old signed cap.
+        with psycopg.connect(DSN) as competing:
+            with self.assertRaises(psycopg.Error):
+                competing.execute(
+                    "DELETE FROM quota_v2_revocation_requests"
+                    " WHERE user_id=%s AND epoch=%s AND node_id=%s",
+                    (self.user,self.epoch,self.node))
+            competing.rollback()
         self.assertIs(self.locked_roster(), False)
 
     def test_serialized_gate_denies_partial_duplicate_and_textual_originals(self):
