@@ -26,7 +26,7 @@ const css=panelStyles();
 assert.equal(fs.readFileSync('VERSION','utf8').trim(),'6.0.0');
 assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.33');
 assert.match(api,/\/nodes\/\{id\}\/agent-update/);
-assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]32";/);
+assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]33";/);
 assert.match(runtimeEntry,/control_v6_transition_active/);
 for(const v of ['control-v4','control-v5','control-v6']) assert.ok(runtimeEntry.includes(v),`v6 transition must accept ${v}`);
 assert.match(runtimeEntry,/No approved signed Agent update is available/);
@@ -58,7 +58,7 @@ assert.match(releaseAck,/XSP-v2 Agent release ACK identity mismatch/);
 assert.match(releaseAck,/NEW[.]release_ack_success IS DISTINCT FROM TRUE/);
 
 // v6 shell control worker remains the authority for the fixed command surface.
-assert.match(agent,/AGENT_VERSION="control-v6[.]0[.]32"/);
+assert.match(agent,/AGENT_VERSION="control-v6[.]0[.]33"/);
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
 assert.match(agent,/router_running\(\)/);
 assert.match(agent,/releaseIdentity/);
