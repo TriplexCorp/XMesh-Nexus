@@ -123,7 +123,9 @@ fi
         self.assertFalse((self.base / 'run/update-node-control-agent.bootstrap').exists())
 
     def test_wrong_target_is_never_executed(self):
-        self.bootstrap.write_text(self.bootstrap.read_text().replace('6.0.33', '6.0.10'))
+        fixture = self.bootstrap.read_text()
+        self.assertIn('AGENT_VERSION="control-v6.0.35"', fixture)
+        self.bootstrap.write_text(fixture.replace('control-v6.0.35', 'control-v6.0.10'))
         result = self.bootstrap_call()
         self.assertEqual(result.returncode, 1)
         self.assertIn('failed target validation', result.stdout)
