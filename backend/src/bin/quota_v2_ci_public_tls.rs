@@ -18,7 +18,10 @@ fn run() -> Result<()> {
         "public TLS signer fixture may run only in disposable hosted CI"
     );
     let args: Vec<String> = env::args().skip(1).collect();
-    ensure!(args.len() == 2, "usage: cli PROFILE_SHA256 RUNNER_OUTPUT_DIR");
+    ensure!(
+        args.len() == 2,
+        "usage: cli PROFILE_SHA256 RUNNER_OUTPUT_DIR"
+    );
     let revision = &args[0];
     ensure!(
         revision.len() == 64
@@ -53,7 +56,13 @@ fn run() -> Result<()> {
             domain: "vpn.example.com".into(),
         },
     ];
-    let signed = sign(&key, &source, &listeners, 1_800_000_000_000, 1_800_000_060_000)?;
+    let signed = sign(
+        &key,
+        &source,
+        &listeners,
+        1_800_000_000_000,
+        1_800_000_060_000,
+    )?;
     let result = output.join("public-tls-authority.json");
     let public_key = output.join("policy-public-key.txt");
     let mut opts = fs::OpenOptions::new();
@@ -62,7 +71,10 @@ fn run() -> Result<()> {
     opts.open(&result)?.write_all(&signed)?;
     opts.open(&public_key)?
         .write_all(key.public_key().as_bytes())?;
-    println!("Signed isolated TLS authority for CI: {} bytes", signed.len());
+    println!(
+        "Signed isolated TLS authority for CI: {} bytes",
+        signed.len()
+    );
     Ok(())
 }
 
