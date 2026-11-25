@@ -28,12 +28,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 9b63714c9cb506a14495fdff7ac77e731c6e0600
+          ref: 937a283c2eeb61a49ffa45fe827f2d90699e4c57
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Require exact reviewed Node and absent public TLS deployment
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 9b63714c9cb506a14495fdff7ac77e731c6e0600
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 937a283c2eeb61a49ffa45fe827f2d90699e4c57
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.35
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_frontend.py
           ! grep -E '^ExecStart=.*public_tls_frontend' .ci-reviewed-node/deploy/install-metered-services.sh
@@ -51,7 +51,14 @@ jobs:
           # No signed VLESS alias may outlive its actual installed Xray cap.
           # The watcher and its stop-only monitor cannot issue TLS authority.
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_cap_watch.py -v
+          # The installed Node reconstructs every root-private original cap,
+          # verifies the complete live measured Xray roster, and sends the
+          # independently derived signed capRosterSha256 to Nexus. This is
+          # diagnostic only; matching SQL evidence cannot open public TLS.
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_preflight.py -v
+          grep -Fq 'capRosterSha256' .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_preflight.py
+          # Regression guard: enrollment transport cannot itself return spend authority.
+          grep -Fq 'signedEnvelope' .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_preflight.py
           # Node #197 bounds all live per-user cap observations to 5s total;
           # the real AF_UNIX hung-peer regression must fail closed before
           # the independent TLS stop monitor's 10s watchdog deadline.
