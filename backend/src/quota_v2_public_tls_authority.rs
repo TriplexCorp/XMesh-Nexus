@@ -158,7 +158,10 @@ pub fn verify_existing(
     valid_until_ms: i64,
     raw: &[u8],
 ) -> Result<()> {
-    ensure!((100..=8192).contains(&raw.len()), "invalid TLS authority size");
+    ensure!(
+        (100..=8192).contains(&raw.len()),
+        "invalid TLS authority size"
+    );
     let envelope: Value = serde_json::from_slice(raw)?;
     let bindings: Vec<PublicListener> =
         serde_json::from_value(envelope["payload"]["bindings"].clone())?;
