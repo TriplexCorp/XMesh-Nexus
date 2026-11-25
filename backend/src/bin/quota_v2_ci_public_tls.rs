@@ -8,7 +8,14 @@ mod quota_v2_public_tls_authority;
 
 use anyhow::{Result, ensure};
 use quota_v2_public_tls_authority::{GenesisBinding, PublicListener, sign};
-use std::{env, fs, io::Write, path::PathBuf};
+use serde_json::json;
+use sha2::{Digest, Sha256};
+use std::{
+    env, fs,
+    io::Write,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 fn run() -> Result<()> {
     ensure!(
@@ -70,6 +77,46 @@ fn run() -> Result<()> {
     opts.open(&result)?.write_all(&signed)?;
     opts.open(&public_key)?
         .write_all(key.public_key().as_bytes())?;
+
+    // Disposable-only positive revocation *fixture* for testing strict
+    // Node parsing. This signature is NOT backed by a SQL revocation lock,
+    // authenticated active Node/Xray/WAL or production admission, and is
+    // never issued by a production Nexus route.
+    let now_ms: i64 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)?
+        .as_millis()
+        .try_into()?;
+    let public_tls_hash = hex::encode(Sha256::digest(&signed));
+    let witness = json!({
+        "schemaVersion": 1,
+        "kind": "xmesh.quota-v2.public-tls-revocation-witness",
+        "nodeId": source.node_id,
+        "activationReceiptSha256": source.activation_receipt_sha256,
+        "genesisPolicySha256": source.genesis_policy_sha256,
+        "runtimeId": source.runtime_id,
+        "profileRevision": source.profile_revision,
+        "authoritySha256": public_tls_hash,
+        "capRosterSha256": "f".repeat(64),
+        "challenge": "7".repeat(64),
+        "issuedAtMs": now_ms,
+        "validUntilMs": now_ms + 7_000,
+        "revoked": false,
+        "canServePublic": false,
+        "canStart": false,
+        "canResume": false,
+    });
+    let signed_witness = serde_json::to_vec(&json!({
+        "algorithm": "Ed25519",
+        "payload": witness,
+        "signature": key.sign(&witness)?,
+    }))?;
+    ensure!(
+        signed_witness.len() < 4096,
+        "disposable revocation fixture exceeds Node wire limit"
+    );
+    let mut revocation_file = opts.open(output.join("public-tls-revocation.json"))?;
+    revocation_file.write_all(&signed_witness)?;
+    revocation_file.write_all(b"\n")?;
     println!(
         "Signed isolated TLS authority for CI: {} bytes",
         signed.len()
