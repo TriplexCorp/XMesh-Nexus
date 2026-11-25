@@ -445,6 +445,81 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
                           (guest.node,nonce)).fetchone()[0]==grant
         cap_jobs.append((item,measurement,cap_request,grant,lease["ceilingBytes"]))
 
+    # Exercise the real strict-PQ diagnostic before the first short-lived
+    # admission evidence expires or the data-plane spends any of these caps.
+    # Reconstruct the exact complete two-user roster from the independently
+    # verified wire bytes on disk AND the durable Nexus outbox.
+    import psycopg
+
+    tls_path = "/api/v1/node/quota-v2/public-tls-preflight"
+    tls_requests = []
+    for item, measurement, _, _, _ in cap_jobs:
+        guest, req, _ = item
+        original = json.loads(guest.exec("cat", STATE+"/genesis-quarantine-envelope.json"))
+        roster = []
+        signed_rows = db.execute(
+            "SELECT user_id,signed_envelope FROM quota_v2_signed_first_cap_outbox "
+            "WHERE node_id=%s ORDER BY user_id", (guest.node,)
+        ).fetchall()
+        assert [row[0] for row in signed_rows] == sorted([uid,peer_id]), signed_rows
+        for signed_uid, raw in signed_rows:
+            raw = bytes(raw)
+            saved = json.loads(guest.exec(
+                "cat", STATE+f"/genesis-positive-cap-u{signed_uid}.json"))
+            assert saved["signedEnvelope"].encode() == raw
+            doc = json.loads(raw)
+            independent_signature(root, f"tls-roster-{guest.node}-{signed_uid}", doc, CAP_DOMAIN)
+            assert doc["payload"]["userId"] == signed_uid
+            roster.append({
+                "userId": signed_uid,
+                "grantSha256": hashlib.sha256(raw).hexdigest(),
+                "aliases": doc["payload"]["aliasScopes"],
+            })
+        request = {
+            "nodeId": guest.node, "userId": uid,
+            "activationReceiptSha256": doc["payload"]["activationReceiptSha256"],
+            "genesisPolicySha256": req["policySha256"],
+            "runtimeId": measurement[3],
+            "profileRevision": original["reply"]["revision"],
+            "capRosterSha256": hashlib.sha256(canonical(roster)).hexdigest(),
+            "requiredLifetimeMs": 1000,
+        }
+        tls_requests.append(request)
+
+    def assert_tls_diagnostic(guest, request, matched):
+        code, response = guest.request(tls_path, request)
+        assert code == 200, (code, response)
+        assert response == {
+            "status":"candidate_only_not_authorized",
+            "nodeId":request["nodeId"],"userId":request["userId"],
+            "evidenceMatched":matched,
+            "capRosterSha256":request["capRosterSha256"] if matched else None,
+            "canServePublic":False,"canStart":False,"canResume":False,
+            "canSpend":False,"authorizedBytes":0,"signedEnvelope":None,
+            "liveMeterVerified":False,"certificateVerified":False,
+            "revocationWatchInstalled":False,
+        }, response
+
+    for guest, request in zip(pair,tls_requests):
+        assert_tls_diagnostic(guest, request, True)
+        assert_tls_diagnostic(guest, dict(request,userId=peer_id), True)
+        assert_tls_diagnostic(guest, dict(request,capRosterSha256="0"*64), False)
+        assert_tls_diagnostic(guest, dict(request,userId=max(uid,peer_id)+1000000), False)
+    assert guest_a.request(tls_path,tls_requests[1])[0] == 401
+    # Real competing PostgreSQL account writer. The authenticated probe
+    # must fail closed within its bounded SQL lock wait, then recover once
+    # the other transaction releases the account. No quota is modified.
+    with psycopg.connect(dsn) as blocker:
+        blocker.execute(
+            "SELECT user_id FROM quota_v2_accounts WHERE user_id=%s AND NOT closed FOR UPDATE",
+            (uid,)
+        )
+        assert_tls_diagnostic(guest_a, tls_requests[0], False)
+        blocker.rollback()
+    assert_tls_diagnostic(guest_a, tls_requests[0], True)
+    assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone() == (4,)
+    print("PASS: installed strict-PQ TLS preflight verifies the full signed roster, rejects foreign evidence and fails closed on a competing SQL lock without granting any public authority.")
+
     assert guest_a.request(CAP_PATH,cap_jobs[1][2])[0]==401
     assert guest_a.request(CAP_PATH,dict(cap_jobs[0][2],requestChallenge=cap_jobs[1][2]["requestChallenge"]))[0]==409
 
