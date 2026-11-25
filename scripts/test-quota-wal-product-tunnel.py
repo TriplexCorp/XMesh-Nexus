@@ -288,7 +288,7 @@ def main():
         assert os.environ.get("XMESH_AUDIT_DISPOSABLE") == "1"
     binary = os.environ["XMESH_WAL_PRODUCT_AGENT"]
     identity = json.loads(subprocess.check_output([binary, "--identity"], timeout=10))
-    assert identity["version"] == "control-v6.0.30"
+    assert identity["version"] == "control-v6.0.31"
     pin = identity["sourceRevision"] + ":" + identity["artifactSha256"]
     with tempfile.TemporaryDirectory(prefix="xmesh-xsp-wal-") as directory:
         root = Path(directory)
@@ -371,7 +371,7 @@ def main():
                     "WHERE node_id=%s ORDER BY inventory_sequence", (agent.node,),
                 ).fetchall()
                 assert rows == [(2,), (4,)], rows
-            print("Two activated 6.0.30 agents stored independent WAL and recovered its current receipts over strict XSP/2.")
+            print("Two activated 6.0.31 agents stored independent WAL and recovered its current receipts over strict XSP/2.")
             if binary:
                 print("Both authenticated WAL heads survived a restart of the PostgreSQL service container.")
             provision_signed_policies(agents)
