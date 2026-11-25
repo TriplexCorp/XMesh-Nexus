@@ -130,9 +130,8 @@ pub(super) async fn locked_digest(
     if !candidate {
         return Ok(None);
     }
-    let Some(original) =
-        verified_original_users(tx, state, request, activation, &signer_key).await?
-    else {
+    let original = verified_original_users(tx, state, request, activation, &signer_key).await?;
+    let Some(original) = original else {
         return Ok(None);
     };
     // Read EVERY existing signed first-cap row of this enrolled Node. Never
@@ -168,15 +167,8 @@ pub(super) async fn locked_digest(
         return Ok(None);
     };
 
-    let checked = verify_locked_plan(
-        tx,
-        request,
-        activation,
-        &signer_key,
-        &original,
-        &grants,
-    )
-    .await;
+    let check = verify_locked_plan(tx, request, activation, &signer_key, &original, &grants);
+    let checked = check.await;
     match checked {
         Ok(true) => Ok(Some(digest)),
         Ok(false) => Ok(None),
