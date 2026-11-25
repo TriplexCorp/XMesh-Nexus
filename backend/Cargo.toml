@@ -14,6 +14,12 @@ name = "quota-v2-ci-signed-cap"
 path = "src/bin/quota_v2_ci_signed_cap.rs"
 required-features = ["quota-v2-disposable-cap-issuer"]
 
+# CI-only real Ed25519 Nexus->Node TLS wire contract. Not in the normal API.
+[[bin]]
+name = "quota-v2-ci-public-tls"
+path = "src/bin/quota_v2_ci_public_tls.rs"
+required-features = ["quota-v2-disposable-cap-issuer"]
+
 [[bin]]
 name = "xsp-v2-recovery-checkpoint"
 path = "src/bin/xsp_v2_recovery_checkpoint.rs"
