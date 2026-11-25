@@ -28,15 +28,27 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 6f52b1097bc918e8a64cd3371ce2da1e8fc3c25d
+          ref: d2a819e65f3e11a7f8ac8a47ecb2769c3478bf2e
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Require exact reviewed Node and absent public TLS deployment
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 6f52b1097bc918e8a64cd3371ce2da1e8fc3c25d
-          test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.33
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = d2a819e65f3e11a7f8ac8a47ecb2769c3478bf2e
+          test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.35
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_frontend.py
           ! grep -E '^ExecStart=.*public_tls_frontend' .ci-reviewed-node/deploy/install-metered-services.sh
+      - name: Test current Node signed TLS isolation and stop-only fail-closed behavior
+        run: |
+          set -euo pipefail
+          python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_frontend.py -v
+          sudo python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_certificates.py -v
+          python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_stop_monitor.py -v
+          python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_preflight.py -v
+          # This independent compatibility test must never install a public
+          # service. Positive ingress still needs runtime cap/WAL admission,
+          # a root-owned supervisor and continuous authenticated revocation.
+          ! grep -E '^ExecStart=.*public_tls_(frontend|stop_monitor)' \
+            .ci-reviewed-node/deploy/install-metered-services.sh
       - uses: dtolnay/rust-toolchain@stable
       - name: Test Nexus real Ed25519 signer and rejected authorizations
         run: cargo test --manifest-path backend/Cargo.toml quota_v2_public_tls_authority -- --nocapture
