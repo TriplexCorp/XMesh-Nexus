@@ -86,11 +86,12 @@ jobs:
             --bin quota-v2-ci-public-tls -- \
             "$digest" "$RUNNER_TEMP/public-tls-contract"
           python3 - "$RUNNER_TEMP/public-tls-contract" <<'PY'
-          import copy, json, sys
+          import copy, hashlib, json, sys
           from pathlib import Path
           sys.path.insert(0, str(Path.cwd() / ".ci-reviewed-node/tests"))
           from test_quota_v2_public_tls_frontend import profile
           import public_tls_frontend as tls
+          import wal_transport
           root = Path(sys.argv[1])
           raw = (root / "public-tls-authority.json").read_bytes()
           key = (root / "policy-public-key.txt").read_text()
@@ -139,9 +140,9 @@ jobs:
               fetch=lambda nonce: signed_revocation,
               node=47, activation="a"*64, genesis_sha="b"*64,
               runtime_id="c"*64,
-              profile_sha256=__import__("hashlib").sha256(
+              profile_sha256=hashlib.sha256(
                   wal_transport.observed.canonical(profile())).hexdigest(),
-              authority_sha256=__import__("hashlib").sha256(raw).hexdigest(),
+              authority_sha256=hashlib.sha256(raw).hexdigest(),
               roster_sha256="f"*64,
               pinned=key,
           )
