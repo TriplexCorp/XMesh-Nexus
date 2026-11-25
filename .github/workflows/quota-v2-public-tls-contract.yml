@@ -28,12 +28,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 20ff04e95717989409e238ee29a085f5fefc0143
+          ref: b37a9c3e1bfbd9fc7d28b47c07ac54c1d616f1a3
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Require exact reviewed Node and absent public TLS deployment
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 20ff04e95717989409e238ee29a085f5fefc0143
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = b37a9c3e1bfbd9fc7d28b47c07ac54c1d616f1a3
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.35
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_frontend.py
           ! grep -E '^ExecStart=.*public_tls_frontend' .ci-reviewed-node/deploy/install-metered-services.sh
@@ -48,6 +48,10 @@ jobs:
           # The watcher and its stop-only monitor cannot issue TLS authority.
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_cap_watch.py -v
           python3 .ci-reviewed-node/tests/test_quota_v2_public_tls_preflight.py -v
+          # Node #197 bounds all live per-user cap observations to 5s total;
+          # the real AF_UNIX hung-peer regression must fail closed before
+          # the independent TLS stop monitor's 10s watchdog deadline.
+          # Its signed-cap WRITE path must retain the original 12s timeout.
           # Agent must read the real signed-cap state from the measured Xray
           # through a PID-bound, root-private Unix socket. It is never
           # evidence of positive public TLS authorization or off-host WAL.
