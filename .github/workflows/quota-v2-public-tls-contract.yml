@@ -28,12 +28,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 120d08d1a955cbd1b80d19fca5a514937d71f69e
+          ref: 87892dcd5a0e1b7fc6d0fc71ec666bb34613ab6d
           path: .ci-reviewed-node
           persist-credentials: false
       - name: Require exact reviewed Node and absent public TLS deployment
         run: |
-          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 120d08d1a955cbd1b80d19fca5a514937d71f69e
+          test "$(git -C .ci-reviewed-node rev-parse HEAD)" = 87892dcd5a0e1b7fc6d0fc71ec666bb34613ab6d
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = control-v6.0.35
           test -f .ci-reviewed-node/experiments/quota-v2-physical-stop/public_tls_frontend.py
           ! grep -E '^ExecStart=.*public_tls_frontend' .ci-reviewed-node/deploy/install-metered-services.sh
