@@ -204,7 +204,7 @@ mod tests {
             corrupted["users"][0][field] = json!("invalid");
             assert_eq!(original_users(&corrupted, &r), None, "{field}");
         }
-        for faulty in [json!(true), json!("true"), json!(null), json!(1)] {
+        for faulty in [json!(false), json!("true"), json!(null), json!(1)] {
             let mut corrupted = p.clone();
             corrupted["users"][0]["onHold"] = faulty;
             assert_eq!(original_users(&corrupted, &r), None);
