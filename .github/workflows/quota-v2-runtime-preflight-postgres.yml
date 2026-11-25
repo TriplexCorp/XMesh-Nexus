@@ -28,6 +28,7 @@ on:
       - 'backend/migrations/0162_quota_v2_runtime_wal_anchors.sql'
       - 'backend/migrations/0167_quota_v2_public_tls_cap_candidates.sql'
       - 'backend/migrations/0168_quota_v2_public_tls_exact_first_roster.sql'
+      - 'backend/migrations/0169_quota_v2_public_tls_serialized_revocation_gate.sql'
       - 'scripts/test-quota-v2-public-tls-cap-candidates-postgres.py'
       - 'scripts/test-quota-v2-calendar-successor-postgres.py'
       - 'scripts/test-quota-v2-sql-migration-delimiters.py'
@@ -142,6 +143,7 @@ jobs:
                   "backend/migrations/0162_quota_v2_runtime_wal_anchors.sql",
                   "backend/migrations/0167_quota_v2_public_tls_cap_candidates.sql",
                   "backend/migrations/0168_quota_v2_public_tls_exact_first_roster.sql",
+                  "backend/migrations/0169_quota_v2_public_tls_serialized_revocation_gate.sql",
               ):
                   c.execute(Path(path).read_text(encoding="utf-8"))
           PY
