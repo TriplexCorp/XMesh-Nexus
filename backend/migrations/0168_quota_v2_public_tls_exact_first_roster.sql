@@ -53,6 +53,23 @@ BEGIN
         RETURN FALSE;
     END IF;
 
+    -- A foreign first-Genesis signed outbox entry must not disappear simply
+    -- because migration 0167 correctly excludes it from eligible candidates.
+    -- Its bytes might still be present on the real Xray. Refuse the ENTIRE
+    -- public socket until the extra grant is independently reconciled.
+    IF EXISTS (
+        SELECT 1 FROM quota_v2_signed_first_cap_outbox o
+         WHERE o.node_id=p_node
+           AND o.runtime_id=p_runtime
+           AND o.policy_sha256=p_genesis_policy
+           AND NOT EXISTS (
+               SELECT 1 FROM jsonb_array_elements(roster) AS original(user_record)
+                WHERE original.user_record->>'userId'=o.user_id::TEXT
+           )
+    ) THEN
+        RETURN FALSE;
+    END IF;
+
     -- Materialize the current SQL candidate snapshot ONCE. Re-evaluating a
     -- mutable cap/revocation function for each user could mix generations.
     -- This is still only a best-effort read snapshot; no long-lived positive
