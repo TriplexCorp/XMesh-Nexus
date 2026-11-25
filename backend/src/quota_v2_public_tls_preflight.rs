@@ -7,7 +7,10 @@
 //! are released before replying. A future issuer must retain them through
 //! signing and durable commit, and verify live Node evidence.
 //! Returning a candidate NEVER permits traffic.
+mod revocation;
 mod signed_roster;
+
+pub use revocation::handle as revocation_handle;
 
 use crate::{ApiError, AppState, node_auth};
 use axum::{
