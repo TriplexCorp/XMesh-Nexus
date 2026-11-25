@@ -41,7 +41,8 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
     def setUp(self):
         self.seed()
 
-    def seed(self, *, extra_user=None, duplicate_user=False):
+    def seed(self, *, extra_user=None, duplicate_user=False,
+             textual_user_fields=False):
         self.node = uuid.uuid4().int % (2**42) + 100
         self.user = uuid.uuid4().int % (2**50) + 100
         self.epoch = uuid.uuid4()
@@ -69,6 +70,13 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                  self.prepared,"0"*128))
             roster = [{"userId":self.user,"offlineBudgetBytes":0,
                        "onHold":True}]
+            if textual_user_fields:
+                # Legacy SQL stage checks the ->> text value, so JSON
+                # string impostors can pass its deliberately weak grammar.
+                # The new COMPLETE-roster diagnostic must deny them even
+                # when all other first-Genesis cap evidence exists.
+                roster[0] = {"userId":str(self.user),
+                             "offlineBudgetBytes":"0","onHold":"true"}
             if extra_user is not None:
                 roster.append({"userId":extra_user,"offlineBudgetBytes":0,
                                "onHold":True})
@@ -213,6 +221,15 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
         self.assertEqual([row[0] for row in self.candidates()], [self.user])
         self.assertIs(self.exact_roster(), False,
                       "duplicate signed user identity is not a complete roster")
+
+    def test_json_string_impostors_cannot_complete_signed_roster(self):
+        self.seed(textual_user_fields=True)
+        self.armed()
+        # Older read-only SQL candidate logic checks only ->> field text.
+        self.assertEqual([row[0] for row in self.candidates()], [self.user])
+        # Never treat a string "true" as a signed Boolean True, a string
+        # "0" as an integer byte budget, or a string ID as an integer ID.
+        self.assertIs(self.exact_roster(), False)
 
     def test_revocation_exhaustion_and_node_deactivation_deny_full_roster(self):
         self.armed()
