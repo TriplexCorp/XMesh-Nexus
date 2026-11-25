@@ -272,12 +272,19 @@ class FirstGenesisPublicTlsSqlCandidates(unittest.TestCase):
                       "WHERE node_id=%s",(self.node,))
         self.assertEqual(self.candidates(),[])
 
-    def test_legacy_desired_policy_consumption_blocks_candidates(self):
+    def test_legacy_desired_policy_cannot_consume_quarantined_genesis(self):
         self.armed()
+        # Production migration 0143 rejects this mutation *before* our read
+        # filter is reached. Never weaken that prior fail-closed trigger.
         with psycopg.connect(DSN) as c:
-            c.execute("UPDATE quota_v2_xray_genesis SET policy_path_used=TRUE "
-                      "WHERE node_id=%s",(self.node,))
-        self.assertEqual(self.candidates(),[])
+            with self.assertRaises(psycopg.Error):
+                with c.transaction():
+                    c.execute("UPDATE quota_v2_xray_genesis "
+                              "SET policy_path_used=TRUE WHERE node_id=%s",
+                              (self.node,))
+        self.assertEqual(
+            len(self.candidates()),1,
+            "failed legacy-policy hijack changed the original signed lease")
 
     def test_unconfirmed_lease_and_global_oversubscription_block_candidates(self):
         self.armed()
