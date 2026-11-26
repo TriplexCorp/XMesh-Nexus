@@ -190,8 +190,8 @@ fn validate_anchor(
     key: &ed25519_dalek::VerifyingKey,
 ) -> Result<History, ApiError> {
     let raw = row.witness_bytes.as_deref().ok_or_else(conflict)?;
-    let w =
-        verify_witness(raw, &row.inventory_bytes, proof.scope.node_id, key).map_err(|_| conflict())?;
+    let w = verify_witness(raw, &row.inventory_bytes, proof.scope.node_id, key)
+        .map_err(|_| conflict())?;
     if row.inventory_sequence != w.inventory_sequence
         || row.inventory_sha256 != w.inventory_sha256
         || row.inventory_tail_digest != w.inventory_tail_digest
@@ -291,9 +291,12 @@ pub(super) async fn snapshot(
     if activation != proof.scope.activation_receipt_sha256 {
         return Err(conflict());
     }
-    tokio::time::timeout(Duration::from_secs(2), read_snapshot(state, proof, activation))
-        .await
-        .map_err(|_| conflict())?
+    tokio::time::timeout(
+        Duration::from_secs(2),
+        read_snapshot(state, proof, activation),
+    )
+    .await
+    .map_err(|_| conflict())?
 }
 
 #[cfg(test)]
@@ -416,7 +419,14 @@ mod tests {
         assert_eq!(proof["canServePublic"], false);
         let (row, key, _) = anchor(&req, &req.scope.runtime_id, email);
         assert!(
-            validate_anchor(row, &req, &aliases, &["foreign".into()], &key.verifying_key()).is_err()
+            validate_anchor(
+                row,
+                &req,
+                &aliases,
+                &["foreign".into()],
+                &key.verifying_key()
+            )
+            .is_err()
         );
         let (row, key, _) = anchor(&req, &"9".repeat(64), email);
         assert!(validate_anchor(row, &req, &aliases, &[], &key.verifying_key()).is_err());
