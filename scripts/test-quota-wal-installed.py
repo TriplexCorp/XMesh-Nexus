@@ -224,6 +224,27 @@ systemctl stop docker.socket docker.service containerd.service
             returncode = process.wait(timeout=5)
             if returncode != 0:
                 excerpt = bytes(recent[-4096:])
+                if metered:
+                    # The real installer stops on a failed systemd unit.
+                    # Capture the failed service while this disposable
+                    # guest still exists; no restart, retry or fallback.
+                    for diagnostic in (
+                        ("journalctl", "--no-pager", "-n", "100", "-o", "cat",
+                         "-u", "xmesh-quota-v2-meter.service",
+                         "-u", "xmesh-quota-v2-egress.service",
+                         "-u", "xmesh-pq-activation-recovery.service"),
+                        ("docker", "ps", "-a", "--format", "{{.Names}} {{.Status}}"),
+                        ("docker", "logs", "--tail", "40", "xmesh-managed-xray"),
+                    ):
+                        result = subprocess.run(
+                            ["docker", "exec", self.name, *diagnostic],
+                            capture_output=True, timeout=15,
+                        )
+                        redacted = (result.stdout + result.stderr)[-16000:].replace(
+                            token_bytes, b"[REDACTED]")
+                        print(f"[installed Node {self.node}] {diagnostic[0]} "
+                              f"diagnostic (exit={result.returncode}): "
+                              f"{redacted.decode('utf-8', errors='replace')}", flush=True)
                 raise AssertionError(
                     f"bootstrap failed on Node {self.node} (exit {returncode}); "
                     f"last guest output: {excerpt.decode('utf-8', errors='replace')}"
