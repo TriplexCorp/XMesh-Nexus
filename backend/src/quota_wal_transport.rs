@@ -17,6 +17,7 @@ use sqlx::PgConnection;
 use std::io::{Read, Write};
 
 mod charge;
+mod public_tls;
 pub use charge::committed_charge_totals;
 
 pub const PATH: &str = "/api/v1/node/quota-v2/wal";
@@ -54,6 +55,10 @@ enum Request {
         node_id: i64,
         challenge: String,
         runtime_id: Option<String>,
+    },
+    PublicTlsHead {
+        node_id: i64,
+        proof: public_tls::ProofRequest,
     },
     PrepareGenesis {
         node_id: i64,
@@ -696,6 +701,18 @@ async fn authenticate_runtime<'a>(
     node_auth::authenticate_product_activation(state, headers, node_id, PATH).await
 }
 
+impl Request {
+    const fn node_id(&self) -> i64 {
+        match self {
+            Self::Store { node_id, .. }
+            | Self::Charge { node_id, .. }
+            | Self::Head { node_id, .. }
+            | Self::PublicTlsHead { node_id, .. }
+            | Self::PrepareGenesis { node_id, .. } => *node_id,
+        }
+    }
+}
+
 async fn handle(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -708,12 +725,7 @@ async fn handle(
         ));
     }
     let request: Request = serde_json::from_slice(&raw).map_err(|_| invalid())?;
-    let node_id = match &request {
-        Request::Store { node_id, .. }
-        | Request::Charge { node_id, .. }
-        | Request::Head { node_id, .. }
-        | Request::PrepareGenesis { node_id, .. } => *node_id,
-    };
+    let node_id = request.node_id();
     if node_id <= 0 {
         return Err(invalid());
     }
@@ -780,6 +792,11 @@ async fn handle(
                 node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
             }
             head(&state, node_id, &challenge, runtime_id.as_deref()).await?
+        }
+        Request::PublicTlsHead { proof, .. } => {
+            // Never accept this first-generation TLS proof over the legacy
+            // node-wide authenticated WAL transport.
+            public_tls::snapshot(&state, &headers, node_id, &proof).await?
         }
         Request::PrepareGenesis {
             candidate_runtime_id,

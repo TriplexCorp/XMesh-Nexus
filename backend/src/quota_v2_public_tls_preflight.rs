@@ -8,7 +8,7 @@
 //! signing and durable commit, and verify live Node evidence.
 //! Returning a candidate NEVER permits traffic.
 mod revocation;
-mod signed_roster;
+pub mod signed_roster;
 
 pub use revocation::handle as revocation_handle;
 
@@ -27,15 +27,15 @@ const MAX_BODY: usize = 1536;
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Request {
-    node_id: i64,
-    user_id: i64,
-    activation_receipt_sha256: String,
-    genesis_policy_sha256: String,
-    runtime_id: String,
-    profile_revision: String,
-    cap_roster_sha256: String,
-    required_lifetime_ms: i64,
+pub struct Request {
+    pub node_id: i64,
+    pub user_id: i64,
+    pub activation_receipt_sha256: String,
+    pub genesis_policy_sha256: String,
+    pub runtime_id: String,
+    pub profile_revision: String,
+    pub cap_roster_sha256: String,
+    pub required_lifetime_ms: i64,
 }
 
 fn hex64(value: &str) -> bool {
@@ -45,7 +45,7 @@ fn hex64(value: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-fn valid(request: &Request) -> bool {
+pub fn valid(request: &Request) -> bool {
     request.node_id > 0
         && request.user_id > 0
         && [

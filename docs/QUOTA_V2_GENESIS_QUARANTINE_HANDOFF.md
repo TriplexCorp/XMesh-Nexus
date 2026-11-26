@@ -149,3 +149,29 @@ witness, real signed positive XSP/2 issuer connected to the immutable
 0139 outbox, delivery to the measured Unix-socket Xray, public ingress
 qualification and restart/rollback tests. Keep production V2 OFF.
 
+
+### First-Genesis TLS remote WAL snapshot (zero authority)
+
+The existing strict product WAL tunnel supports the distinct
+`public_tls_head` operation. It requires the exact original signed
+first-cap roster, Genesis/activation/profile/runtime and the concrete
+container/PID from every durable cap-delivery preflight. Under the
+serialized roster locks AND the Node-wide WAL-writer advisory lock, it
+revalidates the current exact committed birth index and its original Node
+Ed25519 witness, matches each entry to the runtime and signed MAIN/CDN
+aliases, and refuses charge streams not covered by that index. A new
+domain-separated Nexus signature binds a fresh challenge, measurement,
+roster, exact sequence/hash/tail, and at most seven seconds of validity.
+
+`empty_remote_history` means only that the SQL snapshot has no committed
+first-Genesis index, no later runtime anchor, no durable charge and no
+already acknowledged or burned reservation bytes. It is NOT a proof that
+the host WAL is empty, that pre-bootstrap history was complete, or that
+a cap was installed. An unsigned HTTP 404 cannot substitute for it.
+`committed_birth_index` means the remote birth registry exists and was
+validated; it does not attest complete transmitted-byte accounting. Both
+responses explicitly deny public service, start/resume, spending and
+refund authority. The eventual installed supervisor must independently
+compare the actual mounted WAL, live signed cap counters, qualification
+pins and current remote snapshot; no public listener or production
+positive TLS issuer is introduced here.

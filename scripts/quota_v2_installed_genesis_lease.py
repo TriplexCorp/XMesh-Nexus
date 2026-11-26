@@ -5,6 +5,7 @@ or production ingress. Nexus signs and commits caps from its own confirmed
 leases. The runner independently checks both guests and their PostgreSQL rows.
 """
 import concurrent.futures
+import copy
 import base64
 import hashlib
 import json
@@ -548,6 +549,77 @@ print('verified_without_authority')
     assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone() == (4,)
     print("PASS: installed strict-PQ TLS preflight verifies the full signed roster, rejects foreign evidence and fails closed on a competing SQL lock without granting any public authority.")
 
+    # Fresh signed first-Genesis remote WAL readback, not an assertion
+    # that an absent remote index proves an empty host. Every field is
+    # independently bound to the original measured process and cap roster.
+    tls_wal_domain = b"XMESH_QUOTA_V2_PUBLIC_TLS_WAL_HEAD_V1\0"
+
+    def wal_proof_request(scope, measurement):
+        return {
+            "operation": "public_tls_head", "nodeId": scope["nodeId"],
+            "proof": {
+                "scope": dict(scope, requiredLifetimeMs=7000),
+                "challenge": secrets.token_hex(32),
+                "containerId": measurement[0], "startedAt": measurement[1],
+                "hostPid": measurement[2],
+            },
+        }
+
+    def assert_tls_wal_snapshot(guest, request, inventory):
+        request["proof"]["challenge"] = secrets.token_hex(32)
+        code, response = guest.request(WAL_PATH, request)
+        assert code == 200, (code, response)
+        assert set(response) == {"signedEnvelope"}
+        raw = response["signedEnvelope"].encode()
+        doc = json.loads(raw)
+        assert raw == canonical(doc) + b"\n"
+        independent_signature(root, f"tls-wal-head-{guest.node}", doc, tls_wal_domain)
+        claims = doc["payload"]
+        scope, proof = request["proof"]["scope"], request["proof"]
+        assert claims["kind"] == "xmesh.quota-v2.public-tls-wal-head"
+        assert claims["schemaVersion"] == 1
+        for name in ("nodeId", "userId", "activationReceiptSha256", "genesisPolicySha256",
+                     "runtimeId", "profileRevision", "capRosterSha256"):
+            assert claims[name] == scope[name], claims
+        for name in ("challenge", "containerId", "hostPid", "startedAt"):
+            assert claims[name] == proof[name], claims
+        assert 0 < claims["validUntilMs"] - claims["issuedAtMs"] <= 7000
+        assert claims["inventorySha256"] == hashlib.sha256(inventory).hexdigest()
+        lines = inventory.splitlines()
+        assert claims["inventorySequence"] == len(lines)
+        assert claims["historyState"] == (
+            "committed_birth_index" if lines else "empty_remote_history")
+        assert claims["inventoryTailDigest"] == (
+            json.loads(lines[-1])["digest"] if lines else "0"*64)
+        assert claims["committedChargeStreamCount"] == 0
+        assert all(claims[name] is False for name in (
+            "preBootstrapHistoryCompletenessVerified", "liveMeterVerified",
+            "finalMeterVerified", "canServePublic", "canSpend", "canStart", "canResume"))
+        assert claims["authorizedBytes"] == claims["refundableBytes"] == 0
+
+    wal_proofs = [wal_proof_request(scope, measurement)
+                  for scope, (_, measurement, _, _, _) in zip(tls_requests, cap_jobs)]
+    for guest, request in zip(pair, wal_proofs):
+        assert_tls_wal_snapshot(guest, request, b"")
+        # A signed zero-history SQL snapshot is not sufficient to prove
+        # the actual meter has no WAL. This hosted fixture checks both.
+        names = guest.exec("ls", "-1A", MEASURED+"/wal/ledger").decode().splitlines()
+        assert not any(n.startswith("meter-") or n == "xmesh-meter-inventory-v1.jsonl"
+                       for n in names), names
+    assert guest_b.request(WAL_PATH, wal_proofs[0])[0] == 401
+    for name, bad in (("containerId", "9"*64),
+                      ("hostPid", wal_proofs[0]["proof"]["hostPid"]+1)):
+        request = copy.deepcopy(wal_proofs[0])
+        request["proof"][name] = bad
+        assert guest_a.request(WAL_PATH, request)[0] == 409
+    with psycopg.connect(dsn) as blocker:
+        blocker.execute("SELECT pg_advisory_xact_lock(1794501,hashtext(%s))",
+                        (str(guest_a.node),))
+        assert guest_a.request(WAL_PATH, wal_proofs[0])[0] == 409
+        blocker.rollback()
+    assert_tls_wal_snapshot(guest_a, wal_proofs[0], b"")
+    print("PASS: strict-PQ fresh signed empty remote WAL history, exact runtime/roster binding, foreign identity and WAL writer contention; no public authority.")
+
     # Real strict-PQ revocation endpoint, without opening a public socket.
     # Only this disposable hosted harness may create a signed positive
     # fixture using its own freshly generated ephemeral panel identity.
@@ -870,6 +942,16 @@ else:
     # B provides the independent transaction rollback fixture. A must
     # publish its first birth index from the installed service.
     check_remote_wal(guest_b, "store")
+    # Same original process now has a real committed index with two
+    # byte-bearing streams. This proves the distinct nonempty wire branch.
+    signed_inventory = guest_b.exec(
+        "cat", MEASURED+"/wal/ledger/xmesh-meter-inventory-v1.jsonl")
+    assert signed_inventory
+    assert_tls_wal_snapshot(guest_b, wal_proofs[1], signed_inventory)
+    wrong_start = copy.deepcopy(wal_proofs[1])
+    wrong_start["proof"]["startedAt"] = "2026-01-01T00:00:00Z"
+    assert guest_b.request(WAL_PATH, wrong_start)[0] == 409
+    print("PASS: real Xray nonempty birth index returned with fresh signed first-Genesis WAL head; wrong container start time refused.")
     anchor_sql = """SELECT a.inventory_sequence,a.inventory_sha256,a.inventory_bytes,s.witness_bytes
                     FROM quota_v2_external_wal_birth_anchors a
                     JOIN quota_v2_external_wal_birth_sources s USING(node_id,inventory_sequence)

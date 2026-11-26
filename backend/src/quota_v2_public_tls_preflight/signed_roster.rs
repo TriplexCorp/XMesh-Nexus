@@ -77,7 +77,7 @@ pub(super) async fn authenticated_digest(
     checked
 }
 
-pub(super) async fn configure_transaction(
+pub async fn configure_transaction(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<(), sqlx::Error> {
     // 0169 requires READ COMMITTED so its final check observes writers
@@ -99,7 +99,7 @@ pub(super) async fn configure_transaction(
 
 /// The caller retains the same transaction and all acquired row locks.
 /// This is control-plane evidence only; not a measured runtime proof.
-pub(super) async fn locked_digest(
+pub async fn locked_digest(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     state: &AppState,
     request: &Request,
