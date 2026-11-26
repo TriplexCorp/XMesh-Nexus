@@ -17,6 +17,7 @@ use sqlx::PgConnection;
 use std::io::{Read, Write};
 
 mod charge;
+mod public_tls;
 pub use charge::committed_charge_totals;
 
 pub const PATH: &str = "/api/v1/node/quota-v2/wal";
@@ -54,6 +55,10 @@ enum Request {
         node_id: i64,
         challenge: String,
         runtime_id: Option<String>,
+    },
+    PublicTlsHead {
+        node_id: i64,
+        proof: public_tls::ProofRequest,
     },
     PrepareGenesis {
         node_id: i64,
@@ -712,6 +717,7 @@ async fn handle(
         Request::Store { node_id, .. }
         | Request::Charge { node_id, .. }
         | Request::Head { node_id, .. }
+        | Request::PublicTlsHead { node_id, .. }
         | Request::PrepareGenesis { node_id, .. } => *node_id,
     };
     if node_id <= 0 {
@@ -780,6 +786,11 @@ async fn handle(
                 node_auth::authenticate_for(&state, &headers, node_id, &raw, PATH).await?;
             }
             head(&state, node_id, &challenge, runtime_id.as_deref()).await?
+        }
+        Request::PublicTlsHead { proof, .. } => {
+            // Never accept this first-generation TLS proof over the legacy
+            // node-wide authenticated WAL transport.
+            public_tls::snapshot(&state, &headers, node_id, &proof).await?
         }
         Request::PrepareGenesis {
             candidate_runtime_id,
