@@ -12,7 +12,7 @@ from pathlib import Path
 
 from quota_v2_installed_genesis_lease import STATE, parallel
 
-INSTALLED_WAL = "/opt/xmesh-node/experiments/quota-v2-physical-stop"
+INSTALLED_WAL = "/usr/local/libexec/xmesh-quota-wal/quota-v2-physical-stop"
 LEDGER = "/var/lib/xmesh-first-meter/runtime/ledger"
 
 
@@ -135,9 +135,10 @@ sys.path.insert(0, str(Path(source).parent))
 sys.path.insert(1, installed)
 import public_tls_wal_watch as watch
 assert Path(watch.__file__).resolve() == Path(source)
-assert Path(watch.wal.__file__).resolve().parent == Path(installed)
-assert Path(watch.preflight.__file__).resolve().parent == Path(installed)
-assert Path(watch.qualification.__file__).resolve().parent == Path(installed)
+for module in (watch.wal, watch.preflight, watch.qualification,
+               watch.cap_install, watch.genesis_reservation, watch.preflight.quarantine):
+    assert Path(module.__file__).resolve().parent == Path(installed)
+assert not (Path(installed) / Path(source).name).exists()
 # Don't override any qualification pin, network client, clock, filesystem,
 # runtime, signature checker or Unix peer observation. Only retry actual
 # transient acquisition of the installed worker's pre-existing lock.
@@ -179,7 +180,7 @@ print("signed_wal_readback_verified_without_authority")
         lock_before = guest.exec("stat", "-c", "%d:%i:%u:%a", STATE + "/lock")
         output = guest.exec(
             "env", "XMESH_QUOTA_V2_AGENT_MODE=installed",
-            "python3", "-E", "-B", "-c", script, target, INSTALLED_WAL,
+            "python3", "-I", "-B", "-c", script, target, INSTALLED_WAL,
             panel, str(guest.node), str(user_id), STATE, expected, timeout=30)
         assert output.strip() == b"signed_wal_readback_verified_without_authority", output
         assert guest.exec("stat", "-c", "%d:%i:%u:%a", STATE + "/lock") == lock_before

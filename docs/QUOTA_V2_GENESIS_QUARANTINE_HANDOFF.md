@@ -190,9 +190,11 @@ egress and renewal services must produce real confirmed first-cap records and
 the loopback-only ingress. No TLS listener is opened and no client sends bytes.
 
 The separately pinned dormant readback module is copied into a root-private
-test directory, not installed into Agent 6.0.37. Its actual enrolled product,
-signed profile/roster, isolated meter PID, private production-path WAL bind
-and strict-PQ request are all used unchanged. The test asserts an empty
+test directory, not installed into the Agent. The verifier imports its
+dependencies from the actual root-private installed libexec directory, not
+from the source checkout. Its actual enrolled product, signed profile/roster,
+isolated meter PID, private production-path WAL bind and strict-PQ request are
+all used unchanged. The test asserts an empty
 remote birth index and exact cap files with no local traffic before and
 after, and no public TLS authority outbox row. All four scenarios must pass;
 the fourth is a diagnostic, not a fourth signed release artifact or a
