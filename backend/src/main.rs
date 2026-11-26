@@ -36,6 +36,8 @@ mod quota_v2_public_tls_preflight;
 // Production may verify committed authority and issue revocation witnesses.
 // Positive public TLS signing remains individually gated to disposable CI.
 mod quota_v2_public_tls_authority;
+#[cfg(test)]
+mod quota_v2_public_tls_authority_fixture;
 mod quota_wal_transport;
 mod quota_xray_genesis;
 mod security;

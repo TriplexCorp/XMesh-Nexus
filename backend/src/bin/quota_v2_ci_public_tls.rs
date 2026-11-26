@@ -5,12 +5,14 @@
 mod node_policy;
 #[path = "../quota_v2_public_tls_authority.rs"]
 mod quota_v2_public_tls_authority;
+#[path = "../quota_v2_public_tls_authority_fixture.rs"]
+mod quota_v2_public_tls_authority_fixture;
 
 use anyhow::{Result, ensure};
 use quota_v2_public_tls_authority::{
-    GenesisBinding, PublicListener, RevocationBinding, sign, sign_revocation_witness,
-    verify_existing,
+    GenesisBinding, PublicListener, RevocationBinding, sign_revocation_witness, verify_existing,
 };
+use quota_v2_public_tls_authority_fixture::sign;
 use sha2::{Digest, Sha256};
 use std::{
     env, fs,

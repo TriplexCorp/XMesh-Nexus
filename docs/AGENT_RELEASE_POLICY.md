@@ -37,9 +37,9 @@ The first install does not require the bridge package. Unbound Agent update requ
 
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.
 
-Current target: **`control-v6.0.35`**.
+Current target: **`control-v6.0.36`**.
 
-The 6.0.35 candidate adds the exact strict-PQ TLS *read-only preflight* operation. Its Nexus SQL candidate response cannot open a port, authorize a byte or replace a live installed-cap/WAL proof. The previous 6.0.33 release below is retained as historical qualification evidence; Quota V2 remains disabled until installed public TLS, live revocation and cold-reboot proofs are complete.
+The 6.0.36 candidate is built from exact Node main `a83bcd67358009ccc737fcb894defddab0305eb5` ([Node CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45874347448)). The matching metered Xray patch tree was independently rebuilt and [attested on Node main](https://github.com/TriplexCorp/XMesh-Node/actions/runs/45638609783); the installed matrix verifies the identical tree. The 6.0.36 candidate adds an exact, bounded strict-PQ revocation poll for existing signed TLS authority and packages the preflight roster and revocation verification libraries. It does not start a public listener or provide positive ingress authority. The 6.0.35 candidate adds the exact strict-PQ TLS *read-only preflight* operation. Its Nexus SQL candidate response cannot open a port, authorize a byte or replace a live installed-cap/WAL proof. The previous 6.0.33 release below is retained as historical qualification evidence; Quota V2 remains disabled until installed public TLS, live revocation and cold-reboot proofs are complete.
 
 ## First-install release record
 

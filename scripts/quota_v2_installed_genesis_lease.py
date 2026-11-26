@@ -484,6 +484,34 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             "capRosterSha256": hashlib.sha256(canonical(roster)).hexdigest(),
             "requiredLifetimeMs": 1000,
         }
+        # Independently verify the actual signed-cap roster against the
+        # installed kernel-authenticated Xray Unix peer. The disposable
+        # measured runtime lives under MEASURED, not a production meter path.
+        script = """
+import json
+import sys
+from pathlib import Path
+sys.path.insert(0, '/usr/local/libexec/xmesh-quota-wal/quota-v2-physical-stop')
+import public_tls_cap_watch
+import wal_transport
+state = Path(sys.argv[1])
+scope = json.loads(sys.argv[2])
+original = json.loads((state / 'genesis-quarantine-envelope.json').read_bytes())
+grants = {uid: json.loads((state / f'genesis-positive-cap-u{uid}.json').read_bytes())
+          ['signedEnvelope'].encode() for uid in map(int, sys.argv[5:])}
+watch = public_tls_cap_watch.SignedCapRosterWatch(
+    profile=original['reply']['config'], signed_grants=grants,
+    pinned=wal_transport._panel_pin(), node=scope['nodeId'],
+    activation=scope['activationReceiptSha256'], genesis_sha=scope['genesisPolicySha256'],
+    runtime_id=scope['runtimeId'], trusted_pid=int(sys.argv[3]), socket_path=sys.argv[4])
+assert watch.profile_sha256 == scope['profileRevision']
+assert watch.roster_sha256 == scope['capRosterSha256']
+assert watch.check() is None
+print('verified_without_authority')
+"""
+        assert guest.exec("python3","-E","-c",script,STATE,json.dumps(request),
+                          str(measurement[2]),MEASURED+"/wal/drain.sock",
+                          str(uid),str(peer_id),timeout=10).decode().strip()=="verified_without_authority"
         tls_requests.append(request)
 
     def assert_tls_diagnostic(guest, request, matched):
@@ -544,7 +572,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         "activationReceiptSha256":scope["activationReceiptSha256"],
         "genesisPolicySha256":scope["genesisPolicySha256"],
         "runtimeId":scope["runtimeId"],"profileRevision":scope["profileRevision"],
-        "issuedAtMs":now,"validUntilMs":now+20000,"canServePublic":True,
+        "issuedAtMs":now,"validUntilMs":now+60000,"canServePublic":True,
         "bindings":[{"tag":"vless-main","port":443,"domain":"vpn.example.com"}],
     }
     message=root/"tls-disposable-authority.message"
@@ -580,7 +608,7 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         " VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (scope["nodeId"],secrets.token_hex(32),scope["activationReceiptSha256"],
          scope["runtimeId"],scope["profileRevision"],scope["genesisPolicySha256"],
-         signer,scope["capRosterSha256"],poll["authoritySha256"],now,now+20000,wire)
+         signer,scope["capRosterSha256"],poll["authoritySha256"],now,now+60000,wire)
     )
     def assert_tls_witness(revoked=False):
         poll["challenge"]=secrets.token_hex(32)
@@ -602,7 +630,45 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
         assert 0<claims["validUntilMs"]-claims["issuedAtMs"]<=7000
         if not revoked:
             assert claims["validUntilMs"]<=authority_payload["validUntilMs"]
+    def assert_installed_revocation_watch(expected_clear):
+        # Run the real root-installed library with the original on-node
+        # pinned key, actual strict-PQ subprocess and fresh nonce. No mocked
+        # transport, response JSON re-encoding or listener activation.
+        script = """
+import json
+import subprocess
+import sys
+sys.path.insert(0, '/usr/local/libexec/xmesh-quota-wal/quota-v2-physical-stop')
+import public_tls_revocation_watch as revocation
+import wal_transport
+scope = json.loads(sys.argv[1])
+binding = dict(node=scope['nodeId'], activation=scope['activationReceiptSha256'],
+               genesis_sha=scope['genesisPolicySha256'], runtime_id=scope['runtimeId'],
+               profile_sha256=scope['profileRevision'], authority_sha256=sys.argv[2],
+               roster_sha256=scope['capRosterSha256'])
+fetch = revocation.enrolled_fetch(state=sys.argv[3], user=scope['userId'], **binding)
+watch = revocation.SignedTlsRevocationWatch(fetch=fetch, pinned=wal_transport._panel_pin(),
+                                           **binding)
+try:
+    assert watch.check() is None
+    assert watch.ensure_fresh() is None
+except (ValueError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
+    if sys.argv[4] != 'deny':
+        raise
+    print('denied')
+else:
+    if sys.argv[4] != 'clear':
+        raise AssertionError('installed watch accepted denied authority')
+    print('verified_without_authority')
+"""
+        expected = "verified_without_authority" if expected_clear else "denied"
+        assert guest_a.exec("python3","-E","-c",script,json.dumps(scope),
+                            poll["authoritySha256"],STATE,
+                            "clear" if expected_clear else "deny",
+                            timeout=10).decode().strip()==expected
+
     assert_tls_witness()
+    assert_installed_revocation_watch(True)
     assert guest_b.request(revocation_path,poll)[0]==401
     assert guest_a.request(revocation_path,dict(
         poll,scope=dict(scope,capRosterSha256="9"*64)))[0]==409
@@ -612,8 +678,10 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             (uid,)
         )
         assert_tls_witness(revoked=True)
+        assert_installed_revocation_watch(False)
         blocker.rollback()
     assert_tls_witness()
+    assert_installed_revocation_watch(True)
     assert db.execute(
         "SELECT signed_envelope FROM quota_v2_public_tls_authority_outbox WHERE node_id=%s",
         (scope["nodeId"],)

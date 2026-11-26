@@ -1,5 +1,5 @@
 {
-  "artifactSha256": "a6c4e6bb68cf88e38f85873d3adf8b68b49c79c125a79e8361d67f3ecfa22007",
+  "artifactSha256": "899fbc06bf64aedefd1a8296a38fdb65077d994c4ad3946bba11d54d5f298bcf",
   "buildFlags": [
     "GOOS=linux",
     "GOARCH=amd64",
@@ -11,7 +11,7 @@
   "goVersion": "go version go1.27.4 linux/amd64",
   "independentRebuildMatched": true,
   "kind": "xmesh.metered-xray-candidate",
-  "nodeSourceRevision": "5a5e63c34ad2499c7124d783c76d501728bf5d24",
+  "nodeSourceRevision": "b37a9c3e1bfbd9fc7d28b47c07ac54c1d616f1a3",
   "productionActivationAuthorized": false,
   "schemaVersion": 1,
   "upstreamSourceRevision": "a4a3dff5b20c2faae567b742c172c7b95e75c083"

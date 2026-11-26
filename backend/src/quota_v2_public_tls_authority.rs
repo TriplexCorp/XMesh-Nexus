@@ -70,7 +70,7 @@ fn domain(value: &str) -> bool {
 /// admission and a root-owned TLS certificate life-cycle. Binding the *exact*
 /// original runtime and canonical raw VLESS profile blocks a signed approval
 /// from silently migrating to a fresh unmetered Xray process or modified roster.
-fn policy(
+pub(crate) fn policy(
     source: &GenesisBinding,
     bindings: &[PublicListener],
     issued_at_ms: i64,
@@ -124,29 +124,6 @@ fn policy(
         "canServePublic": true,
         "bindings": configured,
     }))
-}
-
-/// Generate canonical JSON/Ed25519 envelope bytes for interoperability with
-/// the measured Node's strict `public_tls_frontend.verify_signed_public_tls`.
-/// Deliberately private: this creates *only* signature bytes; it proves neither
-/// that a cap was installed nor that the public TLS port may yet be opened.
-#[cfg(any(test, feature = "quota-v2-disposable-cap-issuer"))]
-pub fn sign(
-    signer: &PolicySigner,
-    source: &GenesisBinding,
-    bindings: &[PublicListener],
-    issued_at_ms: i64,
-    valid_until_ms: i64,
-) -> Result<Vec<u8>> {
-    let payload = policy(source, bindings, issued_at_ms, valid_until_ms)?;
-    let signature = signer.sign(&payload)?;
-    let bytes = serde_json::to_vec(&json!({
-        "algorithm": "Ed25519",
-        "payload": payload,
-        "signature": signature,
-    }))?;
-    ensure!(bytes.len() <= 8192, "signed public TLS policy too large");
-    Ok(bytes)
 }
 
 /// Verify exact committed authority bytes independently of SQL JSONB parsing.
@@ -250,6 +227,7 @@ pub fn sign_revocation_witness(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::quota_v2_public_tls_authority_fixture::sign;
     use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
     fn source() -> GenesisBinding {

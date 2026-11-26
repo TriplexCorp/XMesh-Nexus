@@ -2,9 +2,9 @@
 
 // v6 product invariant: the panel must never hand a fresh VPS an installer
 // that can enter operational state before strict-PQ activation is verified.
-// Pin the XMesh-Node v6 strict-PQ release with canonical control-v6.0.35.
-const XMESH_V6_NODE_BOOTSTRAP_SHA='e6d833162c6d34513469902bf331d09969b82149';
-const XMESH_V6_NODE_BOOTSTRAP_SHA256='f2fa44e05f86a398a04485f764cd6f3634f90af1b7d8e3b1c45b3203b4f2c5cb';
+// Pin the XMesh-Node v6 strict-PQ release with canonical control-v6.0.36.
+const XMESH_V6_NODE_BOOTSTRAP_SHA='a83bcd67358009ccc737fcb894defddab0305eb5';
+const XMESH_V6_NODE_BOOTSTRAP_SHA256='b77c28d953e6a0b7c0b5e1eb346bbe045da0df0f8df785f09430f44cd455afb1';
 const XMESH_V6_BOOTSTRAP_MARKER='XMesh Node v6 fresh installer. Security invariant:';
 const XMESH_V6_XSP_IDENTITY_CONFLICT='XSP-v2 identity already enrolled: legacy re-enrollment cannot rotate it.';
 
