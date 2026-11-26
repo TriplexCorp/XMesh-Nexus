@@ -22,6 +22,8 @@ on:
       - 'scripts/quota_v2_installed_live_vless.py'
       - 'scripts/quota_v2_installed_generations*.py'
       - 'scripts/quota_v2_installed_tls_wal_readback.py'
+      - 'scripts/quota_v2_installed_tls_wal_traffic.py'
+      - 'scripts/test-quota-v2-installed-tls-wal-traffic.py'
       - 'scripts/quota_v2_release_candidate.py'
       - 'scripts/metered-xray-*.json'
       - 'scripts/test-quota-v2-release-candidate.py'
@@ -40,14 +42,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [lease-recovery, managed-generations, agent-sigkill, public-tls-wal-readback]
+        scenario: [lease-recovery, managed-generations, agent-sigkill, public-tls-wal-readback, public-tls-wal-nonempty]
     timeout-minutes: 50
     env:
       XMESH_AUDIT_DISPOSABLE: '1'
       XMESH_TEST_INSTALLED_GENERATIONS: ${{ (matrix.scenario == 'managed-generations' || matrix.scenario == 'agent-sigkill') && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
       XMESH_TEST_INSTALLED_REBOOT: ${{ matrix.scenario == 'lease-recovery' && '1' || '0' }}
-      XMESH_INSTALLED_NODE_REF: ${{ matrix.scenario == 'public-tls-wal-readback' && 'f8031684b60bf0289e081079b25efac3cb8ea3d4' || '402f53c29807836224958bf2887a6bec432aec85' }}
+      XMESH_INSTALLED_NODE_REF: ${{ (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty') && 'f8031684b60bf0289e081079b25efac3cb8ea3d4' || '402f53c29807836224958bf2887a6bec432aec85' }}
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -78,14 +80,14 @@ jobs:
       # The diagnostic is separately reviewed source, NOT a replacement
       # installer or a changed release-candidate binary.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        if: matrix.scenario == 'public-tls-wal-readback'
+        if: (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty')
         with:
           repository: TriplexCorp/XMesh-Node
           ref: 803b4fe5ca97e2dc5022f58877f7f27a8df04250
           path: .ci-reviewed-tls-wal
           persist-credentials: false
       - name: Verify exact dormant Node WAL readback without replacing Agent
-        if: matrix.scenario == 'public-tls-wal-readback'
+        if: (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty')
         run: |
           set -euo pipefail
           test "$(git -C .ci-reviewed-tls-wal rev-parse HEAD)" = '803b4fe5ca97e2dc5022f58877f7f27a8df04250'
@@ -100,7 +102,7 @@ jobs:
       - name: Verify exact draft Agent source
         run: |
           test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "$XMESH_INSTALLED_NODE_REF"
-          if [[ "${{ matrix.scenario }}" == public-tls-wal-readback ]]; then
+          if [[ "${{ matrix.scenario }}" == public-tls-wal-readback || "${{ matrix.scenario }}" == public-tls-wal-nonempty ]]; then
             test "$XMESH_INSTALLED_NODE_REF" = 'f8031684b60bf0289e081079b25efac3cb8ea3d4'
             test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.38'
           else
@@ -108,7 +110,8 @@ jobs:
             test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.37'
           fi
           python3 scripts/test-quota-v2-release-candidate.py
-          python3 -m py_compile scripts/quota_v2_installed_agent_successor.py scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py scripts/quota_v2_installed_tls_wal_readback.py
+          python3 -m py_compile scripts/quota_v2_installed_agent_successor.py scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py scripts/quota_v2_installed_tls_wal_readback.py scripts/quota_v2_installed_tls_wal_traffic.py
+          python3 scripts/test-quota-v2-installed-tls-wal-traffic.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
         env:
@@ -212,7 +215,7 @@ jobs:
           export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-installed
       - name: Save exact installed Agent identity after successful scenario
-        if: success() && matrix.scenario != 'public-tls-wal-readback'
+        if: success() && matrix.scenario != 'public-tls-wal-readback' && matrix.scenario != 'public-tls-wal-nonempty'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: quota-v2-release-qualification-${{ matrix.scenario }}
@@ -230,13 +233,13 @@ jobs:
     name: Cross-scenario immutable Agent and Xray consistency (staging only)
     needs: installed-leases
     # GitHub treats a skipped required check as passing. Never skip the gate
-    # when any of the four real two-Node scenarios fails. The extra
-    # diagnostic does not manufacture an extra release-candidate artifact.
+    # when any of the five real two-Node scenarios fails. The two extra
+    # diagnostics do not manufacture extra release-candidate artifacts.
     if: always() && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: All four installed scenarios must have passed
+      - name: All five installed scenarios must have passed
         env:
           INSTALLED_RESULT: ${{ needs.installed-leases.result }}
         run: test "$INSTALLED_RESULT" = success

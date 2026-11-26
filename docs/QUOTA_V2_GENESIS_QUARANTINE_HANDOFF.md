@@ -217,3 +217,37 @@ opt-in isolated rehearsal pin; it does not change the production target,
 production release pin, Node staging settings, or issue public permission.
 The Node candidate's real classic Docker check and all four Nexus scenarios
 must pass before this branch can be considered for integration.
+
+### Nonempty installed WAL diagnostic (fifth scenario)
+
+The independent `public-tls-wal-nonempty` disposable scenario preserves
+the fourth scenario's initial empty-WAL proof and exact Agent 6.0.38 /
+attested Xray candidate, then exercises the actual installed loopback
+VLESS frontend, its isolated metered Xray and the installed TCP egress
+bridge on both nodes. It does not expose TLS or a public listener.
+Before any test payload, it verifies the egress bridge network namespace,
+installs exact OUTPUT/FORWARD reject rules and assigns a synthetic /32
+only to the disposable guest's loopback, verifying the local route.
+The guard rules remain until guest destruction. The bridge's real
+global-address policy is unchanged; no packets are sent to an internet
+endpoint.
+
+The test sends 16 KiB in each direction for one subscriber on the main
+and CDN nodes, requires exactly two real meter WAL streams per node and
+an unspent second subscriber, then expects the dormant verifier to
+reject the mismatched empty remote history. The actual installed
+`charge_worker` must commit the real inventory and authenticate signed
+charge receipts; rerunning must submit zero further batches. The
+runner compares immutable SQL charge bytes, CDN class, conservative
+reservation floors (not delivery acknowledgements) and exact off-host inventory bytes with the actual
+guest WAL. The unmodified pinned dormant verifier must then accept the
+committed nonempty signed history and reconcile actual local counters,
+without changing any ledger bytes or issuing public TLS authority.
+This checks first observed birth-index consistency, **not** completeness
+before the first off-host witness or final transport delivery.
+
+All five installed scenarios must pass together. The extra two
+candidate-only diagnostics do not add or replace the existing three
+immutable 6.0.37 release evidence artifacts. No production release pin,
+feature flag, positive issuer, TLS listener or production permission
+changes as a result of this test.
