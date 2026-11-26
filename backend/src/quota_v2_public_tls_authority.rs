@@ -334,7 +334,7 @@ mod tests {
             )
             .is_ok()
         );
-        let mut altered = raw.clone();
+        let mut altered = raw;
         altered.push(b' ');
         assert!(
             verify_existing(
