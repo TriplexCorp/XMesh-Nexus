@@ -36,7 +36,7 @@ const (
 	maxPayloadBytes    = 768 * 1024
 	suite              = "Ed25519+ML-DSA-65"
 	issuerID           = "xmesh-nexus-panel"
-	targetAgentVersion = "control-v6.0.35"
+	targetAgentVersion = "control-v6.0.37"
 )
 
 var b64 = base64.StdEncoding
@@ -552,7 +552,7 @@ func (g *gateway) issueClientCertificate(nodeID int64, publicDER []byte) (string
 
 // The isolated WAL rehearsal pins the exact proposed product binary.
 func pinnedWALCandidate(release releaseIdentity, enabled, pin string) bool {
-	if enabled != "1" || (release.Version != "control-v6.0.25" && release.Version != "control-v6.0.33" && release.Version != "control-v6.0.34" && release.Version != "control-v6.0.35") {
+	if enabled != "1" || (release.Version != "control-v6.0.25" && release.Version != "control-v6.0.33" && release.Version != "control-v6.0.34" && release.Version != "control-v6.0.35" && release.Version != "control-v6.0.36" && release.Version != "control-v6.0.37") {
 		return false
 	}
 	return matchesReleasePin(release, pin)
@@ -990,7 +990,8 @@ var allowedTunnelPaths = map[string]bool{
 	"/api/v1/node/quota-v2/policy-pin":           true,
 	"/api/v1/node/quota-v2/genesis-reservation":  true,
 	"/api/v1/node/quota-v2/genesis-cap-delivery": true,
-	"/api/v1/node/quota-v2/public-tls-preflight": true,
+	"/api/v1/node/quota-v2/public-tls-preflight":  true,
+	"/api/v1/node/quota-v2/public-tls-revocation": true,
 }
 
 // Original activation binding is forwarded ONLY on explicitly registered
@@ -1002,7 +1003,8 @@ func needsGenesisActivationBinding(path string) bool {
 		"/api/v1/node/quota-v2/policy-pin",
 		"/api/v1/node/quota-v2/genesis-reservation",
 		"/api/v1/node/quota-v2/genesis-cap-delivery",
-		"/api/v1/node/quota-v2/public-tls-preflight":
+		"/api/v1/node/quota-v2/public-tls-preflight",
+		"/api/v1/node/quota-v2/public-tls-revocation":
 		return true
 	default:
 		return false

@@ -5,11 +5,14 @@
 mod node_policy;
 #[path = "../quota_v2_public_tls_authority.rs"]
 mod quota_v2_public_tls_authority;
+#[path = "../quota_v2_public_tls_authority_fixture.rs"]
+mod quota_v2_public_tls_authority_fixture;
 
 use anyhow::{Result, ensure};
 use quota_v2_public_tls_authority::{
-    GenesisBinding, PublicListener, RevocationBinding, sign, sign_revocation_witness,
+    GenesisBinding, PublicListener, RevocationBinding, sign_revocation_witness, verify_existing,
 };
+use quota_v2_public_tls_authority_fixture::sign;
 use sha2::{Digest, Sha256};
 use std::{
     env, fs,
@@ -71,6 +74,7 @@ fn run() -> Result<()> {
         1_800_000_000_000,
         1_800_000_060_000,
     )?;
+    verify_existing(&key, &source, 1_800_000_000_000, 1_800_000_060_000, &signed)?;
     let result = output.join("public-tls-authority.json");
     let public_key = output.join("policy-public-key.txt");
     let mut opts = fs::OpenOptions::new();

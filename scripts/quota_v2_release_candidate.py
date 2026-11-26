@@ -189,7 +189,7 @@ def check_evidence(doc, scenario, nexus_revision, identity):
 
 
 def write_installed_evidence(path, scenario, nexus_revision, identity, nodes, xray_sha):
-    check_identity(identity, "control-v6.0.35", identity["sourceRevision"])
+    check_identity(identity, "control-v6.0.37", identity["sourceRevision"])
     require(hex_field(identity["sourceRevision"], 40), "invalid Node source revision")
     doc = {
         "schema": "xmesh-quota-v2-installed-release-evidence-v1",
@@ -223,7 +223,7 @@ def verify_installed_matrix(evidence, node_revision, nexus_revision):
     first = records[0]
     require(isinstance(first, dict), "invalid installed evidence")
     identity = first.get("productIdentity")
-    check_identity(identity, "control-v6.0.35", node_revision)
+    check_identity(identity, "control-v6.0.37", node_revision)
     seen = set()
     xray_digests = set()
     for doc in records:
@@ -255,7 +255,7 @@ def verify(candidate, evidence, node_revision, nexus_revision):
     require(manifest["schema"] == "xmesh-agent-release-candidate-v1"
             and manifest["candidateOnly"] is True
             and manifest["productionActivationAuthorized"] is False
-            and manifest["version"] == "control-v6.0.35"
+            and manifest["version"] == "control-v6.0.37"
             and manifest["sourceRevision"] == node_revision
             and manifest["platform"] == "linux/amd64"
             and manifest["builder"] == "golang:1.27.3-trixie",

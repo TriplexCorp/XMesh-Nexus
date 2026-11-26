@@ -1,11 +1,11 @@
 //! Production-compatible byte contract for a *future* Quota V2 public TLS issuer.
 //!
-//! No HTTP route calls this module. A signature is never a spending permit.
+//! Production may verify existing authority and sign control-plane stop witnesses.
+//! Positive ingress signing remains compiled only in tests and disposable CI.
 //! The caller must first hold an authenticated strict-PQ Node activation,
 //! immutable original Genesis policy, measured runtime, current signed cap
 //! and verified public certificate ownership, with durable revocation.
-//! We intentionally leave the constructor private until the database-backed
-//! admission check and installed two-node TLS proof are implemented.
+//! The positive constructor remains gated until the installed proof is complete.
 use crate::node_policy::PolicySigner;
 use anyhow::{Result, ensure};
 use serde_json::{Value, json};
@@ -20,7 +20,8 @@ pub struct GenesisBinding {
     pub profile_revision: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PublicListener {
     pub tag: String,
     pub domain: String,
@@ -69,7 +70,7 @@ fn domain(value: &str) -> bool {
 /// admission and a root-owned TLS certificate life-cycle. Binding the *exact*
 /// original runtime and canonical raw VLESS profile blocks a signed approval
 /// from silently migrating to a fresh unmetered Xray process or modified roster.
-fn policy(
+pub fn policy(
     source: &GenesisBinding,
     bindings: &[PublicListener],
     issued_at_ms: i64,
@@ -125,26 +126,31 @@ fn policy(
     }))
 }
 
-/// Generate canonical JSON/Ed25519 envelope bytes for interoperability with
-/// the measured Node's strict `public_tls_frontend.verify_signed_public_tls`.
-/// Deliberately private: this creates *only* signature bytes; it proves neither
-/// that a cap was installed nor that the public TLS port may yet be opened.
-pub fn sign(
+/// Verify exact committed authority bytes independently of SQL JSONB parsing.
+/// This does not mint new authority or attest an installed Xray.
+pub fn verify_existing(
     signer: &PolicySigner,
     source: &GenesisBinding,
-    bindings: &[PublicListener],
     issued_at_ms: i64,
     valid_until_ms: i64,
-) -> Result<Vec<u8>> {
-    let payload = policy(source, bindings, issued_at_ms, valid_until_ms)?;
+    raw: &[u8],
+) -> Result<()> {
+    ensure!(
+        (100..=8192).contains(&raw.len()),
+        "invalid TLS authority size"
+    );
+    let envelope: Value = serde_json::from_slice(raw)?;
+    let bindings: Vec<PublicListener> =
+        serde_json::from_value(envelope["payload"]["bindings"].clone())?;
+    let payload = policy(source, &bindings, issued_at_ms, valid_until_ms)?;
     let signature = signer.sign(&payload)?;
-    let bytes = serde_json::to_vec(&json!({
+    let expected = serde_json::to_vec(&json!({
         "algorithm": "Ed25519",
         "payload": payload,
         "signature": signature,
     }))?;
-    ensure!(bytes.len() <= 8192, "signed public TLS policy too large");
-    Ok(bytes)
+    ensure!(raw == expected, "foreign or altered TLS authority");
+    Ok(())
 }
 
 /// Exact identity of one existing public TLS authority and its installed cap
@@ -161,7 +167,7 @@ pub struct RevocationBinding<'a> {
 /// grant ingress, spending, start or resume authority. The production caller
 /// must hold the current serialized SQL/plan/identity gate and verify the
 /// committed authority, current meter and WAL before signing a clear witness.
-/// Until then, only the disposable contract fixture calls this function.
+/// A clear control-plane witness is not local meter or WAL attestation.
 pub fn sign_revocation_witness(
     signer: &PolicySigner,
     binding: &RevocationBinding<'_>,
@@ -221,6 +227,7 @@ pub fn sign_revocation_witness(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::quota_v2_public_tls_authority_fixture::sign;
     use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
     fn source() -> GenesisBinding {
@@ -295,6 +302,28 @@ mod tests {
             .is_err()
         );
         assert_eq!(serde_json::to_vec(&envelope).unwrap(), raw);
+        assert!(
+            verify_existing(
+                &signer,
+                &source(),
+                1_800_000_000_000,
+                1_800_000_060_000,
+                &raw,
+            )
+            .is_ok()
+        );
+        let mut altered = raw;
+        altered.push(b' ');
+        assert!(
+            verify_existing(
+                &signer,
+                &source(),
+                1_800_000_000_000,
+                1_800_000_060_000,
+                &altered,
+            )
+            .is_err()
+        );
     }
     #[test]
     fn witness_is_short_lived_nonce_bound_and_never_authorizes_traffic() {

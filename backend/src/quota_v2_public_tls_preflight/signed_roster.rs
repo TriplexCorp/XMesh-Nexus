@@ -69,22 +69,43 @@ pub(super) async fn authenticated_digest(
     request: &Request,
     activation: &str,
 ) -> Result<Option<String>, ApiError> {
-    let signer_key = state.node_policy_signer.public_key();
     let mut tx = state.pool.begin().await?;
+    configure_transaction(&mut tx).await?;
+    let checked = locked_digest(&mut tx, state, request, activation).await;
+    // Never persist allocator helper writes in a diagnostic.
+    tx.rollback().await?;
+    checked
+}
+
+pub(super) async fn configure_transaction(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+) -> Result<(), sqlx::Error> {
     // 0169 requires READ COMMITTED so its final check observes writers
     // that committed before the gate acquired all of its row locks.
     sqlx::query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
     sqlx::query("SET LOCAL lock_timeout = '250ms'")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
     sqlx::query("SET LOCAL statement_timeout = '3s'")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
     sqlx::query("SET LOCAL idle_in_transaction_session_timeout = '5s'")
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
+    Ok(())
+}
+
+/// The caller retains the same transaction and all acquired row locks.
+/// This is control-plane evidence only; not a measured runtime proof.
+pub(super) async fn locked_digest(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    state: &AppState,
+    request: &Request,
+    activation: &str,
+) -> Result<Option<String>, ApiError> {
+    let signer_key = state.node_policy_signer.public_key();
     // Cheap advisory rejection before doing any Ed25519 work or taking
     // row locks. This is NOT the final eligibility decision.
     let candidate: bool = sqlx::query_scalar(
@@ -104,14 +125,13 @@ pub(super) async fn authenticated_digest(
     .bind(&signer_key)
     .bind(request.required_lifetime_ms)
     .bind(request.user_id)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut **tx)
     .await?;
     if !candidate {
         return Ok(None);
     }
-    let Some(original) =
-        verified_original_users(&mut tx, state, request, activation, &signer_key).await?
-    else {
+    let original = verified_original_users(tx, state, request, activation, &signer_key).await?;
+    let Some(original) = original else {
         return Ok(None);
     };
     // Read EVERY existing signed first-cap row of this enrolled Node. Never
@@ -122,11 +142,11 @@ pub(super) async fn authenticated_digest(
            WHERE node_id=$1 ORDER BY user_id,request_challenge LIMIT 2049",
     )
     .bind(request.node_id)
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut **tx)
     .await?;
     let now_ms: i64 =
         sqlx::query_scalar("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT")
-            .fetch_one(&mut *tx)
+            .fetch_one(&mut **tx)
             .await?;
     let result = verified_signed_first_cap_roster_sha256(
         &state.node_policy_signer,
@@ -147,18 +167,8 @@ pub(super) async fn authenticated_digest(
         return Ok(None);
     };
 
-    let checked = verify_locked_plan(
-        &mut tx,
-        request,
-        activation,
-        &signer_key,
-        &original,
-        &grants,
-    )
-    .await;
-    // The diagnostic must never commit newly created lifetime baselines or
-    // other allocator helper writes. A real issuer has its own transaction.
-    tx.rollback().await?;
+    let check = verify_locked_plan(tx, request, activation, &signer_key, &original, &grants);
+    let checked = check.await;
     match checked {
         Ok(true) => Ok(Some(digest)),
         Ok(false) => Ok(None),

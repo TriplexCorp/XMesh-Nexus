@@ -484,6 +484,34 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
             "capRosterSha256": hashlib.sha256(canonical(roster)).hexdigest(),
             "requiredLifetimeMs": 1000,
         }
+        # Independently verify the actual signed-cap roster against the
+        # installed kernel-authenticated Xray Unix peer. The disposable
+        # measured runtime lives under MEASURED, not a production meter path.
+        script = """
+import json
+import sys
+from pathlib import Path
+sys.path.insert(0, '/usr/local/libexec/xmesh-quota-wal/quota-v2-physical-stop')
+import public_tls_cap_watch
+import wal_transport
+state = Path(sys.argv[1])
+scope = json.loads(sys.argv[2])
+original = json.loads((state / 'genesis-quarantine-envelope.json').read_bytes())
+grants = {uid: json.loads((state / f'genesis-positive-cap-u{uid}.json').read_bytes())
+          ['signedEnvelope'].encode() for uid in map(int, sys.argv[5:])}
+watch = public_tls_cap_watch.SignedCapRosterWatch(
+    profile=original['reply']['config'], signed_grants=grants,
+    pinned=wal_transport._panel_pin(), node=scope['nodeId'],
+    activation=scope['activationReceiptSha256'], genesis_sha=scope['genesisPolicySha256'],
+    runtime_id=scope['runtimeId'], trusted_pid=int(sys.argv[3]), socket_path=sys.argv[4])
+assert watch.profile_sha256 == scope['profileRevision']
+assert watch.roster_sha256 == scope['capRosterSha256']
+assert watch.check() is None
+print('verified_without_authority')
+"""
+        assert guest.exec("python3","-E","-c",script,STATE,json.dumps(request),
+                          str(measurement[2]),MEASURED+"/wal/drain.sock",
+                          str(uid),str(peer_id),timeout=10).decode().strip()=="verified_without_authority"
         tls_requests.append(request)
 
     def assert_tls_diagnostic(guest, request, matched):
@@ -519,6 +547,154 @@ def try_signed_lease_pair(guests, db, root, panel, owner, stack, dsn, lab):
     assert_tls_diagnostic(guest_a, tls_requests[0], True)
     assert db.execute("SELECT count(*) FROM quota_v2_signed_first_cap_outbox").fetchone() == (4,)
     print("PASS: installed strict-PQ TLS preflight verifies the full signed roster, rejects foreign evidence and fails closed on a competing SQL lock without granting any public authority.")
+
+    # Real strict-PQ revocation endpoint, without opening a public socket.
+    # Only this disposable hosted harness may create a signed positive
+    # fixture using its own freshly generated ephemeral panel identity.
+    revocation_path = "/api/v1/node/quota-v2/public-tls-revocation"
+    scope = dict(tls_requests[0],requiredLifetimeMs=7000)
+    poll = {"scope":scope,"authoritySha256":"0"*64,"challenge":secrets.token_hex(32)}
+    assert guest_a.request(revocation_path,poll)[0]==409
+    assert guest_b.request(revocation_path,poll)[0]==401
+    assert os.environ.get("GITHUB_ACTIONS")=="true"
+    assert os.environ.get("RUNNER_ENVIRONMENT")=="github-hosted"
+    assert os.environ.get("XMESH_AUDIT_DISPOSABLE")=="1"
+    assert dsn.endswith("/quota_wal_installed")
+    core=Path(os.environ["CORE_DATA_DIR"]).resolve()
+    assert core.parent.name.startswith("xmesh-wal.")
+    assert Path(os.environ["XMESH_TEST_POLICY_PUBLIC_KEY"]).resolve().parent==core.parent
+    now=db.execute(
+        "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT"
+    ).fetchone()[0]
+    # Keep the disposable authority strictly inside the shortest signed
+    # cap's lifetime. Never relax the SQL gate to accommodate CI timing.
+    cap_end,=db.execute(
+        "SELECT min(valid_until_ms) FROM quota_v2_signed_first_cap_outbox WHERE node_id=%s",
+        (scope["nodeId"],),
+    ).fetchone()
+    authority_end=min(now+60000,cap_end-2000)
+    assert authority_end>=now+20000,"insufficient live cap horizon for revocation rehearsal"
+    authority_payload={
+        "schemaVersion":1,"kind":"xmesh.quota-v2.public-tls-ingress",
+        "nodeId":scope["nodeId"],
+        "activationReceiptSha256":scope["activationReceiptSha256"],
+        "genesisPolicySha256":scope["genesisPolicySha256"],
+        "runtimeId":scope["runtimeId"],"profileRevision":scope["profileRevision"],
+        "issuedAtMs":now,"validUntilMs":authority_end,"canServePublic":True,
+        "bindings":[{"tag":"vless-main","port":443,"domain":"vpn.example.com"}],
+    }
+    message=root/"tls-disposable-authority.message"
+    message.write_bytes(canonical(authority_payload))
+    # Keep the ephemeral test key in an anonymous file descriptor. Never
+    # copy it into the test artifacts, stdout or a persistent key file.
+    key_fd=os.memfd_create("xmesh-disposable-tls-signing-key",os.MFD_CLOEXEC)
+    try:
+        secret=(core/"node-policy-ed25519.key").read_bytes()
+        assert len(secret)==32
+        der=bytes.fromhex("302e020100300506032b657004220420")+secret
+        assert os.write(key_fd,der)==len(der)
+        os.lseek(key_fd,0,os.SEEK_SET)
+        signature=subprocess.check_output([
+            "openssl","pkeyutl","-sign","-rawin","-keyform","DER",
+            "-inkey",f"/proc/self/fd/{key_fd}","-in",str(message),
+        ],pass_fds=(key_fd,),timeout=5).hex()
+    finally:
+        os.close(key_fd)
+    authority_doc={"algorithm":"Ed25519","payload":authority_payload,"signature":signature}
+    independent_signature(root,"tls-disposable-authority",authority_doc)
+    wire=canonical(authority_doc)
+    poll["authoritySha256"]=hashlib.sha256(wire).hexdigest()
+    signer=db.execute(
+        "SELECT DISTINCT signer_public_key FROM quota_v2_signed_first_cap_outbox WHERE node_id=%s",
+        (scope["nodeId"],)
+    ).fetchone()[0]
+    db.execute(
+        "INSERT INTO quota_v2_public_tls_authority_outbox("
+        "node_id,request_challenge,activation_sha256,runtime_id,profile_revision,"
+        "genesis_policy_sha256,signer_public_key,cap_roster_sha256,authority_sha256,"
+        "issued_at_ms,valid_until_ms,signed_envelope)"
+        " VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (scope["nodeId"],secrets.token_hex(32),scope["activationReceiptSha256"],
+         scope["runtimeId"],scope["profileRevision"],scope["genesisPolicySha256"],
+         signer,scope["capRosterSha256"],poll["authoritySha256"],now,authority_end,wire)
+    )
+    def assert_tls_witness(revoked=False):
+        poll["challenge"]=secrets.token_hex(32)
+        code,witness=guest_a.request(revocation_path,poll)
+        if revoked and code!=200:
+            # SQL timeout/closed connection is also fail-closed.
+            return
+        assert code==200,(code,witness)
+        independent_signature(root,"tls-live-revocation",witness)
+        claims=witness["payload"]
+        assert claims["kind"]=="xmesh.quota-v2.public-tls-revocation-witness"
+        assert claims["revoked"] is revoked
+        assert claims["challenge"]==poll["challenge"]
+        assert claims["authoritySha256"]==poll["authoritySha256"]
+        for name in ("nodeId","activationReceiptSha256","genesisPolicySha256",
+                     "runtimeId","profileRevision","capRosterSha256"):
+            assert claims[name]==scope[name],claims
+        assert all(claims[key] is False for key in ("canServePublic","canStart","canResume"))
+        assert 0<claims["validUntilMs"]-claims["issuedAtMs"]<=7000
+        if not revoked:
+            assert claims["validUntilMs"]<=authority_payload["validUntilMs"]
+    def assert_installed_revocation_watch(expected_clear):
+        # Run the real root-installed library with the original on-node
+        # pinned key, actual strict-PQ subprocess and fresh nonce. No mocked
+        # transport, response JSON re-encoding or listener activation.
+        script = """
+import json
+import subprocess
+import sys
+sys.path.insert(0, '/usr/local/libexec/xmesh-quota-wal/quota-v2-physical-stop')
+import public_tls_revocation_watch as revocation
+import wal_transport
+scope = json.loads(sys.argv[1])
+binding = dict(node=scope['nodeId'], activation=scope['activationReceiptSha256'],
+               genesis_sha=scope['genesisPolicySha256'], runtime_id=scope['runtimeId'],
+               profile_sha256=scope['profileRevision'], authority_sha256=sys.argv[2],
+               roster_sha256=scope['capRosterSha256'])
+fetch = revocation.enrolled_fetch(state=sys.argv[3], user=scope['userId'], **binding)
+watch = revocation.SignedTlsRevocationWatch(fetch=fetch, pinned=wal_transport._panel_pin(),
+                                           **binding)
+try:
+    assert watch.check() is None
+    assert watch.ensure_fresh() is None
+except (ValueError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
+    if sys.argv[4] != 'deny':
+        raise
+    print('denied')
+else:
+    if sys.argv[4] != 'clear':
+        raise AssertionError('installed watch accepted denied authority')
+    print('verified_without_authority')
+"""
+        expected = "verified_without_authority" if expected_clear else "denied"
+        assert guest_a.exec("python3","-E","-c",script,json.dumps(scope),
+                            poll["authoritySha256"],STATE,
+                            "clear" if expected_clear else "deny",
+                            timeout=10).decode().strip()==expected
+
+    assert_tls_witness()
+    assert_installed_revocation_watch(True)
+    assert guest_b.request(revocation_path,poll)[0]==401
+    assert guest_a.request(revocation_path,dict(
+        poll,scope=dict(scope,capRosterSha256="9"*64)))[0]==409
+    with psycopg.connect(dsn) as blocker:
+        blocker.execute(
+            "SELECT user_id FROM quota_v2_accounts WHERE user_id=%s AND NOT closed FOR UPDATE",
+            (uid,)
+        )
+        assert_tls_witness(revoked=True)
+        assert_installed_revocation_watch(False)
+        blocker.rollback()
+    assert_tls_witness()
+    assert_installed_revocation_watch(True)
+    assert db.execute(
+        "SELECT signed_envelope FROM quota_v2_public_tls_authority_outbox WHERE node_id=%s",
+        (scope["nodeId"],)
+    ).fetchone()==(wire,)
+    print("PASS: strict-PQ revocation polling checks a committed real signature, rejects unknown and foreign authority, and fails closed on SQL contention without opening a TLS listener.")
 
     assert guest_a.request(CAP_PATH,cap_jobs[1][2])[0]==401
     assert guest_a.request(CAP_PATH,dict(cap_jobs[0][2],requestChallenge=cap_jobs[1][2]["requestChallenge"]))[0]==409

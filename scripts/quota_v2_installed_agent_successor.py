@@ -32,19 +32,19 @@ def build_fixture_successor(root, revision, builder, docker):
     docker("run", "--rm", "-v", f"{root / 'reviewed'}:/src:ro",
            "-v", f"{output}:/out", "-w", "/src/agent/xspv2",
            builder, "env", "CGO_ENABLED=0", "go", "build", "-trimpath",
-           "-ldflags", f"-X main.version=control-v6.0.36 -X main.sourceRevision={fixture_revision}",
+           "-ldflags", f"-X main.version=control-v6.0.38 -X main.sourceRevision={fixture_revision}",
            "-o", "/out/fixture-product", "./cmd/xmesh-agent-xspv2-product", timeout=350)
     artifact = output / "fixture-product"
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     artifact.rename(output / (digest + ".bin"))
-    return {"version": "control-v6.0.36", "sourceRevision": fixture_revision,
+    return {"version": "control-v6.0.38", "sourceRevision": fixture_revision,
             "artifactSha256": digest}
 
 
 def check_first_successor(guest, db, panel, initial, target):
     node = guest.node
-    assert initial["version"] == "control-v6.0.35"
-    assert target["version"] == "control-v6.0.36"
+    assert initial["version"] == "control-v6.0.37"
+    assert target["version"] == "control-v6.0.38"
     assert target["sourceRevision"] != initial["sourceRevision"]
     assert target["artifactSha256"] != initial["artifactSha256"]
 
