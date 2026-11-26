@@ -566,13 +566,21 @@ print('verified_without_authority')
     now=db.execute(
         "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT"
     ).fetchone()[0]
+    # Keep the disposable authority strictly inside the shortest signed
+    # cap's lifetime. Never relax the SQL gate to accommodate CI timing.
+    cap_end,=db.execute(
+        "SELECT min(valid_until_ms) FROM quota_v2_signed_first_cap_outbox WHERE node_id=%s",
+        (scope["nodeId"],),
+    ).fetchone()
+    authority_end=min(now+60000,cap_end-2000)
+    assert authority_end>=now+20000,"insufficient live cap horizon for revocation rehearsal"
     authority_payload={
         "schemaVersion":1,"kind":"xmesh.quota-v2.public-tls-ingress",
         "nodeId":scope["nodeId"],
         "activationReceiptSha256":scope["activationReceiptSha256"],
         "genesisPolicySha256":scope["genesisPolicySha256"],
         "runtimeId":scope["runtimeId"],"profileRevision":scope["profileRevision"],
-        "issuedAtMs":now,"validUntilMs":now+60000,"canServePublic":True,
+        "issuedAtMs":now,"validUntilMs":authority_end,"canServePublic":True,
         "bindings":[{"tag":"vless-main","port":443,"domain":"vpn.example.com"}],
     }
     message=root/"tls-disposable-authority.message"
@@ -608,7 +616,7 @@ print('verified_without_authority')
         " VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (scope["nodeId"],secrets.token_hex(32),scope["activationReceiptSha256"],
          scope["runtimeId"],scope["profileRevision"],scope["genesisPolicySha256"],
-         signer,scope["capRosterSha256"],poll["authoritySha256"],now,now+60000,wire)
+         signer,scope["capRosterSha256"],poll["authoritySha256"],now,authority_end,wire)
     )
     def assert_tls_witness(revoked=False):
         poll["challenge"]=secrets.token_hex(32)
