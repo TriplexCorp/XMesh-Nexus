@@ -55,3 +55,18 @@ func TestCurrentWALCandidateRejectsRetiredVersion(t *testing.T) {
 		t.Fatal("retired 6.0.27 identity must not enroll with current release pins")
 	}
 }
+
+func TestClassicImageCandidateIsNeverProductionEnrollment(t *testing.T) {
+	revision, artifact := strings.Repeat("a", 40), strings.Repeat("b", 64)
+	pin := revision + ":" + artifact
+	release := releaseIdentity{"control-v6.0.38", revision, artifact}
+	if releaseAllowedForEnrollment(release, pin, "", "") ||
+		releaseAllowedForEnrollment(release, pin, "0", pin) ||
+		releaseAllowedForEnrollment(release, pin, "1", "") ||
+		releaseAllowedForEnrollment(release, pin, "1", revision+":"+strings.Repeat("c", 64)) {
+		t.Fatal("unqualified candidate accepted outside exact enabled rehearsal")
+	}
+	if !releaseAllowedForEnrollment(release, "", "1", pin) {
+		t.Fatal("reviewed exact candidate must be testable in isolated WAL rehearsal")
+	}
+}

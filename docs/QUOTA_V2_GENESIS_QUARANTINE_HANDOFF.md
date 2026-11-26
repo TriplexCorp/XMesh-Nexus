@@ -175,3 +175,45 @@ refund authority. The eventual installed supervisor must independently
 compare the actual mounted WAL, live signed cap counters, qualification
 pins and current remote snapshot; no public listener or production
 positive TLS issuer is introduced here.
+
+### Installed first-Genesis WAL readback qualification
+
+The installed lease workflow keeps its original lease-recovery,
+managed-generations and Agent SIGKILL scenarios. A separate fourth hosted
+scenario runs the unmodified pinned Node metered bootstrap on two fresh
+disposable systemd guests **without** their staging meter or staging
+environment. It prepositions the independently rebuilt and attested Xray
+executable only; the real installer still verifies the exact manifest and
+artifact attestation and creates its own qualification identity. Profiles and
+the two-user roster are assigned before enrollment; the installed first meter,
+egress and renewal services must produce real confirmed first-cap records and
+the loopback-only ingress. No TLS listener is opened and no client sends bytes.
+
+The separately pinned dormant readback module is copied into a root-private
+test directory, not wired into an Agent service. The metered installer exits
+through `install-metered-services.sh`, whose installed systemd units directly
+execute their workers under the exact root-owned `/opt/xmesh-node` release
+checkout, unlike the normal strict-PQ libexec installer. The scenario
+verifies those actual unit ExecStart paths, exact checkout revision, clean
+tracked worker bytes and root-owned imported module paths. No substitute
+checkout, imported test stub or normal libexec fallback is permitted.
+Its actual enrolled product, signed profile/roster,
+isolated meter PID, private production-path WAL bind and strict-PQ request are
+all used unchanged. The test asserts an empty
+remote birth index, exact cap files and the measured Xray PID's actual
+exclusive lifetime instance lock with no local traffic before and after,
+and no public TLS authority outbox row. All four scenarios must pass;
+the fourth is a diagnostic, not a fourth signed release artifact or a
+production permission.
+
+The first genuinely metered bootstrap hit a confirmed image-configuration
+rejection on both Ubuntu classic-Docker guests before any WAL proof. The
+fourth scenario now pins the separate Agent 6.0.38 candidate which explicitly
+sets numeric image identity and names the rejected metadata field without
+dumping environment values. The existing three 6.0.37 scenarios and their
+immutable evidence gate remain independent and unchanged. The fourth
+scenario only admits the exact candidate digest through the already
+opt-in isolated rehearsal pin; it does not change the production target,
+production release pin, Node staging settings, or issue public permission.
+The Node candidate's real classic Docker check and all four Nexus scenarios
+must pass before this branch can be considered for integration.

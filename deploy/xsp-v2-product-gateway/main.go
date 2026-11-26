@@ -552,7 +552,7 @@ func (g *gateway) issueClientCertificate(nodeID int64, publicDER []byte) (string
 
 // The isolated WAL rehearsal pins the exact proposed product binary.
 func pinnedWALCandidate(release releaseIdentity, enabled, pin string) bool {
-	if enabled != "1" || (release.Version != "control-v6.0.25" && release.Version != "control-v6.0.33" && release.Version != "control-v6.0.34" && release.Version != "control-v6.0.35" && release.Version != "control-v6.0.36" && release.Version != "control-v6.0.37") {
+	if enabled != "1" || (release.Version != "control-v6.0.25" && release.Version != "control-v6.0.33" && release.Version != "control-v6.0.34" && release.Version != "control-v6.0.35" && release.Version != "control-v6.0.36" && release.Version != "control-v6.0.37" && release.Version != "control-v6.0.38") {
 		return false
 	}
 	return matchesReleasePin(release, pin)

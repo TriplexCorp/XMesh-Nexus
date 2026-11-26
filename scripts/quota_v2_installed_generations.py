@@ -198,8 +198,8 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         parallel(enable, pair)
         initial = first(main, uid)
         stable = first(main, peer["id"])
-        first(pair[1], uid)
-        first(pair[1], peer["id"])
+        second_initial = first(pair[1], uid)
+        second_stable = first(pair[1], peer["id"])
         pid = ready_route(main, uid, initial)
         assert ready_route(main, peer["id"], stable) == pid
         start_echo(main, 1, pid)

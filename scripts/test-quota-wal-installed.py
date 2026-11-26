@@ -56,7 +56,10 @@ def reference_identity(root, revision):
     output = root / "build"
     output.mkdir()
     version = (NODE / "AGENT_VERSION").read_text().strip()
-    assert version in ("control-v6.0.25", "control-v6.0.37")
+    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+        assert version == "control-v6.0.38"
+    else:
+        assert version in ("control-v6.0.25", "control-v6.0.37")
     subprocess.run(["git", "clone", "--no-hardlinks", "--no-checkout", NODE, source],
                    check=True, timeout=30)
     subprocess.run(["git", "-C", source, "checkout", "--detach", revision], check=True, timeout=30)
@@ -66,6 +69,10 @@ def reference_identity(root, revision):
            "-ldflags", f"-X main.version={version} -X main.sourceRevision={revision}",
            "-o", "/out/product", "./cmd/xmesh-agent-xspv2-product", timeout=350)
     digest = hashlib.sha256((output / "product").read_bytes()).hexdigest()
+    # Independently built by the reviewed Node candidate workflow; this
+    # extra scenario must not qualify a different self-consistent artifact.
+    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+        assert digest == "eb7909e7e901b5aee3dafc90d4f57e30aba01df9710afcab8bb7b46c9732a45b"
     expected = {"version": version, "sourceRevision": revision, "artifactSha256": digest}
     assert json.loads(subprocess.check_output([output / "product", "--identity"], timeout=10)) == expected
     return expected
@@ -164,12 +171,16 @@ systemctl stop docker.socket docker.service containerd.service
         self.exec("update-ca-certificates")
         docker("cp", NODE / "bootstrap.sh", f"{self.name}:/root/xmesh-bootstrap.sh")
 
-    def install(self, panel, identity, nexus_revision, token, *, wal_staging=True):
+    def install(self, panel, identity, nexus_revision, token, *, wal_staging=True, metered=False):
         primary, secondary = pty.openpty()
         command = ["docker", "exec", "-it", self.name, "env",
                    f"XMESH_NODE_RELEASE_REF={identity['sourceRevision']}",
                    f"XMESH_NEXUS_RELEASE_REF={nexus_revision}",
                    ]
+        assert not (wal_staging and metered)
+        if metered:
+            assert os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback"
+            command.append("XMESH_QUOTA_V2_METERED_INSTALL=1")
         if wal_staging:
             command.extend(("XMESH_QUOTA_V2_WAL_STAGE_AGENT=1",
                             f"XMESH_QUOTA_V2_AUTO_RENEW_STAGING={int(os.environ.get('XMESH_INSTALLED_GENESIS_LEASE') == '1')}"))
@@ -220,6 +231,27 @@ systemctl stop docker.socket docker.service containerd.service
             returncode = process.wait(timeout=5)
             if returncode != 0:
                 excerpt = bytes(recent[-4096:])
+                if metered:
+                    # The real installer stops on a failed systemd unit.
+                    # Capture the failed service while this disposable
+                    # guest still exists; no restart, retry or fallback.
+                    for diagnostic in (
+                        ("journalctl", "--no-pager", "-n", "100", "-o", "cat",
+                         "-u", "xmesh-quota-v2-meter.service",
+                         "-u", "xmesh-quota-v2-egress.service",
+                         "-u", "xmesh-pq-activation-recovery.service"),
+                        ("docker", "ps", "-a", "--format", "{{.Names}} {{.Status}}"),
+                        ("docker", "logs", "--tail", "40", "xmesh-managed-xray"),
+                    ):
+                        result = subprocess.run(
+                            ["docker", "exec", self.name, *diagnostic],
+                            capture_output=True, timeout=15,
+                        )
+                        redacted = (result.stdout + result.stderr)[-16000:].replace(
+                            token_bytes, b"[REDACTED]")
+                        print(f"[installed Node {self.node}] {diagnostic[0]} "
+                              f"diagnostic (exit={result.returncode}): "
+                              f"{redacted.decode('utf-8', errors='replace')}", flush=True)
                 raise AssertionError(
                     f"bootstrap failed on Node {self.node} (exit {returncode}); "
                     f"last guest output: {excerpt.decode('utf-8', errors='replace')}"
@@ -524,7 +556,7 @@ def main():
                                             f"{revision}:{identity['artifactSha256']}" if identity["version"] == "control-v6.0.37" else ""
                                         ),
                                         "XSP_V2_PRODUCT_WAL_CANDIDATE_PIN": (
-                                            f"{revision}:{identity['artifactSha256']}" if identity["version"] == "control-v6.0.25" else ""
+                                            f"{revision}:{identity['artifactSha256']}" if identity["version"] in ("control-v6.0.25", "control-v6.0.38") else ""
                                         )})
 
         def stop_gateway():
@@ -562,14 +594,30 @@ def main():
                        (hashlib.sha256(token.encode()).hexdigest(), node))
             guests.append((Guest(stack, image, network, node), token))
 
-        def install(item, *, wal_staging=True):
+        def install(item, *, wal_staging=True, metered=False):
             guest, token = item
             guest.prepare(root)
             with agent_builder.open("rb") as archive:
                 docker("exec", "-i", guest.name, "docker", "image", "load", stdin=archive, timeout=120)
             assert guest.exec("docker", "image", "inspect", "--format", "{{.Id}}",
                               AGENT_BUILDER).strip() == builder_id
-            return guest.install(panel, identity, nexus_revision, token, wal_staging=wal_staging)
+            if metered:
+                from quota_v2_installed_tls_wal_readback import seed_attested_binary
+                seed_attested_binary(guest, sys.modules[__name__])
+            return guest.install(panel, identity, nexus_revision, token,
+                                 wal_staging=wal_staging, metered=metered)
+
+        if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+            # The ordinary fixtures have a different mounted WAL path and
+            # lack the real production-role qualification mount. Never
+            # weaken the actual diagnostic to accept those staging meters.
+            from quota_v2_installed_tls_wal_readback import configure_pair, qualify_pair
+            user_ids = configure_pair([guest for guest, _ in guests], owner)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                list(pool.map(lambda item: install(item, wal_staging=False, metered=True), guests))
+            qualify_pair([guest for guest, _ in guests], user_ids, panel, db,
+                         identity, sys.modules[__name__])
+            return  # deliberately NOT lease-recovery/managed-generations release evidence
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             first, second = pool.map(install, guests)
