@@ -701,6 +701,18 @@ async fn authenticate_runtime<'a>(
     node_auth::authenticate_product_activation(state, headers, node_id, PATH).await
 }
 
+impl Request {
+    const fn node_id(&self) -> i64 {
+        match self {
+            Self::Store { node_id, .. }
+            | Self::Charge { node_id, .. }
+            | Self::Head { node_id, .. }
+            | Self::PublicTlsHead { node_id, .. }
+            | Self::PrepareGenesis { node_id, .. } => *node_id,
+        }
+    }
+}
+
 async fn handle(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -713,13 +725,7 @@ async fn handle(
         ));
     }
     let request: Request = serde_json::from_slice(&raw).map_err(|_| invalid())?;
-    let node_id = match &request {
-        Request::Store { node_id, .. }
-        | Request::Charge { node_id, .. }
-        | Request::Head { node_id, .. }
-        | Request::PublicTlsHead { node_id, .. }
-        | Request::PrepareGenesis { node_id, .. } => *node_id,
-    };
+    let node_id = request.node_id();
     if node_id <= 0 {
         return Err(invalid());
     }

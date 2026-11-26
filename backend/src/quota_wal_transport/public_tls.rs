@@ -2,7 +2,7 @@
 //!
 //! This is evidence of what PostgreSQL currently holds, NOT a proof of the
 //! remote kernel, every transmitted byte, or an empty host journal. A fresh
-//! signed "empty_remote_history" is deliberately not an ingress authorization.
+//! signed `empty_remote_history` is deliberately not an ingress authorization.
 use super::{
     Anchor, Birth, authenticate_runtime, conflict, enrolled_key, sha256, signed, verify_witness,
 };
