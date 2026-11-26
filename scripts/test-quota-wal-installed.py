@@ -56,7 +56,10 @@ def reference_identity(root, revision):
     output = root / "build"
     output.mkdir()
     version = (NODE / "AGENT_VERSION").read_text().strip()
-    assert version in ("control-v6.0.25", "control-v6.0.37")
+    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+        assert version == "control-v6.0.38"
+    else:
+        assert version in ("control-v6.0.25", "control-v6.0.37")
     subprocess.run(["git", "clone", "--no-hardlinks", "--no-checkout", NODE, source],
                    check=True, timeout=30)
     subprocess.run(["git", "-C", source, "checkout", "--detach", revision], check=True, timeout=30)
@@ -549,7 +552,7 @@ def main():
                                             f"{revision}:{identity['artifactSha256']}" if identity["version"] == "control-v6.0.37" else ""
                                         ),
                                         "XSP_V2_PRODUCT_WAL_CANDIDATE_PIN": (
-                                            f"{revision}:{identity['artifactSha256']}" if identity["version"] == "control-v6.0.25" else ""
+                                            f"{revision}:{identity['artifactSha256']}" if identity["version"] in ("control-v6.0.25", "control-v6.0.38") else ""
                                         )})
 
         def stop_gateway():

@@ -197,3 +197,15 @@ remote birth index and exact cap files with no local traffic before and
 after, and no public TLS authority outbox row. All four scenarios must pass;
 the fourth is a diagnostic, not a fourth signed release artifact or a
 production permission.
+
+The first genuinely metered bootstrap hit a confirmed image-configuration
+rejection on both Ubuntu classic-Docker guests before any WAL proof. The
+fourth scenario now pins the separate Agent 6.0.38 candidate which explicitly
+sets numeric image identity and names the rejected metadata field without
+dumping environment values. The existing three 6.0.37 scenarios and their
+immutable evidence gate remain independent and unchanged. The fourth
+scenario only admits the exact candidate digest through the already
+opt-in isolated rehearsal pin; it does not change the production target,
+production release pin, Node staging settings, or issue public permission.
+The Node candidate's real classic Docker check and all four Nexus scenarios
+must pass before this branch can be considered for integration.
