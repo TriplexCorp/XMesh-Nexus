@@ -195,8 +195,9 @@ dependencies from the actual root-private installed libexec directory, not
 from the source checkout. Its actual enrolled product, signed profile/roster,
 isolated meter PID, private production-path WAL bind and strict-PQ request are
 all used unchanged. The test asserts an empty
-remote birth index and exact cap files with no local traffic before and
-after, and no public TLS authority outbox row. All four scenarios must pass;
+remote birth index, exact cap files and the measured Xray PID's actual
+exclusive lifetime instance lock with no local traffic before and after,
+and no public TLS authority outbox row. All four scenarios must pass;
 the fourth is a diagnostic, not a fourth signed release artifact or a
 production permission.
 

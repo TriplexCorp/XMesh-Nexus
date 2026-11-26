@@ -81,14 +81,14 @@ jobs:
         if: matrix.scenario == 'public-tls-wal-readback'
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 7f3781e80d1f222c8115aa2bc19eb1eb69dace4f
+          ref: 803b4fe5ca97e2dc5022f58877f7f27a8df04250
           path: .ci-reviewed-tls-wal
           persist-credentials: false
       - name: Verify exact dormant Node WAL readback without replacing Agent
         if: matrix.scenario == 'public-tls-wal-readback'
         run: |
           set -euo pipefail
-          test "$(git -C .ci-reviewed-tls-wal rev-parse HEAD)" = '7f3781e80d1f222c8115aa2bc19eb1eb69dace4f'
+          test "$(git -C .ci-reviewed-tls-wal rev-parse HEAD)" = '803b4fe5ca97e2dc5022f58877f7f27a8df04250'
           test "$(cat .ci-reviewed-tls-wal/AGENT_VERSION)" = 'control-v6.0.37'
           module=experiments/quota-v2-physical-stop/public_tls_wal_watch.py
           test -f ".ci-reviewed-tls-wal/$module"

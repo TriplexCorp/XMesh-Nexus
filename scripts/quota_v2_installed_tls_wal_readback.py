@@ -111,17 +111,23 @@ def qualify_pair(pair, user_ids, panel, db, identity, lab):
                         "ORDER BY node_id,user_id").fetchall()
     assert actual == sorted((guest.node, uid) for guest in pair for uid in user_ids), actual
     assert db.execute("SELECT count(*) FROM quota_v2_external_wal_birth_anchors").fetchone() == (0,)
-    verify_initial(pair, user_ids[0], panel, lab, "/run/xmesh-ci-tls-wal-readback")
+    verify_initial(pair, user_ids, panel, lab, "/run/xmesh-ci-tls-wal-readback")
     assert db.execute("SELECT count(*) FROM quota_v2_external_wal_birth_anchors").fetchone() == (0,)
     assert db.execute("SELECT count(*) FROM quota_v2_public_tls_authority_outbox").fetchone() == (0,)
     print("PASS: both true installed qualified meters verified before traffic; no public TLS authority.", flush=True)
 
-def verify_initial(pair, user_id, panel, lab, work):
+def verify_initial(pair, user_ids, panel, lab, work):
     require_disposable()
     source = Path(os.environ["XMESH_PUBLIC_TLS_WAL_WATCH_SOURCE"]).resolve(strict=True)
     assert source.name == "public_tls_wal_watch.py" and source.is_file()
     source_bytes = source.read_bytes()
     expected = hashlib.sha256(source_bytes).hexdigest()
+    user_id = user_ids[0]
+    # Exact initial ledger shape from durable_fence.go and the signed cap
+    # admission implementation. The probe verifies the actual held lock;
+    # its presence alone cannot pass the readback.
+    expected_ledger = {b"xray-instance.lock", *(
+        f"positive-cap-u{uid}.json".encode("ascii") for uid in user_ids)}
     script = r"""
 import errno
 import hashlib
@@ -169,7 +175,9 @@ print("signed_wal_readback_verified_without_authority")
         # A first-ever generation must be pristine before any test sends
         # traffic. This check is separate from the signed readback.
         before = guest.exec("ls", "-1A", LEDGER)
-        assert before and all(n.startswith(b"positive-cap-u") for n in before.splitlines())
+        assert set(before.splitlines()) == expected_ledger, (
+            f"Node {guest.node}: unexpected pristine ledger names {before!r}"
+        )
         # The production-path ledger must be the actual nested Docker bind,
         # not an empty directory manufactured for the test.
         raw = json.loads(guest.exec("docker", "inspect", "--format", "{{json .}}",
