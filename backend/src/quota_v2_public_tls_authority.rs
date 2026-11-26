@@ -70,7 +70,7 @@ fn domain(value: &str) -> bool {
 /// admission and a root-owned TLS certificate life-cycle. Binding the *exact*
 /// original runtime and canonical raw VLESS profile blocks a signed approval
 /// from silently migrating to a fresh unmetered Xray process or modified roster.
-pub(crate) fn policy(
+pub fn policy(
     source: &GenesisBinding,
     bindings: &[PublicListener],
     issued_at_ms: i64,

@@ -57,7 +57,7 @@ Path(v['--status-file']).write_text('200\\n')
         self.bootstrap = self.base / 'updater-fixture'
         self.bootstrap.write_text('''#!/bin/bash
 # XMESH_TARGET_AWARE_UPDATER=1
-# AGENT_VERSION="control-v6.0.36"
+# AGENT_VERSION="control-v6.0.37"
 # xmesh-node-agent-upgrade.service
 printf 'executed\\n' >> "$CALLS"
 ''')
@@ -93,7 +93,7 @@ systemd-run(){
 timeout(){ shift; "$@"; }
 sanitize_updater_error(){ :; }
 ''' + worker + '''
-if run_agent_updater control-v6.0.36;then
+if run_agent_updater control-v6.0.37;then
  printf 'success\\n'
 else
  printf '%s\\n' "$UPDATER_ERROR"
@@ -124,8 +124,8 @@ fi
 
     def test_wrong_target_is_never_executed(self):
         fixture = self.bootstrap.read_text()
-        self.assertIn('AGENT_VERSION="control-v6.0.36"', fixture)
-        self.bootstrap.write_text(fixture.replace('control-v6.0.36', 'control-v6.0.10'))
+        self.assertIn('AGENT_VERSION="control-v6.0.37"', fixture)
+        self.bootstrap.write_text(fixture.replace('control-v6.0.37', 'control-v6.0.10'))
         result = self.bootstrap_call()
         self.assertEqual(result.returncode, 1)
         self.assertIn('failed target validation', result.stdout)
