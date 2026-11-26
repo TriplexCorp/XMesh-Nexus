@@ -164,12 +164,16 @@ systemctl stop docker.socket docker.service containerd.service
         self.exec("update-ca-certificates")
         docker("cp", NODE / "bootstrap.sh", f"{self.name}:/root/xmesh-bootstrap.sh")
 
-    def install(self, panel, identity, nexus_revision, token, *, wal_staging=True):
+    def install(self, panel, identity, nexus_revision, token, *, wal_staging=True, metered=False):
         primary, secondary = pty.openpty()
         command = ["docker", "exec", "-it", self.name, "env",
                    f"XMESH_NODE_RELEASE_REF={identity['sourceRevision']}",
                    f"XMESH_NEXUS_RELEASE_REF={nexus_revision}",
                    ]
+        assert not (wal_staging and metered)
+        if metered:
+            assert os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback"
+            command.append("XMESH_QUOTA_V2_METERED_INSTALL=1")
         if wal_staging:
             command.extend(("XMESH_QUOTA_V2_WAL_STAGE_AGENT=1",
                             f"XMESH_QUOTA_V2_AUTO_RENEW_STAGING={int(os.environ.get('XMESH_INSTALLED_GENESIS_LEASE') == '1')}"))
@@ -562,14 +566,30 @@ def main():
                        (hashlib.sha256(token.encode()).hexdigest(), node))
             guests.append((Guest(stack, image, network, node), token))
 
-        def install(item, *, wal_staging=True):
+        def install(item, *, wal_staging=True, metered=False):
             guest, token = item
             guest.prepare(root)
             with agent_builder.open("rb") as archive:
                 docker("exec", "-i", guest.name, "docker", "image", "load", stdin=archive, timeout=120)
             assert guest.exec("docker", "image", "inspect", "--format", "{{.Id}}",
                               AGENT_BUILDER).strip() == builder_id
-            return guest.install(panel, identity, nexus_revision, token, wal_staging=wal_staging)
+            if metered:
+                from quota_v2_installed_tls_wal_readback import seed_attested_binary
+                seed_attested_binary(guest, sys.modules[__name__])
+            return guest.install(panel, identity, nexus_revision, token,
+                                 wal_staging=wal_staging, metered=metered)
+
+        if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+            # The ordinary fixtures have a different mounted WAL path and
+            # lack the real production-role qualification mount. Never
+            # weaken the actual diagnostic to accept those staging meters.
+            from quota_v2_installed_tls_wal_readback import configure_pair, qualify_pair
+            user_ids = configure_pair([guest for guest, _ in guests], owner)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                list(pool.map(lambda item: install(item, wal_staging=False, metered=True), guests))
+            qualify_pair([guest for guest, _ in guests], user_ids, panel, db,
+                         identity, sys.modules[__name__])
+            return  # deliberately NOT lease-recovery/managed-generations release evidence
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             first, second = pool.map(install, guests)

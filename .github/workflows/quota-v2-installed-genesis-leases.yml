@@ -40,11 +40,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [lease-recovery, managed-generations, agent-sigkill]
+        scenario: [lease-recovery, managed-generations, agent-sigkill, public-tls-wal-readback]
     timeout-minutes: 50
     env:
       XMESH_AUDIT_DISPOSABLE: '1'
-      XMESH_TEST_INSTALLED_GENERATIONS: ${{ matrix.scenario != 'lease-recovery' && '1' || '0' }}
+      XMESH_TEST_INSTALLED_GENERATIONS: ${{ (matrix.scenario == 'managed-generations' || matrix.scenario == 'agent-sigkill') && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
       XMESH_TEST_INSTALLED_REBOOT: ${{ matrix.scenario == 'lease-recovery' && '1' || '0' }}
       XMESH_INSTALLED_NODE_REF: 402f53c29807836224958bf2887a6bec432aec85
@@ -78,14 +78,14 @@ jobs:
       # The diagnostic is separately reviewed source, NOT a replacement
       # installer or a changed release-candidate binary.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        if: matrix.scenario == 'managed-generations'
+        if: matrix.scenario == 'public-tls-wal-readback'
         with:
           repository: TriplexCorp/XMesh-Node
           ref: 7f3781e80d1f222c8115aa2bc19eb1eb69dace4f
           path: .ci-reviewed-tls-wal
           persist-credentials: false
       - name: Verify exact dormant Node WAL readback without replacing Agent
-        if: matrix.scenario == 'managed-generations'
+        if: matrix.scenario == 'public-tls-wal-readback'
         run: |
           set -euo pipefail
           test "$(git -C .ci-reviewed-tls-wal rev-parse HEAD)" = '7f3781e80d1f222c8115aa2bc19eb1eb69dace4f'
@@ -206,7 +206,7 @@ jobs:
           export XMESH_WAL_TUNNEL_FIXTURE="$RUNNER_TEMP/wal-tunnel-fixture"
           bash scripts/run-quota-wal-transport-audit.sh backend/target/debug/xmesh-api --with-installed
       - name: Save exact installed Agent identity after successful scenario
-        if: success()
+        if: success() && matrix.scenario != 'public-tls-wal-readback'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: quota-v2-release-qualification-${{ matrix.scenario }}
@@ -214,7 +214,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Save verified public quota evidence
-        if: always() && matrix.scenario != 'lease-recovery'
+        if: always() && (matrix.scenario == 'managed-generations' || matrix.scenario == 'agent-sigkill')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: quota-v2-generations-evidence-${{ matrix.scenario }}
@@ -224,12 +224,13 @@ jobs:
     name: Cross-scenario immutable Agent and Xray consistency (staging only)
     needs: installed-leases
     # GitHub treats a skipped required check as passing. Never skip the gate
-    # when one of the three real two-Node scenarios fails.
+    # when any of the four real two-Node scenarios fails. The extra
+    # diagnostic does not manufacture an extra release-candidate artifact.
     if: always() && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: All three installed scenarios must have passed
+      - name: All four installed scenarios must have passed
         env:
           INSTALLED_RESULT: ${{ needs.installed-leases.result }}
         run: test "$INSTALLED_RESULT" = success

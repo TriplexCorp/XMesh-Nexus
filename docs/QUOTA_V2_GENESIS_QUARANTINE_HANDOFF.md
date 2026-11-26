@@ -175,3 +175,25 @@ refund authority. The eventual installed supervisor must independently
 compare the actual mounted WAL, live signed cap counters, qualification
 pins and current remote snapshot; no public listener or production
 positive TLS issuer is introduced here.
+
+### Installed first-Genesis WAL readback qualification
+
+The installed lease workflow keeps its original lease-recovery,
+managed-generations and Agent SIGKILL scenarios. A separate fourth hosted
+scenario runs the unmodified pinned Node metered bootstrap on two fresh
+disposable systemd guests **without** their staging meter or staging
+environment. It prepositions the independently rebuilt and attested Xray
+executable only; the real installer still verifies the exact manifest and
+artifact attestation and creates its own qualification identity. Profiles and
+the two-user roster are assigned before enrollment; the installed first meter,
+egress and renewal services must produce real confirmed first-cap records and
+the loopback-only ingress. No TLS listener is opened and no client sends bytes.
+
+The separately pinned dormant readback module is copied into a root-private
+test directory, not installed into Agent 6.0.37. Its actual enrolled product,
+signed profile/roster, isolated meter PID, private production-path WAL bind
+and strict-PQ request are all used unchanged. The test asserts an empty
+remote birth index and exact cap files with no local traffic before and
+after, and no public TLS authority outbox row. All four scenarios must pass;
+the fourth is a diagnostic, not a fourth signed release artifact or a
+production permission.

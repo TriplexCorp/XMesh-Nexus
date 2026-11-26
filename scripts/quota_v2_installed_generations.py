@@ -202,14 +202,6 @@ def exercise(pair, db, root, user, peer, lab, stack, dsn, panel):
         second_stable = first(pair[1], peer["id"])
         pid = ready_route(main, uid, initial)
         assert ready_route(main, peer["id"], stable) == pid
-        if not crashes:
-            from quota_v2_installed_tls_wal_readback import verify_initial
-
-            # Actual independently installed first meters, all grants and
-            # privately bound ingress routes ready; NO client sent traffic.
-            second_pid = ready_route(pair[1], uid, second_initial)
-            assert ready_route(pair[1], peer["id"], second_stable) == second_pid
-            verify_initial(pair, uid, panel, lab, WORK)
         start_echo(main, 1, pid)
         if crashes:
             main.exec("test", "-f", FAULT_STATE + "/loaded")
