@@ -190,9 +190,14 @@ egress and renewal services must produce real confirmed first-cap records and
 the loopback-only ingress. No TLS listener is opened and no client sends bytes.
 
 The separately pinned dormant readback module is copied into a root-private
-test directory, not installed into the Agent. The verifier imports its
-dependencies from the actual root-private installed libexec directory, not
-from the source checkout. Its actual enrolled product, signed profile/roster,
+test directory, not wired into an Agent service. The metered installer exits
+through `install-metered-services.sh`, whose installed systemd units directly
+execute their workers under the exact root-owned `/opt/xmesh-node` release
+checkout, unlike the normal strict-PQ libexec installer. The scenario
+verifies those actual unit ExecStart paths, exact checkout revision, clean
+tracked worker bytes and root-owned imported module paths. No substitute
+checkout, imported test stub or normal libexec fallback is permitted.
+Its actual enrolled product, signed profile/roster,
 isolated meter PID, private production-path WAL bind and strict-PQ request are
 all used unchanged. The test asserts an empty
 remote birth index, exact cap files and the measured Xray PID's actual

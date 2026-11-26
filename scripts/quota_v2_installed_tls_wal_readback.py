@@ -12,7 +12,8 @@ from pathlib import Path
 
 from quota_v2_installed_genesis_lease import STATE, parallel
 
-INSTALLED_WAL = "/usr/local/libexec/xmesh-quota-wal/quota-v2-physical-stop"
+INSTALLED_ROOT = "/opt/xmesh-node"
+INSTALLED_WAL = INSTALLED_ROOT + "/experiments/quota-v2-physical-stop"
 LEDGER = "/var/lib/xmesh-first-meter/runtime/ledger"
 
 
@@ -91,7 +92,21 @@ def qualify_pair(pair, user_ids, panel, db, identity, lab):
         guest.exec("test", "!", "-e", "/var/lib/xmesh-measured-lab")
         guest.exec("test", "!", "-e", "/etc/xmesh-quota-generations-staging.env")
         assert json.loads(guest.exec(lab.PRODUCT, "--identity")) == identity
-        assert guest.exec("git", "-C", "/opt/xmesh-node", "rev-parse", "HEAD").strip().decode() == identity["sourceRevision"]
+        assert guest.exec("git", "-C", INSTALLED_ROOT, "rev-parse", "HEAD").strip().decode() == identity["sourceRevision"]
+        # Metered bootstrap has its own operational installation path. Do
+        # not mistake the normal strict-PQ libexec helpers (not installed
+        # here) for the *actual* production-shaped metered systemd workers.
+        for unit, helper in (
+            ("xmesh-quota-v2-meter.service", "qualified_first_meter.py"),
+            ("xmesh-quota-v2-renewal.service", "renewal_worker.py"),
+            ("xmesh-quota-v2-ingress.service", "vless_ingress.py"),
+        ):
+            actual = guest.exec("systemctl", "show", unit, "-p", "ExecStart", "--value")
+            prefix = ("argv[]=/usr/bin/python3 " + INSTALLED_WAL + "/" + helper + " ").encode()
+            assert prefix in actual, (unit, actual)
+        guest.exec("git", "-C", INSTALLED_ROOT, "diff", "--quiet", "HEAD", "--",
+                   "experiments/quota-v2-physical-stop", "experiments/xray-dataplane-fence",
+                   "deploy/xmesh-policy-guard-base.py")
         # No staging overrides and no substitute Xray or WAL path. Quiesce
         # only the test timer; a real installed oneshot must finish normally.
         guest.exec("systemctl", "stop", "xmesh-quota-v2-renewal.timer")
@@ -134,6 +149,7 @@ import hashlib
 from pathlib import Path
 import sys
 import time
+import stat
 
 source, installed, panel, node, user, state, expected = sys.argv[1:]
 assert hashlib.sha256(Path(source).read_bytes()).hexdigest() == expected
@@ -141,10 +157,15 @@ sys.path.insert(0, str(Path(source).parent))
 sys.path.insert(1, installed)
 import public_tls_wal_watch as watch
 assert Path(watch.__file__).resolve() == Path(source)
+assert Path(installed).resolve(strict=True) == Path(installed)
 for module in (watch.wal, watch.preflight, watch.qualification,
                watch.cap_install, watch.genesis_reservation, watch.preflight.quarantine):
-    assert Path(module.__file__).resolve().parent == Path(installed)
-assert not (Path(installed) / Path(source).name).exists()
+    path = Path(module.__file__)
+    assert path.resolve(strict=True) == path and path.parent == Path(installed)
+    info = path.stat()
+    assert stat.S_ISREG(info.st_mode) and info.st_uid == 0 and not info.st_mode & 0o022
+# The dormant module may be present as checked-out source, but it must
+# only execute the separately pinned reviewed diagnostic copy above.
 # Don't override any qualification pin, network client, clock, filesystem,
 # runtime, signature checker or Unix peer observation. Only retry actual
 # transient acquisition of the installed worker's pre-existing lock.
