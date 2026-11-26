@@ -69,6 +69,10 @@ def reference_identity(root, revision):
            "-ldflags", f"-X main.version={version} -X main.sourceRevision={revision}",
            "-o", "/out/product", "./cmd/xmesh-agent-xspv2-product", timeout=350)
     digest = hashlib.sha256((output / "product").read_bytes()).hexdigest()
+    # Independently built by the reviewed Node candidate workflow; this
+    # extra scenario must not qualify a different self-consistent artifact.
+    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+        assert digest == "eb7909e7e901b5aee3dafc90d4f57e30aba01df9710afcab8bb7b46c9732a45b"
     expected = {"version": version, "sourceRevision": revision, "artifactSha256": digest}
     assert json.loads(subprocess.check_output([output / "product", "--identity"], timeout=10)) == expected
     return expected

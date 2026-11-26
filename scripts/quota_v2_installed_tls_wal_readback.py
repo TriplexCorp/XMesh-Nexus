@@ -120,7 +120,8 @@ def verify_initial(pair, user_id, panel, lab, work):
     require_disposable()
     source = Path(os.environ["XMESH_PUBLIC_TLS_WAL_WATCH_SOURCE"]).resolve(strict=True)
     assert source.name == "public_tls_wal_watch.py" and source.is_file()
-    expected = hashlib.sha256(source.read_bytes()).hexdigest()
+    source_bytes = source.read_bytes()
+    expected = hashlib.sha256(source_bytes).hexdigest()
     script = r"""
 import errno
 import hashlib
@@ -155,9 +156,15 @@ print("signed_wal_readback_verified_without_authority")
 
     def check(guest):
         target = work + "/public_tls_wal_watch.py"
-        lab.docker("cp", str(source), f"{guest.name}:{target}")
-        guest.exec("chown", "root:root", target)
-        guest.exec("chmod", "0600", target)
+        # /run is the guest's tmpfs; docker cp addresses the outer
+        # container filesystem instead. Stream into the actual guest
+        # mount, with exclusive creation and private root ownership.
+        assert guest.exec("stat", "-c", "%u:%g:%a", work).strip() == b"0:0:700"
+        lab.docker("exec", "-i", guest.name, "bash", "-ec",
+                   'umask 077; set -C; cat > "$1"', "--", target,
+                   input=source_bytes, timeout=15)
+        assert guest.exec("stat", "-c", "%u:%g:%a:%h", target).strip() == b"0:0:600:1"
+        assert guest.exec("sha256sum", target).split()[0].decode() == expected
         # A first-ever generation must be pristine before any test sends
         # traffic. This check is separate from the signed readback.
         before = guest.exec("ls", "-1A", LEDGER)
