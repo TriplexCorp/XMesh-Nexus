@@ -10,12 +10,11 @@ import quota_v2_installed_tls_wal_traffic as traffic
 
 
 class HarnessTests(unittest.TestCase):
-    def test_vless_header_and_fragmented_exact_reads(self):
+    def test_socks_target_and_fragmented_exact_reads(self):
         ns = {"__name__": "client_unit_test"}
         exec(compile(traffic.CLIENT, "<inner client>", "exec"), ns)
-        identity = "00112233-4455-6677-8899-aabbccddeeff"
-        self.assertEqual(ns["vless_header"](identity, traffic.TARGET, 28421).hex(),
-                         "0000112233445566778899aabbccddeeff00016f0501c0000009")
+        self.assertEqual(ns["socks_request"](traffic.TARGET, 28421).hex(),
+                         "05010001c00000096f05")
         first, second = socket.socketpair()
         with first, second:
             first.sendall(b"abc")
@@ -37,12 +36,14 @@ class HarnessTests(unittest.TestCase):
             def exec(self, *command, **kwargs):
                 self.calls.append(command)
                 if command[:2] == ("docker", "inspect"):
-                    return b"none\n"
+                    return b"42\n" if "{{.State.Pid}}" in command else b"none\n"
                 if command[:2] == ("docker", "port"):
                     return b""
                 if command[0] == "systemctl":
                     return b"42\n"
                 if command[0] == "readlink":
+                    if command[1].endswith("/ingress-u100"):
+                        return b"/proc/42/root/dev/shm/xmesh-" + b"a"*64
                     if self.wrong_namespace and command[1].startswith("/proc/42/"):
                         return b"net:[24]"
                     return b"net:[42]"
@@ -56,6 +57,8 @@ class HarnessTests(unittest.TestCase):
                 if command[0] == "ss":
                     local = b"[::]:28401" if self.wildcard else b"127.0.0.1:28401"
                     return b"LISTEN 0 128 " + local + b" 0.0.0.0:*"
+                if command[0] == "sha256sum":
+                    return b"a"*64 + b"  binary"
                 if command[0] == "python3":
                     return b"actual_vless_echo_verified"
                 return b""
@@ -64,27 +67,28 @@ class HarnessTests(unittest.TestCase):
         env = {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted",
                "XMESH_AUDIT_DISPOSABLE": "1",
                "XMESH_RELEASE_QUALIFICATION_SCENARIO": "public-tls-wal-nonempty",
-               "QUOTA_TEST_DSN": "postgresql://test@127.0.0.1:5432/quota_wal_installed"}
+               "QUOTA_TEST_DSN": "postgresql://test@127.0.0.1:5432/quota_wal_installed",
+               "XMESH_WAL_XRAY_SHA256": "a"*64}
         with patch.dict(os.environ, env, clear=True):
             guest = Guest()
-            traffic.isolated_vless(guest, identity)
+            traffic.isolated_vless(guest, identity, 100)
             calls = guest.calls
             guard_checks = [i for i, c in enumerate(calls) if c[0] == "iptables" and "-C" in c]
             self.assertEqual(len(guard_checks), 2)
             alias_index = next(i for i, c in enumerate(calls) if c[:3] == ("ip", "addr", "add"))
             client_index = next(i for i, c in enumerate(calls) if c[0] == "python3")
             self.assertTrue(max(guard_checks) < alias_index < client_index)
-            self.assertEqual(calls[client_index][-3:], (traffic.TARGET, identity, "16384"))
+            self.assertEqual(calls[client_index][-4:], (traffic.TARGET, identity, "16384", "/usr/local/libexec/xmesh-metered-xray"))
             for item in (Guest(local=False), Guest(wrong_namespace=True), Guest(fail_guard=True), Guest(wildcard=True)):
                 with self.assertRaises((AssertionError, RuntimeError)):
-                    traffic.isolated_vless(item, identity)
+                    traffic.isolated_vless(item, identity, 100)
                 self.assertFalse(any(c[0] == "python3" for c in item.calls))
         # No traffic may be sent from another scenario or normal environment.
         with patch.dict(os.environ, {**env, "XMESH_RELEASE_QUALIFICATION_SCENARIO":
                                       "public-tls-wal-readback"}, clear=True):
             guest = Guest()
             with self.assertRaises(AssertionError):
-                traffic.isolated_vless(guest, identity)
+                traffic.isolated_vless(guest, identity, 100)
             self.assertEqual(guest.calls, [])
 
 

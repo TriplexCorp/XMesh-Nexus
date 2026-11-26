@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 
 from quota_v2_installed_tls_wal_readback import (
     INSTALLED_ROOT, INSTALLED_WAL, INVENTORY, LEDGER, STATE, WORK,
@@ -23,14 +24,20 @@ PAYLOAD_BYTES = 16 * 1024
 
 # Executed inside the outer guest alongside the installed egress bridge.
 # The real Xray child remains in its own network=none namespace; this small
-# client speaks the actual VLESS TCP wire protocol over the loopback frontend.
-# It creates no WAL files, counters, signed documents, or substitute meter.
+# client uses a real attested Xray SOCKS->VLESS connection to the loopback
+# frontend. It creates no WAL files, counters, signatures, or substitute meter.
 CLIENT = r"""
 import concurrent.futures
 import ipaddress
+import json
+import os
+from pathlib import Path
 import socket
 import struct
+import subprocess
 import sys
+import tempfile
+import time
 import uuid
 
 def exact(sock, count):
@@ -42,20 +49,36 @@ def exact(sock, count):
         data += block
     return bytes(data)
 
-def vless_header(identity, target, port):
-    # version, UUID, zero addons, TCP command, port, IPv4 type, IP.
-    return (b"\x00" + uuid.UUID(identity).bytes + b"\x00\x01" +
-            struct.pack("!H", port) + b"\x01" + socket.inet_aton(target))
+def socks_request(target, port):
+    return b"\x05\x01\x00\x01" + socket.inet_aton(target) + struct.pack("!H", port)
 
+def stream(target, port, socks_port):
+    client = socket.create_connection(("127.0.0.1", socks_port), timeout=15)
+    try:
+        client.sendall(b"\x05\x01\x00")
+        assert exact(client, 2) == b"\x05\x00", "SOCKS no-auth handshake refused"
+        client.sendall(socks_request(target, port))
+        header = exact(client, 4)
+        assert header[:3] == b"\x05\x00\x00", ("SOCKS connect refused", header)
+        if header[3] == 3:
+            size = exact(client, 1)[0]
+        else:
+            size = {1: 4, 4: 16}[header[3]]
+        exact(client, size + 2)
+        return client
+    except BaseException:
+        client.close()
+        raise
 
 def main():
-    target, identity, size = sys.argv[1:]
-    assert ipaddress.ip_address(target).is_global
+    target, identity, size, binary = sys.argv[1:]
+    assert ipaddress.ip_address(target).is_global and str(uuid.UUID(identity)) == identity
     size = int(size)
     assert size == 16384
     payload = bytes(range(256)) * (size // 256)
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.settimeout(25)
+        listener.settimeout(20)
         listener.bind((target, 0))
         listener.listen(1)
         port = listener.getsockname()[1]
@@ -63,24 +86,81 @@ def main():
         def echo():
             conn, peer = listener.accept()
             with conn:
-                conn.settimeout(20)
-                # The bridge must have dialed this synthetic guest-local alias.
+                conn.settimeout(15)
                 assert conn.getsockname()[0] == target
                 assert peer[0] == target or ipaddress.ip_address(peer[0]).is_loopback
-                data = exact(conn, size)
-                assert data == payload
-                conn.sendall(data)
+                print("synthetic echo accepted real bridge", file=sys.stderr, flush=True)
+                received = bytearray()
+                while len(received) < size:
+                    block = conn.recv(size - len(received))
+                    if not block:
+                        raise EOFError("actual echo closed before full payload")
+                    received += block
+                    conn.sendall(block)
+                assert received == payload
+                print("synthetic echo verified full payload", file=sys.stderr, flush=True)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(echo)
-            with socket.create_connection(("127.0.0.1", 28401), timeout=25) as client:
-                client.settimeout(25)
-                client.sendall(vless_header(identity, target, port) + payload)
-                assert exact(client, 2) == b"\x00\x00", "not a VLESS response"
-                assert exact(client, size) == payload, "wrong actual echo payload"
-            future.result(timeout=25)
+        # Use the real independently qualified Xray in ordinary client
+        # mode (no meter or production ingress role), as in the existing
+        # generation rehearsals. The SOCKS control remains guest loopback.
+        socks_port = 28411
+        config = {
+            "log": {"loglevel": "debug"},
+            "inbounds": [{"tag": "local-socks", "listen": "127.0.0.1", "port": socks_port,
+                          "protocol": "socks", "settings": {"auth": "noauth"}}],
+            "outbounds": [{"tag": "vless", "protocol": "vless", "settings": {"vnext": [
+                {"address": "127.0.0.1", "port": 28401,
+                 "users": [{"id": identity, "encryption": "none"}]}
+            ]}}],
+        }
+        with tempfile.TemporaryDirectory(prefix="xmesh-local-vless-client-") as directory:
+            root = Path(directory)
+            path = root / "client.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with (root / "client.log").open("w+") as log:
+                process = subprocess.Popen([binary, "run", "-config", str(path)], stdout=log,
+                                           stderr=subprocess.STDOUT, env={"PATH": "/usr/bin:/bin"})
+                try:
+                    until = time.monotonic() + 8
+                    while time.monotonic() < until:
+                        assert process.poll() is None, "actual Xray client exited"
+                        try:
+                            with socket.create_connection(("127.0.0.1", socks_port), timeout=1):
+                                break
+                        except OSError:
+                            time.sleep(0.1)
+                    else:
+                        raise AssertionError("actual Xray SOCKS client never bound loopback")
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        future = pool.submit(echo)
+                        try:
+                            with stream(target, port, socks_port) as client:
+                                client.settimeout(15)
+                                print("SOCKS client connected to actual VLESS", file=sys.stderr, flush=True)
+                                for offset in range(0, size, 4096):
+                                    chunk = payload[offset:offset + 4096]
+                                    client.sendall(chunk)
+                                    assert exact(client, len(chunk)) == chunk, "incorrect echo"
+                            future.result(timeout=20)
+                        except BaseException:
+                            if future.done():
+                                print("echo result:", repr(future.exception()),
+                                      file=sys.stderr, flush=True)
+                            raise
+                except BaseException:
+                    log.seek(0)
+                    print(log.read()[-12000:].replace(identity, "[disposable-uuid]"),
+                          file=sys.stderr, flush=True)
+                    raise
+                finally:
+                    if process.poll() is None:
+                        process.terminate()
+                    try:
+                        process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=3)
     print("actual_vless_echo_verified")
-
 
 if __name__ == "__main__":
     main()
@@ -115,7 +195,7 @@ def require_traffic_scenario():
     assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] == "public-tls-wal-nonempty"
 
 
-def isolated_vless(guest, identity):
+def isolated_vless(guest, identity, user_id):
     require_traffic_scenario()
     assert guest.exec("docker", "inspect", "-f", "{{.HostConfig.NetworkMode}}",
                       "xmesh-managed-xray").strip() == b"none"
@@ -143,9 +223,37 @@ def isolated_vless(guest, identity):
     assert route.get("type") == "local" and route.get("dev") == "lo", route
     # Check the exact private ingress remains the only intended listen bind.
     require_loopback_ingress(guest)
-    result = guest.exec("python3", "-I", "-B", "-c", CLIENT,
-                        TARGET, identity, str(PAYLOAD_BYTES), timeout=80)
-    assert result.strip() == b"actual_vless_echo_verified", result
+    # Verify the actual route published by the installed cap worker rather
+    # than relying only on the positive cap's existence.
+    pid = int(guest.exec("docker", "inspect", "-f", "{{.State.Pid}}", "xmesh-managed-xray"))
+    route_target = guest.exec("readlink", STATE + f"/ingress-u{user_id}").strip().decode()
+    assert re.fullmatch(rf"/proc/{pid}/root/dev/shm/xmesh-[0-9a-f]{{64}}", route_target), route_target
+    binary = "/usr/local/libexec/xmesh-metered-xray"
+    assert guest.exec("sha256sum", binary).split()[0].decode() == os.environ["XMESH_WAL_XRAY_SHA256"]
+    try:
+        result = guest.exec("python3", "-I", "-B", "-c", CLIENT,
+                            TARGET, identity, str(PAYLOAD_BYTES), binary, timeout=65)
+        assert result.strip() == b"actual_vless_echo_verified", result
+    except (AssertionError, OSError, subprocess.SubprocessError):
+        # Capture the installed data path before the guest is destroyed.
+        # No private keys, token files, full profile or grant are dumped.
+        for command in (
+            ("journalctl", "--no-pager", "-n", "100",
+             "-u", "xmesh-quota-v2-ingress.service", "-u", "xmesh-quota-v2-egress.service",
+             "-u", "xmesh-quota-v2-meter.service", "-u", "xmesh-quota-v2-renewal.service"),
+            ("docker", "logs", "--tail", "100", "xmesh-managed-xray"),
+            ("ls", "-lA", LEDGER),
+            ("ls", "-lA", route_target),
+            ("iptables", "--wait", "5", "-nvL", "OUTPUT"),
+            ("ss", "-Hxlpn"),
+        ):
+            try:
+                raw = guest.exec(*command, timeout=10).decode(errors="replace")
+                print(f"Node {guest.node} diagnostic {command[0]}: " +
+                      raw[-18000:].replace(identity, "[disposable-uuid]"), flush=True)
+            except (OSError, subprocess.SubprocessError):
+                print(f"Node {guest.node} no diagnostic: {command[0]}", flush=True)
+        raise
 
 
 def measure_local(guest, user_id, tag):
@@ -192,7 +300,7 @@ def verify_spent_pair(pair, users, panel, db, lab):
             assert db.execute("SELECT count(*) FROM " + table).fetchone() == (0,)
 
     no_remote()
-    parallel(lambda guest: isolated_vless(guest, users[user_id]), pair)
+    parallel(lambda guest: isolated_vless(guest, users[user_id], user_id), pair)
     measurements = parallel(lambda guest: measure_local(guest, user_id, tags[guest.node]), pair)
     no_remote()
     verify_readback(pair, user_ids, panel, lab, WORK, phase="unsynced")
