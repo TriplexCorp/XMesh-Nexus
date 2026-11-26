@@ -21,6 +21,7 @@ on:
       - 'scripts/quota_v2_installed_agent_successor.py'
       - 'scripts/quota_v2_installed_live_vless.py'
       - 'scripts/quota_v2_installed_generations*.py'
+      - 'scripts/quota_v2_installed_tls_wal_readback.py'
       - 'scripts/quota_v2_release_candidate.py'
       - 'scripts/metered-xray-*.json'
       - 'scripts/test-quota-v2-release-candidate.py'
@@ -74,12 +75,34 @@ jobs:
           ref: 402f53c29807836224958bf2887a6bec432aec85
           path: .ci-reviewed-node
           persist-credentials: false
+      # The diagnostic is separately reviewed source, NOT a replacement
+      # installer or a changed release-candidate binary.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        if: matrix.scenario == 'managed-generations'
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 7f3781e80d1f222c8115aa2bc19eb1eb69dace4f
+          path: .ci-reviewed-tls-wal
+          persist-credentials: false
+      - name: Verify exact dormant Node WAL readback without replacing Agent
+        if: matrix.scenario == 'managed-generations'
+        run: |
+          set -euo pipefail
+          test "$(git -C .ci-reviewed-tls-wal rev-parse HEAD)" = '7f3781e80d1f222c8115aa2bc19eb1eb69dace4f'
+          test "$(cat .ci-reviewed-tls-wal/AGENT_VERSION)" = 'control-v6.0.37'
+          module=experiments/quota-v2-physical-stop/public_tls_wal_watch.py
+          test -f ".ci-reviewed-tls-wal/$module"
+          if grep -F 'public_tls_wal_watch' .ci-reviewed-node/deploy/install-v6-strict-operational-agents.sh .ci-reviewed-tls-wal/deploy/install-v6-strict-operational-agents.sh; then
+            echo 'WAL diagnostic must stay out of both installers' >&2
+            exit 1
+          fi
+          echo "XMESH_PUBLIC_TLS_WAL_WATCH_SOURCE=$PWD/.ci-reviewed-tls-wal/$module" >> "$GITHUB_ENV"
       - name: Verify exact draft Agent source
         run: |
           test "$(git -C .ci-reviewed-node rev-parse HEAD)" = '402f53c29807836224958bf2887a6bec432aec85'
           test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.37'
           python3 scripts/test-quota-v2-release-candidate.py
-          python3 -m py_compile scripts/quota_v2_installed_agent_successor.py scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py
+          python3 -m py_compile scripts/quota_v2_installed_agent_successor.py scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py scripts/quota_v2_installed_tls_wal_readback.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
         env:
