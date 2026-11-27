@@ -120,7 +120,7 @@ func TestServeWALTunnelFixture(t *testing.T) {
 			os.Getenv("XSP_V2_PRODUCT_AGENT_PIN") != "" {
 			t.Fatal("retirement possession requires the isolated hosted native-live lab")
 		}
-		candidate := releaseIdentity{"control-v6.0.39", "f277addfd7667b800e658ce176a79f909cb73d85", "e8d285d98b089627870fd79ea0f72d25ee7891982bea2bb1fd63c14601e278b8"}
+		candidate := releaseIdentity{"control-v6.0.39", "0d21b43093c004616308a2b1b873fd21375441dc", "210db5cc2e03eb06c7769f6054dce0cbdf123b4095eb232de5e8d45745258a80"}
 		if !matchesReleasePin(candidate, os.Getenv("XSP_V2_PRODUCT_WAL_CANDIDATE_PIN")) {
 			t.Fatal("exact reviewed retirement possession candidate required")
 		}

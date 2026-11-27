@@ -68,7 +68,7 @@ jobs:
       XMESH_TEST_INSTALLED_GENERATIONS: ${{ (matrix.scenario == 'managed-generations' || matrix.scenario == 'agent-sigkill') && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
       XMESH_TEST_INSTALLED_REBOOT: ${{ matrix.scenario == 'lease-recovery' && '1' || '0' }}
-      XMESH_INSTALLED_NODE_REF: ${{ matrix.scenario == 'public-tls-native-live' && 'f277addfd7667b800e658ce176a79f909cb73d85' || (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty' || matrix.scenario == 'public-tls-namespace-candidate') && 'f8031684b60bf0289e081079b25efac3cb8ea3d4' || '402f53c29807836224958bf2887a6bec432aec85' }}
+      XMESH_INSTALLED_NODE_REF: ${{ matrix.scenario == 'public-tls-native-live' && '0d21b43093c004616308a2b1b873fd21375441dc' || (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty' || matrix.scenario == 'public-tls-namespace-candidate') && 'f8031684b60bf0289e081079b25efac3cb8ea3d4' || '402f53c29807836224958bf2887a6bec432aec85' }}
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -166,8 +166,8 @@ jobs:
         run: |
           test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "$XMESH_INSTALLED_NODE_REF"
           if [[ "${{ matrix.scenario }}" == public-tls-native-live ]]; then
-            test "$XMESH_INSTALLED_NODE_REF" = 'f277addfd7667b800e658ce176a79f909cb73d85'
-            test "$(git -C .ci-reviewed-node rev-parse 'HEAD^{tree}')" = 'e1fdd8a9044780943b4c213a275f847b6a452b8c'
+            test "$XMESH_INSTALLED_NODE_REF" = '0d21b43093c004616308a2b1b873fd21375441dc'
+            test "$(git -C .ci-reviewed-node rev-parse 'HEAD^{tree}')" = '5ddc6b9eeb309bb1ba4c9bd72682a4d8162a463d'
             test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.39'
           elif [[ "${{ matrix.scenario }}" == public-tls-wal-readback || "${{ matrix.scenario }}" == public-tls-wal-nonempty || "${{ matrix.scenario }}" == public-tls-namespace-candidate ]]; then
             test "$XMESH_INSTALLED_NODE_REF" = 'f8031684b60bf0289e081079b25efac3cb8ea3d4'
