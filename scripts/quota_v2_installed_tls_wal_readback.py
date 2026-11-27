@@ -174,6 +174,11 @@ def qualify_pair(pair, users, panel, db, identity, lab):
         print("PASS: independently attested namespace child and original ordinary meter "
               "remained distinct and unchanged across real signed nonempty WAL readback; "
               "no production authority or listener.", flush=True)
+        if live:
+            from quota_v2_installed_meter_retirement import retire_pair
+            from quota_v2_installed_namespace_candidate import ordinary_state
+            retire_pair(pair, users, panel, db, lab, [item[0] for item in initial])
+            assert parallel(ordinary_state, pair) == [item[1] for item in initial]
 
 
 def verify_readback(pair, user_ids, panel, lab, work, *, phase):

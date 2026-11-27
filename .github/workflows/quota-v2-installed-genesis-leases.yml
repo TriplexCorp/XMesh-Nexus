@@ -26,6 +26,9 @@ on:
       - 'scripts/quota_v2_installed_namespace_candidate.py'
       - 'scripts/quota_v2_installed_native_live.py'
       - 'scripts/quota_v2_native_tls_guest.py'
+      - 'scripts/quota_v2_installed_meter_retirement.py'
+      - 'scripts/quota_v2_meter_retirement_guest.py'
+      - 'scripts/test-quota-v2-installed-meter-retirement.py'
       - 'scripts/test-quota-v2-installed-native-live.py'
       - 'scripts/namespace-xray-*.json'
       - 'scripts/namespace-xray-*.jsonl'
@@ -118,6 +121,26 @@ jobs:
           ref: 4eb388a9d7977138ad635204e6358ff6d51976fe
           path: .ci-native-live
           persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        if: matrix.scenario == 'public-tls-native-live'
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 1b483a7dd12ef71e62db0ffd96af7bbcc99105c5
+          path: .ci-meter-retirement
+          persist-credentials: false
+      - name: Verify exact dormant original-meter retirement diagnostic
+        if: matrix.scenario == 'public-tls-native-live'
+        run: |
+          set -euo pipefail
+          test "$(git -C .ci-meter-retirement rev-parse HEAD)" = 1b483a7dd12ef71e62db0ffd96af7bbcc99105c5
+          test "$(git -C .ci-meter-retirement rev-parse 'HEAD^{tree}')" = af0a14cbaab60eed403f3ab259635ac2960a1eb0
+          test "$(cat .ci-meter-retirement/AGENT_VERSION)" = control-v6.0.38
+          test -f .ci-meter-retirement/experiments/quota-v2-physical-stop/public_tls_meter_retirement.py
+          if grep -F 'public_tls_meter_retirement' .ci-meter-retirement/deploy/install-metered-services.sh .ci-reviewed-node/deploy/install-metered-services.sh; then
+            echo 'retirement diagnostic must stay out of both installers' >&2
+            exit 1
+          fi
+          echo "XMESH_RETIREMENT_SOURCE=$PWD/.ci-meter-retirement" >> "$GITHUB_ENV"
       - name: Verify exact dormant Node WAL readback without replacing Agent
         if: (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty' || (matrix.scenario == 'public-tls-namespace-candidate' || matrix.scenario == 'public-tls-native-live'))
         run: |
@@ -148,6 +171,8 @@ jobs:
           python3 scripts/test-quota-v2-installed-tls-wal-traffic.py
           python3 scripts/test-quota-v2-installed-namespace-candidate.py
           python3 scripts/test-quota-v2-installed-native-live.py
+          python3 -m py_compile scripts/quota_v2_installed_meter_retirement.py scripts/quota_v2_meter_retirement_guest.py
+          python3 scripts/test-quota-v2-installed-meter-retirement.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
         env:
