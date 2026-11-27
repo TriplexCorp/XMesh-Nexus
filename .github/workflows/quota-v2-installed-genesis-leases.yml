@@ -30,6 +30,8 @@ on:
       - 'scripts/quota_v2_meter_retirement_guest.py'
       - 'scripts/quota_v2_retirement_evidence.py'
       - 'scripts/test-quota-v2-retirement-evidence.py'
+      - 'scripts/quota_v2_retired_meter_recovery.py'
+      - 'scripts/test-quota-v2-retired-meter-recovery.py'
       - 'scripts/test-quota-v2-installed-meter-retirement.py'
       - 'scripts/test-quota-v2-installed-native-live.py'
       - 'scripts/namespace-xray-*.json'
@@ -176,6 +178,7 @@ jobs:
           python3 -m py_compile scripts/quota_v2_installed_meter_retirement.py scripts/quota_v2_meter_retirement_guest.py scripts/quota_v2_retirement_evidence.py
           python3 scripts/test-quota-v2-installed-meter-retirement.py
           python3 scripts/test-quota-v2-retirement-evidence.py
+          python3 scripts/test-quota-v2-retired-meter-recovery.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
         env:
