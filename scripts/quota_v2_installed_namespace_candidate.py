@@ -140,7 +140,8 @@ print(json.dumps(identity, separators=(",", ":")))
 
 def require_native():
     require_disposable()
-    assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] == "public-tls-namespace-candidate"
+    assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] in (
+        "public-tls-namespace-candidate", "public-tls-native-live")
 
 
 def file_digest(path):

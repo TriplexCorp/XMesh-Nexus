@@ -198,7 +198,7 @@ def require_traffic_scenario():
     assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] in TRAFFIC_SCENARIOS
 
 
-def isolated_vless(guest, identity, user_id):
+def isolate_target(guest):
     require_traffic_scenario()
     assert guest.exec("docker", "inspect", "-f", "{{.HostConfig.NetworkMode}}",
                       "xmesh-managed-xray").strip() == b"none"
@@ -225,6 +225,11 @@ def isolated_vless(guest, identity, user_id):
     route, = json.loads(guest.exec("ip", "-j", "route", "get", TARGET))
     assert (route.get("type"), route.get("dev"), route.get("prefsrc")) == (
         "local", "lo", TARGET), route
+    return output_rule, forward_rule
+
+
+def isolated_vless(guest, identity, user_id):
+    output_rule, forward_rule = isolate_target(guest)
     # Check the exact private ingress remains the only intended listen bind.
     require_loopback_ingress(guest)
     # Verify the actual route published by the installed cap worker rather
@@ -238,17 +243,7 @@ def isolated_vless(guest, identity, user_id):
         result = guest.exec("python3", "-I", "-B", "-c", CLIENT,
                             TARGET, identity, str(PAYLOAD_BYTES), binary, timeout=65)
         assert result.strip() == b"actual_vless_echo_verified", result
-        # Verify unchanged local-only route and first-position reject
-        # guards with zero rejected packets after actual data transfer.
-        after, = json.loads(guest.exec("ip", "-j", "route", "get", TARGET))
-        assert (after.get("type"), after.get("dev"), after.get("prefsrc")) == (
-            "local", "lo", TARGET), after
-        rules = guest.exec("iptables-save", "-c", "-t", "filter").decode().splitlines()
-        for chain, rule in (("OUTPUT", output_rule), ("FORWARD", forward_rule)):
-            guest.exec("iptables", "--wait", "5", "-C", chain, *rule)
-            first = next(line for line in rules if re.match(r"^\[\d+:\d+\] -A " + chain + r" ", line))
-            expected = "[0:0] -A " + chain + " " + " ".join(rule)
-            assert first == expected + " --reject-with icmp-port-unreachable" or first == expected, first
+        verify_isolated_target(guest, output_rule, forward_rule)
     except (AssertionError, OSError, subprocess.SubprocessError):
         # Capture the installed data path before the guest is destroyed.
         # No private keys, token files, full profile or grant are dumped.
@@ -269,6 +264,20 @@ def isolated_vless(guest, identity, user_id):
             except (OSError, subprocess.SubprocessError):
                 print(f"Node {guest.node} no diagnostic: {command[0]}", flush=True)
         raise
+
+
+def verify_isolated_target(guest, output_rule, forward_rule):
+    # Verify unchanged local-only route and first-position reject
+    # guards with zero rejected packets after actual data transfer.
+    after, = json.loads(guest.exec("ip", "-j", "route", "get", TARGET))
+    assert (after.get("type"), after.get("dev"), after.get("prefsrc")) == (
+        "local", "lo", TARGET), after
+    rules = guest.exec("iptables-save", "-c", "-t", "filter").decode().splitlines()
+    for chain, rule in (("OUTPUT", output_rule), ("FORWARD", forward_rule)):
+        guest.exec("iptables", "--wait", "5", "-C", chain, *rule)
+        first = next(line for line in rules if re.match(r"^\[\d+:\d+\] -A " + chain + r" ", line))
+        expected = "[0:0] -A " + chain + " " + " ".join(rule)
+        assert first == expected + " --reject-with icmp-port-unreachable" or first == expected, first
 
 
 def measure_local(guest, user_id, tag):
@@ -303,19 +312,27 @@ def charge(guest, panel):
     assert result.splitlines()[-1] == b"actual_installed_wal_charges_committed_once", result
 
 
-def verify_spent_pair(pair, users, panel, db, lab):
+def verify_spent_pair(pair, users, panel, db, lab, *, native_traffic=None):
     require_traffic_scenario()
     user_ids = list(users)
     user_id, peer_id = user_ids
     tags = dict(zip((g.node for g in pair), ("vless-main", "vless-cdn")))
 
+    expected_authorities = []
+
+    def authority_state():
+        return db.execute("SELECT node_id,signed_envelope FROM quota_v2_public_tls_authority_outbox ORDER BY node_id").fetchall()
+
     def no_remote():
-        for table in ("quota_v2_external_wal_birth_anchors", "quota_v2_wal_charges",
-                      "quota_v2_public_tls_authority_outbox"):
+        assert authority_state() == expected_authorities
+        for table in ("quota_v2_external_wal_birth_anchors", "quota_v2_wal_charges"):
             assert db.execute("SELECT count(*) FROM " + table).fetchone() == (0,)
 
     no_remote()
-    parallel(lambda guest: isolated_vless(guest, users[user_id], user_id), pair)
+    if native_traffic is None:
+        parallel(lambda guest: isolated_vless(guest, users[user_id], user_id), pair)
+    else:
+        expected_authorities = native_traffic(pair, users, panel, db, lab, tags)
     measurements = parallel(lambda guest: measure_local(guest, user_id, tags[guest.node]), pair)
     no_remote()
     verify_readback(pair, user_ids, panel, lab, WORK, phase="unsynced")
@@ -361,7 +378,7 @@ def verify_spent_pair(pair, users, panel, db, lab):
     verify_readback(pair, user_ids, panel, lab, WORK, phase="committed")
     assert parallel(lambda guest: measure_local(guest, user_id, tags[guest.node]), pair) == measurements
     assert db.execute(charge_sql).fetchall() == expected_charges
-    assert db.execute("SELECT count(*) FROM quota_v2_public_tls_authority_outbox").fetchone() == (0,)
+    assert authority_state() == expected_authorities
     print("PASS: both installed Nodes independently reconciled actual VLESS main/CDN bytes, "
-          "refused stale remote history, and verified the committed nonempty signed WAL "
-          "with no public TLS authority.", flush=True)
+          "refused stale remote history, and verified the committed nonempty signed WAL; "
+          "no production public TLS authority.", flush=True)

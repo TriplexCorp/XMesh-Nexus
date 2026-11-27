@@ -270,7 +270,65 @@ This is a prerequisite for the actual installed native TLS data path,
 Nexus stop witness inside a private supervisor. No listener or positive
 authority is created. The candidate is not a release artifact.
 
-All six installed scenarios must pass together. The extra three
+### Native TLS with original installed meter and actual Nexus stop witness (seventh scenario)
+
+The additional `public-tls-native-live` rehearsal reuses the two separate
+signed artifact pins, actual installed Agent 6.0.38 and original ordinary
+meter. Before traffic it independently verifies the pristine signed WAL,
+actual enrolled Genesis policy, immutable complete original cap roster,
+original PID, qualified executable and configuration. Only the hosted
+harness generates a short-lived, ephemeral fixture authority with the
+disposable panel key in an anonymous descriptor and inserts that exact
+envelope into the real SQL outbox; existing insertion guards remain intact.
+There is still no production positive issuer.
+
+The separately reviewed Node live diagnostic source from #238
+`4eb388a9d7977138ad635204e6358ff6d51976fe` (exact tree
+`a423c743bf874cf5de12d9e90d25481718888b1a`) retains the relay from #237
+and carries only the original
+fixed-scope strict-PQ revocation challenges/replies between the outer guest
+and private loopback-only supervisor. The supervisor independently verifies
+the actual signed profile, cert lineage (disposable local CA), immutable
+route and original meter peer, signed authority and fresh online witness.
+The first hosted attempt verified both genuine installed binaries but
+failed closed on foreign Docker mount `open_tree` EINVAL. The reviewed
+Node helper clones the exact original meter directory in its pinned
+pidfd's mount namespace and returns one detached read-only FD after
+closing unrelated descriptors; the supervisor never joins that namespace.
+No writable or pathname fallback is allowed.
+It executes the actual attested native frontend in a capless private PID,
+mount and network namespace, checks exclusive bound listener transfer,
+and requires that no witness relay socket or broker pidfd is inherited.
+The actual TLS 1.3 VLESS client sends 16 KiB both directions through each
+MAIN/CDN installed ordinary meter and the unchanged guarded local echo.
+No TLS listener appears in the original network namespace.
+
+After both active TLS connections have echoed, the host runner holds an
+actual PostgreSQL account row lock. The private supervisor must obtain a
+fresh nonce-bound, independently signature-verified **revoked** witness
+from Nexus over strict-PQ (a generic network failure is insufficient for
+this test), kill the exact native child and verify existing connections
+and its isolated port physically stop. The fixture SQL lock rolls back;
+the timing proof requires both authorities and every original cap to
+remain live beyond the stop, excluding ordinary expiry as the cause. A
+contended SQL roster gate runs inside a savepoint: rolling back negative
+evidence recovers the SQL clock transaction from PostgreSQL's aborted
+state, whereas releasing a successful gate's savepoint retains all
+acquired locks until the existing signed clear-witness operation completes.
+The original installed strict-PQ endpoint diagnostic also requires an
+actual signed revoked response during contention and a fresh clear after
+rollback, rather than accepting a generic error.
+The ordinary meter and qualification are measured unchanged. The original
+nonempty WAL flow must reject stale remote history, submit each actual
+charge once, and reconcile the committed signed remote WAL to the
+original live meter. The fixture authority outbox is checked unchanged.
+
+This is a disposable first-Genesis rehearsal, not authorization to publish
+an internet-facing port. Remote WAL readback precedes traffic and follows
+commit; it is not an atomic live WAL+authority issuer or successor
+generation/terminal settlement proof.
+
+All seven installed scenarios must pass together. The extra four
 candidate-only diagnostics do not add or replace the existing three
 immutable 6.0.37 release evidence artifacts. No production release pin,
 feature flag, positive issuer, TLS listener or production permission
