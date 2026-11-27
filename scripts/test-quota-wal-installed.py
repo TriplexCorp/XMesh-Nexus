@@ -21,6 +21,8 @@ from urllib.parse import urlsplit
 
 import psycopg
 
+from quota_v2_installed_tls_wal_readback import SCENARIOS as TLS_WAL_SCENARIOS
+
 ROOT = Path(__file__).resolve().parents[1]
 NODE = ROOT / ".ci-reviewed-node"
 PRODUCT = "/usr/local/bin/xmesh-agent-xspv2-product"
@@ -56,7 +58,7 @@ def reference_identity(root, revision):
     output = root / "build"
     output.mkdir()
     version = (NODE / "AGENT_VERSION").read_text().strip()
-    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS:
         assert version == "control-v6.0.38"
     else:
         assert version in ("control-v6.0.25", "control-v6.0.37")
@@ -71,7 +73,7 @@ def reference_identity(root, revision):
     digest = hashlib.sha256((output / "product").read_bytes()).hexdigest()
     # Independently built by the reviewed Node candidate workflow; this
     # extra scenario must not qualify a different self-consistent artifact.
-    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS:
         assert digest == "eb7909e7e901b5aee3dafc90d4f57e30aba01df9710afcab8bb7b46c9732a45b"
     expected = {"version": version, "sourceRevision": revision, "artifactSha256": digest}
     assert json.loads(subprocess.check_output([output / "product", "--identity"], timeout=10)) == expected
@@ -179,7 +181,7 @@ systemctl stop docker.socket docker.service containerd.service
                    ]
         assert not (wal_staging and metered)
         if metered:
-            assert os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback"
+            assert os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS
             command.append("XMESH_QUOTA_V2_METERED_INSTALL=1")
         if wal_staging:
             command.extend(("XMESH_QUOTA_V2_WAL_STAGE_AGENT=1",
@@ -607,15 +609,15 @@ def main():
             return guest.install(panel, identity, nexus_revision, token,
                                  wal_staging=wal_staging, metered=metered)
 
-        if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-wal-readback":
+        if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS:
             # The ordinary fixtures have a different mounted WAL path and
             # lack the real production-role qualification mount. Never
             # weaken the actual diagnostic to accept those staging meters.
             from quota_v2_installed_tls_wal_readback import configure_pair, qualify_pair
-            user_ids = configure_pair([guest for guest, _ in guests], owner)
+            users = configure_pair([guest for guest, _ in guests], owner)
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
                 list(pool.map(lambda item: install(item, wal_staging=False, metered=True), guests))
-            qualify_pair([guest for guest, _ in guests], user_ids, panel, db,
+            qualify_pair([guest for guest, _ in guests], users, panel, db,
                          identity, sys.modules[__name__])
             return  # deliberately NOT lease-recovery/managed-generations release evidence
 
@@ -707,21 +709,10 @@ def main():
                 if index == 0:
                     # Lost response: the installer preflight first attempts
                     # the original signed request and then the strict tunnel.
-                    result = guest.exec(
-                        "bash", "-ec",
-                        'source /opt/xmesh-node/deploy/xmesh-pq-install-guard.sh; '
-                        'xmesh_verify_or_resume_enrolled_product "$@"',
-                        "bash", state, PRODUCT, panel, str(guest.node),
-                        timeout=60,
-                    )
-                    # The enabled systemd recovery unit can restore the same
-                    # signed request and receipt before this installer guard
-                    # runs. In that case verify-active returns "active" rather
-                    # than "resumed". Both outcomes are safe only because we
-                    # verify the original file digests and PostgreSQL identity
-                    # immediately below (and never request enrollment again).
-                    assert result.strip() in (b"resumed", b"active"), (
-                        f"Node {guest.node} installer re-enrollment guard failed: {result!r}"
+                    from quota_v2_installed_activation_recovery import run_installer_guard
+                    run_installer_guard(
+                        guest, state=state, product=PRODUCT, panel=panel,
+                        original=original, db=db, before=before,
                     )
                 else:
                     # Power cut after receipt fsync: systemd must reconstruct
