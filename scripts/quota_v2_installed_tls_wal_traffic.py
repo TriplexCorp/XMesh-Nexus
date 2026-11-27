@@ -23,6 +23,8 @@ from quota_v2_installed_tls_wal_readback import (
 # its public service. Both egress guards remain until guest destruction.
 TARGET = "1.1.1.1"
 PAYLOAD_BYTES = 16 * 1024
+OUTPUT_GUARD = ("-d", TARGET + "/32", "!", "-o", "lo", "-j", "REJECT")
+FORWARD_GUARD = ("-d", TARGET + "/32", "-j", "REJECT")
 
 # Executed inside the outer guest alongside the installed egress bridge.
 # The real Xray child remains in its own network=none namespace; this small
@@ -198,7 +200,7 @@ def require_traffic_scenario():
     assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] in TRAFFIC_SCENARIOS
 
 
-def isolate_target(guest):
+def require_network_scope(guest):
     require_traffic_scenario()
     assert guest.exec("docker", "inspect", "-f", "{{.HostConfig.NetworkMode}}",
                       "xmesh-managed-xray").strip() == b"none"
@@ -208,6 +210,10 @@ def isolate_target(guest):
     assert bridge_pid > 1
     assert guest.exec("readlink", f"/proc/{bridge_pid}/ns/net") == guest.exec(
         "readlink", "/proc/1/ns/net")
+
+
+def isolate_target(guest):
+    require_network_scope(guest)
     # Refuse any existing alias; never send traffic until both guards and
     # the route are installed and verified. Keeping them for the remaining
     # short guest lifetime also blocks any delayed egress retransmission.
@@ -216,8 +222,7 @@ def isolate_target(guest):
         for link in json.loads(guest.exec("ip", "-j", "addr", "show"))
         for a in link.get("addr_info", [])
     )
-    output_rule = ("-d", TARGET + "/32", "!", "-o", "lo", "-j", "REJECT")
-    forward_rule = ("-d", TARGET + "/32", "-j", "REJECT")
+    output_rule, forward_rule = OUTPUT_GUARD, FORWARD_GUARD
     for chain, rule in (("OUTPUT", output_rule), ("FORWARD", forward_rule)):
         guest.exec("iptables", "--wait", "5", "-I", chain, "1", *rule)
         guest.exec("iptables", "--wait", "5", "-C", chain, *rule)
@@ -228,8 +233,16 @@ def isolate_target(guest):
     return output_rule, forward_rule
 
 
-def isolated_vless(guest, identity, user_id):
-    output_rule, forward_rule = isolate_target(guest)
+def isolated_vless(guest, identity, user_id, *, already_isolated=False):
+    if already_isolated:
+        # The second transfer is only the explicit loopback-WAL test.
+        # Never reuse a revoked TLS authority or open the native listener.
+        assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] == "public-tls-wal-nonempty"
+        require_network_scope(guest)
+        output_rule, forward_rule = OUTPUT_GUARD, FORWARD_GUARD
+        verify_isolated_target(guest, output_rule, forward_rule)
+    else:
+        output_rule, forward_rule = isolate_target(guest)
     # Check the exact private ingress remains the only intended listen bind.
     require_loopback_ingress(guest)
     # Verify the actual route published by the installed cap worker rather
@@ -280,7 +293,7 @@ def verify_isolated_target(guest, output_rule, forward_rule):
         assert first == expected + " --reject-with icmp-port-unreachable" or first == expected, first
 
 
-def measure_local(guest, user_id, tag):
+def measure_local(guest, user_id, tag, total=PAYLOAD_BYTES):
     # Independently require exactly the two actual directions, original
     # subscriber and measured payload, rather than treating nonempty files
     # as successful metering. The dormant verifier subsequently verifies
@@ -297,7 +310,7 @@ def measure_local(guest, user_id, tag):
         assert re.fullmatch(r"meter-[0-9a-f]{64}\.jsonl", name)
         journal = guest.exec("cat", LEDGER + "/" + name)
         last = json.loads(journal.splitlines()[-1])
-        assert last["nextBytes"] == PAYLOAD_BYTES, (guest.node, item["direction"], last["nextBytes"])
+        assert last["nextBytes"] == total, (guest.node, item["direction"], last["nextBytes"])
         assert last["email"] == item["email"] and last["direction"] == item["direction"]
     return inventory, filenames
 
@@ -379,6 +392,34 @@ def verify_spent_pair(pair, users, panel, db, lab, *, native_traffic=None):
     assert parallel(lambda guest: measure_local(guest, user_id, tags[guest.node]), pair) == measurements
     assert db.execute(charge_sql).fetchall() == expected_charges
     assert authority_state() == expected_authorities
+    if os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] == "public-tls-wal-nonempty":
+        # A second transfer appends within EXACTLY the same two WAL files.
+        # The remote inventory hash, birth count and charged stream count
+        # still match. Only a signed complete committed-tail digest can
+        # distinguish the old SQL prefix from the actual current meter.
+        parallel(lambda guest: isolated_vless(guest, users[user_id], user_id,
+                                              already_isolated=True), pair)
+        second = parallel(lambda guest: measure_local(
+            guest, user_id, tags[guest.node], 2 * PAYLOAD_BYTES), pair)
+        assert second == measurements, "same streams must keep exact original birth index"
+        assert db.execute(charge_sql).fetchall() == expected_charges
+        verify_readback(pair, user_ids, panel, lab, WORK, phase="lagging")
+        assert db.execute(charge_sql).fetchall() == expected_charges
+        parallel(lambda guest: charge(guest, panel), pair)
+        doubled = [(*row[:-1], row[-1] * 2) for row in expected_charges]
+        assert db.execute(charge_sql).fetchall() == doubled
+        assert db.execute(
+            "SELECT user_id,SUM(settled_bytes),SUM(observed_floor_bytes) "
+            "FROM quota_v2_accounts GROUP BY user_id ORDER BY user_id"
+        ).fetchall() == sorted(((user_id, 8 * PAYLOAD_BYTES, 0), (peer_id, 0, 0)))
+        verify_readback(pair, user_ids, panel, lab, WORK, phase="committed")
+        assert parallel(lambda guest: measure_local(
+            guest, user_id, tags[guest.node], 2 * PAYLOAD_BYTES), pair) == second
+        assert db.execute(charge_sql).fetchall() == doubled
+        assert authority_state() == expected_authorities
+        print("PASS: same original registered MAIN/CDN streams carried a second real payload; "
+              "fresh signed but lagging remote tails were refused, then each new batch "
+              "was committed once and exact updated tails verified.", flush=True)
     print("PASS: both installed Nodes independently reconciled actual VLESS main/CDN bytes, "
           "refused stale remote history, and verified the committed nonempty signed WAL; "
           "no production public TLS authority.", flush=True)

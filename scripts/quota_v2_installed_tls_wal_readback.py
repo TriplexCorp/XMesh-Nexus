@@ -177,7 +177,7 @@ def qualify_pair(pair, users, panel, db, identity, lab):
 
 
 def verify_readback(pair, user_ids, panel, lab, work, *, phase):
-    assert phase in ("pristine", "unsynced", "committed")
+    assert phase in ("pristine", "unsynced", "lagging", "committed")
     if phase != "pristine":
         assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] in TRAFFIC_SCENARIOS
     require_disposable()
@@ -222,20 +222,20 @@ while True:
     try:
         result = watch.probe(panel, int(node), int(user), state)
         assert result is None
-        assert phase != "unsynced", "unexpected acceptance of stale empty remote history"
+        assert phase not in ("unsynced", "lagging"), "unexpected acceptance of stale remote WAL"
         break
     except ValueError as exc:
-        # Actual Nexus still has no history; the precise independent
-        # local-versus-remote mismatch must fail, not unrelated errors.
-        if (phase != "unsynced" or str(exc) !=
-                "foreign, expired, authorizing or mismatched Nexus WAL history"):
+        # Actual Nexus signed empty or lagging SQL tails; the precise
+        # independent local-versus-remote mismatch must fail.
+        if (phase not in ("unsynced", "lagging") or str(exc) !=
+                "signed Nexus WAL history does not match complete local conservative tails"):
             raise
         break
     except BlockingIOError as exc:
         if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK) or time.monotonic() >= until:
             raise
         time.sleep(0.2)
-print("stale_remote_wal_refused" if phase == "unsynced"
+print("stale_remote_wal_refused" if phase in ("unsynced", "lagging")
       else "signed_wal_readback_verified_without_authority")
 """
 
@@ -275,7 +275,7 @@ print("stale_remote_wal_refused" if phase == "unsynced"
             "env", "XMESH_QUOTA_V2_AGENT_MODE=installed",
             "python3", "-I", "-B", "-c", script, target, INSTALLED_WAL,
             panel, str(guest.node), str(user_id), STATE, expected, phase, timeout=30)
-        marker = (b"stale_remote_wal_refused" if phase == "unsynced" else
+        marker = (b"stale_remote_wal_refused" if phase in ("unsynced", "lagging") else
                   b"signed_wal_readback_verified_without_authority")
         assert output.strip() == marker, output
         assert guest.exec("stat", "-c", "%d:%i:%u:%a", STATE + "/lock") == lock_before
@@ -285,6 +285,8 @@ print("stale_remote_wal_refused" if phase == "unsynced"
             message = "independently verified signed empty remote WAL and actual pristine metered Xray"
         elif phase == "unsynced":
             message = "refused stale empty remote WAL after actual VLESS traffic"
+        elif phase == "lagging":
+            message = "refused a fresh signed remote WAL with matching birth index but lagging committed tails"
         else:
             message = "independently verified committed signed nonempty remote WAL and actual metered bytes"
         print(f"PASS: installed Node {guest.node} {message}, readback grants no authority.", flush=True)

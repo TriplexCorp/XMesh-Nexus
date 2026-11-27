@@ -92,7 +92,7 @@ jobs:
         if: (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty' || (matrix.scenario == 'public-tls-namespace-candidate' || matrix.scenario == 'public-tls-native-live'))
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 803b4fe5ca97e2dc5022f58877f7f27a8df04250
+          ref: 70129491ff521bf3e56d4e8f0e318e79b40cdbe1
           path: .ci-reviewed-tls-wal
           persist-credentials: false
       # Separate reviewed checkout for the signed namespace artifact and
@@ -122,8 +122,9 @@ jobs:
         if: (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty' || (matrix.scenario == 'public-tls-namespace-candidate' || matrix.scenario == 'public-tls-native-live'))
         run: |
           set -euo pipefail
-          test "$(git -C .ci-reviewed-tls-wal rev-parse HEAD)" = '803b4fe5ca97e2dc5022f58877f7f27a8df04250'
-          test "$(cat .ci-reviewed-tls-wal/AGENT_VERSION)" = 'control-v6.0.37'
+          test "$(git -C .ci-reviewed-tls-wal rev-parse HEAD)" = '70129491ff521bf3e56d4e8f0e318e79b40cdbe1'
+          test "$(git -C .ci-reviewed-tls-wal rev-parse 'HEAD^{tree}')" = 'c238418ed5b461cb691f6394101a692d98223f91'
+          test "$(cat .ci-reviewed-tls-wal/AGENT_VERSION)" = 'control-v6.0.38'
           module=experiments/quota-v2-physical-stop/public_tls_wal_watch.py
           test -f ".ci-reviewed-tls-wal/$module"
           if grep -F 'public_tls_wal_watch' .ci-reviewed-node/deploy/install-v6-strict-operational-agents.sh .ci-reviewed-tls-wal/deploy/install-v6-strict-operational-agents.sh; then

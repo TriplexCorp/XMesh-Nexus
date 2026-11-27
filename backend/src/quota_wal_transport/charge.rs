@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use sqlx::PgConnection;
 
 const BATCH_LIMIT: usize = 64 * 1024;
-const CHARGE_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_WAL_CHARGE_V1\0";
+pub(super) const CHARGE_DOMAIN: &[u8] = b"XMESH_QUOTA_V2_WAL_CHARGE_V1\0";
 const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 // Field order matches the Xray WAL encoding and its hash input.

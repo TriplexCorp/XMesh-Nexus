@@ -84,6 +84,16 @@ class HarnessTests(unittest.TestCase):
             client_index = next(i for i, c in enumerate(calls) if c[0] == "python3")
             self.assertTrue(max(guard_checks[:2]) < alias_index < client_index < min(guard_checks[2:]))
             self.assertEqual(calls[client_index][-4:], (traffic.TARGET, identity, "16384", "/usr/local/libexec/xmesh-metered-xray"))
+            repeat = Guest()
+            traffic.isolated_vless(repeat, identity, 100, already_isolated=True)
+            self.assertFalse(any(c[:3] == ("ip", "addr", "add") for c in repeat.calls))
+            self.assertFalse(any(c[0] == "iptables" and "-I" in c for c in repeat.calls))
+            repeat_client = next(i for i, c in enumerate(repeat.calls) if c[0] == "python3")
+            self.assertTrue(any(c[0] == "iptables-save" for c in repeat.calls[:repeat_client]))
+            bad_repeat = Guest(local=False)
+            with self.assertRaises(AssertionError):
+                traffic.isolated_vless(bad_repeat, identity, 100, already_isolated=True)
+            self.assertFalse(any(c[0] == "python3" for c in bad_repeat.calls))
             for item in (Guest(local=False), Guest(wrong_namespace=True), Guest(fail_guard=True), Guest(wildcard=True)):
                 with self.assertRaises((AssertionError, RuntimeError)):
                     traffic.isolated_vless(item, identity, 100)
