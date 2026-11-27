@@ -194,7 +194,8 @@ print("actual_installed_wal_charges_committed_once")
 
 def require_traffic_scenario():
     require_disposable()
-    assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] == "public-tls-wal-nonempty"
+    from quota_v2_installed_tls_wal_readback import TRAFFIC_SCENARIOS
+    assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] in TRAFFIC_SCENARIOS
 
 
 def isolated_vless(guest, identity, user_id):

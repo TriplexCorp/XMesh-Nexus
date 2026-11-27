@@ -16,7 +16,9 @@ from quota_v2_installed_genesis_lease import STATE, parallel
 INSTALLED_ROOT = "/opt/xmesh-node"
 INSTALLED_WAL = INSTALLED_ROOT + "/experiments/quota-v2-physical-stop"
 LEDGER = "/var/lib/xmesh-first-meter/runtime/ledger"
-SCENARIOS = ("public-tls-wal-readback", "public-tls-wal-nonempty")
+SCENARIOS = ("public-tls-wal-readback", "public-tls-wal-nonempty",
+             "public-tls-namespace-candidate")
+TRAFFIC_SCENARIOS = SCENARIOS[1:]
 STREAM = re.compile(rb"meter-[0-9a-f]{64}\.jsonl\Z")
 INVENTORY = b"xmesh-meter-inventory-v1.jsonl"
 WORK = "/run/xmesh-ci-tls-wal-readback"
@@ -131,6 +133,12 @@ def qualify_pair(pair, users, panel, db, identity, lab):
         # Neither diagnostic ever opens a public listener.
         require_loopback_ingress(guest)
         guest.exec("install", "-d", "-m", "0700", WORK)
+    # Installation may take time; do it before refreshing the short-lived
+    # caps. The unrelated original metered release must remain unchanged.
+    native = os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] == "public-tls-namespace-candidate"
+    if native:
+        from quota_v2_installed_namespace_candidate import install_candidate, prove_candidate
+        parallel(lambda guest: install_candidate(guest, lab), pair)
     parallel(check, pair)
     # The full original-roster local proof must reconcile to actual SQL.
     actual = db.execute("SELECT node_id,user_id FROM quota_v2_signed_first_cap_outbox "
@@ -142,15 +150,25 @@ def qualify_pair(pair, users, panel, db, identity, lab):
     assert db.execute("SELECT count(*) FROM quota_v2_public_tls_authority_outbox").fetchone() == (0,)
     print("PASS: both true installed qualified meters verified before traffic; no public TLS authority.", flush=True)
 
-    if os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] == "public-tls-wal-nonempty":
+    if native:
+        initial = parallel(prove_candidate, pair)
+
+    if os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] in TRAFFIC_SCENARIOS:
         from quota_v2_installed_tls_wal_traffic import verify_spent_pair
         verify_spent_pair(pair, users, panel, db, lab)
+
+    if native:
+        assert parallel(prove_candidate, pair) == initial
+        assert db.execute("SELECT count(*) FROM quota_v2_public_tls_authority_outbox").fetchone() == (0,)
+        print("PASS: independently attested namespace child and original ordinary meter "
+              "remained distinct and unchanged across real signed nonempty WAL readback; "
+              "no public TLS authority or native listener.", flush=True)
 
 
 def verify_readback(pair, user_ids, panel, lab, work, *, phase):
     assert phase in ("pristine", "unsynced", "committed")
     if phase != "pristine":
-        assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] == "public-tls-wal-nonempty"
+        assert os.environ["XMESH_RELEASE_QUALIFICATION_SCENARIO"] in TRAFFIC_SCENARIOS
     require_disposable()
     source = Path(os.environ["XMESH_PUBLIC_TLS_WAL_WATCH_SOURCE"]).resolve(strict=True)
     assert source.name == "public_tls_wal_watch.py" and source.is_file()
