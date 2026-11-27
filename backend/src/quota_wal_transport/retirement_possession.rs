@@ -143,10 +143,11 @@ fn verify_observation(observation: &Value, scope: &Scope<'_>, response_sha: &str
         .ok_or("invalid durable denials")?;
     require(
         denials.len() == scope.users.len()
-            && scope
-                .users
-                .iter()
-                .all(|uid| denials.get(&uid.to_string()).is_some_and(|v| digest(v).is_ok())),
+            && scope.users.iter().all(|uid| {
+                denials
+                    .get(&uid.to_string())
+                    .is_some_and(|v| digest(v).is_ok())
+            }),
         "archived denial roster differs from independently known roster",
     )?;
     let retired_ledger = digest(&observation["retiredLedgerSha256"])?;
@@ -163,7 +164,10 @@ fn verify_observation(observation: &Value, scope: &Scope<'_>, response_sha: &str
         "refundableBytes":0, "deliveredBytesVerified":false, "nodeSignatureVerified":false,
         "canServePublic":false, "canStart":false,
     });
-    require(*observation == expected, "unexpected historical observation")
+    require(
+        *observation == expected,
+        "unexpected historical observation",
+    )
 }
 
 fn verify_readback(response: &[u8], scope: &Scope<'_>) -> Check<(i64, i64)> {
@@ -178,10 +182,10 @@ fn verify_readback(response: &[u8], scope: &Scope<'_>) -> Check<(i64, i64)> {
     let envelope = object(raw.as_bytes(), true)?;
     let payload = &envelope["payload"];
     let challenge = digest(&payload["challenge"])?;
-    let issued = payload["issuedAtMs"].as_i64().ok_or("invalid issued time")?;
-    let expires = payload["validUntilMs"]
+    let issued = payload["issuedAtMs"]
         .as_i64()
-        .ok_or("invalid expiry")?;
+        .ok_or("invalid issued time")?;
+    let expires = payload["validUntilMs"].as_i64().ok_or("invalid expiry")?;
     // Historical validation, not acceptance as a fresh witness. Bounds
     // avoid overflow and reject an authorizing long-lived response.
     require(
@@ -254,12 +258,12 @@ mod tests {
 
     // Public synthetic fixture keys only; not enrolled product keys.
     const NODE_TEST_SEED: [u8; 32] = [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-        23, 24, 25, 26, 27, 28, 29, 30, 31,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31,
     ];
     const POLICY_TEST_SEED: [u8; 32] = [
-        32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52,
-        53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
+        32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+        55, 56, 57, 58, 59, 60, 61, 62, 63,
     ];
 
     struct Fixture {
@@ -350,7 +354,10 @@ mod tests {
             result.response_sha256,
             f.payload["signedWalReadbackSha256"].as_str().unwrap()
         );
-        assert_eq!(sign(&f.payload, POSSESSION_DOMAIN, &NODE_TEST_SEED), f.proof);
+        assert_eq!(
+            sign(&f.payload, POSSESSION_DOMAIN, &NODE_TEST_SEED),
+            f.proof
+        );
     }
 
     #[test]
@@ -399,11 +406,20 @@ mod tests {
         assert!(verify(f.archive.as_bytes(), &f.proof, &scope).is_err());
         let wrong_domain = sign(&f.payload, b"different\0", &NODE_TEST_SEED);
         assert!(verify(f.archive.as_bytes(), &wrong_domain, &f.scope()).is_err());
-        let duplicate = String::from_utf8(f.proof.clone())
-            .unwrap()
-            .replacen("\"algorithm\":", "\"algorithm\":\"Ed25519\",\"algorithm\":", 1);
+        let duplicate = String::from_utf8(f.proof.clone()).unwrap().replacen(
+            "\"algorithm\":",
+            "\"algorithm\":\"Ed25519\",\"algorithm\":",
+            1,
+        );
         assert!(verify(f.archive.as_bytes(), duplicate.as_bytes(), &f.scope()).is_err());
-        assert!(verify(f.archive.as_bytes(), &f.proof[..f.proof.len() - 1], &f.scope()).is_err());
+        assert!(
+            verify(
+                f.archive.as_bytes(),
+                &f.proof[..f.proof.len() - 1],
+                &f.scope()
+            )
+            .is_err()
+        );
         assert!(verify(f.archive.as_bytes(), &[0; LIMIT + 1], &f.scope()).is_err());
     }
 
