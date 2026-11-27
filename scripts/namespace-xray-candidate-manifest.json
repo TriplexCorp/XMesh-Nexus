@@ -1,0 +1,26 @@
+{
+  "artifactSha256": "8fec9498156b1b5a15a5a3c017ce8eba2f445437d1e23867f94d346b8ff16982",
+  "buildFlags": [
+    "GOOS=linux",
+    "GOARCH=amd64",
+    "GOAMD64=v1",
+    "CGO_ENABLED=0",
+    "-trimpath"
+  ],
+  "candidateOnly": true,
+  "goVersion": "go version go1.27.4 linux/amd64",
+  "independentRebuildMatched": true,
+  "kind": "xmesh.namespace-xray-candidate",
+  "namespacePeerTree": "d6699ab3ee737f3c0acee50d718ce1776f68fba4",
+  "nodeSourceRevision": "26b69f184a74a2ea6e58365dd9572f77d83be1e2",
+  "nodeSourceTree": "0865a1007b577548c831b1eb69069974f6965e4c",
+  "patchSourceTree": "1e5a7f56af0bdb20d1743cf269e46476dd25db45",
+  "productionActivationAuthorized": false,
+  "schemaVersion": 1,
+  "upstreamSourceRevision": "a4a3dff5b20c2faae567b742c172c7b95e75c083",
+  "verifiedScenarios": [
+    "signed-witness-expiry",
+    "signed-revocation",
+    "systemd-watchdog-frozen-supervisor-guardian"
+  ]
+}

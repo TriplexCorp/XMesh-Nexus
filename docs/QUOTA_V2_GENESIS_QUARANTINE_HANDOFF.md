@@ -246,7 +246,31 @@ without changing any ledger bytes or issuing public TLS authority.
 This checks first observed birth-index consistency, **not** completeness
 before the first off-host witness or final transport delivery.
 
-All five installed scenarios must pass together. The extra two
+### Independent namespace executable diagnostic (sixth scenario)
+
+`public-tls-namespace-candidate` preserves the nonempty WAL test and adds
+an independently rebuilt, main-only signed namespace Xray from Node
+`26b69f184a74a2ea6e58365dd9572f77d83be1e2`. The workflow verifies both
+the executable and manifest against the committed Sigstore bundle; each
+disposable clean guest repeats verification with the pinned installer.
+The ordinary installed Agent 6.0.38, original metered Xray and release
+qualification are not replaced. The separately reviewed dormant proof
+from Node `9eaf579ff32171ca815c520bb7c6beb347c32745` binds the original
+live PID and ordinary qualification to a different immutable sealed
+namespace executable. Independent input hashes pin the namespace manifest
+and provenance. The probe runs the sealed candidate with an inert empty
+config in a new private loopback-only network namespace, verifies the
+actual owned child executable, and checks that native mode without its
+authenticated containment/bootstrap inputs fails closed. It measures
+the original meter and ordinary qualification again after the real
+MAIN/CDN loopback WAL traffic and strict-PQ committed readback.
+
+This is a prerequisite for the actual installed native TLS data path,
+**not** proof of native TLS traffic to the installed meter or a live
+Nexus stop witness inside a private supervisor. No listener or positive
+authority is created. The candidate is not a release artifact.
+
+All six installed scenarios must pass together. The extra three
 candidate-only diagnostics do not add or replace the existing three
 immutable 6.0.37 release evidence artifacts. No production release pin,
 feature flag, positive issuer, TLS listener or production permission
