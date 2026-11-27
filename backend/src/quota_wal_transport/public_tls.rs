@@ -108,6 +108,7 @@ impl ChargeHead {
         proof: &ProofRequest,
         signer: &PolicySigner,
     ) -> Result<(), ApiError> {
+        let matches_birth_digest = self.last_digest == birth.first_wal_digest;
         if self.filename != birth.filename
             || self.user_id != owner.user_id
             || self.reservation_id != owner.reservation_id
@@ -115,7 +116,7 @@ impl ChargeHead {
             || self.first_sequence <= 0
             || self.last_sequence < self.first_sequence
             || self.stream_bytes <= 0
-            || (self.last_sequence == 1 && self.last_digest != birth.first_wal_digest)
+            || (self.last_sequence == 1 && !matches_birth_digest)
             || !super::lower_hex(&self.last_digest, 64)
             || !super::lower_hex(&self.journal_sha256, 64)
         {
