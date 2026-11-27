@@ -709,21 +709,10 @@ def main():
                 if index == 0:
                     # Lost response: the installer preflight first attempts
                     # the original signed request and then the strict tunnel.
-                    result = guest.exec(
-                        "bash", "-ec",
-                        'source /opt/xmesh-node/deploy/xmesh-pq-install-guard.sh; '
-                        'xmesh_verify_or_resume_enrolled_product "$@"',
-                        "bash", state, PRODUCT, panel, str(guest.node),
-                        timeout=60,
-                    )
-                    # The enabled systemd recovery unit can restore the same
-                    # signed request and receipt before this installer guard
-                    # runs. In that case verify-active returns "active" rather
-                    # than "resumed". Both outcomes are safe only because we
-                    # verify the original file digests and PostgreSQL identity
-                    # immediately below (and never request enrollment again).
-                    assert result.strip() in (b"resumed", b"active"), (
-                        f"Node {guest.node} installer re-enrollment guard failed: {result!r}"
+                    from quota_v2_installed_activation_recovery import run_installer_guard
+                    run_installer_guard(
+                        guest, state=state, product=PRODUCT, panel=panel,
+                        original=original, db=db, before=before,
                     )
                 else:
                     # Power cut after receipt fsync: systemd must reconstruct

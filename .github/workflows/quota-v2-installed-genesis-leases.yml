@@ -23,6 +23,8 @@ on:
       - 'scripts/quota_v2_installed_generations*.py'
       - 'scripts/quota_v2_installed_tls_wal_readback.py'
       - 'scripts/quota_v2_installed_tls_wal_traffic.py'
+      - 'scripts/quota_v2_installed_activation_recovery.py'
+      - 'scripts/test-quota-v2-installed-activation-recovery.py'
       - 'scripts/test-quota-v2-installed-tls-wal-traffic.py'
       - 'scripts/quota_v2_release_candidate.py'
       - 'scripts/metered-xray-*.json'
@@ -110,7 +112,8 @@ jobs:
             test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.37'
           fi
           python3 scripts/test-quota-v2-release-candidate.py
-          python3 -m py_compile scripts/quota_v2_installed_agent_successor.py scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py scripts/quota_v2_installed_tls_wal_readback.py scripts/quota_v2_installed_tls_wal_traffic.py
+          python3 scripts/test-quota-v2-installed-activation-recovery.py
+          python3 -m py_compile scripts/quota_v2_installed_agent_successor.py scripts/quota_v2_release_candidate.py scripts/test-quota-wal-installed.py scripts/quota_v2_installed_genesis_lease.py scripts/quota_v2_installed_live_vless.py scripts/quota_v2_installed_generations.py scripts/quota_v2_installed_generations_faults.py scripts/quota_v2_installed_generations_client.py scripts/quota_v2_installed_tls_wal_readback.py scripts/quota_v2_installed_tls_wal_traffic.py scripts/quota_v2_installed_activation_recovery.py
           python3 scripts/test-quota-v2-installed-tls-wal-traffic.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
