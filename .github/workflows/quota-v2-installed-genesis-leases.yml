@@ -29,6 +29,9 @@ on:
       - 'scripts/quota_v2_installed_meter_retirement.py'
       - 'scripts/quota_v2_meter_retirement_guest.py'
       - 'scripts/quota_v2_retirement_evidence.py'
+      - 'scripts/quota_v2_retirement_possession.py'
+      - 'scripts/quota_v2_meter_patch_projection.py'
+      - 'scripts/test-quota-v2-retirement-possession.py'
       - 'scripts/test-quota-v2-retirement-evidence.py'
       - 'scripts/quota_v2_retired_meter_recovery.py'
       - 'scripts/test-quota-v2-retired-meter-recovery.py'
@@ -65,7 +68,7 @@ jobs:
       XMESH_TEST_INSTALLED_GENERATIONS: ${{ (matrix.scenario == 'managed-generations' || matrix.scenario == 'agent-sigkill') && '1' || '0' }}
       XMESH_TEST_INSTALLED_CRASHES: ${{ matrix.scenario == 'agent-sigkill' && '1' || '0' }}
       XMESH_TEST_INSTALLED_REBOOT: ${{ matrix.scenario == 'lease-recovery' && '1' || '0' }}
-      XMESH_INSTALLED_NODE_REF: ${{ (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty' || (matrix.scenario == 'public-tls-namespace-candidate' || matrix.scenario == 'public-tls-native-live')) && 'f8031684b60bf0289e081079b25efac3cb8ea3d4' || '402f53c29807836224958bf2887a6bec432aec85' }}
+      XMESH_INSTALLED_NODE_REF: ${{ matrix.scenario == 'public-tls-native-live' && 'f277addfd7667b800e658ce176a79f909cb73d85' || (matrix.scenario == 'public-tls-wal-readback' || matrix.scenario == 'public-tls-wal-nonempty' || matrix.scenario == 'public-tls-namespace-candidate') && 'f8031684b60bf0289e081079b25efac3cb8ea3d4' || '402f53c29807836224958bf2887a6bec432aec85' }}
       XMESH_INSTALLED_GENESIS_LEASE: '1'
       QUOTA_TEST_DSN: postgresql://quota_test:quota_test_disposable@127.0.0.1:5432/quota_wal_installed
       REDIS_URL: redis://127.0.0.1:6379/0
@@ -162,7 +165,11 @@ jobs:
       - name: Verify exact draft Agent source
         run: |
           test "$(git -C .ci-reviewed-node rev-parse HEAD)" = "$XMESH_INSTALLED_NODE_REF"
-          if [[ "${{ matrix.scenario }}" == public-tls-wal-readback || "${{ matrix.scenario }}" == public-tls-wal-nonempty || "${{ matrix.scenario }}" == public-tls-namespace-candidate || "${{ matrix.scenario }}" == public-tls-native-live ]]; then
+          if [[ "${{ matrix.scenario }}" == public-tls-native-live ]]; then
+            test "$XMESH_INSTALLED_NODE_REF" = 'f277addfd7667b800e658ce176a79f909cb73d85'
+            test "$(git -C .ci-reviewed-node rev-parse 'HEAD^{tree}')" = 'e1fdd8a9044780943b4c213a275f847b6a452b8c'
+            test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.39'
+          elif [[ "${{ matrix.scenario }}" == public-tls-wal-readback || "${{ matrix.scenario }}" == public-tls-wal-nonempty || "${{ matrix.scenario }}" == public-tls-namespace-candidate ]]; then
             test "$XMESH_INSTALLED_NODE_REF" = 'f8031684b60bf0289e081079b25efac3cb8ea3d4'
             test "$(cat .ci-reviewed-node/AGENT_VERSION)" = 'control-v6.0.38'
           else
@@ -178,6 +185,11 @@ jobs:
           python3 -m py_compile scripts/quota_v2_installed_meter_retirement.py scripts/quota_v2_meter_retirement_guest.py scripts/quota_v2_retirement_evidence.py
           python3 scripts/test-quota-v2-installed-meter-retirement.py
           python3 scripts/test-quota-v2-retirement-evidence.py
+          if [[ "${{ matrix.scenario }}" == public-tls-native-live ]]; then
+            export XMESH_RETIREMENT_POSSESSION_VECTOR="$PWD/.ci-reviewed-node/experiments/quota-v2-retirement-attestation/testdata/python_ed25519_vector.json"
+            test -s "$XMESH_RETIREMENT_POSSESSION_VECTOR"
+          fi
+          python3 scripts/test-quota-v2-retirement-possession.py
           python3 scripts/test-quota-v2-retired-meter-recovery.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Build the real Nexus API
@@ -226,8 +238,14 @@ jobs:
           git -C .ci-reviewed-node fetch --no-tags --depth=1 origin "$reviewed_node"
           git -C .ci-reviewed-node worktree add --detach "$patch_source" "$reviewed_node"
           test "$(git -C "$patch_source" rev-parse HEAD:experiments/xray-dataplane-fence)" = "$(jq -er .patchSourceTree scripts/metered-xray-qualification.json)"
-          # Require the exact same reviewed patch tree in the installed Agent checkout.
-          test "$(git -C .ci-reviewed-node rev-parse HEAD:experiments/xray-dataplane-fence)" = "$(jq -er .patchSourceTree scripts/metered-xray-qualification.json)"
+          # Only the native-live Agent has the separately reviewed
+          # namespace-only extension. It must preserve every precise signed
+          # ordinary-meter entry; the build still uses the attested checkout.
+          if [[ "${{ matrix.scenario }}" == public-tls-native-live ]]; then
+            python3 -I -B scripts/quota_v2_meter_patch_projection.py .ci-reviewed-node "$patch_source"
+          else
+            test "$(git -C .ci-reviewed-node rev-parse HEAD:experiments/xray-dataplane-fence)" = "$(jq -er .patchSourceTree scripts/metered-xray-qualification.json)"
+          fi
           python3 "$patch_source/experiments/xray-dataplane-fence/apply-experiment.py" "$source"
           mkdir "$bundle"
           (cd "$source" &&

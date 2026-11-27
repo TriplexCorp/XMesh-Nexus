@@ -58,7 +58,11 @@ def reference_identity(root, revision):
     output = root / "build"
     output.mkdir()
     version = (NODE / "AGENT_VERSION").read_text().strip()
-    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS:
+    from quota_v2_retirement_possession import CANDIDATE_VERSION, CANDIDATE_REVISION, CANDIDATE_ARTIFACT
+    possession = os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-native-live"
+    if possession:
+        assert (version, revision) == (CANDIDATE_VERSION, CANDIDATE_REVISION)
+    elif os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS:
         assert version == "control-v6.0.38"
     else:
         assert version in ("control-v6.0.25", "control-v6.0.37")
@@ -73,7 +77,9 @@ def reference_identity(root, revision):
     digest = hashlib.sha256((output / "product").read_bytes()).hexdigest()
     # Independently built by the reviewed Node candidate workflow; this
     # extra scenario must not qualify a different self-consistent artifact.
-    if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS:
+    if possession:
+        assert digest == CANDIDATE_ARTIFACT
+    elif os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS:
         assert digest == "eb7909e7e901b5aee3dafc90d4f57e30aba01df9710afcab8bb7b46c9732a45b"
     expected = {"version": version, "sourceRevision": revision, "artifactSha256": digest}
     assert json.loads(subprocess.check_output([output / "product", "--identity"], timeout=10)) == expected
@@ -552,13 +558,14 @@ def main():
         gateway = subprocess.Popen([os.environ["XMESH_WAL_TUNNEL_FIXTURE"], "-test.run=^TestServeWALTunnelFixture$", "-test.v"],
                                    env={**os.environ, "XMESH_WAL_TEST_BRIDGE": bridge,
                                         "XMESH_TEST_INSTALLED_FIRST_SUCCESSOR": str(int(rehearsal_successor is not None)),
+                                        "XMESH_TEST_RETIREMENT_POSSESSION": str(int(identity["version"] == "control-v6.0.39")),
                                         "XMESH_QUOTA_V2_WAL_TRANSPORT": "1",
                                         "XMESH_WAL_TUNNEL_FIXTURE_DIR": directory,
                                         "XSP_V2_PRODUCT_AGENT_PIN": (
                                             f"{revision}:{identity['artifactSha256']}" if identity["version"] == "control-v6.0.37" else ""
                                         ),
                                         "XSP_V2_PRODUCT_WAL_CANDIDATE_PIN": (
-                                            f"{revision}:{identity['artifactSha256']}" if identity["version"] in ("control-v6.0.25", "control-v6.0.38") else ""
+                                            f"{revision}:{identity['artifactSha256']}" if identity["version"] in ("control-v6.0.25", "control-v6.0.38", "control-v6.0.39") else ""
                                         )})
 
         def stop_gateway():
@@ -603,11 +610,30 @@ def main():
                 docker("exec", "-i", guest.name, "docker", "image", "load", stdin=archive, timeout=120)
             assert guest.exec("docker", "image", "inspect", "--format", "{{.Id}}",
                               AGENT_BUILDER).strip() == builder_id
-            if metered:
+            cold_meter = (metered and guest is guests[0][0] and
+                          os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") == "public-tls-native-live")
+            if cold_meter:
+                # Exercise the actual new installer, not merely its
+                # existing-artifact verification path. The MAIN guest
+                # reconstructs without prepositioning any Xray binary or
+                # qualification; the CDN guest verifies the independent
+                # runner's already attested bytes.
+                guest.exec("test", "!", "-e", "/usr/local/libexec/xmesh-metered-xray")
+                guest.exec("test", "!", "-e", "/var/lib/xmesh-metered-xray")
+            elif metered:
                 from quota_v2_installed_tls_wal_readback import seed_attested_binary
                 seed_attested_binary(guest, sys.modules[__name__])
-            return guest.install(panel, identity, nexus_revision, token,
-                                 wal_staging=wal_staging, metered=metered)
+            result = guest.install(panel, identity, nexus_revision, token,
+                                   wal_staging=wal_staging, metered=metered)
+            if cold_meter:
+                digest = os.environ["XMESH_WAL_XRAY_SHA256"]
+                assert guest.exec("sha256sum", "/usr/local/libexec/xmesh-metered-xray").split()[0].decode() == digest
+                assert guest.exec("stat", "-c", "%u:%a:%h", "/var/lib/xmesh-metered-xray/identity").strip() == b"0:600:1"
+                assert b"artifactSha256=" + digest.encode() in guest.exec(
+                    "cat", "/var/lib/xmesh-metered-xray/identity").splitlines()
+                print(f"PASS: Node {guest.node} cold bootstrap reconstructed the exact signed ordinary meter "
+                      "without prepositioned binary or qualification.", flush=True)
+            return result
 
         if os.environ.get("XMESH_RELEASE_QUALIFICATION_SCENARIO") in TLS_WAL_SCENARIOS:
             # The ordinary fixtures have a different mounted WAL path and
