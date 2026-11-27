@@ -14,7 +14,7 @@ class HarnessTests(unittest.TestCase):
         ns = {"__name__": "client_unit_test"}
         exec(compile(traffic.CLIENT, "<inner client>", "exec"), ns)
         self.assertEqual(ns["socks_request"](traffic.TARGET, 28421).hex(),
-                         "05010001c00000096f05")
+                         "05010001010101016f05")
         first, second = socket.socketpair()
         with first, second:
             first.sendall(b"abc")
@@ -53,7 +53,12 @@ class HarnessTests(unittest.TestCase):
                     raise RuntimeError("guard refused")
                 if command[:4] == ("ip", "-j", "route", "get"):
                     return json.dumps([{"type": "local" if self.local else "unicast",
-                                        "dev": "lo" if self.local else "eth0"}]).encode()
+                                        "dev": "lo" if self.local else "eth0",
+                                        "prefsrc": traffic.TARGET}]).encode()
+                if command[0] == "iptables-save":
+                    address = traffic.TARGET + "/32"
+                    return (f"[0:0] -A OUTPUT -d {address} ! -o lo -j REJECT --reject-with icmp-port-unreachable\n"
+                            f"[0:0] -A FORWARD -d {address} -j REJECT --reject-with icmp-port-unreachable\n").encode()
                 if command[0] == "ss":
                     local = b"[::]:28401" if self.wildcard else b"127.0.0.1:28401"
                     return b"LISTEN 0 128 " + local + b" 0.0.0.0:*"
@@ -74,10 +79,10 @@ class HarnessTests(unittest.TestCase):
             traffic.isolated_vless(guest, identity, 100)
             calls = guest.calls
             guard_checks = [i for i, c in enumerate(calls) if c[0] == "iptables" and "-C" in c]
-            self.assertEqual(len(guard_checks), 2)
+            self.assertEqual(len(guard_checks), 4)
             alias_index = next(i for i, c in enumerate(calls) if c[:3] == ("ip", "addr", "add"))
             client_index = next(i for i, c in enumerate(calls) if c[0] == "python3")
-            self.assertTrue(max(guard_checks) < alias_index < client_index)
+            self.assertTrue(max(guard_checks[:2]) < alias_index < client_index < min(guard_checks[2:]))
             self.assertEqual(calls[client_index][-4:], (traffic.TARGET, identity, "16384", "/usr/local/libexec/xmesh-metered-xray"))
             for item in (Guest(local=False), Guest(wrong_namespace=True), Guest(fail_guard=True), Guest(wildcard=True)):
                 with self.assertRaises((AssertionError, RuntimeError)):

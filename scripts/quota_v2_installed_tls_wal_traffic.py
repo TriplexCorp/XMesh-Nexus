@@ -2,8 +2,8 @@
 
 The egress bridge deliberately refuses private destinations. Use an exact
 synthetic local /32 in each throwaway guest, guarded by OUTPUT and FORWARD
-reject rules installed before the alias. Never weaken the real bridge, use
-a public destination, or send a packet outside the guest.
+reject rules installed before the alias. Never weaken the real bridge,
+contact a public service, or send a packet outside the guest.
 """
 import hashlib
 import json
@@ -16,10 +16,12 @@ from quota_v2_installed_tls_wal_readback import (
     parallel, require_disposable, require_loopback_ingress, verify_readback,
 )
 
-# IANA special-purpose PCP anycast address, considered global by Python's
-# ipaddress. This is an isolated synthetic echo endpoint, NOT the real
-# service at that address. Both guards remain until guest destruction.
-TARGET = "192.0.0.9"
+# Xray a4a3dff5b20c2faae567b742c172c7b95e75c083 explicitly blocks
+# PCP anycast 192.0.0.9/32 in its default freedom private-IP matcher,
+# even though Python ipaddress marks it global. Use an ordinary global
+# address exclusively as a synthetic guest loopback alias, NEVER contact
+# its public service. Both egress guards remain until guest destruction.
+TARGET = "1.1.1.1"
 PAYLOAD_BYTES = 16 * 1024
 
 # Executed inside the outer guest alongside the installed egress bridge.
@@ -220,7 +222,8 @@ def isolated_vless(guest, identity, user_id):
         guest.exec("iptables", "--wait", "5", "-C", chain, *rule)
     guest.exec("ip", "addr", "add", TARGET + "/32", "dev", "lo")
     route, = json.loads(guest.exec("ip", "-j", "route", "get", TARGET))
-    assert route.get("type") == "local" and route.get("dev") == "lo", route
+    assert (route.get("type"), route.get("dev"), route.get("prefsrc")) == (
+        "local", "lo", TARGET), route
     # Check the exact private ingress remains the only intended listen bind.
     require_loopback_ingress(guest)
     # Verify the actual route published by the installed cap worker rather
@@ -234,6 +237,17 @@ def isolated_vless(guest, identity, user_id):
         result = guest.exec("python3", "-I", "-B", "-c", CLIENT,
                             TARGET, identity, str(PAYLOAD_BYTES), binary, timeout=65)
         assert result.strip() == b"actual_vless_echo_verified", result
+        # Verify unchanged local-only route and first-position reject
+        # guards with zero rejected packets after actual data transfer.
+        after, = json.loads(guest.exec("ip", "-j", "route", "get", TARGET))
+        assert (after.get("type"), after.get("dev"), after.get("prefsrc")) == (
+            "local", "lo", TARGET), after
+        rules = guest.exec("iptables-save", "-c", "-t", "filter").decode().splitlines()
+        for chain, rule in (("OUTPUT", output_rule), ("FORWARD", forward_rule)):
+            guest.exec("iptables", "--wait", "5", "-C", chain, *rule)
+            first = next(line for line in rules if re.match(r"^\[\d+:\d+\] -A " + chain + r" ", line))
+            expected = "[0:0] -A " + chain + " " + " ".join(rule)
+            assert first == expected + " --reject-with icmp-port-unreachable" or first == expected, first
     except (AssertionError, OSError, subprocess.SubprocessError):
         # Capture the installed data path before the guest is destroyed.
         # No private keys, token files, full profile or grant are dumped.
