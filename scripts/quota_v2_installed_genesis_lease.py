@@ -693,9 +693,8 @@ print('verified_without_authority')
     def assert_tls_witness(revoked=False):
         poll["challenge"]=secrets.token_hex(32)
         code,witness=guest_a.request(revocation_path,poll)
-        if revoked and code!=200:
-            # SQL timeout/closed connection is also fail-closed.
-            return
+        # The enrolled Node must receive the actual signed negative witness
+        # after a SQL lock timeout, not just a generic fail-closed error.
         assert code==200,(code,witness)
         independent_signature(root,"tls-live-revocation",witness)
         claims=witness["payload"]
@@ -753,12 +752,14 @@ else:
     assert guest_a.request(revocation_path,dict(
         poll,scope=dict(scope,capRosterSha256="9"*64)))[0]==409
     with psycopg.connect(dsn) as blocker:
-        blocker.execute(
+        assert blocker.execute(
             "SELECT user_id FROM quota_v2_accounts WHERE user_id=%s AND NOT closed FOR UPDATE",
             (uid,)
-        )
+        ).fetchall() == [(uid,)]
         assert_tls_witness(revoked=True)
         assert_installed_revocation_watch(False)
+        now, = db.execute("SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT").fetchone()
+        assert min(authority_end, cap_end - 7000)>now, "revocation must precede expiry"
         blocker.rollback()
     assert_tls_witness()
     assert_installed_revocation_watch(True)

@@ -16,6 +16,7 @@ use axum::{
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use sqlx::Acquire;
 use std::time::Duration;
 
 const PATH: &str = "/api/v1/node/quota-v2/public-tls-revocation";
@@ -111,9 +112,23 @@ async fn signed_reply(
     let mut tx = state.pool.begin().await?;
     signed_roster::configure_transaction(&mut tx).await?;
     let matched = if profile_before {
-        signed_roster::locked_digest(&mut tx, state, &poll.scope, activation)
+        // A lock/statement timeout aborts its PostgreSQL transaction even
+        // when the roster gate intentionally translates contention into
+        // negative evidence. Isolate that check in a savepoint so a denied
+        // gate can still obtain a fresh SQL clock and sign *revoked*.
+        // RELEASE SAVEPOINT retains every acquired clear-gate lock in the
+        // outer transaction until after signing. Never release those locks
+        // by rolling back a successful gate, or retry a denied check.
+        let mut gate = tx.begin().await?;
+        let matched = signed_roster::locked_digest(&mut gate, state, &poll.scope, activation)
             .await?
-            .is_some()
+            .is_some();
+        if matched {
+            gate.commit().await?;
+        } else {
+            gate.rollback().await?;
+        }
+        matched
     } else {
         false
     };
