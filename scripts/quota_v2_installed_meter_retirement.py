@@ -166,6 +166,9 @@ def retire_pair(pair, users, panel, db, lab, initial):
         assert not guest.exec("ss", "-Hltnp", "sport", "=", ":443").strip()
         assert not guest.exec("ss", "-Hltnp", "sport", "=", ":28401").strip()
     assert sql_snapshot(db) == before, "historical exit must not refund or issue spend authority"
+    from quota_v2_retired_meter_recovery import verify_recovery_pair
+    verify_recovery_pair(pair, panel, initial, lab)
+    assert sql_snapshot(db) == before, "retired-meter recovery must not release or recreate authority"
     print("PASS: both exact original installed meter pidfds exited under durable complete "
           "signed-roster denial, unchanged committed WAL tails and SQL reserve; "
           "independent raw SQL-to-disk reconstruction and pinned Nexus signature matched "
