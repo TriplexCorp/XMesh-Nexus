@@ -16,7 +16,10 @@ class RetirementHarnessTests(unittest.TestCase):
             signedWalReadbackSha256="c"*64, inventorySha256="d"*64,
             committedChargeHeadsSha256="e"*64, durableUserDenials={"100":"f"*64,"101":"0"*64},
             originalMeterPidfdExited=True, lifetimeLockReleased=True,
-            finalMeterVerified=False, settlementEligible=False, canResume=False, refundableBytes=0)
+            finalMeterVerified=False, settlementEligible=False, canResume=False, refundableBytes=0,
+            schemaVersion=1, nodeId=1, retiredLedgerSha256="d"*64,
+            deliveredBytesVerified=False, nodeSignatureVerified=False,
+            canServePublic=False, canStart=False)
 
     def verify(self, value):
         retirement.verify_result(value, "a"*64, "b"*64, "2026-11-27T04:00:00Z",
@@ -30,7 +33,10 @@ class RetirementHarnessTests(unittest.TestCase):
             ("signedWalReadbackSha256", ""), ("originalMeterPidfdExited", 1),
             ("lifetimeLockReleased", False), ("durableUserDenials", {"100":"f"*64}),
             ("finalMeterVerified", True), ("settlementEligible", True),
-            ("canResume", True), ("refundableBytes", False), ("refundableBytes", 1)):
+            ("canResume", True), ("refundableBytes", False), ("refundableBytes", 1),
+            ("schemaVersion", True), ("nodeId", False), ("retiredLedgerSha256", ""),
+            ("deliveredBytesVerified", True), ("nodeSignatureVerified", True),
+            ("canServePublic", True), ("canStart", True)):
             with self.subTest(field=key), self.assertRaises(AssertionError):
                 self.verify(dict(self.expected, **{key: value}))
         with self.assertRaises(AssertionError):
@@ -50,7 +56,7 @@ class RetirementHarnessTests(unittest.TestCase):
     def test_quiesce_requires_every_unit_and_both_ports_inactive(self):
         def fixture(*args, **kwargs):
             if args[:2] == ("systemctl", "show"):
-                return b"inactive\n"
+                return b"LoadState=loaded\nActiveState=inactive\nSubState=dead\n"
             return b""
         with mock.patch.object(guest, "command", side_effect=fixture) as command:
             guest.quiesce()

@@ -15,7 +15,11 @@ from quota_v2_installed_genesis_lease import canonical, parallel
 from quota_v2_installed_namespace_candidate import PROOF, file_digest, reviewed_checkout
 from quota_v2_installed_native_live import ENV, require_live
 
-REV = "1b483a7dd12ef71e62db0ffd96af7bbcc99105c5"
+from quota_v2_retirement_evidence import (
+    LEDGER_DIR, RECORD_DIR, read_private, verify_ledger, verify_record,
+)
+
+REV = "86a541a90ce7a4f1b50671ed6fde00c15a60bb68"
 MODULES = ("public_tls_wal_watch.py", "public_tls_meter_retirement.py")
 SCRIPT = Path(__file__).with_name("quota_v2_meter_retirement_guest.py")
 HASH = re.compile(r"[0-9a-f]{64}\Z")
@@ -62,7 +66,10 @@ def verify_result(result, expected_runtime, expected_container, expected_started
     assert set(result) == {"kind", "runtimeId", "containerId", "startedAt", "signedWalReadbackSha256",
                            "inventorySha256", "committedChargeHeadsSha256", "durableUserDenials",
                            "originalMeterPidfdExited", "lifetimeLockReleased", "finalMeterVerified",
-                           "settlementEligible", "canResume", "refundableBytes"}
+                           "settlementEligible", "canResume", "refundableBytes",
+                           "schemaVersion", "nodeId", "retiredLedgerSha256",
+                           "deliveredBytesVerified", "nodeSignatureVerified",
+                           "canServePublic", "canStart"}
     assert (result["kind"], result["runtimeId"], result["containerId"], result["startedAt"],
             result["inventorySha256"], result["committedChargeHeadsSha256"]) == (
         "xmesh.quota-v2.nonfinal-first-meter-retirement", expected_runtime,
@@ -71,8 +78,12 @@ def verify_result(result, expected_runtime, expected_container, expected_started
     assert set(result["durableUserDenials"]) == {str(uid) for uid in users}
     assert all(HASH.fullmatch(value) for value in result["durableUserDenials"].values())
     assert result["originalMeterPidfdExited"] is True and result["lifetimeLockReleased"] is True
-    for flag in ("finalMeterVerified", "settlementEligible", "canResume"):
+    for flag in ("finalMeterVerified", "settlementEligible", "canResume", "canStart",
+                 "canServePublic", "deliveredBytesVerified", "nodeSignatureVerified"):
         assert result[flag] is False
+    assert type(result["schemaVersion"]) is int and result["schemaVersion"] == 1
+    assert type(result["nodeId"]) is int and result["nodeId"] > 0
+    assert HASH.fullmatch(result["retiredLedgerSha256"])
     assert type(result["refundableBytes"]) is int and result["refundableBytes"] == 0
 
 
@@ -89,19 +100,74 @@ def retire_pair(pair, users, panel, db, lab, initial):
                             panel, str(guest.node), str(next(iter(users))), timeout=60)
         return json.loads(result)
 
+    clock = "SELECT (EXTRACT(EPOCH FROM clock_timestamp())*1000)::BIGINT"
+    earliest, = db.execute(clock).fetchone()
     results = parallel(retire, pair)
+    latest, = db.execute(clock).fetchone()
+    challenges = set()
     for guest, result, original in zip(pair, results, initial):
-        container, started, _pid, runtime = original
+        container, started, pid, runtime = original
         anchors = db.execute(
-            "SELECT inventory_sha256 FROM quota_v2_external_wal_birth_anchors "
+            "SELECT inventory_sequence,inventory_sha256,inventory_tail_digest,inventory_bytes "
+            "FROM quota_v2_external_wal_birth_anchors "
             "WHERE node_id=%s ORDER BY inventory_sequence DESC LIMIT 1",
             (guest.node,)).fetchall()
         assert len(anchors) == 1
-        verify_result(result, runtime, container, started, users, anchors[0][0],
-                      committed_manifest(db, guest.node))
+        seq, inventory_hash, tail, inventory = anchors[0]
+        assert seq == 2 and hashlib.sha256(inventory).hexdigest() == inventory_hash
+        manifest = committed_manifest(db, guest.node)
+        verify_result(result, runtime, container, started, users, inventory_hash, manifest)
+        assert result["nodeId"] == guest.node
+        scope = db.execute(
+            "SELECT activation_sha256,genesis_policy_sha256,profile_revision,cap_roster_sha256,runtime_id "
+            "FROM quota_v2_public_tls_authority_outbox WHERE node_id=%s", (guest.node,)).fetchall()
+        assert len(scope) == 1
+        activation, genesis, profile, roster, sql_runtime = scope[0]
+        assert sql_runtime == runtime
+        expected = dict(nodeId=guest.node, userId=next(iter(users)), runtimeId=runtime,
+                        activationReceiptSha256=activation, genesisPolicySha256=genesis,
+                        profileRevision=profile, capRosterSha256=roster, containerId=container,
+                        hostPid=pid, startedAt=started, inventorySequence=seq,
+                        inventorySha256=inventory_hash, inventoryTailDigest=tail,
+                        committedChargeStreamCount=seq, committedChargeHeadsSha256=manifest)
+        record = read_private(guest, RECORD_DIR)
+        name = "retired-" + runtime + ".json"
+        assert set(record) == {name}, "extra or pending retirement records"
+        witness = verify_record(record[name], result, expected, earliest, latest)
+        assert witness["challenge"] not in challenges
+        challenges.add(witness["challenge"])
+        caps = {uid: bytes(raw) for uid, raw in db.execute(
+            "SELECT user_id,signed_envelope FROM quota_v2_signed_first_cap_outbox "
+            "WHERE node_id=%s ORDER BY user_id", (guest.node,))}
+        assert set(caps) == set(users)
+        # Reconstruct every committed raw stream from its exact immutable
+        # SQL batches, not just the latest digest or a claimed byte count.
+        streams, cursors = {}, {}
+        for filename, first, last, journal in db.execute(
+                "SELECT c.filename,c.first_sequence,c.last_sequence,c.journal "
+                "FROM quota_v2_wal_charges c JOIN quota_v2_reservations r USING(reservation_id) "
+                "WHERE r.node_id=%s ORDER BY c.filename,c.first_sequence", (guest.node,)):
+            assert first == cursors.get(filename, 0) + 1 and last >= first
+            raw = bytes(journal)
+            assert raw.endswith(b"\n") and len(raw.splitlines()) == last - first + 1
+            streams[filename] = streams.get(filename, b"") + raw
+            cursors[filename] = last
+        assert len(streams) == seq
+        verify_ledger(read_private(guest, LEDGER_DIR), caps, streams, bytes(inventory),
+                      result, guest.node, runtime)
+        stopped = json.loads(guest.exec("docker", "inspect", "--type", "container",
+                                        "--format", "{{json .}}", container))
+        state = stopped["State"]
+        assert stopped["Id"] == container and state["StartedAt"] == started
+        assert state["Running"] is False and state["Restarting"] is False
+        assert type(state["Pid"]) is int and state["Pid"] == 0 and state["ExitCode"] == 137
+        assert stopped["HostConfig"]["NetworkMode"] == "none"
+        assert stopped["HostConfig"]["RestartPolicy"]["Name"] == "no"
         assert not guest.exec("ss", "-Hltnp", "sport", "=", ":443").strip()
         assert not guest.exec("ss", "-Hltnp", "sport", "=", ":28401").strip()
     assert sql_snapshot(db) == before, "historical exit must not refund or issue spend authority"
     print("PASS: both exact original installed meter pidfds exited under durable complete "
           "signed-roster denial, unchanged committed WAL tails and SQL reserve; "
-          "no terminal settlement, delivery or refund authority.", flush=True)
+          "independent raw SQL-to-disk reconstruction and pinned Nexus signature matched "
+          "each immutable private unsigned retirement record; no terminal settlement, "
+          "delivery or refund authority.", flush=True)

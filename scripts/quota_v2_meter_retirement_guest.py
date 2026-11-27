@@ -2,6 +2,7 @@
 """Disposable guest: physical original meter retirement after real TLS stop."""
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -21,8 +22,14 @@ def quiesce():
     # runner. Stop only the disposable guest's ordinary ingress/renewal and
     # oneshot starter. No modified installed files or alternate runtime.
     command("systemctl", "stop", *UNITS, timeout=30)
+    require_quiescent()
+
+
+def require_quiescent():
     for unit in UNITS:
-        assert command("systemctl", "show", unit, "-p", "ActiveState", "--value").strip() == b"inactive"
+        status = command("systemctl", "show", unit, "-p", "LoadState,ActiveState,SubState")
+        assert set(status.splitlines()) == {b"LoadState=loaded", b"ActiveState=inactive",
+                                           b"SubState=dead"}
     for port in (":443", ":28401"):
         assert not command("ss", "-Hltnp", "sport", "=", port).strip()
 
@@ -43,6 +50,7 @@ def retire(panel, node, user):
         assert Path(module.__file__).parent == INSTALLED
     assert retirement.wal is wal
     retirement._require_disposable()
+    assert not retirement.RECORD_DIRECTORY.exists()
     quiesce()
     with native.original(panel, node, user) as (scope, roster, _profile, _pinned, measured, _fd):
         release = qualification.read_identity(qualification.QUALIFICATION)
@@ -55,15 +63,17 @@ def retire(panel, node, user):
             return actual, directory
         with retirement.FirstGenesisRetirement(roster, user, measured, current) as proof:
             proof.fence_all()
-            # Use the independently pinned immutable full container ID,
-            # never kill by a recycled host PID or a mutable Docker name.
-            command("docker", "kill", "--signal", "SIGKILL", measured[0])
+            require_quiescent()
+            # Send SIGKILL to the actual original, still-open kernel pidfd.
+            # Docker wait is only a corroborating immutable-ID observation.
+            signal.pidfd_send_signal(proof._pidfd, signal.SIGKILL)
             assert command("docker", "wait", measured[0]).strip() == b"137"
-            result = proof.verify_exited()
-        for unit in UNITS:
-            assert command("systemctl", "show", unit, "-p", "ActiveState", "--value").strip() == b"inactive"
-        for port in (":443", ":28401"):
-            assert not command("ss", "-Hltnp", "sport", "=", port).strip()
+            require_quiescent()
+            result = proof.publish_exited()
+            # Exact idempotent re-read while still holding the original
+            # exclusive instance lock; never synthesize from a dead PID.
+            assert proof.publish_exited() == result
+        require_quiescent()
         return result
 
 
