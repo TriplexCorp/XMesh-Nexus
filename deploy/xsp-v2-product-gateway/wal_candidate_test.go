@@ -70,3 +70,26 @@ func TestClassicImageCandidateIsNeverProductionEnrollment(t *testing.T) {
 		t.Fatal("reviewed exact candidate must be testable in isolated WAL rehearsal")
 	}
 }
+
+func TestRetirementPossessionCandidateFixtureOnly(t *testing.T) {
+	release := releaseIdentity{"control-v6.0.39", strings.Repeat("a", 40), strings.Repeat("b", 64)}
+	pin := release.SourceRevision + ":" + release.ArtifactSHA256
+	production := &gateway{}
+	if production.enrollmentReleaseAllowed(release, pin, "1", pin) {
+		t.Fatal("production and existing WAL candidate allowlists must reject 6.0.39")
+	}
+	fixture := &gateway{fixtureEnrollmentCandidate: &release}
+	if fixture.enrollmentReleaseAllowed(release, pin, "0", pin) ||
+		fixture.enrollmentReleaseAllowed(release, pin, "1", "") ||
+		fixture.enrollmentReleaseAllowed(release, pin, "1", release.SourceRevision+":"+strings.Repeat("c", 64)) {
+		t.Fatal("fixture must require exact enabled rehearsal pin")
+	}
+	other := release
+	other.SourceRevision = strings.Repeat("d", 40)
+	if fixture.enrollmentReleaseAllowed(other, "", "1", other.SourceRevision+":"+other.ArtifactSHA256) {
+		t.Fatal("fixture must reject a different self-consistent artifact")
+	}
+	if !fixture.enrollmentReleaseAllowed(release, "", "1", pin) {
+		t.Fatal("fixture must allow exact reviewed candidate in the lab")
+	}
+}

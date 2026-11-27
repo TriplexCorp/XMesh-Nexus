@@ -112,6 +112,20 @@ func TestServeWALTunnelFixture(t *testing.T) {
 		t.Setenv("XSP_V2_PRODUCT_RELEASE_COMMIT", "1")
 		t.Setenv("XSP_V2_PRODUCT_RELEASE_ARTIFACT_DIR", filepath.Join(dir, "successor-artifacts"))
 	}
+	if os.Getenv("XMESH_TEST_RETIREMENT_POSSESSION") == "1" {
+		if address == "127.0.0.1" || dsn.Path != "/quota_wal_installed" ||
+			os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("RUNNER_ENVIRONMENT") != "github-hosted" ||
+			os.Getenv("XMESH_RELEASE_QUALIFICATION_SCENARIO") != "public-tls-native-live" ||
+			os.Getenv("XMESH_QUOTA_V2_WAL_TRANSPORT") != "1" ||
+			os.Getenv("XSP_V2_PRODUCT_AGENT_PIN") != "" {
+			t.Fatal("retirement possession requires the isolated hosted native-live lab")
+		}
+		candidate := releaseIdentity{"control-v6.0.39", "0d21b43093c004616308a2b1b873fd21375441dc", "210db5cc2e03eb06c7769f6054dce0cbdf123b4095eb232de5e8d45745258a80"}
+		if !matchesReleasePin(candidate, os.Getenv("XSP_V2_PRODUCT_WAL_CANDIDATE_PIN")) {
+			t.Fatal("exact reviewed retirement possession candidate required")
+		}
+		g.fixtureEnrollmentCandidate = &candidate
+	}
 	if os.Getenv("XMESH_TEST_INSTALLED_CRASHES") == "1" &&
 		address != "127.0.0.1" && dsn.Path == "/quota_wal_installed" {
 		g.httpClient.Transport = loseCommittedWALReply{dir: dir}

@@ -16,7 +16,7 @@ from quota_v2_installed_namespace_candidate import PROOF, file_digest, reviewed_
 from quota_v2_installed_native_live import ENV, require_live
 
 from quota_v2_retirement_evidence import (
-    LEDGER_DIR, RECORD_DIR, read_private, verify_ledger, verify_record,
+    RECORD_DIR, read_private, verify_ledger, verify_record,
 )
 
 REV = "86a541a90ce7a4f1b50671ed6fde00c15a60bb68"
@@ -105,6 +105,9 @@ def retire_pair(pair, users, panel, db, lab, initial):
     results = parallel(retire, pair)
     latest, = db.execute(clock).fetchone()
     challenges = set()
+    possessions = []
+    from quota_v2_retirement_possession import collect, verify_possession
+    from quota_v2_retired_meter_recovery import historical_snapshot, verify_recovery_pair
     for guest, result, original in zip(pair, results, initial):
         container, started, pid, runtime = original
         anchors = db.execute(
@@ -153,7 +156,9 @@ def retire_pair(pair, users, panel, db, lab, initial):
             streams[filename] = streams.get(filename, b"") + raw
             cursors[filename] = last
         assert len(streams) == seq
-        verify_ledger(read_private(guest, LEDGER_DIR), caps, streams, bytes(inventory),
+        before_signature = historical_snapshot(guest, original)
+        assert before_signature[0] == record
+        verify_ledger(before_signature[1], caps, streams, bytes(inventory),
                       result, guest.node, runtime)
         stopped = json.loads(guest.exec("docker", "inspect", "--type", "container",
                                         "--format", "{{json .}}", container))
@@ -165,12 +170,30 @@ def retire_pair(pair, users, panel, db, lab, initial):
         assert stopped["HostConfig"]["RestartPolicy"]["Name"] == "no"
         assert not guest.exec("ss", "-Hltnp", "sport", "=", ":443").strip()
         assert not guest.exec("ss", "-Hltnp", "sport", "=", ":28401").strip()
+        possession = collect(guest, panel, db, record[name], witness, result, activation)
+        assert historical_snapshot(guest, original) == before_signature, "possession export mutated historical state"
+        possessions.append((record[name], witness, result, activation, possession))
+    assert len({item[4][1] for item in possessions}) == len(pair), "enrolled Node keys must differ"
+    # A valid peer signature cannot stand in for the other enrolled Node.
+    for i, guest in enumerate(pair):
+        archive, witness, result, activation, (raw, node_key, policy_key) = possessions[i]
+        other_raw = possessions[1-i][4][0]
+        try:
+            verify_possession(other_raw, archive, witness, result, guest.node, activation, node_key, policy_key)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError("peer possession accepted for another enrolled Node")
     assert sql_snapshot(db) == before, "historical exit must not refund or issue spend authority"
-    from quota_v2_retired_meter_recovery import verify_recovery_pair
     verify_recovery_pair(pair, panel, initial, lab)
+    for guest, original, (archive, witness, result, activation, possession) in zip(pair, initial, possessions):
+        before_signature = historical_snapshot(guest, original)
+        assert before_signature[0] == {"retired-" + result["runtimeId"] + ".json": archive}
+        assert collect(guest, panel, db, archive, witness, result, activation) == possession
+        assert historical_snapshot(guest, original) == before_signature, "post-reboot export mutated historical state"
     assert sql_snapshot(db) == before, "retired-meter recovery must not release or recreate authority"
     print("PASS: both exact original installed meter pidfds exited under durable complete "
           "signed-roster denial, unchanged committed WAL tails and SQL reserve; "
           "independent raw SQL-to-disk reconstruction and pinned Nexus signature matched "
-          "each immutable private unsigned retirement record; no terminal settlement, "
-          "delivery or refund authority.", flush=True)
+          "each immutable private retirement record; enrolled Node possession signature verified "
+          "before and after reboot; no terminal settlement, delivery or refund authority.", flush=True)

@@ -133,7 +133,8 @@ type gateway struct {
 	internalToken string
 	httpClient    *http.Client
 	// Set only by the disposable Go test fixture, never by production input.
-	releaseTargetVersion string
+	releaseTargetVersion       string
+	fixtureEnrollmentCandidate *releaseIdentity
 }
 
 func fail(w http.ResponseWriter, status int, message string) {
@@ -570,6 +571,16 @@ func releaseAllowedForEnrollment(release releaseIdentity, productionPin, rehears
 		pinnedWALCandidate(release, rehearsalEnabled, rehearsalPin)
 }
 
+// The fixture-only exact candidate identity is never set by a production
+// constructor or an environment variable consumed by the running gateway.
+func (g *gateway) enrollmentReleaseAllowed(release releaseIdentity, productionPin, rehearsalEnabled, rehearsalPin string) bool {
+	if releaseAllowedForEnrollment(release, productionPin, rehearsalEnabled, rehearsalPin) {
+		return true
+	}
+	return g.fixtureEnrollmentCandidate != nil && rehearsalEnabled == "1" &&
+		release == *g.fixtureEnrollmentCandidate && matchesReleasePin(release, rehearsalPin)
+}
+
 func isLowerHex(value string) bool {
 	for i := range len(value) {
 		c := value[i]
@@ -590,7 +601,7 @@ func (g *gateway) enroll(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "invalid strict-PQ enrollment request")
 		return
 	}
-	versionOK := releaseAllowedForEnrollment(req.ReleaseIdentity,
+	versionOK := g.enrollmentReleaseAllowed(req.ReleaseIdentity,
 		os.Getenv("XSP_V2_PRODUCT_AGENT_PIN"), os.Getenv("XMESH_QUOTA_V2_WAL_TRANSPORT"),
 		os.Getenv("XSP_V2_PRODUCT_WAL_CANDIDATE_PIN"))
 	if req.NodeID <= 0 || req.Purpose != "node_request" || req.KeyEpoch != 1 || !versionOK ||
