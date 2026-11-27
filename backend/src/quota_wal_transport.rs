@@ -18,6 +18,9 @@ use std::io::{Read, Write};
 
 mod charge;
 mod public_tls;
+// No runtime route, SQL mutation or permission depends on the archival proof.
+#[cfg(test)]
+mod retirement_possession;
 pub use charge::committed_charge_totals;
 
 pub const PATH: &str = "/api/v1/node/quota-v2/wal";
