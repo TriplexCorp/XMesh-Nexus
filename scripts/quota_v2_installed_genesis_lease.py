@@ -552,7 +552,7 @@ print('verified_without_authority')
     # Fresh signed first-Genesis remote WAL readback, not an assertion
     # that an absent remote index proves an empty host. Every field is
     # independently bound to the original measured process and cap roster.
-    tls_wal_domain = b"XMESH_QUOTA_V2_PUBLIC_TLS_WAL_HEAD_V1\0"
+    tls_wal_domain = b"XMESH_QUOTA_V2_PUBLIC_TLS_WAL_HEAD_V2\0"
 
     def wal_proof_request(scope, measurement):
         return {
@@ -577,7 +577,7 @@ print('verified_without_authority')
         claims = doc["payload"]
         scope, proof = request["proof"]["scope"], request["proof"]
         assert claims["kind"] == "xmesh.quota-v2.public-tls-wal-head"
-        assert claims["schemaVersion"] == 1
+        assert claims["schemaVersion"] == 2
         for name in ("nodeId", "userId", "activationReceiptSha256", "genesisPolicySha256",
                      "runtimeId", "profileRevision", "capRosterSha256"):
             assert claims[name] == scope[name], claims
@@ -592,6 +592,7 @@ print('verified_without_authority')
         assert claims["inventoryTailDigest"] == (
             json.loads(lines[-1])["digest"] if lines else "0"*64)
         assert claims["committedChargeStreamCount"] == 0
+        assert claims["committedChargeHeadsSha256"] == hashlib.sha256(b"[]").hexdigest()
         assert all(claims[name] is False for name in (
             "preBootstrapHistoryCompletenessVerified", "liveMeterVerified",
             "finalMeterVerified", "canServePublic", "canSpend", "canStart", "canResume"))

@@ -339,3 +339,37 @@ candidate-only diagnostics do not add or replace the existing three
 immutable 6.0.37 release evidence artifacts. No production release pin,
 feature flag, positive issuer, TLS listener or production permission
 changes as a result of this test.
+
+### Exact conservative WAL charge heads (V2 domain)
+
+The first-Genesis strict-PQ readback now uses schema 2 and the distinct
+`XMESH_QUOTA_V2_PUBLIC_TLS_WAL_HEAD_V2\0` signature domain. No V1
+downgrade is accepted by the reviewed dormant Node verifier
+`70129491ff521bf3e56d4e8f0e318e79b40cdbe1` (tree `c238418ed5b461cb691f6394101a692d98223f91`).
+Production still has no positive TLS issuer. A committed birth index is
+immutable but subsequent byte intents can append to a previously registered
+stream without changing the index or even the count of charged streams.
+
+Under the original serialized plan, account, lease and WAL anchor locks,
+Nexus selects the latest immutable row for every original stream, validates
+its exact signed charge receipt against the SQL journal digest and matches
+its filename, user, reservation and CDN class to the authenticated original
+cap roster and birth. A canonical byte-sorted-by-filename JSON array of
+`{filename,reservationId,userId,lastSequence,lastDigest,streamBytes,isCdn}`
+records is hashed into `committedChargeHeadsSha256`. Empty arrays hash as
+`[]`. The Node derives that digest independently from the actual complete
+fsynced WAL, measured original cap roster and live counters; *every* local
+stream must have an exact committed head. A signed but lagging snapshot
+with the same birth index, missing charge or changed tail is refused. An
+unauthenticated/expired/foreign response is a different failure, never
+proof of authentic SQL lag.
+
+The additional second real MAIN/CDN loopback transfer in the
+`public-tls-wal-nonempty` scenario leaves the first birth inventory byte
+for byte unchanged. It must reject the authentic signed stale tails,
+submit each newly appended batch exactly once, and accept only then the
+fresh matching signed head; all existing native TLS and installed recovery
+scenarios retain their requirements. This is conservative **intent** equality,
+not proof of delivery, physical writer retirement, terminal settlement or
+authorization to refund. Neither release pin nor any production service,
+installer, flag or public listener changes.
