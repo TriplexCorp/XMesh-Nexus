@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import select
 import socket
 import ssl
@@ -177,8 +178,8 @@ def stop(child):
     child.wait(timeout=5)
 
 
-def child_line(child, prefix):
-    deadline = time.monotonic() + 8
+def child_line(child, prefix, *, match=None, timeout=8):
+    deadline = time.monotonic() + timeout
     buf = getattr(child, "_ci_buf", b"")
     while time.monotonic() < deadline:
         if b"\n" not in buf:
@@ -193,9 +194,33 @@ def child_line(child, prefix):
         line, buf = buf.split(b"\n", 1)
         child._ci_buf = buf
         line = line.decode(errors="replace").strip()
-        if line.startswith(prefix):
+        if (match(line) if match is not None else line.startswith(prefix)):
             return line
     raise AssertionError("missing native phase " + prefix)
+
+
+def wait_native_started(child, *, startup_timeout=2, stability_timeout=1):
+    # The adopted-listener marker precedes Xray core startup, when Go may
+    # still create worker threads. Readiness is not authority: no probe
+    # may transmit bytes until the original full post-transfer proof and
+    # stop monitor check pass. Do not retry a failed security proof.
+    child_line(child, "native core started", timeout=startup_timeout,
+               match=lambda line: re.fullmatch(
+                   r"\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\.\d+ \[Warning\] core: Xray \d+\.\d+\.\d+ started", line) is not None)
+    deadline = time.monotonic() + stability_timeout
+    previous, stable_since = None, None
+    while time.monotonic() < deadline:
+        if child.poll() is not None:
+            raise ValueError("native child exited during startup")
+        threads = tuple(sorted(os.listdir(f"/proc/{child.pid}/task")))
+        assert threads and all(t.isascii() and t.isdecimal() for t in threads)
+        now = time.monotonic()
+        if threads != previous:
+            previous, stable_since = threads, now
+        elif now - stable_since >= 0.15:
+            return
+        time.sleep(0.025)
+    raise ValueError("native startup thread set did not settle before post-transfer proof")
 
 
 def verify_revoked_wire(raw, challenge, args, pinned, wal, guard):
@@ -325,6 +350,7 @@ def supervisor(panel, node, user, tag, identity, echo_port, relay_fd, broker_pid
             line = child_line(child, "xmesh_namespace_candidate_listener:")
             _, port, listener_fd = line.split(":")
             assert int(port) == PORT
+            wait_native_started(child)
             assert native.observe_adopted(child, {tag:int(listener_fd)}) is None
             assert monitor.check_stop_only() is None
             # Actual TLS 1.3 VLESS client in the private supervisor netns;

@@ -49,6 +49,26 @@ class Tests(unittest.TestCase):
             child.stdout.close()
         self.assertEqual(child.returncode, 0)
 
+    def test_post_transfer_startup_wait_requires_core_ready_and_stable_threads(self):
+        def launch(line):
+            return subprocess.Popen([sys.executable,"-c",
+                "import sys,time; print(sys.argv[1],flush=True); time.sleep(2)",line],
+                stdout=subprocess.PIPE,text=True)
+        marker = "2026/11/27 04:14:05.074571 [Warning] core: Xray 26.10.31 started"
+        with launch(marker) as child:
+            try:
+                start = time.monotonic()
+                guest.wait_native_started(child)
+                self.assertGreaterEqual(time.monotonic()-start,0.15)
+            finally:
+                child.kill()
+        with launch(marker+" fake") as child:
+            try:
+                with self.assertRaisesRegex(AssertionError,"missing native phase"):
+                    guest.wait_native_started(child,startup_timeout=0.2)
+            finally:
+                child.kill()
+
     def test_revoked_wire_must_have_exact_nonce_and_actual_signature(self):
         args = dict(node=7, activation="a"*64, genesis_sha="b"*64,
                     runtime_id="c"*64, profile_sha256="d"*64,

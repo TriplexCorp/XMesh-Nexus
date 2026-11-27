@@ -299,6 +299,12 @@ No writable or pathname fallback is allowed.
 It executes the actual attested native frontend in a capless private PID,
 mount and network namespace, checks exclusive bound listener transfer,
 and requires that no witness relay socket or broker pidfd is inherited.
+The second hosted attempt reached actual native listener adoption, but
+the strict post-transfer credential proof detected a changing Go thread
+set and failed closed. The harness now first requires actual core-ready
+output and a bounded stable thread-set observation, with the independent
+deadman already armed, then runs the original unchanged complete
+post-transfer proof once; any failure stops the child before client bytes.
 The actual TLS 1.3 VLESS client sends 16 KiB both directions through each
 MAIN/CDN installed ordinary meter and the unchanged guarded local echo.
 No TLS listener appears in the original network namespace.
