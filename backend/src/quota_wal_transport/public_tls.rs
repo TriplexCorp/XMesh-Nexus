@@ -5,8 +5,8 @@
 //! additionally binds exact committed charge tails, not just stream births. A fresh
 //! signed `empty_remote_history` is deliberately not an ingress authorization.
 use super::{
-    Anchor, Birth, authenticate_runtime, canonical_envelope, conflict, enrolled_key, sha256, signed,
-    verify_witness,
+    Anchor, Birth, authenticate_runtime, canonical_envelope, conflict, enrolled_key, sha256,
+    signed, verify_witness,
 };
 use crate::{
     ApiError, AppState,
@@ -125,9 +125,14 @@ impl ChargeHead {
         let claims = &doc["payload"];
         // The cumulative receipt totals are as of its original commit,
         // NOT the current total across other subsequently charged streams.
-        let total = claims["conservativeWalBytes"].as_i64().ok_or_else(conflict)?;
-        let cdn = claims["conservativeCdnWalBytes"].as_i64().ok_or_else(conflict)?;
-        if total < self.stream_bytes || !(0..=total).contains(&cdn)
+        let total = claims["conservativeWalBytes"]
+            .as_i64()
+            .ok_or_else(conflict)?;
+        let cdn = claims["conservativeCdnWalBytes"]
+            .as_i64()
+            .ok_or_else(conflict)?;
+        if total < self.stream_bytes
+            || !(0..=total).contains(&cdn)
             || (self.is_cdn && cdn < self.stream_bytes)
         {
             return Err(conflict());
@@ -571,7 +576,11 @@ mod tests {
             user_id: 91,
             first_sequence: sequence,
             last_sequence: sequence,
-            last_digest: if sequence == 1 { "2".repeat(64) } else { "3".repeat(64) },
+            last_digest: if sequence == 1 {
+                "2".repeat(64)
+            } else {
+                "3".repeat(64)
+            },
             stream_bytes: sequence * 17,
             is_cdn: false,
             journal_sha256: "4".repeat(64),
@@ -602,9 +611,10 @@ mod tests {
         let email = "xmesh-u91--vless-main";
         let aliases = aliases();
         let signer = test_signer();
-        let validate = |row: Anchor, req: &ProofRequest, charges: &[ChargeHead], key: &SigningKey| {
-            validate_anchor(row, req, &aliases, charges, &key.verifying_key(), &signer)
-        };
+        let validate =
+            |row: Anchor, req: &ProofRequest, charges: &[ChargeHead], key: &SigningKey| {
+                validate_anchor(row, req, &aliases, charges, &key.verifying_key(), &signer)
+            };
 
         let (row, key, filename) = anchor(&req, &req.scope.runtime_id, email);
         let head = signed_head(&req, &signer, &filename, 1);
@@ -698,8 +708,15 @@ mod tests {
         }
         let (row, _, _) = anchor(&req, &req.scope.runtime_id, email);
         assert!(
-            validate_anchor(row, &req, &aliases, &[initial.clone(), initial], &key, &signer)
-                .is_err()
+            validate_anchor(
+                row,
+                &req,
+                &aliases,
+                &[initial.clone(), initial],
+                &key,
+                &signer
+            )
+            .is_err()
         );
     }
 }
